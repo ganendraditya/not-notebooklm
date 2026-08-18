@@ -124,8 +124,12 @@ export default function LeftSidebar({
     <div className="w-[260px] bg-[#171717] flex flex-col h-full text-sm border-r border-white/5 select-none shrink-0">
       {/* Top Header with NotbookLM Logo and Sidebar Toggle */}
       <div className="p-3.5 flex items-center justify-between">
-        {/* Logo NotbookLM */}
-        <div className="flex items-center gap-2 font-bold text-white tracking-tight">
+        {/* Logo NotbookLM (Clickable -> New Chat) */}
+        <div 
+          onClick={onCreateChat}
+          className="flex items-center gap-2 font-bold text-white tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
+          title="New chat"
+        >
           <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm flex items-center justify-center">
             <Sparkles size={14} />
           </div>
