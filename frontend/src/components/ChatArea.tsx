@@ -17,7 +17,8 @@ import {
   Square,
   Clock,
   X,
-  Trash2
+  Trash2,
+  SlidersHorizontal
 } from "lucide-react";
 import { ChatMessage, Document as DocType } from "@/app/ChatClient";
 import ModelSelector from "@/components/ModelSelector";
@@ -462,11 +463,19 @@ const ChatInputBox = memo(function ChatInputBox({
           className="w-full bg-transparent border-0 focus:outline-none resize-none px-2 py-1 text-[15px] text-white placeholder:text-gray-500 max-h-[180px] min-h-[32px] overflow-y-auto overflow-x-hidden leading-relaxed shadow-none box-border"
         />
 
-        {/* Bottom Actions Row (Exact match to Antigravity IDE UI) */}
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04]">
-          {/* Left: ModelSelector */}
-          <div className="flex items-center">
+        {/* Bottom Actions Row (Clean seamlessly integrated row without divider) */}
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          {/* Left: ModelSelector & Filter */}
+          <div className="flex items-center gap-1.5">
             <ModelSelector backendUrl={backendUrl} />
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 hover:text-white transition-colors cursor-pointer shrink-0"
+              title="Filter referensi & pencarian"
+            >
+              <SlidersHorizontal size={11} className="text-gray-400" />
+              <span className="font-medium">Filter</span>
+            </button>
           </div>
 
           {/* Right: Sources Badge and Send/Stop Button */}
@@ -481,11 +490,11 @@ const ChatInputBox = memo(function ChatInputBox({
               <span className="font-medium">{documentsCount} sources</span>
             </button>
 
-            {/* Morphing Send / Stop Button */}
+            {/* Send / Stop Button (Consistent rounded-full circular wrapper) */}
             {isLoading && !input.trim() ? (
               <button 
                 type="button"
-                className="rounded-lg h-7 w-7 bg-[#eb5757] hover:bg-[#ff6b6b] text-white transition-all shrink-0 cursor-pointer shadow-sm flex items-center justify-center animate-in fade-in zoom-in-90 duration-150 border-0 outline-none"
+                className="rounded-full h-7 w-7 bg-[#eb5757] hover:bg-[#ff6b6b] text-white transition-all shrink-0 cursor-pointer shadow-sm flex items-center justify-center animate-in fade-in duration-150 border-0 outline-none"
                 onClick={onStopGeneration}
                 title="Hentikan pembuatan jawaban"
               >
@@ -584,26 +593,24 @@ export default function ChatArea({
       {/* Top Floating Reopen Left Sidebar Button */}
       {!isSidebarOpen && onOpenSidebar && (
         <div className="absolute top-3.5 left-3.5 z-20">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <button 
+            type="button"
             onClick={onOpenSidebar}
-            className="h-8 w-8 text-gray-400 hover:text-white bg-[#282828] hover:bg-[#333333] border border-white/10 rounded-lg shadow-md cursor-pointer"
+            className="h-8 w-8 text-gray-400 hover:text-white bg-[#282828] hover:bg-[#333333] border border-white/10 rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
             title="Buka Sidebar"
           >
             <Sparkles size={16} />
-          </Button>
+          </button>
         </div>
       )}
 
       {/* Top Floating Toggle Sources Button */}
       {!isRightSidebarOpen && onToggleRightSidebar && (
         <div className="absolute top-3.5 right-3.5 z-20">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <button 
+            type="button"
             onClick={onToggleRightSidebar}
-            className="h-8 px-2.5 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-xs text-gray-300 hover:text-white flex items-center gap-1.5 cursor-pointer shadow-md backdrop-blur"
+            className="h-8 px-2.5 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-xs text-gray-300 hover:text-white flex items-center gap-1.5 cursor-pointer shadow-md backdrop-blur transition-colors"
             title="Buka Sources"
           >
             <FileText size={13} className="text-blue-400" />
@@ -613,7 +620,7 @@ export default function ChatArea({
                 {documents.length}
               </span>
             )}
-          </Button>
+          </button>
         </div>
       )}
 
@@ -671,22 +678,21 @@ export default function ChatArea({
                           }}
                         />
                         <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                          <button
+                            type="button"
                             onClick={() => setEditingMessageIdx(null)}
-                            className="h-7 px-3 text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer"
+                            className="h-7 px-3 text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer transition-colors"
                           >
                             Batal
-                          </Button>
-                          <Button
-                            size="sm"
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleSaveEdit(idx)}
                             disabled={!editContent.trim() || isLoading}
-                            className="h-7 px-3.5 text-xs bg-white text-black hover:bg-gray-200 font-medium rounded-lg cursor-pointer shadow"
+                            className="h-7 px-3.5 text-xs bg-white text-black hover:bg-gray-200 font-medium rounded-lg cursor-pointer shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Kirim
-                          </Button>
+                          </button>
                         </div>
                       </div>
                     ) : (

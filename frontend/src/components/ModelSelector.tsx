@@ -20,7 +20,6 @@ const MODEL_GROUPS: ModelGroup[] = [
   {
     id: "gemini-3.7-flash",
     name: "Gemini 3.7 Flash",
-    badge: "Fast",
     tiers: [
       { id: "ag/gemini-3.7-flash-low", name: "Low" },
       { id: "ag/gemini-3.7-flash-medium", name: "Medium" },
@@ -30,7 +29,6 @@ const MODEL_GROUPS: ModelGroup[] = [
   {
     id: "gemini-3.6-flash",
     name: "Gemini 3.6 Flash",
-    badge: "Fast",
     tiers: [
       { id: "ag/gemini-3.6-flash-low", name: "Low" },
       { id: "ag/gemini-3.6-flash-medium", name: "Medium" },
@@ -40,7 +38,6 @@ const MODEL_GROUPS: ModelGroup[] = [
   {
     id: "gemini-3.5-flash",
     name: "Gemini 3.5 Flash",
-    badge: "Fast",
     tiers: [
       { id: "ag/gemini-3.5-flash-extra-low", name: "Extra Low" },
       { id: "ag/gemini-3.5-flash-low", name: "Low" },
@@ -141,20 +138,20 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
     }
   };
 
-  // Compute trigger button display label
-  const getDisplayLabel = () => {
+  // Compute trigger button display info
+  const getDisplayInfo = () => {
     for (const group of MODEL_GROUPS) {
       if (group.tiers) {
         const matchingTier = group.tiers.find(t => t.id === currentModelId);
         if (matchingTier) {
-          return `${group.name} ${matchingTier.name}`;
+          return { groupName: group.name, tierName: matchingTier.name };
         }
       }
       if (group.directModelId === currentModelId) {
-        return group.name;
+        return { groupName: group.name, tierName: null };
       }
     }
-    return "Gemini 3.7 Flash High";
+    return { groupName: "Gemini 3.7 Flash", tierName: "High" };
   };
 
   // Find active tier in a group if any
@@ -186,9 +183,19 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
         className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer group focus:outline-none"
         title="Pilih Model AI"
       >
-        <span className="font-normal text-gray-200 group-hover:text-white truncate max-w-[220px]">
-          {getDisplayLabel()}
-        </span>
+        {(() => {
+          const { groupName, tierName } = getDisplayInfo();
+          return (
+            <span className="font-normal text-gray-200 group-hover:text-white truncate max-w-[220px] flex items-center gap-1.5">
+              <span>{groupName}</span>
+              {tierName && (
+                <span className="text-gray-400 font-normal text-[11.5px] group-hover:text-gray-300 transition-colors">
+                  {tierName}
+                </span>
+              )}
+            </span>
+          );
+        })()}
         <ChevronUp 
           size={13} 
           className={`text-gray-400 group-hover:text-gray-200 transition-transform duration-200 ${isOpen ? "rotate-180 text-blue-400" : ""}`} 
@@ -214,12 +221,6 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
               const isGroupActive = !!activeTier || isDirectActive;
               const isSubmenuOpen = activeSubmenuId === group.id;
 
-              // Display text in menu item
-              let itemLabel = group.name;
-              if (activeTier) {
-                itemLabel = `${group.name} ${activeTier.name}`;
-              }
-
               return (
                 <div 
                   key={group.id} 
@@ -244,8 +245,13 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
                           : "hover:bg-white/[0.06] text-gray-300 hover:text-white font-normal"
                     }`}
                   >
-                    <span className="truncate flex-1">
-                      {itemLabel}
+                    <span className="truncate flex-1 flex items-center gap-1.5">
+                      <span>{group.name}</span>
+                      {activeTier && (
+                        <span className="text-gray-400 font-normal text-[11.5px]">
+                          {activeTier.name}
+                        </span>
+                      )}
                     </span>
 
                     <div className="flex items-center gap-1 shrink-0">
