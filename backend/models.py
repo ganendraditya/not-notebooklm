@@ -5,6 +5,9 @@ from datetime import datetime
 class ChatSessionCreate(BaseModel):
     title: str = "New Chat"
 
+class ChatSessionUpdate(BaseModel):
+    title: str
+
 class ChatSessionResponse(BaseModel):
     id: str
     title: str
@@ -38,3 +41,21 @@ class ChatSessionDetailResponse(ChatSessionResponse):
 
     class Config:
         from_attributes = True
+
+class PaperCandidate(BaseModel):
+    title: str
+    year: Optional[str] = "N/A"
+    doi: Optional[str] = ""
+    url: Optional[str] = ""
+    snippet: Optional[str] = ""
+
+class ImportSourcesRequest(BaseModel):
+    sources: List[PaperCandidate]
+
+class EditMessageRequest(BaseModel):
+    message_index: int
+    message: str
+
+class BulkDeleteRequest(BaseModel):
+    doc_ids: List[int]
+

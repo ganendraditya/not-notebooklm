@@ -1,9 +1,11 @@
 import os
+import uuid
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 
-DATABASE_URL = "sqlite:///./not_notebooklm.db"
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "not_notebooklm.db"))
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -13,7 +15,7 @@ Base = declarative_base()
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
     
-    id = Column(String, primary_key=True, index=True) # UUID string
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())) # UUID string
     title = Column(String, default="New Chat")
     created_at = Column(DateTime, default=datetime.utcnow)
     

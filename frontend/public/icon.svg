@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="notbookGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#1e1b4b" flood-opacity="0.4" />
+    </filter>
+  </defs>
+  
+  <!-- Rounded Base Background -->
+  <rect x="2" y="2" width="28" height="28" rx="7" fill="url(#notbookGradient)" />
+  
+  <!-- Sparkles Shape -->
+  <path d="M16 7 C16 11.5 11.5 16 7 16 C11.5 16 20.5 16 25 C16 20.5 20.5 16 25 16 C20.5 16 16 11.5 16 7 Z" fill="#ffffff" />
+  <circle cx="23.5" cy="8.5" r="1.5" fill="#bae6fd" />
+</svg>

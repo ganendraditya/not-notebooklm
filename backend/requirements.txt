@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+sqlalchemy
+python-multipart
+qdrant-client
+llama-index
+llama-index-vector-stores-qdrant
+llama-index-llms-gemini
+llama-index-embeddings-gemini
+llama-index-llms-groq
+python-dotenv
+requests
+beautifulsoup4
+ddgs
+pymupdf4llm

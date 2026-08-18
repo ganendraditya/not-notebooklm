@@ -2,7 +2,21 @@ node_modules/
 .next/
 dist/
 venv/
+backend/venv/
 __pycache__/
 *.pyc
 .env
+backend/.env
+backend/.env.local
+frontend/.env.local
 .DS_Store
+
+# Runtime data & uploads
+*.db
+*.sqlite
+*.sqlite3
+backend/not_notebooklm.db
+backend/uploads/
+uploads/
+backend/qdrant_data/
+qdrant_data/
