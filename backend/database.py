@@ -1,0 +1,51 @@
+import os
+from datetime import datetime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
+
+DATABASE_URL = "sqlite:///./not_notebooklm.db"
+
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    
+    id = Column(String, primary_key=True, index=True) # UUID string
+    title = Column(String, default="New Chat")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    documents = relationship("Document", back_populates="chat_session")
+    messages = relationship("ChatMessage", back_populates="chat_session", order_by="ChatMessage.created_at")
+
+class Document(Base):
+    __tablename__ = "documents"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(String, ForeignKey("chat_sessions.id"))
+    filename = Column(String, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    chat_session = relationship("ChatSession", back_populates="documents")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(String, ForeignKey("chat_sessions.id"))
+    role = Column(String) # 'user' or 'assistant'
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    chat_session = relationship("ChatSession", back_populates="messages")
+
+Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
