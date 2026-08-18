@@ -33,7 +33,8 @@ os.makedirs("uploads", exist_ok=True)
 @app.post("/chats", response_model=models.ChatSessionResponse)
 def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
     chat_id = str(uuid.uuid4())
-    db_chat = ChatSession(id=chat_id, title=chat.title)
+    now = datetime.utcnow()
+    db_chat = ChatSession(id=chat_id, title=chat.title, created_at=now, updated_at=now)
     db.add(db_chat)
     db.commit()
     db.refresh(db_chat)
@@ -41,7 +42,7 @@ def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
 
 @app.get("/chats", response_model=List[models.ChatSessionResponse])
 def get_chats(db: Session = Depends(get_db)):
-    return db.query(ChatSession).order_by(ChatSession.created_at.desc()).all()
+    return db.query(ChatSession).order_by(ChatSession.updated_at.desc(), ChatSession.created_at.desc()).all()
 
 @app.get("/chats/{chat_id}", response_model=models.ChatSessionDetailResponse)
 def get_chat(chat_id: str, db: Session = Depends(get_db)):
@@ -56,6 +57,7 @@ def update_chat(chat_id: str, update: models.ChatSessionUpdate, db: Session = De
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     chat.title = update.title
+    chat.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(chat)
     return chat
@@ -266,6 +268,8 @@ def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Session =
         db.refresh(db_doc)
         created_docs.append(db_doc)
         
+    db_chat.updated_at = datetime.utcnow()
+    db.commit()
     return created_docs
 
 @app.post("/chats/{chat_id}/message", response_model=models.ChatMessageResponse)
@@ -287,6 +291,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
     # Save User Message
     user_msg = ChatMessage(chat_id=chat_id, role="user", content=query.message)
     db.add(user_msg)
+    db_chat.updated_at = datetime.utcnow()
     db.commit()
     
     # Query RAG with conversation history
@@ -300,6 +305,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
     # Save Assistant Message (persisted in database even on error)
     assistant_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
     db.add(assistant_msg)
+    db_chat.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(assistant_msg)
     
@@ -312,10 +318,8 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     if not db_chat:
         raise HTTPException(status_code=404, detail="Chat not found")
         
-    # Get all existing messages in order
-    all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.id.asc()).all()
-    
     # Delete from message_index onwards in SQLite
+    all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.id.asc()).all()
     if 0 <= req.message_index < len(all_msgs):
         msgs_to_delete = all_msgs[req.message_index:]
         for m in msgs_to_delete:
@@ -335,6 +339,7 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     # Save User's Edited Message
     user_msg = ChatMessage(chat_id=chat_id, role="user", content=req.message)
     db.add(user_msg)
+    db_chat.updated_at = datetime.utcnow()
     db.commit()
     
     # Query RAG with updated conversation history
@@ -348,6 +353,7 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     # Save Assistant Response
     assistant_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
     db.add(assistant_msg)
+    db_chat.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(assistant_msg)
     

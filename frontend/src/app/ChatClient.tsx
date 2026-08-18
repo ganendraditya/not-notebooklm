@@ -10,6 +10,7 @@ export interface ChatSession {
   id: string;
   title: string;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Document {
@@ -32,6 +33,16 @@ export default function ChatClient() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   
   const backendUrl = "http://localhost:8000";
+
+  const bumpSessionToTop = (chatId: string) => {
+    setSessions(prev => {
+      const idx = prev.findIndex(s => s.id === chatId);
+      if (idx <= 0) return prev; // Already at top or not found
+      const target = { ...prev[idx], updated_at: new Date().toISOString() };
+      const rest = prev.filter((_, i) => i !== idx);
+      return [target, ...rest];
+    });
+  };
 
   // Fetch all sessions on mount
   useEffect(() => {
@@ -151,6 +162,7 @@ export default function ChatClient() {
       if (!currentChatId) {
         currentChatId = await handleEnsureChatSession(nextMessage);
       }
+      bumpSessionToTop(currentChatId);
 
       const res = await fetch(`${backendUrl}/chats/${currentChatId}/message`, {
         method: "POST",
@@ -226,6 +238,7 @@ export default function ChatClient() {
       setIsLoading(false);
       return;
     }
+    bumpSessionToTop(currentChatId);
 
     // Optimistically update message list: keep messages up to messageIndex, replace at messageIndex, remove subsequent responses
     const updatedUserMsg: ChatMessage = { role: "user", content: newContent, created_at: new Date().toISOString() };

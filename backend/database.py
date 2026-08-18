@@ -18,6 +18,7 @@ class ChatSession(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())) # UUID string
     title = Column(String, default="New Chat")
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     documents = relationship("Document", back_populates="chat_session")
     messages = relationship("ChatMessage", back_populates="chat_session", order_by="ChatMessage.created_at")
@@ -44,6 +45,19 @@ class ChatMessage(Base):
     chat_session = relationship("ChatSession", back_populates="messages")
 
 Base.metadata.create_all(bind=engine)
+
+# Auto-migrate columns if missing in SQLite
+try:
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        res = conn.execute(text("PRAGMA table_info(chat_sessions)")).fetchall()
+        cols = [r[1] for r in res]
+        if "updated_at" not in cols:
+            conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN updated_at DATETIME"))
+            conn.execute(text("UPDATE chat_sessions SET updated_at = created_at WHERE updated_at IS NULL"))
+            conn.commit()
+except Exception as e:
+    print(f"[DB Migration Warning]: {e}")
 
 def get_db():
     db = SessionLocal()
