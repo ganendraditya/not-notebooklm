@@ -107,23 +107,19 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
         return default_plan
 
     try:
-        # Context extraction from recent conversation turns
+        # Context extraction from recent conversation turns (Leverage 1M+ token context window)
         context_str = ""
         if history:
             hist_snippets = []
-            for m in history[-8:]:
+            for m in history:
                 role_name = getattr(m, 'role', '')
                 if role_name == MessageRole.USER or role_name == 'user':
-                    hist_snippets.append(f"User: {m.content[:400]}")
+                    hist_snippets.append(f"User: {m.content}")
                 elif role_name == MessageRole.ASSISTANT or role_name == 'assistant':
                     clean_c = m.content.split('<!-- SOURCES_DATA')[0].strip()
-                    # Strip massive list to preserve key topic keywords in context
-                    lines = clean_c.split('\n')
-                    compact_lines = [l for l in lines if not re.match(r'^\s*\d+\.\s+', l) and not l.startswith('    Metode:')]
-                    clean_summary = "\n".join(compact_lines[:15])
-                    hist_snippets.append(f"Assistant: {clean_summary[:400]}")
+                    hist_snippets.append(f"Assistant: {clean_c}")
             if hist_snippets:
-                context_str = "\nPrevious Conversation Context:\n" + "\n".join(hist_snippets) + "\n\n"
+                context_str = "\nPrevious Full Conversation History:\n" + "\n\n".join(hist_snippets) + "\n\n"
 
         prompt = (
             "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\n"

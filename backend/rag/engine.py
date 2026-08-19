@@ -398,7 +398,7 @@ async def query_chat(
                         "Inform the user you can help them analyze research papers, find scholarly sources, extract insights, and answer academic questions."
                     )
                 ),
-                *(formatted_history[-4:] if formatted_history else []),
+                *(formatted_history if formatted_history else []),
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
             await report_status("Thinking...")
@@ -417,7 +417,7 @@ async def query_chat(
                         "Jika pengguna menanyakan berapa dokumen yang relevan dengan topik tertentu (misal: 'berapa yang bahas Prabowo?'), periksa daftar nama dokumen di atas, hitung secara akurat, dan sebutkan nomor referensinya."
                     )
                 ),
-                *(formatted_history[-4:] if formatted_history else []),
+                *(formatted_history if formatted_history else []),
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
             await report_status("Checking loaded workspace documents...")
@@ -483,7 +483,7 @@ async def query_chat(
 
             synth_msgs = [
                 LlamaChatMessage(role=MessageRole.SYSTEM, content=synthesis_prompt),
-                *(formatted_history[-4:] if formatted_history else []),
+                *(formatted_history if formatted_history else []),
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
             
@@ -558,7 +558,7 @@ async def query_chat(
             )
             chat_msgs = [
                 system_msg,
-                *(formatted_history[-8:] if formatted_history else []),
+                *(formatted_history if formatted_history else []),
                 context_msg,
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
