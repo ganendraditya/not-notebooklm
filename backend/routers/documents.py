@@ -512,10 +512,12 @@ async def bulk_download_stream(chat_id: str, req: models.BulkDeleteRequest, db: 
                             seen_names.add(base_name)
                             zf.writestr(base_name, pdf_bytes)
                         
+                        calc_percent = round((processed_count / max(1, total_count)) * 100)
                         queue.put_nowait({
                             "type": "progress",
                             "current": processed_count,
                             "total": total_count,
+                            "percent": calc_percent,
                             "filename": orig_fn
                         })
             
@@ -523,6 +525,7 @@ async def bulk_download_stream(chat_id: str, req: models.BulkDeleteRequest, db: 
                 "type": "complete",
                 "task_id": task_id,
                 "total": total_count,
+                "percent": 100,
                 "download_url": f"/chats/{chat_id}/documents/download_zip/{task_id}"
             })
             queue.put_nowait(None)

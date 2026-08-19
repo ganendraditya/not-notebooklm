@@ -491,11 +491,14 @@ export default function RightSidebar({
                   currentFile: "Starting parallel archive build..."
                 });
               } else if (data.type === "progress") {
+                const calculatedPercent = typeof data.percent === "number" 
+                  ? data.percent 
+                  : (data.total > 0 ? Math.round((data.current / data.total) * 100) : 0);
                 setDownloadTask(prev => ({
                   status: "zipping",
                   total: data.total || docIds.length,
                   current: data.current,
-                  percent: data.percent,
+                  percent: calculatedPercent,
                   currentFile: data.filename || prev?.currentFile || ""
                 }));
               } else if (data.type === "complete") {
