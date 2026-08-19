@@ -27,16 +27,30 @@ from .search import search_academic_papers
 
 load_dotenv()
 
-# Setup Qdrant Client (Local Disk)
-QDRANT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "qdrant_data"))
-os.makedirs(QDRANT_PATH, exist_ok=True)
-try:
-    qdrant_client = QdrantClient(path=QDRANT_PATH, force_disable_check_same_thread=True)
-except Exception:
+# Setup Qdrant Client (Supports Remote Server / Docker or Local Disk fallback)
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+if QDRANT_URL:
     try:
-        qdrant_client = QdrantClient(path=QDRANT_PATH)
+        qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+        logger.info(f"[Qdrant] Connected to remote server at {QDRANT_URL}")
+    except Exception as e:
+        logger.warning(f"[Qdrant] Failed connecting to remote URL {QDRANT_URL}: {e}. Falling back to disk.")
+        QDRANT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "qdrant_data"))
+        os.makedirs(QDRANT_PATH, exist_ok=True)
+        qdrant_client = QdrantClient(path=QDRANT_PATH, force_disable_check_same_thread=True)
+else:
+    QDRANT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "qdrant_data"))
+    os.makedirs(QDRANT_PATH, exist_ok=True)
+    try:
+        qdrant_client = QdrantClient(path=QDRANT_PATH, force_disable_check_same_thread=True)
     except Exception:
-        qdrant_client = QdrantClient(location=":memory:")
+        try:
+            qdrant_client = QdrantClient(path=QDRANT_PATH)
+        except Exception:
+            qdrant_client = QdrantClient(location=":memory:")
+
 collection_name = "not_notebooklm"
 
 vector_store = QdrantVectorStore(client=qdrant_client, collection_name=collection_name, path=None, url=None, api_key=None)
