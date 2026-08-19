@@ -222,10 +222,7 @@ export default function ChatArea({
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-start gap-4">
-                      <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                        <Sparkles size={16} className="text-blue-400" />
-                      </div>
+                    <div className="flex items-start">
                       <div className="flex-1 min-w-0">
                         <InChatMessageComponent 
                           msg={msg}
@@ -263,13 +260,9 @@ export default function ChatArea({
               ))}
 
               {isLoading && (
-                <div className="flex items-start gap-4 animate-in fade-in duration-200">
-                  <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center shrink-0 mt-0.5">
-                    <Loader2 size={16} className="text-blue-400 animate-spin" />
-                  </div>
-                  <div className="flex items-center gap-2 text-gray-400 text-sm py-1.5">
-                    <span>{activeStatus || "Analyzing and generating response..."}</span>
-                  </div>
+                <div className="flex items-center gap-2.5 text-gray-400 text-sm py-1.5 animate-in fade-in duration-200">
+                  <Loader2 size={16} className="text-blue-400 animate-spin shrink-0" />
+                  <span>{activeStatus || "Analyzing and generating response..."}</span>
                 </div>
               )}
 
