@@ -548,14 +548,14 @@ Output ONLY the category name.
 
     try:
         print(f"[RAG Engine] Attempting query with primary LLM: {primary_name}")
-        return await execute_agent(active_llm, timeout_sec=35.0)
+        return await execute_agent(active_llm, timeout_sec=90.0)
     except Exception as e:
         err_str = str(e)
         if fallback_llm and fallback_llm != active_llm:
             print(f"[RAG Fallback] {primary_name} failed or timed out: {err_str}")
             print(f"[RAG Fallback] -> Automatically falling back to {fallback_name}...")
             try:
-                return await execute_agent(fallback_llm, timeout_sec=45.0)
+                return await execute_agent(fallback_llm, timeout_sec=90.0)
             except Exception as fb_err:
                 print(f"[RAG Fallback] {fallback_name} also failed: {fb_err}")
                 raise fb_err
