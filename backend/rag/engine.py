@@ -364,13 +364,16 @@ async def query_chat(
 
     def is_simple_conversational(text: str) -> bool:
         t = text.lower().strip()
+        # Clean Indonesian slang prefix/suffix
+        clean_g = re.sub(r'^(halo|hai|hi|hello|woi|oy|hey|hei|p|bro|bos|min|assalamualaikum)\s+', '', t).strip()
         greetings = [
             "halo", "hai", "hi", "hello", "pagi", "siang", "sore", "malam",
             "terima kasih", "makasih", "thanks", "thank you", "siapa kamu",
             "bisa apa", "kamu siapa", "tes", "test", "ping", "bisa bantu apa",
-            "woi", "oy", "hey", "hei", "p", "bro", "bos", "min"
+            "woi", "oy", "hey", "hei", "p", "bro", "bos", "min", "apa kabar",
+            "gimana kabarnya", "kabar apa", "sehat"
         ]
-        if any(t == g or t.startswith(g + " ") or t.endswith(" " + g) or t.startswith(g + "!") or t.startswith(g + "?") for g in greetings) and len(t.split()) <= 4:
+        if (any(t == g or t.startswith(g + " ") or t.endswith(" " + g) or t.startswith(g + "!") or t.startswith(g + "?") for g in greetings) or clean_g in greetings) and len(t.split()) <= 4:
             return True
         return False
 
@@ -393,9 +396,9 @@ async def query_chat(
                 LlamaChatMessage(
                     role=MessageRole.SYSTEM,
                     content=(
-                        "You are NotbookLM, a helpful, intelligent personal research assistant. "
-                        "Respond to greetings politely, warmly, and concisely in Indonesian. "
-                        "Inform the user you can help them analyze research papers, find scholarly sources, extract insights, and answer academic questions."
+                        "Anda adalah NotbookLM, asisten riset AI yang cerdas, ramah, dan solutif (seperti Google NotebookLM). "
+                        "Jawab sapaan pengguna dengan gaya bahasa Indonesia yang natural, hangat, dan santun. "
+                        "Sebutkan bahwa Anda siap membantu menelusuri paper ilmiah, menganalisis dokumen yang diunggah, atau mengekstrak wawasan riset."
                     )
                 ),
                 *(formatted_history if formatted_history else []),
@@ -470,15 +473,19 @@ async def query_chat(
 
             synthesis_prompt = (
                 "Anda adalah NotbookLM, asisten riset dan kurator literatur ilmiah terpercaya. "
-                "Gunakan BAHASA INDONESIA yang baku, profesional, dan komprehensif.\n\n"
-                f"Pengguna meminta penelusuran paper dengan topik:\n\"{query}\"\n\n"
-                f"Sistem telah berhasil mengumpulkan {len(papers)} paper akademik terverifikasi (kategori Open Access/jurnal bereputasi).\n\n"
-                f"Berikut adalah sampel representatif dari hasil pencarian:\n{papers_context}\n\n"
-                "TUGAS ANDA:\n"
-                "1. Berikan pengantar ramah dan laporkan secara transparan jumlah paper yang berhasil ditemukan (misal: 'Ditemukan X paper...').\n"
-                "2. Berikan sintesis ringkas (3-4 poin mendalam) mengenai tren riset, variasi metodologi, dan pola temuan dari paper-paper tersebut.\n"
-                "3. Beritahukan pengguna bahwa seluruh paper lengkap beserta tautan DOI dan tombol impor telah dimuat pada panel Sumber/Kartu di bawah, sehingga mereka dapat menambahkannya ke workspace dalam satu klik.\n"
-                "4. DILARANG KERAS menyuruh pengguna mencari sendiri di web lain atau mengetik kode manual!"
+                "Gunakan BAHASA INDONESIA yang komunikatif, cerdas, solutif, dan jujur secara transparan.\n\n"
+                f"Pengguna meminta penelusuran paper dengan topik/permintaan:\n\"{query}\"\n\n"
+                f"Status Pencarian Sistem: Dari repositori ilmiah terverifikasi (OpenAlex, Europe PMC, Crossref), sistem berhasil menyaring dan memvalidasi sebanyak {len(papers)} paper Open Access yang benar-benar relevan, bermutu, dan terindeks.\n\n"
+                f"Daftar sampel representatif:\n{papers_context}\n\n"
+                "PANDUAN KOMUNIKASI & SINTESIS (MIRIP GOOGLE NOTEBOOKLM):\n"
+                "1. Transparansi & Kejujuran Volume:\n"
+                "   - Jika pengguna meminta jumlah yang sangat banyak (misal 50 atau 100 paper) tetapi sistem hanya menemukan/menyiapkan {len(papers)} paper yang benar-benar lolos filter relevansi dan Open Access: JELASKAN DENGAN JUJUR dan santun bahwa sistem menyajikan {len(papers)} paper terbaik dan paling terverifikasi agar tidak memasukkan paper sampah/tidak relevan.\n"
+                "   - Berikan tawaran solutif jika pengguna ingin memperluas pencarian (misal: 'Jika ingin menambah lagi, kita bisa memperluas ke domain spesifik tertentu atau menyertakan preprint/jurnal non-OA').\n"
+                "2. Sintesis Tren Riset & Wawasan Mendalam:\n"
+                "   - Buat 3-4 poin sintesis yang mengelompokkan paper berdasarkan metodologi/domain (misal: Multimodal, Transformer, Domain Aplikasi Klinis/Fintech).\n"
+                "3. Arahan Tindak Lanjut:\n"
+                "   - Beritahu pengguna bahwa seluruh {len(papers)} paper sudah disiapkan pada Kartu Sumber (Outside Sources) di bawah pesan ini dan bisa langsung diimpor ke workspace dalam satu klik.\n"
+                "4. DILARANG KERAS bersikap kaku atau menyuruh pengguna mencari sendiri di Google Scholar / menulis kode manual!"
             )
 
             synth_msgs = [
