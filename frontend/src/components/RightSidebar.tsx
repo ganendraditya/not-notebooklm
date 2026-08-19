@@ -684,23 +684,41 @@ export default function RightSidebar({
             </div>
 
             {/* Journal / Venue & Quality Metrics */}
-            <div className="flex items-center justify-between pt-1 text-xs">
-              <div>
-                <p className="font-semibold text-gray-200 text-[12px]">{journalName}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[11px] text-gray-400 font-medium">{paperDetails?.journal_metric || "Peer-Reviewed"}</span>
+            {isLoadingDetails ? (
+              <div className="flex items-center justify-between pt-1 text-xs animate-pulse">
+                <div className="space-y-1.5">
+                  <div className="h-3.5 w-32 bg-white/10 rounded" />
+                  <div className="h-3 w-20 bg-white/5 rounded" />
+                </div>
+                <div className="space-y-1.5 text-right flex flex-col items-end">
+                  <div className="h-3.5 w-10 bg-white/10 rounded" />
+                  <div className="h-3 w-12 bg-white/5 rounded" />
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <div>
+                  <p className="font-semibold text-gray-200 text-[12px]">{journalName}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-[11px] text-gray-400 font-medium">{paperDetails?.journal_metric || "Peer-Reviewed"}</span>
+                  </div>
+                </div>
 
-              {/* Citations Count */}
-              <div className="text-right">
-                <span className="text-xs font-semibold text-gray-300">{citationsCount}</span>
-                <p className="text-[10.5px] text-gray-400">Citations</p>
+                {/* Citations Count */}
+                <div className="text-right">
+                  <span className="text-xs font-semibold text-gray-300">{citationsCount}</span>
+                  <p className="text-[10.5px] text-gray-400">Citations</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* DOI Row with Copy Button */}
-            {doiStr && (
+            {isLoadingDetails ? (
+              <div className="flex items-center gap-2 pt-0.5 animate-pulse">
+                <div className="h-3 w-7 bg-white/5 rounded" />
+                <div className="h-3 w-36 bg-white/10 rounded" />
+              </div>
+            ) : doiStr ? (
               <div className="flex items-center gap-1.5 text-[11px] text-gray-400 pt-0.5">
                 <span className="font-medium text-gray-500">DOI</span>
                 <span className="font-mono text-gray-300 truncate">{doiStr}</span>
@@ -712,19 +730,21 @@ export default function RightSidebar({
                   {copiedDoi ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                 </button>
               </div>
-            )}
+            ) : null}
 
             {/* Open Access vs Closed Access Verification Badge */}
             <div className="pt-1">
-              {paperDetails?.is_oa ? (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  <span>Open Access · Full Original PDF Available</span>
+              {isLoadingDetails ? (
+                <div className="h-6 w-28 rounded-lg bg-white/10 animate-pulse" />
+              ) : paperDetails?.is_oa ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span>Open Access</span>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                  <span>Closed Access / Paywalled · Publisher Abstract & Metadata</span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  <span>Closed Access</span>
                 </div>
               )}
             </div>
@@ -734,9 +754,18 @@ export default function RightSidebar({
 
             {/* Abstract / Overview Section */}
             {isLoadingDetails ? (
-              <div className="py-16 flex flex-col items-center justify-center text-center space-y-3">
-                <Loader2 size={24} className="animate-spin text-blue-400" />
-                <p className="text-xs text-gray-400">Loading academic paper overview...</p>
+              <div className="space-y-3 pt-1 animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="h-3.5 w-24 bg-white/10 rounded" />
+                  <div className="h-3.5 w-20 bg-white/5 rounded" />
+                </div>
+                <div className="space-y-2 pt-1">
+                  <div className="h-3.5 bg-white/10 rounded w-full" />
+                  <div className="h-3.5 bg-white/10 rounded w-11/12" />
+                  <div className="h-3.5 bg-white/10 rounded w-full" />
+                  <div className="h-3.5 bg-white/10 rounded w-4/5" />
+                  <div className="h-3.5 bg-white/10 rounded w-3/4" />
+                </div>
               </div>
             ) : paperDetails?.abstract_type === "ai_summary" ? (
               /* AI Synthesis / Executive Summary Card with Disclaimer */
@@ -868,10 +897,13 @@ export default function RightSidebar({
         )}
 
         {/* 4. Consensus-style Bottom Floating Action Toolbar */}
-        <div className="p-3 border-t border-white/10 bg-[#161719] flex items-center justify-between gap-1.5 shrink-0 select-none">
+        <div className={`p-3 border-t border-white/10 bg-[#161719] flex items-center justify-between gap-1.5 shrink-0 select-none transition-opacity ${
+          isLoadingDetails ? "opacity-40 pointer-events-none" : "opacity-100"
+        }`}>
           <div className="flex items-center gap-1.5">
             {/* Ask Button (Pill) */}
             <button
+              disabled={isLoadingDetails}
               onClick={() => {
                 if (viewingDoc && onAskAboutDocument) {
                   onAskAboutDocument(viewingDoc, paperDetails?.title || viewingDoc.filename);
@@ -881,7 +913,7 @@ export default function RightSidebar({
                   chatInput.focus();
                 }
               }}
-              className="h-8 px-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              className="h-8 px-3 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:cursor-not-allowed"
               title="Ask AI questions specifically about this paper"
             >
               <MessageSquare size={13} />
@@ -890,8 +922,9 @@ export default function RightSidebar({
 
             {/* Multi-Format Cite Button (Opens Interactive Citation Modal) */}
             <button
+              disabled={isLoadingDetails}
               onClick={() => setIsCiteModalOpen(true)}
-              className="h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/10 disabled:opacity-50 border border-white/10 text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed"
               title="Cite paper (APA, IEEE, Harvard, MLA, Chicago, BibTeX, RIS)"
             >
               <Quote size={13} />
@@ -900,8 +933,9 @@ export default function RightSidebar({
 
             {/* Copy Link Icon Button */}
             <button
+              disabled={isLoadingDetails || !landingUrl}
               onClick={() => copyToClipboard(landingUrl, "link")}
-              className="w-8 h-8 rounded-full hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-full hover:bg-white/10 disabled:opacity-50 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed"
               title={copiedLink ? "Link Copied!" : "Copy Paper Link"}
             >
               {copiedLink ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}
@@ -910,9 +944,11 @@ export default function RightSidebar({
             {/* Download Icon Button */}
             {activeChatId && (
               <a
-                href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
+                href={isLoadingDetails ? undefined : `${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
                 download={viewingDoc.filename}
-                className="w-8 h-8 rounded-full hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                className={`w-8 h-8 rounded-full hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors ${
+                  isLoadingDetails ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
                 title="Download original document"
               >
                 <Download size={14} />
@@ -925,10 +961,12 @@ export default function RightSidebar({
             const pdfLink = landingUrl || `https://scholar.google.com/scholar?q=${encodeURIComponent(title)}`;
             return (
               <a
-                href={pdfLink}
+                href={isLoadingDetails ? undefined : pdfLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-gray-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                className={`h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-gray-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 ${
+                  isLoadingDetails ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
                 title={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"}
               >
                 <ExternalLink size={12} />
