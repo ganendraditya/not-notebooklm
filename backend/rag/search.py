@@ -367,6 +367,21 @@ def search_academic_papers_planned(
         if any(j in full for j in junk_topics):
             return False
 
+        # Strict entity validation for focused subject queries (e.g. Prabowo, Jokowi, COVID, etc.)
+        subject_keywords = []
+        for q_src in [en_query, id_query]:
+            clean_q = re.sub(r'\b(sentiment|sentimen|analysis|analisis|classification|klasifikasi|mining|study|studi|jurnal|paper|makalah|indonesia|public|publik)\b', '', q_src, flags=re.I)
+            words = [w.strip().lower() for w in clean_q.split() if len(w.strip()) >= 3]
+            for w in words:
+                if w not in subject_keywords:
+                    subject_keywords.append(w)
+
+        if subject_keywords:
+            # If the user specified distinctive subject keywords, at least one must match the candidate
+            has_subject = any(sk in full for sk in subject_keywords)
+            if not has_subject:
+                return False
+
         if any(k in en_query.lower() or k in id_query.lower() for k in ["sentiment", "sentimen", "opinion", "opini"]):
             sentiment_keys = [
                 "sentiment", "sentimen", "opinion", "opini", "ulasan", 

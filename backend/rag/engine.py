@@ -467,7 +467,10 @@ Output ONLY the category name.
                 if os.path.exists(fpath):
                     try:
                         with open(fpath, "r", encoding="utf-8", errors="ignore") as fp:
-                            content_snippet = fp.read()[:4000]
+                            raw_text = fp.read()
+                            # Efficient context compression when loading large document sets (> 15 docs)
+                            max_chars = 1200 if len(local_docs) > 20 else 3000
+                            content_snippet = raw_text[:max_chars]
                     except Exception:
                         content_snippet = f"(Nama file: {fname})"
                 else:
