@@ -34,6 +34,7 @@ from .engine import (
     qdrant_client,
     create_llm_instances,
     ingest_document_text,
+    ingest_documents_batch,
     ingest_document,
     web_search_and_ingest,
     fetch_and_ingest_doi,

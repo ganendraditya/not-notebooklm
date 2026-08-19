@@ -101,11 +101,14 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     setUserSelectionOverrides(updated);
   };
 
+  const [importedCount, setImportedCount] = useState<number>(0);
+
   const handleImport = async () => {
     const toImport = sources.filter((src, i) => isSourceChecked(src, i));
     if (toImport.length === 0) return;
 
     setIsImporting(true);
+    setImportedCount(0);
     try {
       let currentChatId = activeChatId;
       if (!currentChatId && onEnsureChatSession) {
@@ -122,6 +125,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         const createdDocs = await res.json();
         if (createdDocs && createdDocs.length > 0) {
           createdDocs.forEach((d: DocType) => onDocumentAdded?.(d));
+          setImportedCount(createdDocs.length);
         }
         setIsImported(true);
       }
@@ -332,12 +336,12 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                   {isImporting ? (
                     <>
                       <Loader2 size={12} className="animate-spin" />
-                      <span>Adding...</span>
+                      <span>Adding {selectedCount} sources...</span>
                     </>
                   ) : isImported ? (
                     <>
-                      <Check size={12} />
-                      <span>Added to sources</span>
+                      <Check size={12} className="text-emerald-300" />
+                      <span>Added {importedCount || selectedCount} sources</span>
                     </>
                   ) : (
                     <>

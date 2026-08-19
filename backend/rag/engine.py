@@ -133,7 +133,21 @@ def ingest_document_text(text: str, filename: str, chat_id: str):
         text=text,
         metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
     )
-    VectorStoreIndex.from_documents([doc], vector_store=vector_store, show_progress=True)
+    VectorStoreIndex.from_documents([doc], vector_store=vector_store, show_progress=False)
+    return True
+
+def ingest_documents_batch(doc_items: List[tuple]):
+    """Batch ingests multiple (text, filename, chat_id) into Qdrant in a single embedding call."""
+    if not doc_items:
+        return True
+    docs = [
+        Document(
+            text=text,
+            metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
+        )
+        for text, filename, chat_id in doc_items
+    ]
+    VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
     return True
 
 def ingest_document(file_path: str, chat_id: str):

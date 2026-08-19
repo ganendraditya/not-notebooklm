@@ -67,49 +67,51 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
 
     allowed_sources = novel_sources[:remaining_slots]
     
-    # Process multiple sources concurrently with Semaphore
-    sem = asyncio.Semaphore(10)
+    # 1. Prepare batch metadata and disk files concurrently
+    docs_to_ingest = []
     created_docs = []
 
-    async def process_single_paper(paper):
-        async with sem:
-            filename = sanitize_paper_filename(paper.title)
-            abstract_text = paper.snippet.strip()
-            
-            doc_text = f"# {paper.title} ({paper.year})\n\n"
-            if paper.doi:
-                doc_text += f"**DOI:** {paper.doi}  \n"
-            if paper.url:
-                doc_text += f"**URL:** {paper.url}  \n\n"
-            doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
+    def prepare_paper_file(paper):
+        filename = sanitize_paper_filename(paper.title)
+        abstract_text = paper.snippet.strip()
+        
+        doc_text = f"# {paper.title} ({paper.year})\n\n"
+        if paper.doi:
+            doc_text += f"**DOI:** {paper.doi}  \n"
+        if paper.url:
+            doc_text += f"**URL:** {paper.url}  \n\n"
+        doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
 
-            save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
-            
-            try:
-                await asyncio.to_thread(rag.ingest_document_text, doc_text, filename, chat_id)
-                # Fast synthetic PDF creation for instant indexing without blocking HTTP scrapes
-                pdf_bytes = await asyncio.to_thread(
-                    pdf_exporter.generate_academic_pdf_bytes,
-                    title=paper.title,
-                    authors=[],
-                    year=str(paper.year or ""),
-                    journal="Academic Research Publication",
-                    journal_metric="Peer-Reviewed",
-                    doi=paper.doi or "",
-                    abstract=abstract_text,
-                    url=paper.url or ""
-                )
-                with open(save_path, "wb") as f:
-                    f.write(pdf_bytes)
-            except Exception as e:
-                logger.warning(f"[Import Source Warning]: {e}")
+        save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
+        try:
+            pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
+                title=paper.title,
+                authors=[],
+                year=str(paper.year or ""),
+                journal="Academic Research Publication",
+                journal_metric="Peer-Reviewed",
+                doi=paper.doi or "",
+                abstract=abstract_text,
+                url=paper.url or ""
+            )
+            with open(save_path, "wb") as f:
+                f.write(pdf_bytes)
+        except Exception as e:
+            logger.warning(f"[PDF Creation Warning]: {e}")
 
-            return filename
+        return (doc_text, filename, chat_id)
 
-    # Run batch ingestion concurrently
-    saved_filenames = await asyncio.gather(*(process_single_paper(p) for p in allowed_sources))
+    # Disk files prepared in thread pool
+    docs_to_ingest = await asyncio.gather(*(asyncio.to_thread(prepare_paper_file, p) for p in allowed_sources))
 
-    for fname in saved_filenames:
+    # 2. Single batch vector embedding into Qdrant (1 single API call instead of 50 separate calls)
+    try:
+        await asyncio.to_thread(rag.ingest_documents_batch, docs_to_ingest)
+    except Exception as e:
+        logger.warning(f"[Batch Vector Ingestion Warning]: {e}")
+
+    # 3. Database commit
+    for _, fname, _ in docs_to_ingest:
         db_doc = Document(chat_id=chat_id, filename=fname)
         db.add(db_doc)
         created_docs.append(db_doc)
