@@ -128,7 +128,7 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
         setCurrentModelId(modelId);
         setIsOpen(false);
         setActiveSubmenuId(null);
-        setNotification(`Aktif: ${displayName}`);
+        setNotification(`Active: ${displayName}`);
         setTimeout(() => setNotification(null), 2500);
       }
     } catch (err) {
@@ -181,7 +181,7 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
           });
         }}
         className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer group focus:outline-none"
-        title="Pilih Model AI"
+        title="Select AI Model"
       >
         {(() => {
           const { groupName, tierName } = getDisplayInfo();

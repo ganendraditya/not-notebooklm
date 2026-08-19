@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { ChatMessage, Document as DocType } from "@/app/ChatClient";
 import ModelSelector from "@/components/ModelSelector";
+import SearchFilterPopover, { SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/components/SearchFilterPopover";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -108,7 +109,7 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
     try {
       let currentChatId = activeChatId;
       if (!currentChatId && onEnsureChatSession) {
-        currentChatId = await onEnsureChatSession(toImport[0]?.title || "Riset Paper");
+        currentChatId = await onEnsureChatSession(toImport[0]?.title || "Research Paper");
       }
       if (!currentChatId) return;
 
@@ -265,7 +266,7 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 shrink-0"
                               >
-                                <span>{src.doi ? `DOI: ${src.doi}` : "Link Jurnal"}</span>
+                                <span>{src.doi ? `DOI: ${src.doi}` : "Journal Link"}</span>
                                 <ExternalLink size={10} />
                               </a>
                             ) : src.doi ? (
@@ -357,6 +358,8 @@ const ChatInputBox = memo(function ChatInputBox({
   backendUrl
 }: ChatInputBoxProps) {
   const [input, setInput] = useState("");
+  const [filter, setFilter] = useState<SearchFilterState>(DEFAULT_SEARCH_FILTER);
+  const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-resize textarea height smoothly as text wraps/expands
@@ -413,7 +416,7 @@ const ChatInputBox = memo(function ChatInputBox({
                     type="button"
                     onClick={() => onPromoteQueuedPrompt?.(qIdx)}
                     className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                    title="Alihkan & proses sekarang (hentikan tugas saat ini)"
+                    title="Switch & process now (stop current task)"
                   >
                     <ArrowRight size={14} className="text-blue-400" />
                   </button>
@@ -425,7 +428,7 @@ const ChatInputBox = memo(function ChatInputBox({
                       textareaRef.current?.focus();
                     }}
                     className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                    title="Edit pesan antrean"
+                    title="Edit queued message"
                   >
                     <Pencil size={13} />
                   </button>
@@ -433,7 +436,7 @@ const ChatInputBox = memo(function ChatInputBox({
                     type="button"
                     onClick={() => onRemoveQueuedPrompt?.(qIdx)}
                     className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
-                    title="Hapus dari antrean"
+                    title="Remove from queue"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -458,33 +461,33 @@ const ChatInputBox = memo(function ChatInputBox({
               handleSend();
             }
           }}
-          placeholder={isLoading ? "Tulis pesan berikutnya (otomatis masuk antrean)..." : "Ask NotbookLM anything"}
+          placeholder={isLoading ? "Type your next message (automatically queued)..." : "Ask NotbookLM anything"}
           style={{ wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap" }}
           className="w-full bg-transparent border-0 focus:outline-none resize-none px-2 py-1 text-[15px] text-white placeholder:text-gray-500 max-h-[180px] min-h-[32px] overflow-y-auto overflow-x-hidden leading-relaxed shadow-none box-border"
         />
 
         {/* Bottom Actions Row (Clean seamlessly integrated row without divider) */}
         <div className="flex items-center justify-between gap-2 pt-0.5">
-          {/* Left: ModelSelector & Filter */}
-          <div className="flex items-center gap-1.5">
+          {/* Left: ModelSelector */}
+          <div className="flex items-center">
             <ModelSelector backendUrl={backendUrl} />
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 hover:text-white transition-colors cursor-pointer shrink-0"
-              title="Filter referensi & pencarian"
-            >
-              <SlidersHorizontal size={11} className="text-gray-400" />
-              <span className="font-medium">Filter</span>
-            </button>
           </div>
 
-          {/* Right: Sources Badge and Send/Stop Button */}
+          {/* Right: Filter, Sources Badge and Send/Stop Button */}
           <div className="flex items-center gap-2">
+            <SearchFilterPopover 
+              filter={filter}
+              onApplyFilter={(newFilter) => setFilter(newFilter)}
+              isOpen={isFilterOpen}
+              onClose={() => setIsFilterOpen(false)}
+              onToggle={() => setIsFilterOpen(prev => !prev)}
+            />
+
             <button
               type="button"
               onClick={onToggleRightSidebar}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 hover:text-white transition-colors cursor-pointer shrink-0"
-              title="Kelola sumber referensi"
+              title="Manage sources"
             >
               <FileText size={11} className="text-blue-400" />
               <span className="font-medium">{documentsCount} sources</span>
@@ -496,7 +499,7 @@ const ChatInputBox = memo(function ChatInputBox({
                 type="button"
                 className="rounded-full h-7 w-7 bg-[#eb5757] hover:bg-[#ff6b6b] text-white transition-all shrink-0 cursor-pointer shadow-sm flex items-center justify-center animate-in fade-in duration-150 border-0 outline-none"
                 onClick={onStopGeneration}
-                title="Hentikan pembuatan jawaban"
+                title="Stop generating"
               >
                 <Square size={10} className="fill-white" />
               </button>
@@ -510,7 +513,7 @@ const ChatInputBox = memo(function ChatInputBox({
                     : "bg-white/10 text-gray-500 cursor-not-allowed"
                 }`}
                 onClick={handleSend}
-                title={isLoading ? "Kirim ke antrean" : "Kirim pesan"}
+                title={isLoading ? "Add to queue" : "Send message"}
               >
                 <ArrowRight size={14} />
               </button>
@@ -520,7 +523,7 @@ const ChatInputBox = memo(function ChatInputBox({
       </div>
 
       <p className="text-center text-[11px] text-gray-500 mt-2">
-        NotbookLM dapat membuat kesalahan. Periksa informasi penting.
+        NotbookLM can make mistakes. Verify important info.
       </p>
     </div>
   );
@@ -597,7 +600,7 @@ export default function ChatArea({
             type="button"
             onClick={onOpenSidebar}
             className="h-8 w-8 text-gray-400 hover:text-white bg-[#282828] hover:bg-[#333333] border border-white/10 rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
-            title="Buka Sidebar"
+            title="Open sidebar"
           >
             <Sparkles size={16} />
           </button>
@@ -611,7 +614,7 @@ export default function ChatArea({
             type="button"
             onClick={onToggleRightSidebar}
             className="h-8 px-2.5 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-xs text-gray-300 hover:text-white flex items-center gap-1.5 cursor-pointer shadow-md backdrop-blur transition-colors"
-            title="Buka Sources"
+            title="Open sources"
           >
             <FileText size={13} className="text-blue-400" />
             <span>Sources</span>
@@ -683,7 +686,7 @@ export default function ChatArea({
                             onClick={() => setEditingMessageIdx(null)}
                             className="h-7 px-3 text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer transition-colors"
                           >
-                            Batal
+                            Cancel
                           </button>
                           <button
                             type="button"
@@ -691,7 +694,7 @@ export default function ChatArea({
                             disabled={!editContent.trim() || isLoading}
                             className="h-7 px-3.5 text-xs bg-white text-black hover:bg-gray-200 font-medium rounded-lg cursor-pointer shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Kirim
+                            Send
                           </button>
                         </div>
                       </div>
@@ -706,7 +709,7 @@ export default function ChatArea({
                           <button
                             onClick={() => handleCopy(msg.content, idx)}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1"
-                            title={copiedMessageIdx === idx ? "Tersalin!" : "Salin teks"}
+                            title={copiedMessageIdx === idx ? "Copied!" : "Copy text"}
                           >
                             {copiedMessageIdx === idx ? (
                               <Check size={16} className="text-green-400" />
@@ -717,7 +720,7 @@ export default function ChatArea({
                           <button
                             onClick={() => handleStartEdit(msg.content, idx)}
                             className="p-1.5 -mr-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                            title="Edit pesan"
+                            title="Edit message"
                           >
                             <Pencil size={16} />
                           </button>
@@ -742,12 +745,12 @@ export default function ChatArea({
                         <button
                           onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/, "").trim(), idx)}
                           className="p-1.5 -ml-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1.5 text-xs"
-                          title={copiedMessageIdx === idx ? "Tersalin!" : "Salin jawaban"}
+                          title={copiedMessageIdx === idx ? "Copied!" : "Copy response"}
                         >
                           {copiedMessageIdx === idx ? (
                             <>
                               <Check size={16} className="text-green-400" />
-                              <span className="text-xs text-green-400 font-medium">Tersalin</span>
+                              <span className="text-xs text-green-400 font-medium">Copied</span>
                             </>
                           ) : (
                             <Copy size={16} />
@@ -767,7 +770,7 @@ export default function ChatArea({
                       <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
                       <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce"></div>
                     </div>
-                    <span className="text-xs font-medium text-gray-400 animate-pulse">Menelusuri & menyusun jawaban...</span>
+                    <span className="text-xs font-medium text-gray-400 animate-pulse">Searching sources & generating response...</span>
                   </div>
                 </div>
               )}

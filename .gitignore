@@ -20,3 +20,4 @@ backend/uploads/
 uploads/
 backend/qdrant_data/
 qdrant_data/
+scratch/

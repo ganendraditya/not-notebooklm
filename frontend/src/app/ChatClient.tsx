@@ -70,12 +70,12 @@ export default function ChatClient() {
     if (activeChatId) return activeChatId;
     
     // Auto generate clean title from search query or paper name
-    let title = (suggestedTitle || "Riset Baru").trim();
-    title = title.replace(/^(cariin|carikan|cari|tolong cari|paper|jurnal tentang|minta paper)\s+/i, "");
+    let title = (suggestedTitle || "New Research").trim();
+    title = title.replace(/^(find|search|look up|get|paper on|journal about|research on)\s+/i, "");
     if (title.length > 35) {
       title = title.substring(0, 35) + "...";
     }
-    if (!title) title = "Riset Baru";
+    if (!title) title = "New Research";
     title = title.charAt(0).toUpperCase() + title.slice(1);
 
     try {
@@ -182,14 +182,14 @@ export default function ChatClient() {
         console.log("Generation stopped by user");
         setMessages(prev => [
           ...prev,
-          { role: "assistant", content: "*(Pembuatan respon dihentikan oleh pengguna)*", created_at: new Date().toISOString() }
+          { role: "assistant", content: "*(Response generation stopped by user)*", created_at: new Date().toISOString() }
         ]);
         return; // Halt further queued processing on user abort
       } else {
         console.error("Failed to send queued message:", err);
         setMessages(prev => [
           ...prev,
-          { role: "assistant", content: "⚠️ Maaf, terjadi kesalahan saat menghubungi server AI.", created_at: new Date().toISOString() }
+          { role: "assistant", content: "⚠️ Sorry, an error occurred while connecting to the AI server.", created_at: new Date().toISOString() }
         ]);
       }
     } finally {
@@ -268,7 +268,7 @@ export default function ChatClient() {
         console.error("Failed to edit message:", err);
         setMessages(prev => [
           ...prev,
-          { role: "assistant", content: "⚠️ Maaf, terjadi kesalahan saat mengedit pesan.", created_at: new Date().toISOString() }
+          { role: "assistant", content: "⚠️ Sorry, an error occurred while editing the message.", created_at: new Date().toISOString() }
         ]);
       }
     } finally {
