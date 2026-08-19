@@ -429,7 +429,10 @@ async def query_chat(
             uq = user_query.lower()
             search_triggers = [
                 "cariin", "carikan", "cari paper", "cari jurnal", "search paper", "find paper",
-                "tambah paper", "tambah referensi", "more paper", "find more"
+                "tambah paper", "tambah referensi", "more paper", "find more", "paper", "jurnal",
+                "artikel", "literatur", "makalah", "rekomendasi", "rekomendasikan", "import ke source",
+                "import to source", "masukin ke source", "masukkan ke source", "add to source", "add source",
+                "bisa diimport", "bisa di-import", "masuk ke sources", "masuk sources"
             ]
             if any(st in uq for st in search_triggers):
                 return "SEARCH_NEW"
@@ -439,6 +442,57 @@ async def query_chat(
 
         intent = resolve_intent_fast(query, has_local_docs)
         print(f"[RAG Engine] Fast Resolved Intent: {intent}")
+
+        # 4. Direct Academic Literature Search Pipeline (OpenAlex, Europe PMC, Crossref with Sources Card UI)
+        if intent == "SEARCH_NEW":
+            await report_status("Planning academic query parameters & search terms...")
+            plan = await plan_academic_search(query, formatted_history, target_llm)
+            
+            await report_status(f"Searching verified academic repositories for {plan.get('target_count', 15)} papers...")
+            existing_sigs = get_existing_notebook_sources_signatures(chat_id)
+            papers = await asyncio.to_thread(search_academic_papers_planned, plan, existing_sigs)
+            
+            if not papers:
+                return f"Maaf, tidak ditemukan paper ilmiah yang cocok dengan kriteria pencarian untuk topik: '{query}'."
+
+            await report_status("Synthesizing research landscape and structuring sources...")
+            
+            # Format candidate papers for synthesis
+            paper_bullet_list = []
+            for p in papers[:25]:
+                p_authors = ", ".join(p.get("authors", [])[:3]) if p.get("authors") else "Academic Researchers"
+                p_venue = p.get("venue", "Academic Publication")
+                paper_bullet_list.append(
+                    f"- **{p.get('title')}** ({p.get('year')}) by {p_authors} in *{p_venue}*\n"
+                    f"  Abstract: {p.get('snippet', '')[:400]}"
+                )
+            papers_context = "\n\n".join(paper_bullet_list)
+
+            synthesis_prompt = (
+                "Anda adalah NotbookLM, asisten riset dan kurator literatur ilmiah terpercaya. "
+                "Gunakan BAHASA INDONESIA yang baku, profesional, dan komprehensif.\n\n"
+                f"Pengguna meminta penelusuran paper dengan topik:\n\"{query}\"\n\n"
+                f"Sistem telah berhasil mengumpulkan {len(papers)} paper akademik terverifikasi (kategori Open Access/jurnal bereputasi).\n\n"
+                f"Berikut adalah sampel representatif dari hasil pencarian:\n{papers_context}\n\n"
+                "TUGAS ANDA:\n"
+                "1. Berikan pengantar ramah dan laporkan secara transparan jumlah paper yang berhasil ditemukan (misal: 'Ditemukan X paper...').\n"
+                "2. Berikan sintesis ringkas (3-4 poin mendalam) mengenai tren riset, variasi metodologi, dan pola temuan dari paper-paper tersebut.\n"
+                "3. Beritahukan pengguna bahwa seluruh paper lengkap beserta tautan DOI dan tombol impor telah dimuat pada panel Sumber/Kartu di bawah, sehingga mereka dapat menambahkannya ke workspace dalam satu klik.\n"
+                "4. DILARANG KERAS menyuruh pengguna mencari sendiri di web lain atau mengetik kode manual!"
+            )
+
+            synth_msgs = [
+                LlamaChatMessage(role=MessageRole.SYSTEM, content=synthesis_prompt),
+                *(formatted_history[-4:] if formatted_history else []),
+                LlamaChatMessage(role=MessageRole.USER, content=query)
+            ]
+            
+            resp = await target_llm.achat(synth_msgs)
+            text_response = clean_response(resp.message.content)
+            
+            # Append structured SOURCES_DATA payload for frontend ChatMessageItem interactive import card!
+            sources_json_str = json.dumps(papers, ensure_ascii=False)
+            return f"{text_response}\n\n<!-- SOURCES_DATA: {sources_json_str} -->"
 
         # 4. Direct Full-Context Synthesis for workspace documents
         if intent == "ANALYZE_WORKSPACE" and has_local_docs:

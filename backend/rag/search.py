@@ -111,13 +111,17 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
         context_str = ""
         if history:
             hist_snippets = []
-            for m in history[-6:]:
+            for m in history[-8:]:
                 role_name = getattr(m, 'role', '')
                 if role_name == MessageRole.USER or role_name == 'user':
-                    hist_snippets.append(f"User: {m.content[:300]}")
+                    hist_snippets.append(f"User: {m.content[:400]}")
                 elif role_name == MessageRole.ASSISTANT or role_name == 'assistant':
                     clean_c = m.content.split('<!-- SOURCES_DATA')[0].strip()
-                    hist_snippets.append(f"Assistant: {clean_c[:200]}")
+                    # Strip massive list to preserve key topic keywords in context
+                    lines = clean_c.split('\n')
+                    compact_lines = [l for l in lines if not re.match(r'^\s*\d+\.\s+', l) and not l.startswith('    Metode:')]
+                    clean_summary = "\n".join(compact_lines[:15])
+                    hist_snippets.append(f"Assistant: {clean_summary[:400]}")
             if hist_snippets:
                 context_str = "\nPrevious Conversation Context:\n" + "\n".join(hist_snippets) + "\n\n"
 
@@ -128,20 +132,20 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
             "Current User Request:\n"
             f"\"{query}\"\n\n"
             "Rules for extraction:\n"
-            "1. CONTEXT & TOPIC RESOLUTION:\n"
-            "   - If the user's request refers to previous topics (e.g. 'topik tadi', 'terkait tadi', 'yang tadi', 'topik sepak bola tadi', 'more papers on this topic', 'coba lagi dong'): You MUST examine 'Previous Conversation Context' to identify the specific research domain (e.g. 'football match outcome prediction Premier League machine learning')!\n"
+            "1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n"
+            "   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi', 'terkait tadi', 'yang tadi', 'coba lagi dong', 'yang analisis sentimen tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain (e.g. 'sentiment analysis machine learning') and retain it in en_query and id_query!\n"
             "   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt' or physics acronyms! 'gw' in Indonesian means 'me/I'.\n"
-            "2. 'en_query': Pure English academic search term for global scholarly databases. Remove all conversational filler words ('cariin', 'mau itu', 'campur aja', 'bebas', 'yang penting', 'gw', 'lah', 'dong', 'ya', 'coba', 'open access', 'q1', 'sinta'). Convert domain abbreviations ('ML' -> 'machine learning', 'DL' -> 'deep learning', 'EPL' -> 'English Premier League').\n"
+            "2. 'en_query': Pure English academic search term for global scholarly databases. Remove all conversational filler words ('cariin', 'mau itu', 'campur aja', 'bebas', 'yang penting', 'gw', 'lah', 'dong', 'ya', 'coba', 'open access', 'q1', 'sinta', 'rekomendasiin', 'biar gw bisa import'). Convert domain abbreviations ('ML' -> 'machine learning', 'DL' -> 'deep learning', 'EPL' -> 'English Premier League').\n"
             "3. 'id_query': Pure Indonesian academic search term for national journals (e.g. 'analisis sentimen machine learning').\n"
             "4. 'target_count': Integer representing how many papers to search for.\n"
-            "   - If the user explicitly specified an exact number (e.g. 30, 50, 25, 100), set target_count to that number (capped at 100 max per fetch).\n"
-            "   - If the user DID NOT specify an exact number (e.g. 'cariin paper', 'cari literatur', 'ada paper apa aja'), choose an optimal, realistic sample count between 10 and 25 (e.g. 15 or 20) based on domain depth. NEVER default to 100 unless explicitly requested!\n"
+            "   - If the user explicitly specified an exact number (e.g. 30, 50, 25, 100) or if recent history asked for 100, set target_count to that number (capped at 100 max per fetch).\n"
+            "   - If the user DID NOT specify an exact number, choose an optimal count between 15 and 30.\n"
             "   - If the user asks for follow-up ('coba lagi', 'tambah lagi'), set target_count to 10-20 fresh papers.\n"
-            "5. 'open_access_only': Boolean true if user explicitly or via filter requested open access / free PDF only, else false.\n"
+            "5. 'open_access_only': Boolean true if user explicitly or in recent context requested open access / free PDF only, else false.\n"
             "6. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n"
             "7. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n"
             "8. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n"
-            "9. 'user_requested_count': The exact integer if the user specified a number (e.g. 30, 50, 300), otherwise null.\n"
+            "9. 'user_requested_count': The exact integer if the user specified a number (e.g. 30, 50, 100), otherwise null.\n"
             "10. 'min_year': Integer representing minimum publication year (e.g. 2020 if user mentioned '5 tahun terakhir' or 'terbaru', otherwise null).\n"
             "11. 'min_citations': Integer representing minimum citations count threshold (e.g. 10 if user specified 'min 10 sitasi', otherwise 0).\n"
             "12. 'language_preference': 'mixed' (if user wants both/either/mix/unspecified), 'en' (if user strictly asked for English/international), 'id' (if user strictly asked for Indonesian).\n"
@@ -156,7 +160,7 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
             "  \"sinta_tiers\": [],\n"
             "  \"exclude_preprints\": false,\n"
             "  \"user_requested_count\": 100,\n"
-            "  \"min_year\": null,\n"
+            "  \"min_year\": 2021,\n"
             "  \"min_citations\": 0,\n"
             "  \"language_preference\": \"mixed\"\n"
             "}"
