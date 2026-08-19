@@ -255,14 +255,12 @@ async def query_chat(
     has_local_docs = len(local_docs) > 0
     
     if has_local_docs:
-        doc_list_str = "\n".join([f"  {i+1}. {fname}" for i, fname in enumerate(local_docs[:20])])
-        if len(local_docs) > 20:
-            doc_list_str += f"\n  ... dan {len(local_docs) - 20} dokumen lainnya."
+        doc_list_str = "\n".join([f"  [{i+1}] {fname}" for i, fname in enumerate(local_docs)])
         doc_context_info = (
             f"INFORMASI SUMBER REFERENSI SESI INI:\n"
             f"- Sesi chat ini memiliki total {len(local_docs)} dokumen referensi aktif yang diimpor:\n"
             f"{doc_list_str}\n"
-            f"- Selalu gunakan fakta ini secara akurat saat menjawab pertanyaan pengguna mengenai jumlah atau daftar dokumen yang tersedia."
+            f"- Selalu gunakan fakta ini secara akurat saat menjawab pertanyaan pengguna mengenai jumlah, relevansi judul, atau daftar dokumen yang tersedia."
         )
     else:
         doc_context_info = "INFORMASI SUMBER REFERENSI: Sesi percakapan ini saat ini belum memiliki dokumen referensi yang diunggah/diimpor."
@@ -364,27 +362,19 @@ async def query_chat(
             return True
         return False
 
-    def is_sources_capacity_query(text: str) -> bool:
+    def is_sources_meta_query(text: str) -> bool:
         t = text.lower().strip()
-        phrases = [
+        meta_phrases = [
             "berapa dokumen", "berapa file", "berapa banyak dokumen", "berapa jumlah dokumen",
             "berapa total dokumen", "jumlah dokumen", "daftar dokumen", "ada berapa dokumen",
             "ada dokumen apa", "dokumen apa saja", "list dokumen", "sebutkan dokumen",
             "dokumen yang diupload", "dokumen yang diimpor", "berapa source", "jumlah source",
-            "berapa referensi", "daftar referensi", "ada referensi apa"
+            "berapa referensi", "daftar referensi", "ada referensi apa", "berapa doang", "berapa yang",
+            "yang mana saja", "yang relevan", "relevan berapa", "yang cocok berapa"
         ]
-        return any(p in t for p in phrases)
+        return any(p in t for p in meta_phrases)
 
-    def is_sources_meta_query(text: str) -> bool:
-        t = text.lower().strip()
-        meta_phrases = [
-            "apa saja topiknya", "topik apa saja", "analisis topik", "rangkum topik",
-            "ringkas topik", "topik dari dokumen", "topik dokumen", "cakupan dokumen",
-            "tema dokumen", "tema paper", "variasi topik", "pembagian topik"
-        ]
-        return any(p in t for p in phrases for phrases in [meta_phrases])
-
-    async def execute_agent(target_llm, timeout_sec=30.0):
+    async def execute_agent(target_llm, timeout_sec=60.0):
         # 1. Handle casual conversational messages
         if is_simple_conversational(query):
             chat_msgs = [
@@ -403,19 +393,16 @@ async def query_chat(
             resp = await target_llm.achat(chat_msgs)
             return clean_response(resp.message.content)
 
-        # 2. Handle meta-capacity queries
-        if is_sources_capacity_query(query):
-            if not has_local_docs:
-                return "Saat ini belum ada dokumen atau paper yang diimpor ke dalam sesi percakapan ini. Anda dapat mengunggah file (PDF, Word, RIS, BibTeX) atau mencari paper melalui panel pencarian di sebelah kanan."
-            
+        # 2. Fast Meta/Capacity Queries (Direct LLM call with metadata list, no agentic loop)
+        if is_sources_meta_query(query) and has_local_docs:
             chat_msgs = [
                 LlamaChatMessage(
                     role=MessageRole.SYSTEM,
                     content=(
-                        "You are NotbookLM, a helpful personal research assistant. "
-                        f"{doc_context_info}\n"
-                        "The user is asking about the documents/sources currently loaded in this chat session. "
-                        "Answer accurately, stating the exact number of documents and listing their filenames neatly in Indonesian."
+                        "Anda adalah NotbookLM, asisten riset cerdas. "
+                        f"{doc_context_info}\n\n"
+                        "Tugas: Jawab pertanyaan pengguna mengenai dokumen yang sudah diimpor ke workspace secara lugas, tepat, dan cepat dalam Bahasa Indonesia. "
+                        "Jika pengguna menanyakan berapa dokumen yang relevan dengan topik tertentu (misal: 'berapa yang bahas Prabowo?'), periksa daftar nama dokumen di atas, hitung secara akurat, dan sebutkan nomor referensinya."
                     )
                 ),
                 *(formatted_history[-4:] if formatted_history else []),
@@ -426,31 +413,20 @@ async def query_chat(
             return clean_response(resp.message.content)
 
         # 3. Handle query routing
-        async def judge_intent_with_ai(user_query: str, has_docs: bool) -> str:
-            judge_prompt = f"""
-Analyze this user query in a research assistant workspace:
-User Query: "{user_query}"
-Workspace has uploaded documents: {has_docs}
+        def resolve_intent_fast(user_query: str, has_docs: bool) -> str:
+            uq = user_query.lower()
+            search_triggers = [
+                "cariin", "carikan", "cari paper", "cari jurnal", "search paper", "find paper",
+                "tambah paper", "tambah referensi", "more paper", "find more"
+            ]
+            if any(st in uq for st in search_triggers):
+                return "SEARCH_NEW"
+            if has_docs:
+                return "ANALYZE_WORKSPACE"
+            return "SEARCH_NEW"
 
-Classify into exactly ONE category:
-- SEARCH_NEW: User explicitly wants to find NEW papers, search scholarly literature, get more papers.
-- ANALYZE_WORKSPACE: User wants to compare, analyze, summarize, make a table, extract methods from existing workspace documents.
-- GENERAL_QA: General academic/conceptual question.
-
-Output ONLY the category name.
-"""
-            try:
-                judge_resp = await target_llm.acomplete(judge_prompt)
-                category = judge_resp.text.strip().upper()
-                if "SEARCH_NEW" in category: return "SEARCH_NEW"
-                if "ANALYZE_WORKSPACE" in category: return "ANALYZE_WORKSPACE"
-                if "GENERAL_QA" in category: return "GENERAL_QA"
-            except Exception as e:
-                print(f"[AI Intent Judge Warning]: {e}")
-            return "ANALYZE_WORKSPACE" if has_docs else "SEARCH_NEW"
-
-        intent = await judge_intent_with_ai(query, has_local_docs)
-        print(f"[RAG Engine] AI Classified Intent: {intent}")
+        intent = resolve_intent_fast(query, has_local_docs)
+        print(f"[RAG Engine] Fast Resolved Intent: {intent}")
 
         # 4. Direct Full-Context Synthesis for workspace documents
         if intent == "ANALYZE_WORKSPACE" and has_local_docs:
