@@ -3,6 +3,7 @@ import asyncio
 import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from database import get_db, ChatSession, Document
@@ -42,6 +43,103 @@ async def search_papers(query: str, limit: int = 10):
         )
         for p in papers
     ]
+
+@router.post("/chats/{chat_id}/import_sources_stream")
+async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, db: Session = Depends(get_db)):
+    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+        
+    current_doc_count = db.query(Document).filter(Document.chat_id == chat_id).count()
+    remaining_slots = max(0, MAX_SOURCES_PER_CHAT - current_doc_count)
+    if remaining_slots <= 0:
+        raise HTTPException(status_code=400, detail=f"Document limit reached (Max {MAX_SOURCES_PER_CHAT} documents per chat). Please delete some sources before importing new ones.")
+        
+    existing_sigs = rag.get_existing_notebook_sources_signatures(chat_id)
+    novel_sources = []
+    for paper in req.sources:
+        if not rag.is_paper_duplicate(paper.title, paper.doi, existing_sigs):
+            novel_sources.append(paper)
+            norm = rag.normalize_title_str(paper.title)
+            if norm:
+                existing_sigs["token_signatures"].append((norm, set(norm.split())))
+            if paper.doi:
+                existing_sigs["dois"].add(paper.doi.lower().strip())
+
+    allowed_sources = novel_sources[:remaining_slots]
+    total_to_import = len(allowed_sources)
+
+    async def event_generator():
+        import json
+        from database import SessionLocal
+        
+        batch_docs_for_embedding = []
+        
+        for idx, paper in enumerate(allowed_sources, start=1):
+            filename = sanitize_paper_filename(paper.title)
+            abstract_text = paper.snippet.strip()
+            
+            doc_text = f"# {paper.title} ({paper.year})\n\n"
+            if paper.doi:
+                doc_text += f"**DOI:** {paper.doi}  \n"
+            if paper.url:
+                doc_text += f"**URL:** {paper.url}  \n\n"
+            doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
+
+            save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
+            try:
+                pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
+                    title=paper.title,
+                    authors=[],
+                    year=str(paper.year or ""),
+                    journal="Academic Research Publication",
+                    journal_metric="Peer-Reviewed",
+                    doi=paper.doi or "",
+                    abstract=abstract_text,
+                    url=paper.url or ""
+                )
+                with open(save_path, "wb") as f:
+                    f.write(pdf_bytes)
+            except Exception as e:
+                logger.warning(f"[PDF Creation Warning]: {e}")
+
+            # Save to DB immediately so frontend receives it
+            local_db = SessionLocal()
+            created_doc_id = None
+            created_at_str = ""
+            try:
+                db_doc = Document(chat_id=chat_id, filename=filename)
+                local_db.add(db_doc)
+                local_db.commit()
+                local_db.refresh(db_doc)
+                created_doc_id = db_doc.id
+                created_at_str = db_doc.created_at.isoformat() if db_doc.created_at else ""
+            finally:
+                local_db.close()
+
+            batch_docs_for_embedding.append((doc_text, filename, chat_id))
+
+            # Stream progressive status event to frontend
+            yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': created_doc_id, 'filename': filename, 'created_at': created_at_str, 'index': current_doc_count + idx}})}\n\n"
+
+        # Background batch embedding into Qdrant
+        if batch_docs_for_embedding:
+            try:
+                await asyncio.to_thread(rag.ingest_documents_batch, batch_docs_for_embedding)
+            except Exception as e:
+                logger.warning(f"[Batch Vector Ingestion Warning]: {e}")
+
+        yield f"data: {json.dumps({'type': 'done', 'total': total_to_import})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 @router.post("/chats/{chat_id}/import_sources", response_model=List[models.DocumentResponse])
 async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Session = Depends(get_db)):

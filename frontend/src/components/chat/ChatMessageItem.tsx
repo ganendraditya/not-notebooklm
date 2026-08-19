@@ -102,12 +102,14 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   };
 
   const [importedCount, setImportedCount] = useState<number>(0);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
 
   const handleImport = async () => {
     const toImport = sources.filter((src, i) => isSourceChecked(src, i));
     if (toImport.length === 0) return;
 
     setIsImporting(true);
+    setImportProgress({ current: 0, total: toImport.length });
     setImportedCount(0);
     try {
       let currentChatId = activeChatId;
@@ -116,23 +118,60 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       }
       if (!currentChatId) return;
 
-      const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources`, {
+      const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sources: toImport })
       });
-      if (res.ok) {
-        const createdDocs = await res.json();
-        if (createdDocs && createdDocs.length > 0) {
-          createdDocs.forEach((d: DocType) => onDocumentAdded?.(d));
-          setImportedCount(createdDocs.length);
+
+      if (!res.ok) {
+        throw new Error(`Server responded with ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error("No readable stream");
+
+      let buffer = "";
+      let totalAdded = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        while (buffer.includes("\n\n")) {
+          const splitIdx = buffer.indexOf("\n\n");
+          const eventBlock = buffer.slice(0, splitIdx);
+          buffer = buffer.slice(splitIdx + 2);
+
+          const lines = eventBlock.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "progress") {
+                  setImportProgress({ current: data.current, total: data.total });
+                  if (data.doc) {
+                    onDocumentAdded?.(data.doc);
+                    totalAdded++;
+                  }
+                } else if (data.type === "done") {
+                  setIsImported(true);
+                  setImportedCount(totalAdded);
+                }
+              } catch (e) {
+                console.error("Parse import progress error:", e);
+              }
+            }
+          }
         }
-        setIsImported(true);
       }
     } catch (e) {
       console.error("Import sources failed:", e);
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -336,7 +375,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                   {isImporting ? (
                     <>
                       <Loader2 size={12} className="animate-spin" />
-                      <span>Adding {selectedCount} sources...</span>
+                      <span>
+                        {importProgress ? `Adding ${importProgress.current}/${importProgress.total}...` : "Adding sources..."}
+                      </span>
                     </>
                   ) : isImported ? (
                     <>
