@@ -17,6 +17,7 @@ export interface Document {
   id: number;
   filename: string;
   created_at: string;
+  index?: number;
 }
 
 export interface TargetedSource {
@@ -39,6 +40,7 @@ export default function ChatClient() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [targetedSource, setTargetedSource] = useState<TargetedSource | null>(null);
   const [activeStatus, setActiveStatus] = useState<string | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   
   const backendUrl = "http://localhost:8000";
 
@@ -441,6 +443,10 @@ export default function ChatClient() {
         onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
         documents={documents}
         onDocumentAdded={(doc) => setDocuments(prev => [...prev, doc])}
+        onOpenDocument={(doc) => {
+          setViewingDoc(doc);
+          setIsRightSidebarOpen(true);
+        }}
         onEnsureChatSession={handleEnsureChatSession}
         backendUrl={backendUrl}
         isSidebarOpen={isSidebarOpen}
@@ -461,15 +467,19 @@ export default function ChatClient() {
           onDocumentDeleted={(id) => {
             setDocuments(prev => prev.filter(d => d.id !== id));
             if (targetedSource?.id === id) setTargetedSource(null);
+            if (viewingDoc?.id === id) setViewingDoc(null);
           }}
           onBulkDocumentsDeleted={(ids) => {
             handleBulkDocumentsDeleted(ids);
             if (targetedSource && ids.includes(targetedSource.id)) setTargetedSource(null);
+            if (viewingDoc && ids.includes(viewingDoc.id)) setViewingDoc(null);
           }}
           onEnsureChatSession={handleEnsureChatSession}
           onAskAboutDocument={(doc, paperTitle) => {
             setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
           }}
+          externalViewingDoc={viewingDoc}
+          onClearViewingDoc={() => setViewingDoc(null)}
           backendUrl={backendUrl}
           onClose={() => setIsRightSidebarOpen(false)}
         />

@@ -1753,12 +1753,12 @@ async def query_chat(
         ]
         return any(p in clean for p in meta_phrases)
 
-    # Load all imported / uploaded document texts for this chat with verified journal & quartile metrics
+    # Load all imported / uploaded document texts for this chat with permanent global indexing & verified metrics
     full_docs_context = ""
     UPLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "uploads"))
     if has_local_docs:
         doc_texts = []
-        for fname in local_docs:
+        for doc_idx, fname in enumerate(local_docs, start=1):
             fpath = os.path.join(UPLOADS_DIR, f"{chat_id}_{fname}")
             if os.path.exists(fpath):
                 try:
@@ -1773,12 +1773,12 @@ async def query_chat(
                             metric_tag = meta.get("journal_metric", "Peer-Reviewed") if meta else "Peer-Reviewed"
                             journal_name = meta.get("journal", "") if meta else ""
                             
-                            meta_header = f"**Jurnal/Venue:** {journal_name}  \n**Status Indeksasi:** {metric_tag}" if journal_name else f"**Status Indeksasi:** {metric_tag}"
-                            doc_texts.append(f"### Dokumen: {fname}\n{meta_header}\n\n{content}")
+                            meta_header = f"**Nomor Referensi Global:** [{doc_idx}]  \n**Jurnal/Venue:** {journal_name}  \n**Status Indeksasi:** {metric_tag}" if journal_name else f"**Nomor Referensi Global:** [{doc_idx}]  \n**Status Indeksasi:** {metric_tag}"
+                            doc_texts.append(f"### [{doc_idx}] Dokumen: {fname}\n{meta_header}\n\n{content}")
                 except Exception as e:
                     print(f"[RAG] Error reading doc file {fpath}: {e}")
             else:
-                doc_texts.append(f"### Dokumen: {fname}\n(File terdaftar sebagai referensi)")
+                doc_texts.append(f"### [{doc_idx}] Dokumen: {fname}\n**Nomor Referensi Global:** [{doc_idx}]\n(File terdaftar sebagai referensi)")
                 
         full_docs_context = "\n\n".join(doc_texts)
 
@@ -1957,7 +1957,10 @@ async def query_chat(
                     "Selalu sesuaikan bahasa responmu mengikuti bahasa dan konteks yang digunakan oleh pengguna (jika pengguna menggunakan bahasa Indonesia jawab dalam bahasa Indonesia, jika bahasa Inggris jawab dalam bahasa Inggris, dsb). "
                     "Kamu memiliki akses penuh ke seluruh teks, abstrak, dan data dari dokumen referensi yang diimpor pengguna di bawah ini. "
                     "Gunakan SELURUH data dokumen ini untuk menjawab instruksi pengguna secara lengkap, terstruktur, dan mendalam."
-                    f"{focus_instruction}\n\n"
+                    "ATURAN SITASI REFERENSI GLOBAL (IEEE STYLE - SANGAT PENTING):\n"
+                    "- Setiap dokumen referensi memiliki Nomor Referensi Global tetap: [1], [2], [3], dst yang tertulis di header dokumen.\n"
+                    "- Saat mengutip, merujuk temuan, membandingkan metode, atau membuat tabel, SELALU sertakan sitasi bracket nomor yang sesuai, contoh: [1], [2], [3], [1, 2], atau [1]-[3].\n"
+                    "- Nomor referensi ini bersifat permanen dan konsisten di seluruh percakapan. Jangan mengubah nomor referensi sebuah dokumen!\n\n"
                     "ATURAN STATUS INDEKSASI & KUARTIL JURNAL (SANGAT KETAT):\n"
                     "- Selalu gunakan data status indeksasi resmi yang tertera pada header dokumen (**Status Indeksasi** dan **Jurnal/Venue**).\n"
                     "- JANGAN PERNAH melabeli 'Conference Proceedings' sebagai Jurnal Q1/Q2/Q3/Q4 (karena kuartil Q Scopus/SJR hanya berlaku untuk jurnal berkala, bukan prosiding konferensi).\n"

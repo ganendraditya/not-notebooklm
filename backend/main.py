@@ -64,7 +64,25 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-    return chat
+        
+    sorted_docs = sorted(chat.documents, key=lambda d: d.id)
+    doc_responses = []
+    for idx, d in enumerate(sorted_docs, start=1):
+        doc_responses.append(models.DocumentResponse(
+            id=d.id,
+            filename=d.filename,
+            created_at=d.created_at,
+            index=idx
+        ))
+        
+    return models.ChatSessionDetailResponse(
+        id=chat.id,
+        title=chat.title,
+        created_at=chat.created_at,
+        updated_at=chat.updated_at,
+        documents=doc_responses,
+        messages=chat.messages
+    )
 
 @app.patch("/chats/{chat_id}", response_model=models.ChatSessionResponse)
 def update_chat(chat_id: str, update: models.ChatSessionUpdate, db: Session = Depends(get_db)):
@@ -118,7 +136,13 @@ def upload_document(chat_id: str, file: UploadFile = File(...), db: Session = De
     db.commit()
     db.refresh(db_doc)
     
-    return db_doc
+    total_docs_count = db.query(Document).filter(Document.chat_id == chat_id).count()
+    return models.DocumentResponse(
+        id=db_doc.id,
+        filename=db_doc.filename,
+        created_at=db_doc.created_at,
+        index=total_docs_count
+    )
 
 @app.delete("/chats/{chat_id}/documents/{doc_id}")
 def delete_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
@@ -568,7 +592,14 @@ def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Session =
         db.add(db_doc)
         db.commit()
         db.refresh(db_doc)
-        created_docs.append(db_doc)
+        
+        doc_index = current_doc_count + len(created_docs) + 1
+        created_docs.append(models.DocumentResponse(
+            id=db_doc.id,
+            filename=db_doc.filename,
+            created_at=db_doc.created_at,
+            index=doc_index
+        ))
         
     chat.updated_at = datetime.utcnow()
     db.commit()

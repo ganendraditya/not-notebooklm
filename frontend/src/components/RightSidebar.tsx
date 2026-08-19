@@ -33,6 +33,8 @@ interface RightSidebarProps {
   onBulkDocumentsDeleted?: (ids: number[]) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   onAskAboutDocument?: (doc: Document, paperTitle?: string) => void;
+  externalViewingDoc?: Document | null;
+  onClearViewingDoc?: () => void;
   backendUrl: string;
   onClose: () => void;
 }
@@ -197,6 +199,8 @@ export default function RightSidebar({
   onBulkDocumentsDeleted,
   onEnsureChatSession,
   onAskAboutDocument,
+  externalViewingDoc,
+  onClearViewingDoc,
   backendUrl,
   onClose
 }: RightSidebarProps) {
@@ -205,11 +209,18 @@ export default function RightSidebar({
   
   // Sorting state & dropdown
   const [sortBy, setSortBy] = useState<"date" | "title">("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
   // Detail / Reader View State (Consensus.app style)
-  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(externalViewingDoc || null);
+
+  useEffect(() => {
+    if (externalViewingDoc) {
+      setViewingDoc(externalViewingDoc);
+    }
+  }, [externalViewingDoc]);
   const [paperDetails, setPaperDetails] = useState<PaperDetailData | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"overview" | "preview">("overview");
@@ -373,13 +384,17 @@ export default function RightSidebar({
     setSelectedDocs(updated);
   };
 
-  // Sort documents based on sortBy
+  // Sort documents based on sortBy and sortDirection (asc/desc)
   const sortedDocuments = [...documents].sort((a, b) => {
+    let cmp = 0;
     if (sortBy === "title") {
-      return a.filename.localeCompare(b.filename);
+      cmp = a.filename.localeCompare(b.filename);
     } else {
-      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      const dateA = new Date(a.created_at || 0).getTime() || a.id;
+      const dateB = new Date(b.created_at || 0).getTime() || b.id;
+      cmp = dateA - dateB;
     }
+    return sortDirection === "asc" ? cmp : -cmp;
   });
 
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -510,7 +525,10 @@ export default function RightSidebar({
         {/* 1. Header Bar: ← Paper + Circular Close Button */}
         <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
           <button
-            onClick={() => setViewingDoc(null)}
+            onClick={() => {
+              setViewingDoc(null);
+              onClearViewingDoc?.();
+            }}
             className="flex items-center gap-2 text-xs font-semibold text-gray-200 hover:text-white transition-colors cursor-pointer group"
           >
             <ArrowLeft size={16} className="text-gray-400 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
@@ -549,11 +567,16 @@ export default function RightSidebar({
         {/* 3. Main Body */}
         {activeTab === "overview" ? (
           <div className="flex-1 p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 min-h-0">
-            {/* Paper Title */}
+            {/* Paper Title with Global Reference Badge */}
             <div className="space-y-1.5">
-              <h1 className="text-[15px] sm:text-[16px] font-bold text-white leading-snug tracking-tight">
-                {title}
-              </h1>
+              <div className="flex items-start gap-2">
+                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30 shrink-0 mt-0.5 select-none" title="Permanent Global Reference Index">
+                  [{viewingDoc.index || (documents.findIndex(d => d.id === viewingDoc.id) + 1)}]
+                </span>
+                <h1 className="text-[15px] sm:text-[16px] font-bold text-white leading-snug tracking-tight">
+                  {title}
+                </h1>
+              </div>
 
               {/* Authors & Publication Date (Textual format e.g. Oct 9, 2024) */}
               <p className="text-xs text-gray-400 font-normal">
@@ -986,27 +1009,47 @@ export default function RightSidebar({
                 </svg>
               </button>
 
-              {/* Sort Dropdown Menu */}
+              {/* Sort Dropdown Menu (2 Sections with Divider: Criteria & Direction) */}
               {isSortMenuOpen && (
-                <div className="absolute left-0 top-7 z-30 w-32 rounded-xl bg-[#28292c] border border-white/15 shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100">
-                  <button
-                    onClick={() => { setSortBy("title"); setIsSortMenuOpen(false); }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
-                      sortBy === "title" ? "bg-blue-600 text-white font-medium" : "text-gray-300 hover:bg-white/5"
-                    }`}
-                  >
-                    <span>Title</span>
-                    {sortBy === "title" && <Check size={11} />}
-                  </button>
-                  <button
-                    onClick={() => { setSortBy("date"); setIsSortMenuOpen(false); }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer ${
-                      sortBy === "date" ? "bg-blue-600 text-white font-medium" : "text-gray-300 hover:bg-white/5"
-                    }`}
-                  >
-                    <span>Date added</span>
-                    {sortBy === "date" && <Check size={11} />}
-                  </button>
+                <div className="absolute left-0 top-7 z-30 w-36 rounded-xl bg-[#28292c] border border-white/15 shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+                  {/* Section 1: Sort Criteria */}
+                  <div className="space-y-0.5 pb-0.5">
+                    <button
+                      onClick={() => { setSortBy("title"); setIsSortMenuOpen(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-gray-300 hover:text-white hover:bg-white/10"
+                    >
+                      <span className={sortBy === "title" ? "text-white font-medium" : "text-gray-300"}>Title</span>
+                      {sortBy === "title" && <Check size={13} className="text-white" strokeWidth={2.5} />}
+                    </button>
+                    <button
+                      onClick={() => { setSortBy("date"); setIsSortMenuOpen(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-gray-300 hover:text-white hover:bg-white/10"
+                    >
+                      <span className={sortBy === "date" ? "text-white font-medium" : "text-gray-300"}>Date added</span>
+                      {sortBy === "date" && <Check size={13} className="text-white" strokeWidth={2.5} />}
+                    </button>
+                  </div>
+
+                  {/* Section Divider Line */}
+                  <div className="border-t border-white/10 my-1" />
+
+                  {/* Section 2: Sort Direction (Ascending / Descending) */}
+                  <div className="space-y-0.5 pt-0.5">
+                    <button
+                      onClick={() => { setSortDirection("asc"); setIsSortMenuOpen(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-gray-300 hover:text-white hover:bg-white/10"
+                    >
+                      <span className={sortDirection === "asc" ? "text-white font-medium" : "text-gray-300"}>Ascending</span>
+                      {sortDirection === "asc" && <Check size={13} className="text-white" strokeWidth={2.5} />}
+                    </button>
+                    <button
+                      onClick={() => { setSortDirection("desc"); setIsSortMenuOpen(false); }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-gray-300 hover:text-white hover:bg-white/10"
+                    >
+                      <span className={sortDirection === "desc" ? "text-white font-medium" : "text-gray-300"}>Descending</span>
+                      {sortDirection === "desc" && <Check size={13} className="text-white" strokeWidth={2.5} />}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1105,15 +1148,24 @@ export default function RightSidebar({
             sortedDocuments.map((doc) => {
               const isChecked = selectedDocs[doc.id] !== undefined ? selectedDocs[doc.id] : true;
               const badge = getFileBadgeInfo(doc.filename);
+              const docIndex = doc.index || (documents.findIndex(d => d.id === doc.id) + 1);
 
               return (
                 <div
                   key={doc.id}
                   onClick={() => setViewingDoc(doc)}
-                  className="flex items-center justify-between py-1.5 pl-0.5 pr-0.5 rounded-lg bg-transparent hover:bg-white/5 transition-colors cursor-pointer group"
+                  className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-white/5 transition-colors cursor-pointer group"
                 >
-                  {/* Left: Compact Format Badge + File Name (Clicking row opens Paper Detail View) */}
+                  {/* Left: Clean Monospace Index + Compact Format Badge + File Name */}
                   <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
+                    {/* Clean Minimalist Index (Fixed w-7 text-left tabular-nums for 100% straight vertical icon alignment) */}
+                    <span 
+                      className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-gray-500 group-hover:text-gray-300 transition-colors shrink-0 select-none tabular-nums"
+                      title={`Permanent Reference Index [${docIndex}]`}
+                    >
+                      {docIndex}.
+                    </span>
+
                     <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${badge.bg}`}>
                       <span className="text-[7.5px] font-bold tracking-tighter uppercase font-mono">{badge.label}</span>
                     </div>

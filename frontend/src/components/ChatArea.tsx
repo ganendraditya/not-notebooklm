@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo, memo, Fragment, cloneElement, isValidElement } from "react";
 import { 
   ArrowUp, 
   ArrowRight,
@@ -38,6 +38,7 @@ interface ChatAreaProps {
   onPromoteQueuedPrompt?: (index: number) => void;
   documents: DocType[];
   onDocumentAdded?: (doc: DocType) => void;
+  onOpenDocument?: (doc: DocType) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   backendUrl: string;
   isSidebarOpen?: boolean;
@@ -55,7 +56,100 @@ interface InChatMessageProps {
   backendUrl: string;
   documents?: DocType[];
   onDocumentAdded?: (doc: DocType) => void;
+  onOpenDocument?: (doc: DocType) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
+}
+
+// Helper to recursively parse IEEE-style citation brackets [1], [2], [1, 2], [1-3] into interactive clickable pills
+function parseCitationsInReactNode(
+  node: React.ReactNode, 
+  documents?: DocType[], 
+  onOpenDocument?: (doc: DocType) => void
+): React.ReactNode {
+  if (typeof node === "string") {
+    // Regex matching [1], [2], [1, 2], [1-3], [1, 3, 5]
+    const regex = /\[(\d+(?:\s*,\s*\d+|\s*-\s*\d+)*)\]/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(node)) !== null) {
+      const matchIndex = match.index;
+      if (matchIndex > lastIndex) {
+        parts.push(node.substring(lastIndex, matchIndex));
+      }
+
+      const rawNumbers = match[1];
+      const nums: number[] = [];
+      if (rawNumbers.includes("-")) {
+        const [startStr, endStr] = rawNumbers.split("-");
+        const start = parseInt(startStr.trim(), 10);
+        const end = parseInt(endStr.trim(), 10);
+        if (!isNaN(start) && !isNaN(end) && start <= end && end - start <= 10) {
+          for (let i = start; i <= end; i++) nums.push(i);
+        } else if (!isNaN(start)) {
+          nums.push(start);
+        }
+      } else {
+        rawNumbers.split(",").forEach(nStr => {
+          const n = parseInt(nStr.trim(), 10);
+          if (!isNaN(n)) nums.push(n);
+        });
+      }
+
+      if (nums.length > 0) {
+        parts.push(
+          <span key={`cite-group-${matchIndex}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
+            {nums.map((num, i) => {
+              const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
+              const docTitle = doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
+
+              return (
+                <button
+                  key={`pill-${num}-${i}`}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (doc && onOpenDocument) {
+                      onOpenDocument(doc);
+                    }
+                  }}
+                  className="inline-flex items-center justify-center px-1.5 py-0 min-w-[20px] h-[19px] text-[10.5px] font-mono font-bold text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70 rounded-full cursor-pointer transition-all duration-150 transform hover:scale-110 active:scale-95 select-none shadow-sm"
+                  title={`[${num}] ${docTitle}\nClick to open paper details in panel`}
+                >
+                  {num}
+                </button>
+              );
+            })}
+          </span>
+        );
+      } else {
+        parts.push(match[0]);
+      }
+
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < node.length) {
+      parts.push(node.substring(lastIndex));
+    }
+
+    return parts.length === 1 ? parts[0] : parts;
+  }
+
+  if (Array.isArray(node)) {
+    return node.map((child, idx) => (
+      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument)}</React.Fragment>
+    ));
+  }
+
+  if (React.isValidElement(node) && (node.props as any)?.children) {
+    return React.cloneElement(node as React.ReactElement<any>, {
+      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument)
+    });
+  }
+
+  return node;
 }
 
 // Memoized In-Chat Message Component with Markdown parsing & Interactive Source Cards
@@ -65,6 +159,7 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
   backendUrl, 
   documents = [],
   onDocumentAdded, 
+  onOpenDocument,
   onEnsureChatSession 
 }: InChatMessageProps) {
   // Parse any embedded SOURCES_DATA with useMemo
@@ -114,19 +209,22 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
   const [isImported, setIsImported] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Synchronous selection resolver without any setState inside useEffect
-  const isSourceChecked = useCallback((src: any, i: number) => {
-    if (isDuplicateSource(src)) return false;
-    if (i in userSelectionOverrides) return userSelectionOverrides[i];
-    return true; // Default to selected for novel candidate papers
-  }, [isDuplicateSource, userSelectionOverrides]);
+  const isSourceChecked = useCallback((src: any, index: number) => {
+    if (userSelectionOverrides[index] !== undefined) {
+      return userSelectionOverrides[index];
+    }
+    return !isDuplicateSource(src);
+  }, [userSelectionOverrides, isDuplicateSource]);
 
   const toggleSelectAll = () => {
     const novelIndices = sources.map((s, i) => (!isDuplicateSource(s) ? i : -1)).filter(i => i !== -1);
-    const allSelected = novelIndices.length > 0 && novelIndices.every(i => isSourceChecked(sources[i], i));
-    const next = !allSelected;
-    const updated: Record<number, boolean> = { ...userSelectionOverrides };
-    novelIndices.forEach(i => { updated[i] = next; });
+    const areAllNovelSelected = novelIndices.length > 0 && novelIndices.every(i => isSourceChecked(sources[i], i));
+    const nextState = !areAllNovelSelected;
+    
+    const updated = { ...userSelectionOverrides };
+    novelIndices.forEach(i => {
+      updated[i] = nextState;
+    });
     setUserSelectionOverrides(updated);
   };
 
@@ -149,7 +247,9 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
       });
       if (res.ok) {
         const createdDocs = await res.json();
-        createdDocs.forEach((d: DocType) => onDocumentAdded?.(d));
+        if (createdDocs && createdDocs.length > 0) {
+          createdDocs.forEach((d: DocType) => onDocumentAdded?.(d));
+        }
         setIsImported(true);
       }
     } catch (e) {
@@ -173,13 +273,13 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
-            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{children}</p>,
+            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument)}</p>,
             h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{children}</h1>,
             h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{children}</h2>,
             h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{children}</h3>,
             ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ol>,
-            li: ({ children }) => <li className="leading-[1.65]">{children}</li>,
+            li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument)}</li>,
             strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
             a: ({ href, children }) => (
               <a 
@@ -202,10 +302,10 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
             tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
             tr: ({ children }) => <tr className="hover:bg-white/[0.02] transition-colors">{children}</tr>,
             th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{children}</th>,
-            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{children}</td>,
+            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument)}</td>,
             blockquote: ({ children }) => (
               <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-gray-300 bg-blue-500/5 rounded-r-lg italic">
-                {children}
+                {parseCitationsInReactNode(children, documents, onOpenDocument)}
               </blockquote>
             ),
             code: ({ inline, className, children, ...props }: any) => {
@@ -679,6 +779,7 @@ export default function ChatArea({
   onPromoteQueuedPrompt,
   documents, 
   onDocumentAdded, 
+  onOpenDocument,
   onEnsureChatSession,
   backendUrl,
   isSidebarOpen = true,
@@ -894,6 +995,7 @@ export default function ChatArea({
                           backendUrl={backendUrl}
                           documents={documents}
                           onDocumentAdded={onDocumentAdded}
+                          onOpenDocument={onOpenDocument}
                           onEnsureChatSession={onEnsureChatSession}
                         />
                       </div>

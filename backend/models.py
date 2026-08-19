@@ -21,6 +21,7 @@ class DocumentResponse(BaseModel):
     id: int
     filename: str
     created_at: datetime
+    index: Optional[int] = None
     
     class Config:
         from_attributes = True
