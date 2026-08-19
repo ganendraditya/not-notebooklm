@@ -120,7 +120,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
         queue = asyncio.Queue()
         
         async def status_callback(status_text: str):
-            await queue.put({"type": "status", "data": status_text})
+            await queue.put({"type": "status", "text": status_text, "data": status_text})
             
         async def worker():
             try:
@@ -233,7 +233,7 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
         queue = asyncio.Queue()
         
         async def status_callback(status_text: str):
-            await queue.put({"type": "status", "data": status_text})
+            await queue.put({"type": "status", "text": status_text, "data": status_text})
             
         async def worker():
             try:

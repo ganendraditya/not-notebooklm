@@ -209,10 +209,15 @@ export default function ChatClient() {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
-                if (data.type === "status" && data.text) {
-                  setActiveStatus(data.text);
-                } else if (data.type === "done" && data.message) {
-                  setMessages(prev => [...prev, data.message]);
+                if (data.type === "status") {
+                  const statusText = data.text || data.data;
+                  if (statusText) setActiveStatus(statusText);
+                } else if (data.type === "done") {
+                  const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
+                  setMessages(prev => [...prev, asstMsg]);
+                } else if (data.type === "error") {
+                  const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
+                  setMessages(prev => [...prev, errorMsg]);
                 }
               } catch (e) {
                 console.error("SSE parse error:", e);
@@ -328,10 +333,15 @@ export default function ChatClient() {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
-                if (data.type === "status" && data.text) {
-                  setActiveStatus(data.text);
-                } else if (data.type === "done" && data.message) {
-                  setMessages(prev => [...prev, data.message]);
+                if (data.type === "status") {
+                  const statusText = data.text || data.data;
+                  if (statusText) setActiveStatus(statusText);
+                } else if (data.type === "done") {
+                  const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
+                  setMessages(prev => [...prev, asstMsg]);
+                } else if (data.type === "error") {
+                  const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
+                  setMessages(prev => [...prev, errorMsg]);
                 }
               } catch (e) {
                 console.error("SSE parse error:", e);
