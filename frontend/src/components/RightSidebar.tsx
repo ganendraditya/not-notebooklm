@@ -301,9 +301,9 @@ export default function RightSidebar({
         const data = await res.json();
         if (data.cleaned_doc_ids && data.cleaned_doc_ids.length > 0) {
           onBulkDocumentsDeleted?.(data.cleaned_doc_ids);
-          setCleanFeedback(`Removed ${data.cleaned_count} duplicate(s)!`);
+          setCleanFeedback(`Removed ${data.cleaned_count} duplicate(s)`);
         } else {
-          setCleanFeedback("No duplicates found — all sources are unique!");
+          setCleanFeedback("No duplicates found");
         }
         setTimeout(() => setCleanFeedback(null), 3000);
       }
@@ -1135,9 +1135,9 @@ export default function RightSidebar({
 
         {/* Dynamic Clean Feedback Notification */}
         {cleanFeedback && (
-          <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
-            <Check size={14} className="text-emerald-400 shrink-0" />
-            <span className="truncate">{cleanFeedback}</span>
+          <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+            <Check size={13} className="text-emerald-400 shrink-0" />
+            <span className="text-[12px]">{cleanFeedback}</span>
           </div>
         )}
 
