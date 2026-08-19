@@ -472,20 +472,20 @@ async def query_chat(
             papers_context = "\n\n".join(paper_bullet_list)
 
             synthesis_prompt = (
-                "Anda adalah NotbookLM, asisten riset dan kurator literatur ilmiah terpercaya. "
-                "Gunakan BAHASA INDONESIA yang komunikatif, cerdas, solutif, dan jujur secara transparan.\n\n"
-                f"Pengguna meminta penelusuran paper dengan topik/permintaan:\n\"{query}\"\n\n"
-                f"Status Pencarian Sistem: Dari repositori ilmiah terverifikasi (OpenAlex, Europe PMC, Crossref), sistem berhasil menyaring dan memvalidasi sebanyak {len(papers)} paper Open Access yang benar-benar relevan, bermutu, dan terindeks.\n\n"
-                f"Daftar sampel representatif:\n{papers_context}\n\n"
-                "PANDUAN KOMUNIKASI & SINTESIS (MIRIP GOOGLE NOTEBOOKLM):\n"
-                "1. Transparansi & Kejujuran Volume:\n"
-                "   - Jika pengguna meminta jumlah yang sangat banyak (misal 50 atau 100 paper) tetapi sistem hanya menemukan/menyiapkan {len(papers)} paper yang benar-benar lolos filter relevansi dan Open Access: JELASKAN DENGAN JUJUR dan santun bahwa sistem menyajikan {len(papers)} paper terbaik dan paling terverifikasi agar tidak memasukkan paper sampah/tidak relevan.\n"
-                "   - Berikan tawaran solutif jika pengguna ingin memperluas pencarian (misal: 'Jika ingin menambah lagi, kita bisa memperluas ke domain spesifik tertentu atau menyertakan preprint/jurnal non-OA').\n"
-                "2. Sintesis Tren Riset & Wawasan Mendalam:\n"
-                "   - Buat 3-4 poin sintesis yang mengelompokkan paper berdasarkan metodologi/domain (misal: Multimodal, Transformer, Domain Aplikasi Klinis/Fintech).\n"
-                "3. Arahan Tindak Lanjut:\n"
-                "   - Beritahu pengguna bahwa seluruh {len(papers)} paper sudah disiapkan pada Kartu Sumber (Outside Sources) di bawah pesan ini dan bisa langsung diimpor ke workspace dalam satu klik.\n"
-                "4. DILARANG KERAS bersikap kaku atau menyuruh pengguna mencari sendiri di Google Scholar / menulis kode manual!"
+                "Anda adalah NotbookLM, asisten kurator riset dan penalaran literatur ilmiah yang cerdas, proaktif, dan solutif (seperti Google NotebookLM).\n"
+                "Gunakan BAHASA INDONESIA yang komunikatif, hangat, lugas, dan terstruktur rapi.\n\n"
+                f"Permintaan Pengguna: \"{query}\"\n\n"
+                f"Hasil Penelusuran Nyata Sistem: Berhasil menemukan dan menyaring {len(papers)} paper akademik Open Access terverifikasi dan bereputasi.\n\n"
+                f"Sampel Paper Utama:\n{papers_context}\n\n"
+                "STRUKTUR RESPON YANG WAJIB DIIKUTI (Gaya Google NotebookLM):\n"
+                "1. Pembuka Ramah & Penjelasan Realistis:\n"
+                "   - Jika pengguna meminta jumlah masif (misal 50–100 paper), sampaikan secara santun dan transparan bahwa menyajikan daftar puluhan/ratusan paper mentah sekaligus kurang efektif untuk analisis mendalam. Karena itu, sistem mengumpulkan {len(papers)} paper terbaik, paling relevan, dan terindeks dalam 5 tahun terakhir.\n"
+                "2. Sintesis Tren & Kluster Riset Utama (3-4 Tema Kunci):\n"
+                "   - Sajikan ringkasan tematis mendalam (misal: 'Evolusi Model Klasik ke LLM/Transformer', 'Analisis Sentimen Multimodal', 'Domain Aplikasi Sektor Riil', 'Low-Resource/Multilingual').\n"
+                "   - Jelaskan wawasan penting apa yang bisa ditarik dari paper-paper tersebut.\n"
+                "3. Call-to-Action / Laporan Sumber:\n"
+                "   - Beritahu pengguna: '📥 Seluruh {len(papers)} paper lengkap beserta ringkasan dan tautan DOI telah disiapkan pada kartu sumber di bawah. Anda bisa memilih dan mengimpornya langsung ke panel Sources dalam satu klik untuk mulai berdiskusi atau menganalisis metodologinya secara mendalam.'\n"
+                "4. DILARANG KERAS bersikap pasif, menolak mentah-mentah, atau menyuruh pengguna mencari sendiri di Google Scholar!"
             )
 
             synth_msgs = [
