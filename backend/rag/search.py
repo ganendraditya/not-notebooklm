@@ -44,10 +44,14 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
         "en_query": clean_text or query.strip(),
         "id_query": clean_text or query.strip(),
         "target_count": 15,
-        "language_preference": "mixed"
+        "language_preference": "mixed",
+        "open_access_only": False,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": False
     }
     
-    # Fast regex extraction for fallback count and min_year
+    # Fast regex extraction for fallback count, min_year, open access, quartiles
     user_requested_count = None
     default_min_year = None
     if any(k in query.lower() for k in ["5 tahun", "lima tahun", "terbaru", "recent"]):
@@ -66,6 +70,25 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
                 default_plan["user_requested_count"] = p_num
         except Exception:
             pass
+
+    # Extract open access intent
+    if any(k in query.lower() for k in ["open access", "open-access", "oa only", "open access only", "free pdf", "gratis", "free full text"]):
+        default_plan["open_access_only"] = True
+
+    # Extract Scopus Quartile intent (e.g. Q1 only, Q1/Q2, Scopus Q1)
+    q_matches = re.findall(r'\b[qQ]([1-4])\b', query)
+    if q_matches:
+        default_plan["scopus_quartiles"] = list(set([f"Q{q}" for q in q_matches]))
+
+    # Extract SINTA Tier intent (e.g. Sinta 1, Sinta 2, SINTA 1/2)
+    sinta_matches = re.findall(r'\bsinta\s*([1-6])\b', query, re.I)
+    if sinta_matches:
+        default_plan["sinta_tiers"] = list(set([f"S{s}" for s in sinta_matches]))
+
+    # Extract exclude preprints intent
+    if any(k in query.lower() for k in ["exclude preprint", "tanpa preprint", "bukan preprint", "exclude preprints"]):
+        default_plan["exclude_preprints"] = True
+
     # Extract minimum citations threshold from prompt if present
     default_min_citations = 0
     cit_match = re.search(r'(?:minimum|min|tersitasi\s*minimal|sitasi\s*minimal|cit(?:ed|ations)?\s*(?:>=|min|minimal)?)\s*[:=]?\s*(\d+)', query, re.I)
@@ -108,23 +131,31 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
             "1. CONTEXT & TOPIC RESOLUTION:\n"
             "   - If the user's request refers to previous topics (e.g. 'topik tadi', 'terkait tadi', 'yang tadi', 'topik sepak bola tadi', 'more papers on this topic', 'coba lagi dong'): You MUST examine 'Previous Conversation Context' to identify the specific research domain (e.g. 'football match outcome prediction Premier League machine learning')!\n"
             "   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt' or physics acronyms! 'gw' in Indonesian means 'me/I'.\n"
-            "2. 'en_query': Pure English academic search term for global scholarly databases. Remove all conversational filler words ('cariin', 'mau itu', 'campur aja', 'bebas', 'yang penting', 'gw', 'lah', 'dong', 'ya', 'coba'). Convert domain abbreviations ('ML' -> 'machine learning', 'DL' -> 'deep learning', 'EPL' -> 'English Premier League').\n"
-            "3. 'id_query': Pure Indonesian academic search term for national journals (e.g. 'prediksi hasil pertandingan sepak bola machine learning').\n"
+            "2. 'en_query': Pure English academic search term for global scholarly databases. Remove all conversational filler words ('cariin', 'mau itu', 'campur aja', 'bebas', 'yang penting', 'gw', 'lah', 'dong', 'ya', 'coba', 'open access', 'q1', 'sinta'). Convert domain abbreviations ('ML' -> 'machine learning', 'DL' -> 'deep learning', 'EPL' -> 'English Premier League').\n"
+            "3. 'id_query': Pure Indonesian academic search term for national journals (e.g. 'analisis sentimen machine learning').\n"
             "4. 'target_count': Integer representing how many papers to search for.\n"
             "   - If the user explicitly specified an exact number (e.g. 30, 50, 25, 100), set target_count to that number (capped at 100 max per fetch).\n"
             "   - If the user DID NOT specify an exact number (e.g. 'cariin paper', 'cari literatur', 'ada paper apa aja'), choose an optimal, realistic sample count between 10 and 25 (e.g. 15 or 20) based on domain depth. NEVER default to 100 unless explicitly requested!\n"
             "   - If the user asks for follow-up ('coba lagi', 'tambah lagi'), set target_count to 10-20 fresh papers.\n"
-            "5. 'user_requested_count': The exact integer if the user specified a number (e.g. 30, 50, 300), otherwise null.\n"
-            "6. 'min_year': Integer representing minimum publication year (e.g. 2020 if user mentioned '5 tahun terakhir' or 'terbaru', otherwise null).\n"
-            "7. 'min_citations': Integer representing minimum citations count threshold (e.g. 10 if user specified 'min 10 sitasi', otherwise 0).\n"
-            "8. 'language_preference': 'mixed' (if user wants both/either/mix/unspecified), 'en' (if user strictly asked for English/international), 'id' (if user strictly asked for Indonesian).\n"
-            "9. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\n"
+            "5. 'open_access_only': Boolean true if user explicitly or via filter requested open access / free PDF only, else false.\n"
+            "6. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n"
+            "7. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n"
+            "8. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n"
+            "9. 'user_requested_count': The exact integer if the user specified a number (e.g. 30, 50, 300), otherwise null.\n"
+            "10. 'min_year': Integer representing minimum publication year (e.g. 2020 if user mentioned '5 tahun terakhir' or 'terbaru', otherwise null).\n"
+            "11. 'min_citations': Integer representing minimum citations count threshold (e.g. 10 if user specified 'min 10 sitasi', otherwise 0).\n"
+            "12. 'language_preference': 'mixed' (if user wants both/either/mix/unspecified), 'en' (if user strictly asked for English/international), 'id' (if user strictly asked for Indonesian).\n"
+            "13. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\n"
             "Example Output:\n"
             "{\n"
-            "  \"en_query\": \"football match outcome prediction Premier League machine learning\",\n"
-            "  \"id_query\": \"prediksi hasil pertandingan sepak bola machine learning\",\n"
-            "  \"target_count\": 20,\n"
-            "  \"user_requested_count\": null,\n"
+            "  \"en_query\": \"sentiment analysis machine learning\",\n"
+            "  \"id_query\": \"analisis sentimen machine learning\",\n"
+            "  \"target_count\": 100,\n"
+            "  \"open_access_only\": true,\n"
+            "  \"scopus_quartiles\": [],\n"
+            "  \"sinta_tiers\": [],\n"
+            "  \"exclude_preprints\": false,\n"
+            "  \"user_requested_count\": 100,\n"
             "  \"min_year\": null,\n"
             "  \"min_citations\": 0,\n"
             "  \"language_preference\": \"mixed\"\n"
@@ -170,12 +201,21 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
             lang = str(parsed.get("language_preference", "mixed")).lower()
             if lang not in ["mixed", "en", "id"]:
                 lang = "mixed"
+
+            oa_only = bool(parsed.get("open_access_only", default_plan["open_access_only"])) or default_plan["open_access_only"]
+            scopus_q = parsed.get("scopus_quartiles") or default_plan["scopus_quartiles"]
+            sinta_t = parsed.get("sinta_tiers") or default_plan["sinta_tiers"]
+            ex_prep = bool(parsed.get("exclude_preprints", default_plan["exclude_preprints"])) or default_plan["exclude_preprints"]
             
-            print(f"[AI Query Planner] en_query='{en_q}' | id_query='{id_q}' | count={cnt} (requested: {req_cnt}) | min_year={m_year} | min_citations={m_cit} | lang='{lang}'")
+            print(f"[AI Query Planner] en_query='{en_q}' | id_query='{id_q}' | count={cnt} | oa={oa_only} | scopus={scopus_q} | sinta={sinta_t} | min_year={m_year} | min_citations={m_cit} | lang='{lang}'")
             return {
                 "en_query": en_q,
                 "id_query": id_q,
                 "target_count": cnt,
+                "open_access_only": oa_only,
+                "scopus_quartiles": scopus_q,
+                "sinta_tiers": sinta_t,
+                "exclude_preprints": ex_prep,
                 "user_requested_count": req_cnt,
                 "min_year": m_year,
                 "min_citations": m_cit,
@@ -323,6 +363,10 @@ def search_academic_papers_planned(
 
     min_year = plan.get("min_year")
     min_citations = int(plan.get("min_citations") or 0)
+    open_access_only = bool(plan.get("open_access_only", False))
+    scopus_quartiles = [q.upper() for q in (plan.get("scopus_quartiles") or [])]
+    sinta_tiers = [s.upper() for s in (plan.get("sinta_tiers") or [])]
+    exclude_preprints = bool(plan.get("exclude_preprints", False))
     
     def is_candidate_duplicate(title: str, doi: str) -> bool:
         c_norm = normalize_title_str(title)
@@ -411,7 +455,10 @@ def search_academic_papers_planned(
         fetched = []
         if not term.strip(): return fetched
         try:
-            url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={urllib.parse.quote(term.strip())}&format=json&pageSize={min(target_count + 10, 50)}&resultType=core"
+            query_term = term.strip()
+            if open_access_only:
+                query_term += " OPEN_ACCESS:y"
+            url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={urllib.parse.quote(query_term)}&format=json&pageSize={min(target_count + 10, 50)}&resultType=core"
             resp = requests.get(url, timeout=6)
             if resp.status_code == 200:
                 for p in resp.json().get("resultList", {}).get("result", []):
@@ -431,6 +478,16 @@ def search_academic_papers_planned(
                     pdf_urls = [f.get("url") for f in ft_urls if f.get("documentStyle") == "pdf" and f.get("url")]
                     pdf_url = pdf_urls[0] if pdf_urls else ""
                     
+                    # Filter OA if requested
+                    is_oa_pmc = p.get("isOpenAccess") == "Y" or bool(pdf_url)
+                    if open_access_only and not is_oa_pmc:
+                        continue
+
+                    # Filter preprint
+                    is_preprint_pmc = p.get("pubType") == "preprint" or "preprint" in (venue or "").lower()
+                    if exclude_preprints and is_preprint_pmc:
+                        continue
+                    
                     snippet = abstract if abstract else f"Scholarly research publication in {venue} ({year}). DOI: {doi}"
                     if not is_matching_topic(title, snippet): continue
                     
@@ -443,7 +500,8 @@ def search_academic_papers_planned(
                         "snippet": snippet,
                         "authors": authors,
                         "venue": venue,
-                        "pdf_url": pdf_url
+                        "pdf_url": pdf_url,
+                        "is_oa": is_oa_pmc
                     })
         except Exception as e:
             print(f"[Europe PMC Search Error]: {e}")
@@ -454,7 +512,7 @@ def search_academic_papers_planned(
         fetched = []
         if not term.strip(): return fetched
         page = 1
-        max_pages = max(10, (target_count // 25) + 3)
+        max_pages = max(15, (target_count // 20) + 5)
         while len(fetched) < target_count and page <= max_pages:
             try:
                 per_page = min(max(target_count - len(fetched) + 20, 50), 100)
@@ -463,6 +521,7 @@ def search_academic_papers_planned(
                 filter_parts = []
                 if min_year: filter_parts.append(f"publication_year:{min_year}-2026")
                 if min_citations > 0: filter_parts.append(f"cited_by_count:>{min_citations - 1}")
+                if open_access_only: filter_parts.append("is_oa:true")
                 if filter_parts: params["filter"] = ",".join(filter_parts)
                     
                 resp = requests.get(url, params=params, headers=headers, timeout=8)
@@ -481,9 +540,19 @@ def search_academic_papers_planned(
                         citations_count = work.get("cited_by_count", 0)
                         if min_citations > 0 and citations_count < min_citations: continue
                                 
-                        landing_url = work.get("primary_location", {}).get("landing_page_url") or doi or f"https://openalex.org/{work.get('id')}"
-                        oa_pdf = work.get("best_oa_location", {}).get("pdf_url") or work.get("primary_location", {}).get("pdf_url") or ""
-                        venue = work.get("primary_location", {}).get("source", {}).get("display_name") if work.get("primary_location", {}).get("source") else ""
+                        loc = work.get("primary_location") or {}
+                        is_oa_work = work.get("open_access", {}).get("is_oa", False) or loc.get("is_oa", False)
+                        if open_access_only and not is_oa_work:
+                            continue
+
+                        work_type = loc.get("source", {}).get("type") or work.get("type", "")
+                        is_preprint_work = work_type == "preprint" or "preprint" in (loc.get("source", {}).get("display_name") or "").lower()
+                        if exclude_preprints and is_preprint_work:
+                            continue
+
+                        landing_url = loc.get("landing_page_url") or doi or f"https://openalex.org/{work.get('id')}"
+                        oa_pdf = work.get("best_oa_location", {}).get("pdf_url") or loc.get("pdf_url") or ""
+                        venue = loc.get("source", {}).get("display_name") if loc.get("source") else ""
                         authors = [a.get("author", {}).get("display_name", "") for a in work.get("authorships", [])]
                         
                         abstract = ""
@@ -507,7 +576,8 @@ def search_academic_papers_planned(
                             "snippet": snippet,
                             "authors": authors,
                             "venue": venue,
-                            "pdf_url": oa_pdf
+                            "pdf_url": oa_pdf,
+                            "is_oa": is_oa_work
                         })
                     page += 1
                 else:
@@ -522,7 +592,7 @@ def search_academic_papers_planned(
         fetched = []
         if not term.strip(): return fetched
         offset = 0
-        while len(fetched) < target_count and offset <= (target_count * 2):
+        while len(fetched) < target_count and offset <= (target_count * 3):
             try:
                 url = "https://api.crossref.org/works"
                 rows = min(target_count - len(fetched) + 30, 100)
@@ -544,6 +614,17 @@ def search_academic_papers_planned(
                         created = item.get("created", {}).get("date-parts", [[]])[0]
                         if created: year = str(created[0])
                         if min_year and year.isdigit() and int(year) < min_year: continue
+
+                        # Open access link check for Crossref
+                        link_list = item.get("link", [])
+                        oa_pdf_link = ""
+                        for l_entry in link_list:
+                            if l_entry.get("content-type") == "application/pdf":
+                                oa_pdf_link = l_entry.get("URL", "")
+                                break
+                        is_oa_cr = bool(oa_pdf_link) or any("open-access" in str(lic.get("URL", "")).lower() for lic in item.get("license", []))
+                        if open_access_only and not is_oa_cr:
+                            continue
                             
                         authors = [f"{a.get('given', '')} {a.get('family', '')}".strip() for a in item.get("author", [])]
                         venue = item.get("container-title", [""])[0] if item.get("container-title") else ""
@@ -562,7 +643,8 @@ def search_academic_papers_planned(
                             "snippet": snippet,
                             "authors": authors,
                             "venue": venue,
-                            "pdf_url": ""
+                            "pdf_url": oa_pdf_link,
+                            "is_oa": is_oa_cr
                         })
                     offset += rows
                 else:
@@ -589,12 +671,21 @@ def search_academic_papers_planned(
         if len(results) < limit:
             cr_id = fetch_crossref(id_query, limit - len(results))
             results.extend(cr_id)
+
+        # 3. Dynamic Quota Spillover: If local papers are scarce, exhaust remaining quota from global English sources!
+        if len(results) < limit:
+            remaining_needed = limit - len(results)
+            spillover_oa = fetch_openalex(en_query, remaining_needed)
+            results.extend(spillover_oa)
     elif lang_pref == "id":
         id_papers = fetch_openalex(id_query, limit)
         results.extend(id_papers)
         if len(results) < limit:
             cr_id = fetch_crossref(id_query, limit - len(results))
             results.extend(cr_id)
+        if len(results) < limit:
+            spillover_oa = fetch_openalex(en_query, limit - len(results))
+            results.extend(spillover_oa)
     else: # "en"
         epmc_papers = fetch_europe_pmc(en_query, limit // 2 + 2)
         results.extend(epmc_papers)
@@ -602,7 +693,7 @@ def search_academic_papers_planned(
             oa_papers = fetch_openalex(en_query, limit - len(results))
             results.extend(oa_papers)
             
-    # Fallback to Crossref if still under limit
+    # Final Fallback to Crossref if still under limit
     if len(results) < limit:
         extra_cr = fetch_crossref(en_query or id_query, limit - len(results))
         results.extend(extra_cr)
