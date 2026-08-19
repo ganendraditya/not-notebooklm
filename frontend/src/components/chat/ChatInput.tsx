@@ -236,34 +236,13 @@ export const ChatInputBox = memo(function ChatInputBox({
 
             <ModelSelector backendUrl={backendUrl} />
 
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                  isCustomized
-                    ? "bg-blue-500/20 border-blue-500/40 text-blue-300 hover:bg-blue-500/30"
-                    : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-300 border-white/5"
-                }`}
-                title="Configure Search Filters"
-              >
-                <SlidersHorizontal size={13} className={isCustomized ? "text-blue-400" : "text-gray-400"} />
-                <span className="hidden sm:inline">
-                  {isCustomized ? "Filtered" : "Filter"}
-                </span>
-                {isCustomized && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                )}
-              </button>
-
-              <SearchFilterPopover
-                isOpen={isFilterOpen}
-                onClose={() => setIsFilterOpen(false)}
-                onToggle={() => setIsFilterOpen(prev => !prev)}
-                filter={filter}
-                onApplyFilter={setFilter}
-              />
-            </div>
+            <SearchFilterPopover
+              isOpen={isFilterOpen}
+              onClose={() => setIsFilterOpen(false)}
+              onToggle={() => setIsFilterOpen(prev => !prev)}
+              filter={filter}
+              onApplyFilter={setFilter}
+            />
           </div>
 
           <div className="flex items-center gap-1">
