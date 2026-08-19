@@ -207,7 +207,13 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 {parseCitationsInReactNode(children, documents, onOpenDocument)}
               </blockquote>
             ),
-            pre: ({ children }) => <>{children}</>,
+            pre: ({ children }) => (
+              <div className="relative group my-3">
+                <pre className="bg-[#16171a] p-3.5 rounded-xl overflow-x-auto text-xs text-gray-200 font-mono border border-white/10">
+                  {children}
+                </pre>
+              </div>
+            ),
             code: ({ inline, className, children, ...props }: any) => {
               if (inline) {
                 return (
@@ -217,13 +223,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 );
               }
               return (
-                <div className="relative group my-3">
-                  <pre className="bg-[#16171a] p-3.5 rounded-xl overflow-x-auto text-xs text-gray-200 font-mono border border-white/10">
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  </pre>
-                </div>
+                <code className={className} {...props}>
+                  {children}
+                </code>
               );
             }
           }}
