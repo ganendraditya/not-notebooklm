@@ -374,7 +374,51 @@ const ChatInputBox = memo(function ChatInputBox({
   const handleSend = () => {
     const query = input.trim();
     if (!query) return;
-    onSubmit(query);
+
+    // Check if any academic search filters are active
+    const filterClauses: string[] = [];
+    if (filter.yearFrom && filter.yearTo) {
+      filterClauses.push(`years ${filter.yearFrom}-${filter.yearTo}`);
+    } else if (filter.yearFrom) {
+      filterClauses.push(`from ${filter.yearFrom} onwards`);
+    } else if (filter.yearTo) {
+      filterClauses.push(`up to ${filter.yearTo}`);
+    }
+
+    if (filter.minCitations && Number(filter.minCitations) > 0) {
+      filterClauses.push(`minimum ${filter.minCitations} citations`);
+    }
+
+    if (filter.scopusQuartiles && filter.scopusQuartiles.length > 0) {
+      filterClauses.push(`Scopus ${filter.scopusQuartiles.join("/")}`);
+    }
+
+    if (filter.sintaTiers && filter.sintaTiers.length > 0) {
+      filterClauses.push(`SINTA ${filter.sintaTiers.join("/")}`);
+    }
+
+    if (filter.excludePreprints) {
+      filterClauses.push("exclude preprints");
+    }
+
+    if (filter.openAccessOnly) {
+      filterClauses.push("open access only");
+    }
+
+    if (filter.language && filter.language !== "all") {
+      filterClauses.push(`language: ${filter.language}`);
+    }
+
+    if (filter.fieldsOfStudy && filter.fieldsOfStudy.length > 0) {
+      filterClauses.push(`discipline: ${filter.fieldsOfStudy.join(", ")}`);
+    }
+
+    let finalMessage = query;
+    if (filterClauses.length > 0) {
+      finalMessage = `${query}\n[Filter Preferences: ${filterClauses.join(", ")}]`;
+    }
+
+    onSubmit(finalMessage);
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";

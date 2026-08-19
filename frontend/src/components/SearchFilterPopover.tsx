@@ -18,6 +18,7 @@ import {
 export interface SearchFilterState {
   yearFrom: string;
   yearTo: string;
+  minCitations: string; // "" (default: 0 / any), or "1", "10", "50", etc.
   language: string; // "all" or specific ISO code
   fieldsOfStudy: string[];
   scopusQuartiles: string[]; // ["Q1", "Q2", "Q3", "Q4"]
@@ -29,6 +30,7 @@ export interface SearchFilterState {
 export const DEFAULT_SEARCH_FILTER: SearchFilterState = {
   yearFrom: "",
   yearTo: "",
+  minCitations: "",
   language: "all",
   fieldsOfStudy: [],
   scopusQuartiles: [],
@@ -91,6 +93,7 @@ interface SearchFilterPopoverProps {
 const sanitizeFilter = (raw: Partial<SearchFilterState> | undefined): SearchFilterState => ({
   yearFrom: raw?.yearFrom || "",
   yearTo: raw?.yearTo || "",
+  minCitations: raw?.minCitations || "",
   language: raw?.language || "all",
   fieldsOfStudy: Array.isArray(raw?.fieldsOfStudy) ? raw.fieldsOfStudy : [],
   scopusQuartiles: Array.isArray(raw?.scopusQuartiles) ? raw.scopusQuartiles : [],
@@ -152,6 +155,7 @@ export default function SearchFilterPopover({
     if (!f) return 0;
     return (
       (f.yearFrom || f.yearTo ? 1 : 0) +
+      (f.minCitations && Number(f.minCitations) > 0 ? 1 : 0) +
       (f.language && f.language !== "all" ? 1 : 0) +
       (f.fieldsOfStudy?.length || 0) +
       (f.scopusQuartiles?.length || 0) +
@@ -357,6 +361,64 @@ export default function SearchFilterPopover({
                   value={localFilter.yearTo}
                   onChange={(e) => setLocalFilter(prev => ({ ...prev, yearTo: e.target.value }))}
                   className="w-full bg-[#131417] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* 2. Minimum Citations Filter */}
+            <div className="space-y-2 pt-2 border-t border-white/10">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
+                  <Award size={13} className="text-amber-400" />
+                  Minimum Citations
+                </span>
+                {localFilter.minCitations && Number(localFilter.minCitations) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setLocalFilter(prev => ({ ...prev, minCitations: "" }))}
+                    className="text-[11px] text-blue-400 hover:underline cursor-pointer"
+                  >
+                    Reset (Any)
+                  </button>
+                )}
+              </div>
+
+              {/* Preset citation chips */}
+              <div className="grid grid-cols-4 gap-1.5 text-[11px]">
+                {[
+                  { label: "Any (0+)", value: "" },
+                  { label: "1+ Citation", value: "1" },
+                  { label: "10+ Citations", value: "10" },
+                  { label: "50+ Citations", value: "50" },
+                ].map((preset) => {
+                  const isSelected = localFilter.minCitations === preset.value || (!localFilter.minCitations && preset.value === "");
+                  return (
+                    <button
+                      key={preset.label}
+                      type="button"
+                      onClick={() => setLocalFilter(prev => ({ ...prev, minCitations: preset.value }))}
+                      className={
+                        isSelected
+                          ? "py-1 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-amber-500/20 border-amber-500/70 text-amber-300 font-semibold shadow-sm text-[11px]"
+                          : "py-1 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300 text-[11px]"
+                      }
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom numeric input */}
+              <div className="flex items-center gap-2 pt-0.5">
+                <span className="text-[11px] text-gray-400 shrink-0">Custom min:</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 5, 20, 100"
+                  value={localFilter.minCitations}
+                  onChange={(e) => setLocalFilter(prev => ({ ...prev, minCitations: e.target.value }))}
+                  className="w-full bg-[#131417] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 font-mono"
                 />
               </div>
             </div>
