@@ -321,7 +321,7 @@ def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(get_db
         
     abs_match = re.search(r"##\s*Abstract[^\n]*\n+([\s\S]+)", raw_content)
     local_abstract = abs_match.group(1).strip() if abs_match else ""
-    if local_abstract and len(local_abstract) > 30 and "Publikasi ilmiah" not in local_abstract and "Scholarly publication" not in local_abstract and "Indexed in international" not in local_abstract:
+    if local_abstract and rag.is_valid_abstract_content(local_abstract):
         res_data["abstract"] = rag.clean_academic_abstract(local_abstract)
         res_data["abstract_type"] = "official"
         
@@ -343,8 +343,8 @@ def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(get_db
                 res_data["abstract"] = meta.get("abstract")
                 res_data["abstract_type"] = meta.get("abstract_type", "official")
                 
-            # Heal file on disk with clean metadata & abstract if it was previously minimal
-            if meta.get("abstract") and ("Publikasi ilmiah" in raw_content or "Scholarly publication" in raw_content or len(raw_content) < 350):
+            # Heal file on disk with clean metadata & authentic abstract if it was previously invalid or minimal
+            if meta.get("abstract") and (not rag.is_valid_abstract_content(local_abstract) or len(raw_content) < 350):
                 new_saved_content = f"# {res_data['title']} ({res_data['year']})\n\n**DOI:** {res_data['doi']}  \n**URL:** {res_data['url']}  \n\n## Abstract & Overview\n\n{res_data['abstract']}\n"
                 try:
                     with open(file_path, "w", encoding="utf-8") as f:
@@ -380,10 +380,10 @@ def bulk_download_documents(chat_id: str, req: models.BulkDeleteRequest, db: Ses
         return FileResponse(
             path=file_path,
             filename=doc.filename,
-            media_type="application/octet-stream"
+            media_type="application/pdf"
         )
         
-    # If > 1 files: bundle into ZIP archive stream
+    # Multiple files: Create ZIP stream in memory
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for doc in docs:
@@ -394,20 +394,15 @@ def bulk_download_documents(chat_id: str, req: models.BulkDeleteRequest, db: Ses
                 zip_file.writestr(doc.filename, f"# {doc.filename}\n\nDokumen referensi NotbookLM.")
                 
     zip_buffer.seek(0)
-    zip_filename = f"NotbookLM_Sources_{len(docs)}_files.zip"
-    
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="{zip_filename}"',
-            "Access-Control-Expose-Headers": "Content-Disposition"
-        }
+        headers={"Content-Disposition": f"attachment; filename=notbooklm_sources_{chat_id[:8]}.zip"}
     )
 
 @app.get("/search_papers", response_model=List[models.PaperCandidate])
+@app.get("/papers/search", response_model=List[models.PaperCandidate])
 async def search_papers(query: str, limit: int = 10):
-    """Searches OpenAlex & Crossref with Consensus-style AI Query Planner & balanced bilingual retriever."""
     if not query.strip():
         return []
         
@@ -432,16 +427,18 @@ async def search_papers(query: str, limit: int = 10):
 
 @app.post("/chats/{chat_id}/import_sources", response_model=List[models.DocumentResponse])
 def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Session = Depends(get_db)):
-    """Imports selected paper candidates as RAG sources/documents into the chat session."""
-    db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-    if not db_chat:
+    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
         
-    existing_count = db.query(Document).filter(Document.chat_id == chat_id).count()
-    if existing_count >= MAX_SOURCES_PER_CHAT:
-        raise HTTPException(status_code=400, detail="Batas maksimal tercapai! Percakapan ini sudah memiliki 250 sumber.")
+    # Check limit: Maximum 50 documents per chat
+    current_doc_count = db.query(Document).filter(Document.chat_id == chat_id).count()
+    remaining_slots = max(0, 50 - current_doc_count)
+    if remaining_slots <= 0:
+        raise HTTPException(status_code=400, detail="Document limit reached (Max 50 documents per chat). Please delete some sources before importing new ones.")
         
-    allowed_sources = req.sources[:max(0, MAX_SOURCES_PER_CHAT - existing_count)]
+    allowed_sources = req.sources[:remaining_slots]
+    
     created_docs = []
     for paper in allowed_sources:
         # Clean filename
@@ -451,9 +448,9 @@ def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Session =
         filename = f"{clean_title}.pdf"
         
         abstract_text = paper.snippet.strip()
-        if (len(abstract_text) < 40 or "Publikasi ilmiah" in abstract_text or "terindeks Crossref" in abstract_text or "Scholarly publication" in abstract_text) and paper.doi:
+        if not rag.is_valid_abstract_content(abstract_text) and paper.doi:
             fetched_abs = rag.fetch_full_abstract_by_doi(paper.doi)
-            if fetched_abs:
+            if fetched_abs and rag.is_valid_abstract_content(fetched_abs):
                 abstract_text = fetched_abs
         
         # Prepare structured text content

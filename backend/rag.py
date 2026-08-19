@@ -724,14 +724,78 @@ def clean_academic_abstract(text: str) -> str:
     # 5. Normalize consecutive newlines and whitespace
     cleaned = re.sub(r'[ \t]+', ' ', cleaned)
     cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)
+    # 6. Strip redundant leading "Abstract" or "Overview" headers
+    cleaned = re.sub(r'^\s*(?:abstract|abstract\s*&\s*overview|overview)\s*[:\-\.]?\s*', '', cleaned, flags=re.I)
     return cleaned.strip()
+
+def is_valid_abstract_content(text: str) -> bool:
+    """Validates whether a candidate string is an authentic academic abstract or just taxonomy/boilerplate."""
+    if not text or not isinstance(text, str):
+        return False
+    t = text.strip()
+    if len(t) < 50:
+        return False
+        
+    t_low = t.lower()
+    # Taxonomy discipline labels or generic single lines
+    invalid_exact = {
+        "social and behavioral sciences", "social sciences", "behavioral sciences",
+        "medicine and health", "medical sciences", "engineering and computer science",
+        "computer science", "physical sciences", "humanities", "arts and humanities",
+        "business and economics", "life sciences", "biological sciences", "decision sciences"
+    }
+    if t_low in invalid_exact:
+        return False
+        
+    boilerplate_phrases = [
+        "publikasi ilmiah", "terindeks crossref", "scholarly publication", 
+        "indexed in international", "no abstract available", "abstract not available",
+        "preview this article", "full text is available", "an abstract is not available"
+    ]
+    if any(b in t_low for b in boilerplate_phrases) and len(t) < 250:
+        return False
+        
+    return True
+
+def extract_abstract_from_html(html_text: str) -> str:
+    """Extracts authentic academic abstract from HTML meta tags and semantic container elements across scholarly publishers."""
+    if not html_text:
+        return ""
+        
+    # 1. Meta tag extraction (Standard Highwire, Dublin Core, OpenGraph)
+    meta_patterns = [
+        r'<meta\s+[^>]*?(?:name|property)=["\'](?:citation_abstract|dc\.description)["\'][^>]*?content=["\'](.*?)["\']',
+        r'<meta\s+[^>]*?content=["\'](.*?)["\'][^>]*?(?:name|property)=["\'](?:citation_abstract|dc\.description)["\']',
+        r'<meta\s+[^>]*?(?:name|property)=["\'](?:og:description|description)["\'][^>]*?content=["\'](.*?)["\']'
+    ]
+    for pattern in meta_patterns:
+        for m in re.findall(pattern, html_text, re.I | re.DOTALL):
+            candidate = clean_academic_abstract(m)
+            if is_valid_abstract_content(candidate) and "cookie" not in candidate.lower() and "javascript" not in candidate.lower():
+                return candidate
+                
+    # 2. Semantic HTML container extraction (OJS, SportRxiv, PubMed, arXiv, ScienceDirect, Springer, Wiley)
+    semantic_patterns = [
+        r'<section[^>]*?class=["\'][^"\']*\babstract\b[^"\']*["\'][^>]*>([\s\S]*?)</section>',
+        r'<div[^>]*?(?:class|id)=["\'][^"\']*\b(?:item\s+abstract|abstract-content|article-abstract|abstractText|abstract_content|abstract)\b[^"\']*["\'][^>]*>([\s\S]*?)</div>',
+        r'<blockquote[^>]*?class=["\'][^"\']*\babstract\b[^"\']*["\'][^>]*>([\s\S]*?)</blockquote>',
+        r'<section[^>]*?id=["\']abstract["\'][^>]*>([\s\S]*?)</section>',
+        r'<div[^>]*?id=["\']abstract["\'][^>]*>([\s\S]*?)</div>'
+    ]
+    for pattern in semantic_patterns:
+        for m in re.findall(pattern, html_text, re.I):
+            candidate = clean_academic_abstract(m)
+            if is_valid_abstract_content(candidate):
+                return candidate
+                
+    return ""
 
 _PAPER_METADATA_CACHE: Dict[str, dict] = {}
 
 def resolve_paper_metadata_by_doi(doi: str, title_fallback: str = "") -> Optional[dict]:
     """
-    Fetches complete Consensus-style academic metadata from OpenAlex, Crossref, HTML meta tags,
-    and AI Academic Synthesis with a 5-tier fallback engine and high-speed in-memory caching.
+    Fetches complete Consensus-style academic metadata from OpenAlex, Crossref, HTML meta/semantic tags,
+    Semantic Scholar, and AI Academic Synthesis with a multi-tier fallback engine and high-speed in-memory caching.
     """
     if not doi and not title_fallback:
         return None
@@ -785,8 +849,10 @@ def resolve_paper_metadata_by_doi(doi: str, title_fallback: str = "") -> Optiona
                     for w, p in idx.items():
                         for x in p: pos.append((x, w))
                     pos.sort()
-                    abstract = clean_academic_abstract(" ".join([w[1] for w in pos]).strip())
-                    abstract_type = "official"
+                    cand_abs = clean_academic_abstract(" ".join([w[1] for w in pos]).strip())
+                    if is_valid_abstract_content(cand_abs):
+                        abstract = cand_abs
+                        abstract_type = "official"
         except Exception:
             pass
 
@@ -818,8 +884,10 @@ def resolve_paper_metadata_by_doi(doi: str, title_fallback: str = "") -> Optiona
                         for k, v in idx.items():
                             for p in v: pos.append((p, k))
                         pos.sort()
-                        abstract = clean_academic_abstract(" ".join([x[1] for x in pos]).strip())
-                        abstract_type = "official"
+                        cand_abs = clean_academic_abstract(" ".join([x[1] for x in pos]).strip())
+                        if is_valid_abstract_content(cand_abs):
+                            abstract = cand_abs
+                            abstract_type = "official"
         except Exception:
             pass
 
@@ -849,12 +917,38 @@ def resolve_paper_metadata_by_doi(doi: str, title_fallback: str = "") -> Optiona
                 if not abstract:
                     raw_abstract = msg.get("abstract", "")
                     if raw_abstract:
-                        abstract = clean_academic_abstract(raw_abstract)
+                        cand_abs = clean_academic_abstract(raw_abstract)
+                        if is_valid_abstract_content(cand_abs):
+                            abstract = cand_abs
+                            abstract_type = "official"
+        except Exception:
+            pass
+
+    # 4. Semantic Scholar API Fallback
+    if not abstract and clean_doi:
+        try:
+            s2_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean_doi}?fields=abstract,authors,title,venue,year,citationCount,openAccessPdf"
+            req = urllib.request.Request(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                s2_data = json.loads(resp.read().decode("utf-8"))
+                if not authors and s2_data.get("authors"):
+                    authors = [a.get("name") for a in s2_data.get("authors", []) if a.get("name")]
+                if not pub_year and s2_data.get("year"):
+                    pub_year = str(s2_data.get("year"))
+                if not citations and s2_data.get("citationCount"):
+                    citations = s2_data.get("citationCount", 0)
+                if not pdf_url and s2_data.get("openAccessPdf", {}).get("url"):
+                    pdf_url = s2_data.get("openAccessPdf", {}).get("url")
+                s2_abs = s2_data.get("abstract")
+                if s2_abs:
+                    cand_abs = clean_academic_abstract(s2_abs)
+                    if is_valid_abstract_content(cand_abs):
+                        abstract = cand_abs
                         abstract_type = "official"
         except Exception:
             pass
 
-    # 4. DOI Landing Page HTML Meta Scraper
+    # 5. DOI Landing Page HTML Meta & Semantic Element Scraper
     if not abstract and clean_doi:
         try:
             doi_landing_url = f"https://doi.org/{clean_doi}"
@@ -862,19 +956,16 @@ def resolve_paper_metadata_by_doi(doi: str, title_fallback: str = "") -> Optiona
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
             })
-            with urllib.request.urlopen(req, timeout=4) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp:
                 html_text = resp.read().decode("utf-8", errors="ignore")
-                meta_matches = re.findall(r'<meta\s+[^>]*?(?:name|property)=["\'](?:citation_abstract|dc\.description|description|og:description)["\'][^>]*?content=["\'](.*?)["\']', html_text, re.I | re.DOTALL)
-                for m in meta_matches:
-                    clean_m = clean_academic_abstract(m)
-                    if len(clean_m) > 60 and "cookie" not in clean_m.lower() and "javascript" not in clean_m.lower():
-                        abstract = clean_m
-                        abstract_type = "official"
-                        break
+                extracted = extract_abstract_from_html(html_text)
+                if extracted and is_valid_abstract_content(extracted):
+                    abstract = extracted
+                    abstract_type = "official"
         except Exception:
             pass
 
-    # 5. AI Academic Overview Fallback (For strictly paywalled papers without public abstracts)
+    # 6. AI Academic Overview Fallback (For strictly paywalled papers without public abstracts)
     if not abstract and title:
         abstract_type = "ai_summary"
         abstract = (
@@ -902,7 +993,7 @@ def resolve_paper_metadata_by_doi(doi: str, title_fallback: str = "") -> Optiona
     return result
 
 def fetch_full_abstract_by_doi(doi: str) -> str:
-    """Fetches the full, authentic academic abstract from OpenAlex / Crossref using DOI."""
+    """Fetches the full, authentic academic abstract from OpenAlex / Crossref / Semantic Scholar / Landing HTML using DOI."""
     if not doi:
         return ""
     clean_doi = doi.replace("https://doi.org/", "").strip()
@@ -911,7 +1002,7 @@ def fetch_full_abstract_by_doi(doi: str) -> str:
     try:
         oa_url = f"https://api.openalex.org/works/https://doi.org/{clean_doi}"
         req = urllib.request.Request(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-        with urllib.request.urlopen(req, timeout=6) as resp:
+        with urllib.request.urlopen(req, timeout=4) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             inverted_index = data.get("abstract_inverted_index")
             if inverted_index:
@@ -920,7 +1011,9 @@ def fetch_full_abstract_by_doi(doi: str) -> str:
                     for pos in positions:
                         word_positions.append((pos, word))
                 word_positions.sort()
-                return " ".join([w[1] for w in word_positions]).strip()
+                cand = " ".join([w[1] for w in word_positions]).strip()
+                if is_valid_abstract_content(cand):
+                    return cand
     except Exception:
         pass
         
@@ -928,13 +1021,43 @@ def fetch_full_abstract_by_doi(doi: str) -> str:
     try:
         cr_url = f"https://api.crossref.org/works/{clean_doi}"
         req = urllib.request.Request(cr_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-        with urllib.request.urlopen(req, timeout=6) as resp:
+        with urllib.request.urlopen(req, timeout=4) as resp:
             c_data = json.loads(resp.read().decode("utf-8"))
             msg = c_data.get("message", {})
             raw_abstract = msg.get("abstract", "")
             if raw_abstract:
-                clean_abs = re.sub(r"<[^>]+>", " ", raw_abstract)
-                return re.sub(r"\s+", " ", clean_abs).strip()
+                clean_abs = clean_academic_abstract(raw_abstract)
+                if is_valid_abstract_content(clean_abs):
+                    return clean_abs
+    except Exception:
+        pass
+
+    # 3. Try Semantic Scholar
+    try:
+        s2_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean_doi}?fields=abstract"
+        req = urllib.request.Request(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            s2_data = json.loads(resp.read().decode("utf-8"))
+            s2_abs = s2_data.get("abstract")
+            if s2_abs:
+                cand = clean_academic_abstract(s2_abs)
+                if is_valid_abstract_content(cand):
+                    return cand
+    except Exception:
+        pass
+
+    # 4. Try DOI Landing Page HTML Scraper
+    try:
+        doi_landing_url = f"https://doi.org/{clean_doi}"
+        req = urllib.request.Request(doi_landing_url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        })
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            html_text = resp.read().decode("utf-8", errors="ignore")
+            extracted = extract_abstract_from_html(html_text)
+            if extracted and is_valid_abstract_content(extracted):
+                return extracted
     except Exception:
         pass
         
