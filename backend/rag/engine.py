@@ -531,7 +531,7 @@ async def query_chat(
                 return "SEARCH_NEW"
             if has_docs:
                 return "ANALYZE_WORKSPACE"
-            return "SEARCH_NEW"
+            return "GENERAL_CHAT"
 
         intent = resolve_intent_fast(query, has_local_docs)
         print(f"[RAG Engine] Fast Resolved Intent: {intent}")
