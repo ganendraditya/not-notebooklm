@@ -377,6 +377,19 @@ async def query_chat(
             return True
         return False
 
+    def is_technical_discussion(text: str) -> bool:
+        """Identifies queries asking about NotbookLM system internals, RAG, databases, embeddings, or conceptual discussion."""
+        t = text.lower().strip()
+        tech_triggers = [
+            "pake rag", "pakai rag", "sistem rag", "cara kerja", "arsitektur",
+            "database apa", "vector database", "database vektor", "gimana sistemnya",
+            "gimana cara kerja", "masuk ke database", "disimpan di mana", "data disimpan",
+            "bisa fetch apa", "bisa akses apa", "paywall", "open access kah", "cara lo dapet",
+            "dapetin papernya gimana", "punya database sendiri", "apakah ada database",
+            "gimana lu", "gimana lo", "bagaimana kamu", "apakah kamu", "kenapa kamu"
+        ]
+        return any(tr in t for tr in tech_triggers)
+
     def is_sources_meta_query(text: str) -> bool:
         t = text.lower().strip()
         meta_phrases = [
@@ -405,6 +418,30 @@ async def query_chat(
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
             await report_status("Thinking...")
+            resp = await target_llm.achat(chat_msgs)
+            return clean_response(resp.message.content)
+
+        # 2. Handle Technical / Conceptual / System Mechanism Discussion (Fast Direct Synthesis)
+        if is_technical_discussion(query):
+            chat_msgs = [
+                LlamaChatMessage(
+                    role=MessageRole.SYSTEM,
+                    content=(
+                        "Anda adalah NotbookLM, asisten riset AI mutakhir yang transparan, cerdas, dan komunikatif (gaya Google NotebookLM).\n"
+                        "Pengguna menanyakan tentang sistem kerja, database, RAG, atau kemampuan Anda.\n\n"
+                        "FAKTA ARSITEKTUR NOTBOOKLM ANDA:\n"
+                        "1. Retrieval-Augmented Generation (RAG): Sistem utama menggunakan Qdrant Vector Database dan embedding BAAI/bge-small-en-v1.5.\n"
+                        "2. Penyimpanan Dokumen: Setiap dokumen yang diimpor/diunggah dipecah menjadi chunks, di-embed menjadi vektor, dan disimpan privat per-sesi chat.\n"
+                        "3. Penelusuran Paper: Terhubung langsung ke repositori akademik resmi OpenAlex (250M+ paper), Europe PMC, dan Crossref.\n"
+                        "4. Open Access & Paywall: Sistem membaca full-text PDF untuk paper Open Access. Untuk paper paywalled/berbayar, sistem mengekstrak metadata publik dan abstrak resmi, serta menyarankan pengguna mengunggah PDF manual jika memiliki akses institusi.\n"
+                        "5. Sitasi & Bukti: Jawaban riset selalu menyertakan referensi `[1]`, `[2]` yang terhubung langsung ke metadata dokumen.\n\n"
+                        "Gunakan Bahasa Indonesia yang luwes, santun, runtut, dan mudah dipahami."
+                    )
+                ),
+                *(formatted_history if formatted_history else []),
+                LlamaChatMessage(role=MessageRole.USER, content=query)
+            ]
+            await report_status("Explaining system architecture...")
             resp = await target_llm.achat(chat_msgs)
             return clean_response(resp.message.content)
 
