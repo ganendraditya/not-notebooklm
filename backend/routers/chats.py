@@ -140,10 +140,18 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                     bg_db.commit()
                 finally:
                     bg_db.close()
-                await queue.put({"type": "complete", "data": resp_text})
+                await queue.put({
+                    "type": "done",
+                    "data": resp_text,
+                    "message": {
+                        "role": "assistant",
+                        "content": resp_text,
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                })
             except Exception as e:
                 logger.error(f"[Chat Stream Worker Error]: {e}")
-                await queue.put({"type": "error", "data": str(e)})
+                await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Maaf, terjadi kesalahan: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
             finally:
                 await queue.put(None)
                 
@@ -243,10 +251,18 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
                     bg_db.commit()
                 finally:
                     bg_db.close()
-                await queue.put({"type": "complete", "data": resp_text})
+                await queue.put({
+                    "type": "done",
+                    "data": resp_text,
+                    "message": {
+                        "role": "assistant",
+                        "content": resp_text,
+                        "created_at": datetime.utcnow().isoformat()
+                    }
+                })
             except Exception as e:
                 logger.error(f"[Edit Message Stream Worker Error]: {e}")
-                await queue.put({"type": "error", "data": str(e)})
+                await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Maaf, terjadi kesalahan: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
             finally:
                 await queue.put(None)
                 
