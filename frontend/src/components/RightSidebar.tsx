@@ -676,15 +676,22 @@ export default function RightSidebar({
               </div>
 
               {/* Authors & Publication Date (Textual format e.g. Oct 9, 2024) */}
-              <p className="text-xs text-gray-400 font-normal">
-                <span>{pubDateStr}</span>
-                {authorsStr && (
-                  <>
-                    <span className="mx-1.5 text-gray-600">·</span>
-                    <span className="text-gray-300">{authorsStr}</span>
-                  </>
-                )}
-              </p>
+              {isLoadingDetails ? (
+                <div className="flex items-center gap-2 pt-0.5 animate-pulse">
+                  <div className="h-3 w-24 bg-white/10 rounded" />
+                  <div className="h-3 w-40 bg-white/5 rounded" />
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 font-normal">
+                  <span>{pubDateStr}</span>
+                  {authorsStr && (
+                    <>
+                      <span className="mx-1.5 text-gray-600">·</span>
+                      <span className="text-gray-300">{authorsStr}</span>
+                    </>
+                  )}
+                </p>
+              )}
             </div>
 
             {/* Journal / Venue & Quality Metrics */}
