@@ -19,6 +19,12 @@ export interface Document {
   created_at: string;
 }
 
+export interface TargetedSource {
+  id: number;
+  filename: string;
+  title?: string;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
@@ -31,6 +37,8 @@ export default function ChatClient() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [targetedSource, setTargetedSource] = useState<TargetedSource | null>(null);
+  const [activeStatus, setActiveStatus] = useState<string | null>(null);
   
   const backendUrl = "http://localhost:8000";
 
@@ -142,6 +150,7 @@ export default function ChatClient() {
     if (messageQueueRef.current.length === 0) {
       isProcessingRef.current = false;
       setIsLoading(false);
+      setActiveStatus(null);
       return;
     }
 
@@ -149,6 +158,7 @@ export default function ChatClient() {
     setQueuedPrompts(prev => prev.slice(1));
     isProcessingRef.current = true;
     setIsLoading(true);
+    setActiveStatus("Analyzing query & reasoning...");
 
     // Optimistically add the user message into the chat stream WHEN IT ACTUALLY STARTS PROCESSING!
     const newMsg: ChatMessage = { role: "user", content: nextMessage, created_at: new Date().toISOString() };
@@ -164,7 +174,7 @@ export default function ChatClient() {
       }
       bumpSessionToTop(currentChatId);
 
-      const res = await fetch(`${backendUrl}/chats/${currentChatId}/message`, {
+      const res = await fetch(`${backendUrl}/chats/${currentChatId}/message_stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: nextMessage }),
@@ -175,8 +185,40 @@ export default function ChatClient() {
         throw new Error(`Server returned ${res.status}`);
       }
 
-      const assistantMsg = await res.json();
-      setMessages(prev => [...prev, assistantMsg]);
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) {
+        throw new Error("No readable stream received from server");
+      }
+
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        while (buffer.includes("\n\n")) {
+          const splitIdx = buffer.indexOf("\n\n");
+          const eventBlock = buffer.slice(0, splitIdx);
+          buffer = buffer.slice(splitIdx + 2);
+
+          const lines = eventBlock.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "status" && data.text) {
+                  setActiveStatus(data.text);
+                } else if (data.type === "done" && data.message) {
+                  setMessages(prev => [...prev, data.message]);
+                }
+              } catch (e) {
+                console.error("SSE parse error:", e);
+              }
+            }
+          }
+        }
+      }
     } catch (err: any) {
       if (err?.name === "AbortError") {
         console.log("Generation stopped by user");
@@ -193,6 +235,7 @@ export default function ChatClient() {
         ]);
       }
     } finally {
+      setActiveStatus(null);
       if (abortControllerRef.current === controller) {
         abortControllerRef.current = null;
       }
@@ -224,6 +267,7 @@ export default function ChatClient() {
     messageQueueRef.current = [];
     isProcessingRef.current = true;
     setIsLoading(true);
+    setActiveStatus("Analyzing query & reasoning...");
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -236,6 +280,7 @@ export default function ChatClient() {
     if (!currentChatId) {
       isProcessingRef.current = false;
       setIsLoading(false);
+      setActiveStatus(null);
       return;
     }
     bumpSessionToTop(currentChatId);
@@ -245,7 +290,7 @@ export default function ChatClient() {
     setMessages(prev => [...prev.slice(0, messageIndex), updatedUserMsg]);
 
     try {
-      const res = await fetch(`${backendUrl}/chats/${currentChatId}/edit_message`, {
+      const res = await fetch(`${backendUrl}/chats/${currentChatId}/edit_message_stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -259,8 +304,40 @@ export default function ChatClient() {
         throw new Error(`Server returned ${res.status}`);
       }
 
-      const assistantMsg = await res.json();
-      setMessages(prev => [...prev, assistantMsg]);
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) {
+        throw new Error("No readable stream received from server");
+      }
+
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        while (buffer.includes("\n\n")) {
+          const splitIdx = buffer.indexOf("\n\n");
+          const eventBlock = buffer.slice(0, splitIdx);
+          buffer = buffer.slice(splitIdx + 2);
+
+          const lines = eventBlock.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "status" && data.text) {
+                  setActiveStatus(data.text);
+                } else if (data.type === "done" && data.message) {
+                  setMessages(prev => [...prev, data.message]);
+                }
+              } catch (e) {
+                console.error("SSE parse error:", e);
+              }
+            }
+          }
+        }
+      }
     } catch (err: any) {
       if (err?.name === "AbortError") {
         console.log("Edit request aborted");
@@ -272,6 +349,7 @@ export default function ChatClient() {
         ]);
       }
     } finally {
+      setActiveStatus(null);
       if (abortControllerRef.current === controller) {
         abortControllerRef.current = null;
       }
@@ -369,6 +447,9 @@ export default function ChatClient() {
         onOpenSidebar={() => setIsSidebarOpen(true)}
         isRightSidebarOpen={isRightSidebarOpen}
         onToggleRightSidebar={() => setIsRightSidebarOpen(prev => !prev)}
+        targetedSource={targetedSource}
+        onClearTargetedSource={() => setTargetedSource(null)}
+        activeStatus={activeStatus}
       />
 
       {/* Right Sidebar: Sources Panel (NotebookLM Style) */}
@@ -377,9 +458,18 @@ export default function ChatClient() {
           activeChatId={activeChatId} 
           documents={documents} 
           onDocumentAdded={(doc) => setDocuments(prev => [...prev, doc])} 
-          onDocumentDeleted={(id) => setDocuments(prev => prev.filter(d => d.id !== id))}
-          onBulkDocumentsDeleted={handleBulkDocumentsDeleted}
+          onDocumentDeleted={(id) => {
+            setDocuments(prev => prev.filter(d => d.id !== id));
+            if (targetedSource?.id === id) setTargetedSource(null);
+          }}
+          onBulkDocumentsDeleted={(ids) => {
+            handleBulkDocumentsDeleted(ids);
+            if (targetedSource && ids.includes(targetedSource.id)) setTargetedSource(null);
+          }}
           onEnsureChatSession={handleEnsureChatSession}
+          onAskAboutDocument={(doc, paperTitle) => {
+            setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
+          }}
           backendUrl={backendUrl}
           onClose={() => setIsRightSidebarOpen(false)}
         />

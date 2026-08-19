@@ -62,3 +62,29 @@ Fokus utama adalah **keterbacaan teks panjang (*long-form readability*)** dengan
   * Ikon berukuran `16px` dengan area sentuh `p-1.5 rounded-lg`.
   * **Pesan Pengguna:** Tombol aksi (Copy & Edit) harus selalu **rata kanan (*flush right*)** sejajar lurus dengan tepi kanan balon chat.
   * **Jawaban AI:** Tombol aksi (Copy) harus selalu **rata kiri (*flush left*)** sejajar lurus dengan huruf pertama teks jawaban.
+
+---
+
+## 5. Language & UI Copy Standard (Strict 100% English for System UI)
+
+Semua elemen antarmuka sistem (UI chrome, placeholders, buttons, tooltips, modal, alert badges, pills, dan empty states) **HARUS 100% KONSISTEN MENGGUNAKAN BAHASA INGGRIS**:
+
+* **Placeholders:**
+  * `Ask NotbookLM anything`
+  * `Ask a question about this source...` (When focused on a document)
+  * `Type your next message (automatically queued)...`
+* **Focused Source Pills & Badges:**
+  * `Focused on: [Title]` with `[Cancel]` button.
+  * Chat bubble tag: `Focus: [Title]`.
+* **Abstract & Indexation Badges:**
+  * `ABSTRACT` with `✓ Official Abstract`.
+  * `AI Synthesis Overview` with `Paywalled Source`.
+  * `AI Overview Note: Original abstract is protected behind publisher paywall...`
+* **Sources & Actions:**
+  * `Ask`, `Cite`, `Copy Link`, `Download`, `Select All`, `Deselect All`, `Import Sources`.
+* **System Footers & Loading:**
+  * `Searching sources & generating response...`
+  * `NotbookLM can make mistakes. Verify important info.`
+  * `Queued Messages` - `Sends after agent finishes working`.
+
+*(Catatan: Bahasa respon percakapan AI tetap adaptif mengikuti bahasa pengguna, namun seluruh UI, teks kontrol, dan label sistem harus selalu 100% Bahasa Inggris baku).*

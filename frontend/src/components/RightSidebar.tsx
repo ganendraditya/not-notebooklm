@@ -14,12 +14,13 @@ import {
   X,
   Copy,
   MessageSquare,
-  Bookmark,
   Quote,
   Link as LinkIcon,
   ExternalLink,
   ChevronDown,
   BookOpen,
+  Sparkles,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document } from "@/app/ChatClient";
@@ -31,6 +32,7 @@ interface RightSidebarProps {
   onDocumentDeleted?: (id: number) => void;
   onBulkDocumentsDeleted?: (ids: number[]) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
+  onAskAboutDocument?: (doc: Document, paperTitle?: string) => void;
   backendUrl: string;
   onClose: () => void;
 }
@@ -46,6 +48,7 @@ interface PaperDetailData {
   year: string;
   journal: string;
   journal_metric: string;
+  quality_tier?: number;
   citations: number;
   doi: string;
   url: string;
@@ -193,6 +196,7 @@ export default function RightSidebar({
   onDocumentDeleted,
   onBulkDocumentsDeleted,
   onEnsureChatSession,
+  onAskAboutDocument,
   backendUrl,
   onClose
 }: RightSidebarProps) {
@@ -217,7 +221,6 @@ export default function RightSidebar({
 
   const [copiedDoi, setCopiedDoi] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isSaved, setIsSaved] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -257,6 +260,35 @@ export default function RightSidebar({
       window.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isSortMenuOpen]);
+
+  const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
+  const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
+
+  const handleCleanDuplicates = async () => {
+    if (!activeChatId || isCleaningDuplicates || documents.length === 0) return;
+    setIsCleaningDuplicates(true);
+    setCleanFeedback(null);
+    try {
+      const res = await fetch(`${backendUrl}/chats/${activeChatId}/clean_duplicates`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.cleaned_doc_ids && data.cleaned_doc_ids.length > 0) {
+          onBulkDocumentsDeleted?.(data.cleaned_doc_ids);
+          setCleanFeedback(`Removed ${data.cleaned_count} duplicate(s)!`);
+        } else {
+          setCleanFeedback("No duplicates found — all sources are unique!");
+        }
+        setTimeout(() => setCleanFeedback(null), 3000);
+      }
+    } catch (e) {
+      console.error("Clean duplicates failed:", e);
+    } finally {
+      setIsCleaningDuplicates(false);
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
@@ -540,13 +572,7 @@ export default function RightSidebar({
               <div>
                 <p className="font-semibold text-gray-200 text-[12px]">{journalName}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-[11px] text-gray-400 font-medium">{paperDetails?.journal_metric || "Q2 SJR score"}</span>
-                  <div className="flex items-center gap-0.5 text-amber-400 text-[9px]">
-                    <span>●</span>
-                    <span>●</span>
-                    <span>●</span>
-                    <span className="text-gray-600">○</span>
-                  </div>
+                  <span className="text-[11px] text-gray-400 font-medium">{paperDetails?.journal_metric || "Peer-Reviewed"}</span>
                 </div>
               </div>
 
@@ -575,14 +601,51 @@ export default function RightSidebar({
             {/* Divider */}
             <div className="border-t border-white/10 pt-2" />
 
-            {/* Abstract Paragraph */}
+            {/* Abstract / Overview Section */}
             {isLoadingDetails ? (
               <div className="py-16 flex flex-col items-center justify-center text-center space-y-3">
                 <Loader2 size={24} className="animate-spin text-blue-400" />
                 <p className="text-xs text-gray-400">Loading academic paper overview...</p>
               </div>
-            ) : (
+            ) : paperDetails?.abstract_type === "ai_summary" ? (
+              /* AI Synthesis / Executive Summary Card with Disclaimer */
               <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
+                    <Sparkles size={13} className="text-purple-400" />
+                    <span>AI Synthesis Overview</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-950/60 border border-purple-800/60 text-purple-300">
+                    Paywalled Source
+                  </span>
+                </div>
+
+                {/* Clarification Alert Box */}
+                <div className="p-2.5 rounded-lg bg-purple-950/30 border border-purple-800/40 text-[11px] text-purple-200/90 leading-relaxed flex items-start gap-2">
+                  <Info size={13} className="text-purple-400 shrink-0 mt-0.5" />
+                  <p>
+                    <span className="font-semibold text-purple-200">AI Overview Note:</span> Original abstract is protected behind publisher paywall. This executive overview was automatically synthesized from verified official metadata.
+                  </p>
+                </div>
+
+                <p className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
+                  {cleanAbstract}
+                </p>
+              </div>
+            ) : (
+              /* Official Authentic Abstract */
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-200 tracking-wider uppercase">
+                    <FileText size={13} className="text-blue-400" />
+                    <span>Abstract</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 flex items-center gap-1">
+                    <Check size={10} />
+                    <span>Official Abstract</span>
+                  </span>
+                </div>
+
                 <p className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
                   {cleanAbstract}
                 </p>
@@ -679,30 +742,19 @@ export default function RightSidebar({
             {/* Ask Button (Pill) */}
             <button
               onClick={() => {
+                if (viewingDoc && onAskAboutDocument) {
+                  onAskAboutDocument(viewingDoc, paperDetails?.title || viewingDoc.filename);
+                }
                 const chatInput = document.getElementById("chat-input-textarea");
                 if (chatInput) {
                   chatInput.focus();
-                  (chatInput as HTMLTextAreaElement).value = `What are the core findings of the paper "${title}"?`;
                 }
               }}
               className="h-8 px-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-              title="Ask AI questions regarding this paper"
+              title="Ask AI questions specifically about this paper"
             >
               <MessageSquare size={13} />
               <span>Ask</span>
-            </button>
-
-            {/* Save Button (Pill with dropdown arrow) */}
-            <button
-              onClick={() => setIsSaved(prev => !prev)}
-              className={`h-8 px-2.5 rounded-full border text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer ${
-                isSaved ? "bg-[#28292c] border-white/15 text-gray-200" : "bg-transparent border-white/10 text-gray-400 hover:text-white"
-              }`}
-              title="Save paper"
-            >
-              <Bookmark size={13} className={isSaved ? "fill-current text-blue-400" : ""} />
-              <span>Save</span>
-              <ChevronDown size={11} className="opacity-60" />
             </button>
 
             {/* Multi-Format Cite Button (Opens Interactive Citation Modal) */}
@@ -909,6 +961,14 @@ export default function RightSidebar({
           </p>
         </div>
 
+        {/* Dynamic Clean Feedback Notification */}
+        {cleanFeedback && (
+          <div className="px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+            <Check size={14} className="text-emerald-400 shrink-0" />
+            <span className="truncate">{cleanFeedback}</span>
+          </div>
+        )}
+
         {/* 3. Controls Row: Sort (3 descending bars), Contextual Actions (Download & Delete), and Select All */}
         <div className="flex items-center justify-between pt-1 px-0 text-xs text-gray-400 relative">
           <div className="flex items-center gap-1">
@@ -953,6 +1013,24 @@ export default function RightSidebar({
 
             {/* Always Rendered Action Icon Buttons with Clean Disabled State */}
             <div className="flex items-center gap-1">
+              {/* Clean Duplicates Button */}
+              <button
+                onClick={handleCleanDuplicates}
+                disabled={documents.length <= 1 || isCleaningDuplicates}
+                className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                  documents.length > 1 && !isCleaningDuplicates
+                    ? "text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+                    : "text-gray-600 opacity-40 cursor-not-allowed"
+                }`}
+                title="Clean duplicate sources automatically"
+              >
+                {isCleaningDuplicates ? (
+                  <Loader2 size={14} className="animate-spin text-emerald-400" />
+                ) : (
+                  <Sparkles size={14} />
+                )}
+              </button>
+
               {/* Download Button */}
               <button
                 onClick={handleBulkDownload}

@@ -10,7 +10,10 @@ from typing import List
 import zipfile
 import io
 import urllib.request
+import json
+import asyncio
 
+from datetime import datetime
 from database import engine, Base, get_db, ChatSession, Document, ChatMessage
 import models
 import rag
@@ -147,6 +150,74 @@ def bulk_delete_documents(chat_id: str, req: models.BulkDeleteRequest, db: Sessi
     db.commit()
     return {"status": "success", "deleted_count": len(docs)}
 
+@app.post("/chats/{chat_id}/clean_duplicates")
+def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
+    """Automatically scans, identifies and cleans any redundant duplicate documents in this notebook."""
+    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    docs = db.query(Document).filter(Document.chat_id == chat_id).order_by(Document.id.asc()).all()
+    if not docs:
+        return {"status": "success", "cleaned_count": 0, "remaining_count": 0, "cleaned_doc_ids": []}
+
+    seen_signatures = []
+    duplicate_doc_ids = []
+    
+    for doc in docs:
+        file_path = get_doc_file_path(chat_id, doc.filename)
+        doi = None
+        full_title = doc.filename
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as fp:
+                    l1 = fp.readline().strip()
+                    l2 = fp.readline().strip()
+                    l3 = fp.readline().strip()
+                    if l1.startswith("# "):
+                        full_title = re.sub(r'^\#\s*', '', l1).strip()
+                    doi_m = re.search(r'(?:DOI:|\*\*DOI:\*\*|doi\.org/)\s*(10\.\d{4,9}/[^\s\)]+)', f"{l1} {l2} {l3}", re.I)
+                    if doi_m:
+                        doi = doi_m.group(1).lower().strip()
+            except Exception:
+                pass
+
+        norm_title = rag.normalize_title_str(full_title)
+
+        is_dup = False
+        for s_id, s_doi, s_title, s_fn in seen_signatures:
+            # 1. Exact DOI Match
+            if doi and s_doi and doi == s_doi:
+                is_dup = True
+                break
+            # 2. Exact Filename Match
+            if doc.filename.lower() == s_fn.lower():
+                is_dup = True
+                break
+            # 3. Exact Normalized Title Match
+            if norm_title and s_title and norm_title == s_title:
+                is_dup = True
+                break
+            # 4. Truncated Prefix Match (min 20 chars)
+            if norm_title and s_title and len(norm_title) >= 20 and len(s_title) >= 20:
+                if norm_title.startswith(s_title) or s_title.startswith(norm_title):
+                    is_dup = True
+                    break
+
+        if is_dup:
+            duplicate_doc_ids.append(doc.id)
+            db.delete(doc)
+        else:
+            seen_signatures.append((doc.id, doi, norm_title, doc.filename))
+
+    db.commit()
+    return {
+        "status": "success",
+        "cleaned_count": len(duplicate_doc_ids),
+        "remaining_count": len(seen_signatures),
+        "cleaned_doc_ids": duplicate_doc_ids
+    }
+
 @app.get("/chats/{chat_id}/documents/{doc_id}/download")
 def download_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
     """Serves file download for a single imported or uploaded document."""
@@ -250,6 +321,7 @@ def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(get_db
         "year": "",
         "journal": "",
         "journal_metric": "Peer-Reviewed",
+        "quality_tier": 4,
         "citations": 0,
         "doi": "",
         "url": "",
@@ -323,7 +395,10 @@ def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(get_db
     local_abstract = abs_match.group(1).strip() if abs_match else ""
     if local_abstract and rag.is_valid_abstract_content(local_abstract):
         res_data["abstract"] = rag.clean_academic_abstract(local_abstract)
-        res_data["abstract_type"] = "official"
+        if rag.is_ai_synthesized_overview(local_abstract):
+            res_data["abstract_type"] = "ai_summary"
+        else:
+            res_data["abstract_type"] = "official"
         
     # Resolve metadata (authors, journal, citations, pub date) from cache / fast engine
     if extracted_doi or res_data["title"]:
@@ -335,6 +410,7 @@ def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(get_db
             res_data["year"] = meta.get("year", res_data["year"]) or res_data["year"]
             res_data["journal"] = meta.get("journal", "") or res_data["journal"]
             res_data["journal_metric"] = meta.get("journal_metric", "Peer-Reviewed")
+            res_data["quality_tier"] = meta.get("quality_tier", 4)
             res_data["citations"] = meta.get("citations", 0)
             res_data["doi"] = meta.get("doi", extracted_doi)
             res_data["url"] = meta.get("url", res_data["url"])
@@ -352,12 +428,16 @@ def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(get_db
                 except Exception:
                     pass
                     
-    if not res_data["abstract"]:
+    if res_data["abstract"]:
+        if rag.is_ai_synthesized_overview(res_data["abstract"]):
+            res_data["abstract_type"] = "ai_summary"
+    else:
         # Fallback AI Executive Summary
         res_data["abstract_type"] = "ai_summary"
         res_data["abstract"] = rag.clean_academic_abstract(
-            f"This scholarly article investigates '{res_data['title']}' ({res_data['year'] or 'Recent publication'}). "
-            f"The research presents methodology, computational framework, and empirical analysis in this domain. "
+            f"This scholarly publication investigates '{res_data['title']}' ({res_data['year'] or 'Recent publication'}). "
+            f"Published in {res_data['journal']} by {', '.join(res_data['authors'][:3]) if res_data['authors'] else 'researchers'}, "
+            f"the research presents methodology, computational framework, and empirical analysis in this domain. "
             f"Indexed in international academic indexing services (DOI: {extracted_doi or 'N/A'})."
         )
             
@@ -431,13 +511,26 @@ def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Session =
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
         
-    # Check limit: Maximum 50 documents per chat
+    # Check limit: Maximum 250 documents per chat
     current_doc_count = db.query(Document).filter(Document.chat_id == chat_id).count()
-    remaining_slots = max(0, 50 - current_doc_count)
+    remaining_slots = max(0, MAX_SOURCES_PER_CHAT - current_doc_count)
     if remaining_slots <= 0:
-        raise HTTPException(status_code=400, detail="Document limit reached (Max 50 documents per chat). Please delete some sources before importing new ones.")
+        raise HTTPException(status_code=400, detail=f"Document limit reached (Max {MAX_SOURCES_PER_CHAT} documents per chat). Please delete some sources before importing new ones.")
         
-    allowed_sources = req.sources[:remaining_slots]
+    # Filter out any sources that already exist in this notebook chat (Deduplication)
+    existing_sigs = rag.get_existing_notebook_sources_signatures(chat_id)
+    novel_sources = []
+    for paper in req.sources:
+        if not rag.is_paper_duplicate(paper.title, paper.doi, existing_sigs):
+            novel_sources.append(paper)
+            # Register in local signatures to prevent duplicate items within the same batch
+            norm = rag.normalize_title_str(paper.title)
+            if norm:
+                existing_sigs["token_signatures"].append((norm, set(norm.split())))
+            if paper.doi:
+                existing_sigs["dois"].add(paper.doi.lower().strip())
+
+    allowed_sources = novel_sources[:remaining_slots]
     
     created_docs = []
     for paper in allowed_sources:
@@ -477,7 +570,7 @@ def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Session =
         db.refresh(db_doc)
         created_docs.append(db_doc)
         
-    db_chat.updated_at = datetime.utcnow()
+    chat.updated_at = datetime.utcnow()
     db.commit()
     return created_docs
 
@@ -519,6 +612,81 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
     db.refresh(assistant_msg)
     
     return assistant_msg
+
+@app.post("/chats/{chat_id}/message_stream")
+async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session = Depends(get_db)):
+    """Streams real-time dynamic AI thoughts/status updates and yields the final completed assistant message via SSE."""
+    db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not db_chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+        
+    # Retrieve previous conversation history
+    history_records = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.id.asc()).all()
+    chat_history = []
+    for h in history_records[-6:]:
+        content = h.content.strip()
+        if not content.startswith("⚠️") and len(content) > 0:
+            if h.role == "assistant" and len(content) > 250:
+                content = content[:250] + "..."
+            chat_history.append({"role": h.role, "content": content})
+    
+    # Save User Message
+    user_msg = ChatMessage(chat_id=chat_id, role="user", content=query.message)
+    db.add(user_msg)
+    db_chat.updated_at = datetime.utcnow()
+    db.commit()
+
+    async def event_generator():
+        queue = asyncio.Queue()
+
+        async def status_callback(status_text: str):
+            await queue.put({"type": "status", "text": status_text})
+
+        async def worker():
+            try:
+                resp_text = await rag.query_chat(
+                    chat_id, 
+                    query.message, 
+                    chat_history=chat_history,
+                    status_callback=status_callback
+                )
+                await queue.put({"type": "done", "response_text": resp_text})
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                await queue.put({"type": "done", "response_text": f"⚠️ Maaf, terjadi kesalahan saat menghubungi server AI: {str(e)}"})
+
+        asyncio.create_task(worker())
+
+        while True:
+            item = await queue.get()
+            if item["type"] == "status":
+                yield f"data: {json.dumps(item)}\n\n"
+            elif item["type"] == "done":
+                # Persist assistant response in DB with isolated session
+                from database import SessionLocal
+                local_db = SessionLocal()
+                try:
+                    asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=item["response_text"])
+                    local_db.add(asst_msg)
+                    chat_sess = local_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+                    if chat_sess:
+                        chat_sess.updated_at = datetime.utcnow()
+                    local_db.commit()
+                    local_db.refresh(asst_msg)
+                    msg_dict = {
+                        "id": asst_msg.id,
+                        "role": asst_msg.role,
+                        "content": asst_msg.content,
+                        "created_at": asst_msg.created_at.isoformat() if asst_msg.created_at else datetime.utcnow().isoformat()
+                    }
+                finally:
+                    local_db.close()
+
+                yield f"data: {json.dumps({'type': 'done', 'message': msg_dict})}\n\n"
+                break
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.post("/chats/{chat_id}/edit_message", response_model=models.ChatMessageResponse)
 async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session = Depends(get_db)):
@@ -567,6 +735,85 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     db.refresh(assistant_msg)
     
     return assistant_msg
+
+@app.post("/chats/{chat_id}/edit_message_stream")
+async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: Session = Depends(get_db)):
+    """Edits a message and streams real-time AI status updates and final output via SSE."""
+    db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not db_chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+        
+    all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.id.asc()).all()
+    if 0 <= req.message_index < len(all_msgs):
+        msgs_to_delete = all_msgs[req.message_index:]
+        for m in msgs_to_delete:
+            db.delete(m)
+        db.commit()
+        
+    remaining_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.id.asc()).all()
+    chat_history = []
+    for h in remaining_msgs[-6:]:
+        content = h.content.strip()
+        if not content.startswith("⚠️") and len(content) > 0:
+            if h.role == "assistant" and len(content) > 250:
+                content = content[:250] + "..."
+            chat_history.append({"role": h.role, "content": content})
+            
+    user_msg = ChatMessage(chat_id=chat_id, role="user", content=req.message)
+    db.add(user_msg)
+    db_chat.updated_at = datetime.utcnow()
+    db.commit()
+
+    async def event_generator():
+        queue = asyncio.Queue()
+
+        async def status_callback(status_text: str):
+            await queue.put({"type": "status", "text": status_text})
+
+        async def worker():
+            try:
+                resp_text = await rag.query_chat(
+                    chat_id, 
+                    req.message, 
+                    chat_history=chat_history,
+                    status_callback=status_callback
+                )
+                await queue.put({"type": "done", "response_text": resp_text})
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                await queue.put({"type": "done", "response_text": f"⚠️ Maaf, terjadi kesalahan saat menghubungi server AI: {str(e)}"})
+
+        asyncio.create_task(worker())
+
+        while True:
+            item = await queue.get()
+            if item["type"] == "status":
+                yield f"data: {json.dumps(item)}\n\n"
+            elif item["type"] == "done":
+                from database import SessionLocal
+                local_db = SessionLocal()
+                try:
+                    asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=item["response_text"])
+                    local_db.add(asst_msg)
+                    chat_sess = local_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+                    if chat_sess:
+                        chat_sess.updated_at = datetime.utcnow()
+                    local_db.commit()
+                    local_db.refresh(asst_msg)
+                    msg_dict = {
+                        "id": asst_msg.id,
+                        "role": asst_msg.role,
+                        "content": asst_msg.content,
+                        "created_at": asst_msg.created_at.isoformat() if asst_msg.created_at else datetime.utcnow().isoformat()
+                    }
+                finally:
+                    local_db.close()
+
+                yield f"data: {json.dumps({'type': 'done', 'message': msg_dict})}\n\n"
+                break
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @app.get("/llm/models")
 def get_llm_models():

@@ -20,7 +20,7 @@ import {
   Trash2,
   SlidersHorizontal
 } from "lucide-react";
-import { ChatMessage, Document as DocType } from "@/app/ChatClient";
+import { ChatMessage, Document as DocType, TargetedSource } from "@/app/ChatClient";
 import ModelSelector from "@/components/ModelSelector";
 import SearchFilterPopover, { SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/components/SearchFilterPopover";
 import ReactMarkdown from "react-markdown";
@@ -44,12 +44,16 @@ interface ChatAreaProps {
   onOpenSidebar?: () => void;
   isRightSidebarOpen?: boolean;
   onToggleRightSidebar?: () => void;
+  targetedSource?: TargetedSource | null;
+  onClearTargetedSource?: () => void;
+  activeStatus?: string | null;
 }
 
 interface InChatMessageProps {
   msg: ChatMessage;
   activeChatId: string | null;
   backendUrl: string;
+  documents?: DocType[];
   onDocumentAdded?: (doc: DocType) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
 }
@@ -59,6 +63,7 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
   msg, 
   activeChatId, 
   backendUrl, 
+  documents = [],
   onDocumentAdded, 
   onEnsureChatSession 
 }: InChatMessageProps) {
@@ -79,30 +84,54 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
     return { cleanContent: clean, sources: parsedSources };
   }, [msg.content]);
 
-  const [selectedSources, setSelectedSources] = useState<Record<number, boolean>>({});
+  // Smart fuzzy & DOI duplicate detection against current notebook documents
+  const isDuplicateSource = useCallback((src: any) => {
+    if (!documents || documents.length === 0) return false;
+    const normalize = (s: string) => s.replace(/\.pdf$/i, "").replace(/[^a-zA-Z0-9\s]/g, " ").toLowerCase().trim().replace(/\s+/g, " ");
+    const srcNorm = normalize(src.title || "");
+    if (!srcNorm) return false;
+    const srcTokens = new Set(srcNorm.split(" "));
+
+    for (const doc of documents) {
+      const docNorm = normalize(doc.filename || "");
+      if (!docNorm) continue;
+      if (srcNorm === docNorm) return true;
+      if (docNorm.length >= 20 && (srcNorm.startsWith(docNorm) || docNorm.startsWith(srcNorm))) return true;
+
+      const docTokens = new Set(docNorm.split(" "));
+      let intersection = 0;
+      for (const t of srcTokens) {
+        if (docTokens.has(t)) intersection++;
+      }
+      const minLen = Math.min(srcTokens.size, docTokens.size);
+      if (minLen > 0 && intersection / minLen >= 0.75 && intersection >= 3) return true;
+    }
+    return false;
+  }, [documents]);
+
+  const [userSelectionOverrides, setUserSelectionOverrides] = useState<Record<number, boolean>>({});
   const [isImporting, setIsImporting] = useState(false);
   const [isImported, setIsImported] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Initialize all selected by default
-  useEffect(() => {
-    if (sources.length > 0) {
-      const init: Record<number, boolean> = {};
-      sources.forEach((_, i) => { init[i] = true; });
-      setSelectedSources(init);
-    }
-  }, [sources.length]);
+  // Synchronous selection resolver without any setState inside useEffect
+  const isSourceChecked = useCallback((src: any, i: number) => {
+    if (isDuplicateSource(src)) return false;
+    if (i in userSelectionOverrides) return userSelectionOverrides[i];
+    return true; // Default to selected for novel candidate papers
+  }, [isDuplicateSource, userSelectionOverrides]);
 
   const toggleSelectAll = () => {
-    const all = sources.every((_, i) => selectedSources[i]);
-    const next = !all;
-    const updated: Record<number, boolean> = {};
-    sources.forEach((_, i) => { updated[i] = next; });
-    setSelectedSources(updated);
+    const novelIndices = sources.map((s, i) => (!isDuplicateSource(s) ? i : -1)).filter(i => i !== -1);
+    const allSelected = novelIndices.length > 0 && novelIndices.every(i => isSourceChecked(sources[i], i));
+    const next = !allSelected;
+    const updated: Record<number, boolean> = { ...userSelectionOverrides };
+    novelIndices.forEach(i => { updated[i] = next; });
+    setUserSelectionOverrides(updated);
   };
 
   const handleImport = async () => {
-    const toImport = sources.filter((_, i) => selectedSources[i]);
+    const toImport = sources.filter((src, i) => isSourceChecked(src, i));
     if (toImport.length === 0) return;
 
     setIsImporting(true);
@@ -130,7 +159,12 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
     }
   };
 
-  const selectedCount = sources.filter((_, i) => selectedSources[i]).length;
+  const novelSourcesCount = useMemo(() => sources.filter(s => !isDuplicateSource(s)).length, [sources, isDuplicateSource]);
+  const selectedCount = useMemo(() => sources.filter((s, i) => isSourceChecked(s, i)).length, [sources, isSourceChecked]);
+  const allNovelSelected = useMemo(() => {
+    const novelIndices = sources.map((s, i) => (!isDuplicateSource(s) ? i : -1)).filter(i => i !== -1);
+    return novelIndices.length > 0 && novelIndices.every(i => isSourceChecked(sources[i], i));
+  }, [sources, isDuplicateSource, isSourceChecked]);
 
   return (
     <div className="w-full space-y-3">
@@ -157,38 +191,41 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
                 {children}
               </a>
             ),
-            code: ({ className, children, ...props }) => {
-              const isInline = !className?.includes("language-");
-              return isInline ? (
-                <code className="bg-white/10 text-blue-300 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-                  {children}
-                </code>
-              ) : (
-                <pre className="bg-[#1e1e1e] p-3.5 rounded-xl overflow-x-auto text-sm my-3 border border-white/10 font-mono">
-                  <code className={className} {...props}>{children}</code>
-                </pre>
-              );
-            },
             table: ({ children }) => (
-              <div className="overflow-x-auto my-4 rounded-xl border border-white/10 bg-[#1e1e1e]/60 shadow-md">
-                <table className="w-full text-left text-sm border-collapse">{children}</table>
+              <div className="overflow-x-auto my-4 rounded-xl border border-white/10 shadow-md">
+                <table className="w-full text-left text-sm border-collapse bg-[#1a1b1e]">
+                  {children}
+                </table>
               </div>
             ),
-            th: ({ children }) => (
-              <th className="bg-white/5 border-b border-white/10 px-4 py-2.5 font-semibold text-white text-xs uppercase tracking-wider">
-                {children}
-              </th>
-            ),
-            td: ({ children }) => (
-              <td className="border-b border-white/5 px-4 py-2.5 text-gray-200 text-sm leading-normal">
-                {children}
-              </td>
-            ),
+            thead: ({ children }) => <thead className="bg-[#24262b] text-gray-200 border-b border-white/10 font-semibold">{children}</thead>,
+            tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
+            tr: ({ children }) => <tr className="hover:bg-white/[0.02] transition-colors">{children}</tr>,
+            th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{children}</th>,
+            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{children}</td>,
             blockquote: ({ children }) => (
-              <blockquote className="border-l-4 border-blue-500/80 bg-blue-500/10 pl-4 py-2 my-2.5 rounded-r-lg italic text-gray-200">
+              <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-gray-300 bg-blue-500/5 rounded-r-lg italic">
                 {children}
               </blockquote>
             ),
+            code: ({ inline, className, children, ...props }: any) => {
+              if (inline) {
+                return (
+                  <code className="bg-white/10 text-blue-300 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                    {children}
+                  </code>
+                );
+              }
+              return (
+                <div className="relative group my-3">
+                  <pre className="bg-[#16171a] p-3.5 rounded-xl overflow-x-auto text-xs text-gray-200 font-mono border border-white/10">
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  </pre>
+                </div>
+              );
+            }
           }}
         >
           {cleanContent}
@@ -220,34 +257,45 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
               {/* Select All Subheader Bar */}
               <div className="px-4 py-2 bg-[#222325] border-b border-white/5 flex items-center justify-between text-xs text-gray-300">
                 <span className="text-gray-400">Research papers and articles found</span>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
-                  className="hover:text-white font-medium cursor-pointer transition-colors text-blue-400"
-                >
-                  {sources.every((_, i) => selectedSources[i]) ? "Deselect All" : "Select All"}
-                </button>
+                {novelSourcesCount > 0 && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
+                    className="hover:text-white font-medium cursor-pointer transition-colors text-blue-400"
+                  >
+                    {allNovelSelected ? "Deselect All" : "Select All"}
+                  </button>
+                )}
               </div>
 
               {/* Scrollable Paper Cards List */}
               <div className="max-h-[360px] overflow-y-auto divide-y divide-white/5 p-1 custom-scrollbar">
                 {sources.map((src, i) => {
-                  const isChecked = !!selectedSources[i];
+                  const isAlreadyAdded = isDuplicateSource(src);
+                  const isChecked = isAlreadyAdded || isSourceChecked(src, i);
                   return (
                     <div 
                       key={i} 
                       onClick={() => {
-                        setSelectedSources(prev => ({ ...prev, [i]: !prev[i] }));
+                        if (!isAlreadyAdded) {
+                          setUserSelectionOverrides(prev => ({ ...prev, [i]: !isSourceChecked(src, i) }));
+                        }
                       }}
-                      className={`p-3 px-3.5 flex items-start justify-between gap-3 hover:bg-white/5 transition-colors cursor-pointer rounded-xl m-1 ${
-                        isChecked ? "bg-white/[0.03]" : ""
+                      className={`p-3 px-3.5 flex items-start justify-between gap-3 transition-colors rounded-xl m-1 ${
+                        isAlreadyAdded 
+                          ? "bg-emerald-500/[0.04] border border-emerald-500/10 cursor-default" 
+                          : isChecked 
+                            ? "bg-white/[0.04] hover:bg-white/5 cursor-pointer" 
+                            : "hover:bg-white/5 cursor-pointer"
                       }`}
                     >
                       <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 shrink-0 mt-0.5">
+                        <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
+                          isAlreadyAdded ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"
+                        }`}>
                           <BookOpen size={16} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-baseline gap-2">
+                          <div className="flex items-baseline gap-2 flex-wrap">
                             <h4 className="text-xs font-semibold text-white leading-snug line-clamp-2">
                               {src.title}
                             </h4>
@@ -256,13 +304,18 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
                                 ({src.year})
                               </span>
                             )}
+                            {isAlreadyAdded && (
+                              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full shrink-0">
+                                In Sources
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             {src.url ? (
                               <a 
                                 href={src.url} 
                                 target="_blank" 
-                                rel="noopener noreferrer"
+                                rel="noopener noreferrer" 
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 shrink-0"
                               >
@@ -283,10 +336,14 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
                         </div>
                       </div>
 
-                      <div className={`w-3.5 h-3.5 rounded border mt-1 flex items-center justify-center shrink-0 transition-colors ${
-                        isChecked ? "bg-blue-600 border-blue-600 text-white" : "border-gray-500 bg-transparent"
+                      <div className={`w-4 h-4 rounded border mt-1 flex items-center justify-center shrink-0 transition-colors ${
+                        isAlreadyAdded 
+                          ? "bg-emerald-600/30 border-emerald-500/40 text-emerald-300"
+                          : isChecked 
+                            ? "bg-blue-600 border-blue-600 text-white" 
+                            : "border-gray-500 bg-transparent"
                       }`}>
-                        {isChecked && <Check size={10} strokeWidth={3} />}
+                        {(isAlreadyAdded || isChecked) && <Check size={11} strokeWidth={3} />}
                       </div>
                     </div>
                   );
@@ -296,7 +353,7 @@ const InChatMessageComponent = memo(function InChatMessageComponent({
               {/* Sticky Bottom Actions Bar */}
               <div className="p-3 px-4 bg-[#18191a] border-t border-white/5 flex items-center justify-between">
                 <span className="text-xs text-gray-400 font-medium">
-                  {selectedCount}/{sources.length} selected
+                  {selectedCount}/{novelSourcesCount} new selected
                 </span>
 
                 <button
@@ -343,6 +400,8 @@ interface ChatInputBoxProps {
   onRemoveQueuedPrompt?: (index: number) => void;
   onPromoteQueuedPrompt?: (index: number) => void;
   backendUrl: string;
+  targetedSource?: TargetedSource | null;
+  onClearTargetedSource?: () => void;
 }
 
 const ChatInputBox = memo(function ChatInputBox({
@@ -355,7 +414,9 @@ const ChatInputBox = memo(function ChatInputBox({
   queuedPrompts = [],
   onRemoveQueuedPrompt,
   onPromoteQueuedPrompt,
-  backendUrl
+  backendUrl,
+  targetedSource,
+  onClearTargetedSource
 }: ChatInputBoxProps) {
   const [input, setInput] = useState("");
   const [filter, setFilter] = useState<SearchFilterState>(DEFAULT_SEARCH_FILTER);
@@ -414,12 +475,16 @@ const ChatInputBox = memo(function ChatInputBox({
     }
 
     let finalMessage = query;
+    if (targetedSource) {
+      finalMessage = `[Focused Document: "${targetedSource.title || targetedSource.filename}"]\n${query}`;
+    }
     if (filterClauses.length > 0) {
-      finalMessage = `${query}\n[Filter Preferences: ${filterClauses.join(", ")}]`;
+      finalMessage = `${finalMessage}\n[Filter Preferences: ${filterClauses.join(", ")}]`;
     }
 
     onSubmit(finalMessage);
     setInput("");
+    onClearTargetedSource?.();
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -493,8 +558,33 @@ const ChatInputBox = memo(function ChatInputBox({
 
       {/* Main Input Box (Antigravity Style Card) */}
       <div className="bg-[#1e1f22] rounded-2xl p-2.5 sm:p-3 border border-white/10 shadow-2xl focus-within:border-white/20 transition-all flex flex-col gap-2">
+        {/* Active Dedicated Source Reference Card (Dismissible) */}
+        {targetedSource && (
+          <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-blue-950/50 border border-blue-800/70 text-xs animate-in fade-in slide-in-from-top-1 duration-150 shadow-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-1 rounded-md bg-blue-500/20 text-blue-400 shrink-0">
+                <FileText size={12} />
+              </div>
+              <span className="text-blue-300 font-medium text-[11.5px] shrink-0">Focused on:</span>
+              <span className="font-semibold text-white text-[12px] truncate max-w-[240px] sm:max-w-[420px]">
+                {targetedSource.title || targetedSource.filename}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={onClearTargetedSource}
+              className="p-1 rounded-md hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0 flex items-center gap-1 text-[11px]"
+              title="Cancel focus on this document"
+            >
+              <X size={13} />
+              <span className="hidden sm:inline">Cancel</span>
+            </button>
+          </div>
+        )}
+
         {/* Top Textarea */}
         <textarea 
+          id="chat-input-textarea"
           ref={textareaRef}
           rows={1}
           value={input}
@@ -505,7 +595,11 @@ const ChatInputBox = memo(function ChatInputBox({
               handleSend();
             }
           }}
-          placeholder={isLoading ? "Type your next message (automatically queued)..." : "Ask NotbookLM anything"}
+          placeholder={
+            targetedSource 
+              ? "Ask a question about this source..."
+              : (isLoading ? "Type your next message (automatically queued)..." : "Ask NotbookLM anything")
+          }
           style={{ wordBreak: "break-word", overflowWrap: "break-word", whiteSpace: "pre-wrap" }}
           className="w-full bg-transparent border-0 focus:outline-none resize-none px-2 py-1 text-[15px] text-white placeholder:text-gray-500 max-h-[180px] min-h-[32px] overflow-y-auto overflow-x-hidden leading-relaxed shadow-none box-border"
         />
@@ -590,7 +684,10 @@ export default function ChatArea({
   isSidebarOpen = true,
   onOpenSidebar,
   isRightSidebarOpen = true,
-  onToggleRightSidebar
+  onToggleRightSidebar,
+  targetedSource,
+  onClearTargetedSource,
+  activeStatus
 }: ChatAreaProps) {
   const [copiedMessageIdx, setCopiedMessageIdx] = useState<number | null>(null);
   const [editingMessageIdx, setEditingMessageIdx] = useState<number | null>(null);
@@ -697,6 +794,8 @@ export default function ChatArea({
                 onRemoveQueuedPrompt={onRemoveQueuedPrompt}
                 onPromoteQueuedPrompt={onPromoteQueuedPrompt}
                 backendUrl={backendUrl}
+                targetedSource={targetedSource}
+                onClearTargetedSource={onClearTargetedSource}
               />
             </div>
           ) : (
@@ -744,9 +843,23 @@ export default function ChatArea({
                       </div>
                     ) : (
                       <div className="flex flex-col items-end max-w-[85%] sm:max-w-[80%] space-y-1">
-                        <div className="bg-[#2f2f2f] text-white rounded-2xl px-4 py-2.5 shadow-sm">
-                          <p className="whitespace-pre-wrap leading-relaxed text-[16px] break-words">{msg.content}</p>
-                        </div>
+                        {(() => {
+                          const matchFocus = msg.content.match(/^\[(?:Focused Document|Fokus Dokumen|Fokus Sumber):\s*"(.*?)"\]\n?/i);
+                          const focusTitle = matchFocus ? matchFocus[1] : null;
+                          const cleanText = matchFocus ? msg.content.replace(matchFocus[0], "").trim() : msg.content;
+
+                          return (
+                            <div className="bg-[#2f2f2f] text-white rounded-2xl px-4 py-2.5 shadow-sm space-y-1.5">
+                              {focusTitle && (
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-blue-950/80 border border-blue-800/90 text-[11px] text-blue-300 font-medium">
+                                  <FileText size={11} className="text-blue-400" />
+                                  <span className="truncate max-w-[260px] sm:max-w-[380px]">Focus: {focusTitle}</span>
+                                </div>
+                              )}
+                              <p className="whitespace-pre-wrap leading-relaxed text-[15px] sm:text-[16px] break-words">{cleanText}</p>
+                            </div>
+                          );
+                        })()}
 
                         {/* User Action Buttons (Align Right flush with bubble edge) */}
                         <div className="flex items-center gap-1 text-gray-400 self-end pr-0 pt-0.5">
@@ -779,6 +892,7 @@ export default function ChatArea({
                           msg={msg}
                           activeChatId={activeChatId}
                           backendUrl={backendUrl}
+                          documents={documents}
                           onDocumentAdded={onDocumentAdded}
                           onEnsureChatSession={onEnsureChatSession}
                         />
@@ -807,14 +921,14 @@ export default function ChatArea({
               ))}
 
               {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-transparent text-gray-400 px-5 py-3 flex items-center gap-3">
-                    <div className="flex space-x-1.5">
-                      <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                      <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                      <div className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce"></div>
+                <div className="flex justify-start animate-in fade-in duration-200">
+                  <div className="bg-[#242528]/90 border border-blue-500/20 text-gray-200 px-4 py-2.5 rounded-2xl flex items-center gap-3 shadow-md backdrop-blur-sm">
+                    <div className="relative flex items-center justify-center">
+                      <Sparkles size={14} className="text-blue-400 animate-spin" style={{ animationDuration: '3s' }} />
                     </div>
-                    <span className="text-xs font-medium text-gray-400 animate-pulse">Searching sources & generating response...</span>
+                    <span className="text-xs font-medium text-blue-200/90 transition-all duration-300">
+                      {activeStatus || "Analyzing query & reasoning..."}
+                    </span>
                   </div>
                 </div>
               )}
@@ -839,6 +953,8 @@ export default function ChatArea({
             onRemoveQueuedPrompt={onRemoveQueuedPrompt}
             onPromoteQueuedPrompt={onPromoteQueuedPrompt}
             backendUrl={backendUrl}
+            targetedSource={targetedSource}
+            onClearTargetedSource={onClearTargetedSource}
           />
         </div>
       )}
