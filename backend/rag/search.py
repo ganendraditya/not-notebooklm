@@ -449,14 +449,15 @@ def search_academic_papers_planned(
             print(f"[Europe PMC Search Error]: {e}")
         return fetched
 
-    # 2. OpenAlex Search
+    # 2. OpenAlex Search with deep pagination
     def fetch_openalex(term: str, target_count: int):
         fetched = []
         if not term.strip(): return fetched
         page = 1
-        while len(fetched) < target_count and page <= 5:
+        max_pages = max(10, (target_count // 25) + 3)
+        while len(fetched) < target_count and page <= max_pages:
             try:
-                per_page = min(max(target_count - len(fetched) + 15, 25), 100)
+                per_page = min(max(target_count - len(fetched) + 20, 50), 100)
                 url = "https://api.openalex.org/works"
                 params = {"search": term.strip(), "per_page": per_page, "page": page}
                 filter_parts = []
@@ -464,7 +465,7 @@ def search_academic_papers_planned(
                 if min_citations > 0: filter_parts.append(f"cited_by_count:>{min_citations - 1}")
                 if filter_parts: params["filter"] = ",".join(filter_parts)
                     
-                resp = requests.get(url, params=params, headers=headers, timeout=6)
+                resp = requests.get(url, params=params, headers=headers, timeout=8)
                 if resp.status_code == 200:
                     results_list = resp.json().get("results", [])
                     if not results_list: break
@@ -516,50 +517,59 @@ def search_academic_papers_planned(
                 break
         return fetched
 
-    # 3. Crossref Search
+    # 3. Crossref Search with deep pagination
     def fetch_crossref(term: str, target_count: int):
         fetched = []
         if not term.strip(): return fetched
-        try:
-            url = "https://api.crossref.org/works"
-            params = {"query": term.strip(), "rows": min(target_count + 20, 60)}
-            if min_year: params["filter"] = f"from-pub-date:{min_year}-01-01"
-            resp = requests.get(url, params=params, headers=headers, timeout=6)
-            if resp.status_code == 200:
-                for item in resp.json().get("message", {}).get("items", []):
-                    if len(fetched) >= target_count: break
-                    title_list = item.get("title", [])
-                    if not title_list: continue
-                    title = title_list[0].strip()
-                    doi = item.get("DOI", "")
-                    if not title or not is_valid_academic_title(title) or is_candidate_duplicate(title, doi): continue
+        offset = 0
+        while len(fetched) < target_count and offset <= (target_count * 2):
+            try:
+                url = "https://api.crossref.org/works"
+                rows = min(target_count - len(fetched) + 30, 100)
+                params = {"query": term.strip(), "rows": rows, "offset": offset}
+                if min_year: params["filter"] = f"from-pub-date:{min_year}-01-01"
+                resp = requests.get(url, params=params, headers=headers, timeout=8)
+                if resp.status_code == 200:
+                    items = resp.json().get("message", {}).get("items", [])
+                    if not items: break
+                    for item in items:
+                        if len(fetched) >= target_count: break
+                        title_list = item.get("title", [])
+                        if not title_list: continue
+                        title = title_list[0].strip()
+                        doi = item.get("DOI", "")
+                        if not title or not is_valid_academic_title(title) or is_candidate_duplicate(title, doi): continue
+                            
+                        year = "N/A"
+                        created = item.get("created", {}).get("date-parts", [[]])[0]
+                        if created: year = str(created[0])
+                        if min_year and year.isdigit() and int(year) < min_year: continue
+                            
+                        authors = [f"{a.get('given', '')} {a.get('family', '')}".strip() for a in item.get("author", [])]
+                        venue = item.get("container-title", [""])[0] if item.get("container-title") else ""
+                        raw_abs = item.get("abstract", "")
+                        clean_abs = re.sub(r"<[^>]+>", " ", raw_abs) if raw_abs else ""
+                        snippet = re.sub(r"\s+", " ", clean_abs).strip() if clean_abs else f"Scholarly contribution published in {venue} ({year}). DOI: {doi}"
                         
-                    year = "N/A"
-                    created = item.get("created", {}).get("date-parts", [[]])[0]
-                    if created: year = str(created[0])
-                    if min_year and year.isdigit() and int(year) < min_year: continue
-                        
-                    authors = [f"{a.get('given', '')} {a.get('family', '')}".strip() for a in item.get("author", [])]
-                    venue = item.get("container-title", [""])[0] if item.get("container-title") else ""
-                    raw_abs = item.get("abstract", "")
-                    clean_abs = re.sub(r"<[^>]+>", " ", raw_abs) if raw_abs else ""
-                    snippet = re.sub(r"\s+", " ", clean_abs).strip() if clean_abs else f"Scholarly contribution published in {venue} ({year}). DOI: {doi}"
-                    
-                    if not is_matching_topic(title, snippet): continue
-                        
-                    mark_candidate_seen(title, doi)
-                    fetched.append({
-                        "title": title,
-                        "year": str(year),
-                        "doi": f"https://doi.org/{doi}" if doi and not doi.startswith("http") else doi,
-                        "url": f"https://doi.org/{doi}" if doi else item.get("URL", ""),
-                        "snippet": snippet,
-                        "authors": authors,
-                        "venue": venue,
-                        "pdf_url": ""
-                    })
-        except Exception as e:
-            print(f"[Crossref Search Error]: {e}")
+                        if not is_matching_topic(title, snippet): continue
+                            
+                        mark_candidate_seen(title, doi)
+                        fetched.append({
+                            "title": title,
+                            "year": str(year),
+                            "doi": f"https://doi.org/{doi}" if doi and not doi.startswith("http") else doi,
+                            "url": f"https://doi.org/{doi}" if doi else item.get("URL", ""),
+                            "snippet": snippet,
+                            "authors": authors,
+                            "venue": venue,
+                            "pdf_url": ""
+                        })
+                    offset += rows
+                else:
+                    break
+            except Exception as e:
+                print(f"[Crossref Search Error]: {e}")
+                break
         return fetched
 
     # Execute Search Orchestration

@@ -525,12 +525,15 @@ async def query_chat(
             max_iterations=6,
             timeout=timeout_sec,
             system_prompt=(
-                "You are NotbookLM, a helpful personal research assistant. "
+                "You are NotbookLM, a powerful, proactive AI research assistant. "
                 "Always communicate in Indonesian (Bahasa Indonesia). "
                 "Always maintain conversation context from the chat history. "
                 f"{doc_context_info}\n"
-                "Present the final output directly in the requested format (such as Markdown tables). "
-                "Do NOT output internal thoughts or monologues. Output only the final response."
+                "PROAKTIF & EKSEKUTIF:\n"
+                "- Jika pengguna meminta data, mencari paper, menganalisis, atau merangkum, LAKUKAN LANGSUNG menggunakan tools yang ada.\n"
+                "- JANGAN PERNAH menyuruh pengguna menulis script Python, memanggil API manual, atau membuka website lain sendiri.\n"
+                "- Sajikan hasil akhir langsung secara lengkap, rapi, dan terstruktur.\n"
+                "- Do NOT output internal thoughts or monologues. Output only the final response."
             )
         )
         res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
