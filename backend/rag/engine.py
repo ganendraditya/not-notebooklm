@@ -326,36 +326,33 @@ async def query_chat(
                 content = content.split("<!-- SOURCES_DATA")[0].strip()
             formatted_history.append(LlamaChatMessage(role=role, content=content))
             
-    selected_provider = os.getenv("LLM_PROVIDER", "freellmapi").lower()
+    selected_provider = os.getenv("LLM_PROVIDER", "9router").lower()
     
+    # Priority list of available LLMs
+    candidate_llms = []
     if selected_provider == "9router" and ninerouter_llm:
-        active_llm = ninerouter_llm
-        primary_name = f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/claude-sonnet-4-6')})"
-        fallback_llm = freellm_llm or gemini_llm or groq_llm
-        fallback_name = "FreeLLMAPI" if freellm_llm else ("Gemini" if gemini_llm else "Groq")
+        candidate_llms.append((ninerouter_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"))
     elif selected_provider == "freellmapi" and freellm_llm:
-        active_llm = freellm_llm
-        primary_name = f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})"
-        fallback_llm = ninerouter_llm or gemini_llm or groq_llm
-        fallback_name = "9Router" if ninerouter_llm else ("Gemini" if gemini_llm else "Groq")
+        candidate_llms.append((freellm_llm, f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})"))
     elif selected_provider == "groq" and groq_llm:
-        active_llm = groq_llm
-        primary_name = "Groq (Qwen 2.5 32B)"
-        fallback_llm = gemini_llm or freellm_llm or ninerouter_llm
-        fallback_name = "Gemini" if gemini_llm else "FreeLLMAPI"
-    elif gemini_llm:
-        active_llm = gemini_llm
-        primary_name = "Google Gemini Flash"
-        fallback_llm = freellm_llm or groq_llm or ninerouter_llm
-        fallback_name = "FreeLLMAPI" if freellm_llm else "Groq"
-    else:
-        active_llm = freellm_llm or groq_llm or ninerouter_llm
-        primary_name = "Default Fallback"
-        fallback_llm = None
-        fallback_name = "None"
-        
-    if not active_llm:
+        candidate_llms.append((groq_llm, "Groq (Qwen 2.5 32B)"))
+    elif selected_provider == "gemini" and gemini_llm:
+        candidate_llms.append((gemini_llm, "Google Gemini Flash"))
+
+    # Add all other initialized LLMs as sequential fallbacks
+    for llm_inst, name in [
+        (ninerouter_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"),
+        (groq_llm, "Groq (Qwen 2.5 32B)"),
+        (gemini_llm, "Google Gemini Flash"),
+        (freellm_llm, f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})")
+    ]:
+        if llm_inst and not any(cand[0] == llm_inst for cand in candidate_llms):
+            candidate_llms.append((llm_inst, name))
+
+    if not candidate_llms:
         return "Error: Tidak ada LLM Provider yang terkonfigurasi. Silakan periksa file .env."
+
+    active_llm, primary_name = candidate_llms[0]
 
     def clean_response(text: str) -> str:
         text = re.sub(r'Thought:[\s\S]*?(?=Action:|Answer:|$)', '', text)
@@ -370,9 +367,10 @@ async def query_chat(
         greetings = [
             "halo", "hai", "hi", "hello", "pagi", "siang", "sore", "malam",
             "terima kasih", "makasih", "thanks", "thank you", "siapa kamu",
-            "bisa apa", "kamu siapa", "tes", "test", "ping", "bisa bantu apa"
+            "bisa apa", "kamu siapa", "tes", "test", "ping", "bisa bantu apa",
+            "woi", "oy", "hey", "hei", "p", "bro", "bos", "min"
         ]
-        if any(t == g or t.startswith(g + " ") or t.endswith(" " + g) for g in greetings) and len(t.split()) <= 4:
+        if any(t == g or t.startswith(g + " ") or t.endswith(" " + g) or t.startswith(g + "!") or t.startswith(g + "?") for g in greetings) and len(t.split()) <= 4:
             return True
         return False
 
@@ -539,18 +537,18 @@ async def query_chat(
         res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
         return clean_response(str(res))
 
-    try:
-        print(f"[RAG Engine] Attempting query with primary LLM: {primary_name}")
-        return await execute_agent(active_llm, timeout_sec=90.0)
-    except Exception as e:
-        err_str = str(e)
-        if fallback_llm and fallback_llm != active_llm:
-            print(f"[RAG Fallback] {primary_name} failed or timed out: {err_str}")
-            print(f"[RAG Fallback] -> Automatically falling back to {fallback_name}...")
-            try:
-                return await execute_agent(fallback_llm, timeout_sec=90.0)
-            except Exception as fb_err:
-                print(f"[RAG Fallback] {fallback_name} also failed: {fb_err}")
-                raise fb_err
-        else:
-            raise e
+    last_err = None
+    for cand_idx, (curr_llm, curr_name) in enumerate(candidate_llms):
+        try:
+            print(f"[RAG Engine] Attempting query with LLM [{cand_idx+1}/{len(candidate_llms)}]: {curr_name}")
+            return await execute_agent(curr_llm, timeout_sec=60.0)
+        except Exception as e:
+            last_err = e
+            print(f"[RAG Fallback] {curr_name} failed: {e}")
+            if cand_idx + 1 < len(candidate_llms):
+                next_name = candidate_llms[cand_idx+1][1]
+                print(f"[RAG Fallback] -> Automatically cascading to {next_name}...")
+                await report_status(f"Switching AI provider to {next_name}...")
+                continue
+            else:
+                raise last_err
