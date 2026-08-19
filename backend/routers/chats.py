@@ -101,6 +101,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
     return asst_msg
 
 @router.post("/chats/{chat_id}/message/stream")
+@router.post("/chats/{chat_id}/message_stream")
 async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session = Depends(get_db)):
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:
@@ -203,6 +204,8 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     return asst_msg
 
 @router.put("/chats/{chat_id}/edit_message/stream")
+@router.put("/chats/{chat_id}/edit_message_stream")
+@router.post("/chats/{chat_id}/edit_message_stream")
 async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: Session = Depends(get_db)):
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:
