@@ -246,8 +246,8 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         "pdf_url": "",
         "abstract": "",
         "content": "",
-        "is_oa": False,
-        "access_status": "Closed Access (Paywalled)"
+        "is_oa": True,
+        "access_status": "Open Access"
     }
     
     if not os.path.exists(file_path):
