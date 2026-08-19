@@ -42,7 +42,7 @@ export default function ChatClient() {
   const [activeStatus, setActiveStatus] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   
-  const backendUrl = "http://localhost:8000";
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   const bumpSessionToTop = (chatId: string) => {
     setSessions(prev => {

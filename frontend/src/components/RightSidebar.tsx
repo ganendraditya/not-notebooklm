@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document } from "@/app/ChatClient";
+import { DownloadManager, DownloadTask } from "./DownloadManager";
 
 interface RightSidebarProps {
   activeChatId: string | null;
@@ -57,6 +58,8 @@ interface PaperDetailData {
   pdf_url: string;
   abstract: string;
   abstract_type?: "official" | "ai_summary";
+  is_oa?: boolean;
+  access_status?: string;
   content: string;
 }
 
@@ -77,6 +80,16 @@ const cleanHtmlAbstract = (raw?: string): string => {
   text = text.replace(/&apos;/g, "'");
   // Remove remaining HTML tags
   text = text.replace(/<[^>]+>/g, "");
+  // Strip markdown formatting artifacts from PDF text extraction
+  text = text.replace(/\*\*_([^_*]+)_\*\*/g, "$1");
+  text = text.replace(/\*\*([^*]+)\*\*/g, "$1");
+  text = text.replace(/__([^_]+)__/g, "$1");
+  text = text.replace(/(?<!\w)\*([^*]+)\*(?!\w)/g, "$1");
+  text = text.replace(/(?<!\w)_([^_\s][^_]*)_(?!\w)/g, "$1");
+  // Strip orphaned/unpaired markdown delimiters
+  text = text.replace(/\*{2,}/g, "");
+  text = text.replace(/(?<!\w)_+(?!\w)/g, "");
+  text = text.replace(/^#{1,6}\s*/gm, "");
   // Format structured section headings if present without line breaks
   const headers = [
     "Research question", "Research methods", "Methods and materials", "Methodology",
@@ -400,6 +413,7 @@ export default function RightSidebar({
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkDownloading, setIsBulkDownloading] = useState(false);
+  const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
 
   const selectedDocList = sortedDocuments.filter(d => selectedDocs[d.id] !== false);
   const selectedCount = selectedDocList.length;
@@ -407,10 +421,11 @@ export default function RightSidebar({
   const handleBulkDownload = async () => {
     if (!activeChatId || selectedCount === 0 || isBulkDownloading) return;
     setIsBulkDownloading(true);
-    try {
-      const docIds = selectedDocList.map(d => d.id);
-      
-      if (docIds.length === 1) {
+    const docIds = selectedDocList.map(d => d.id);
+
+    // If only 1 document is selected, trigger immediate direct single PDF download
+    if (docIds.length === 1) {
+      try {
         const doc = selectedDocList[0];
         const link = document.createElement("a");
         link.href = `${backendUrl}/chats/${activeChatId}/documents/${doc.id}/download`;
@@ -418,27 +433,105 @@ export default function RightSidebar({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      } else {
-        const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk_download`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ doc_ids: docIds })
-        });
-        
-        if (!res.ok) throw new Error("Failed to download ZIP archive");
-        
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `NotbookLM_Sources_${docIds.length}_files.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error("Single download error:", err);
+      } finally {
+        setIsBulkDownloading(false);
       }
-    } catch (err) {
+      return;
+    }
+
+    // Multiple documents: Launch Google Drive style floating progress stream
+    setDownloadTask({
+      status: "preparing",
+      total: docIds.length,
+      current: 0,
+      percent: 0,
+      currentFile: "Connecting to server..."
+    });
+
+    try {
+      const response = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk_download_stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doc_ids: docIds })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start download stream");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      if (!reader) {
+        throw new Error("No readable stream received");
+      }
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const block of lines) {
+          const line = block.trim();
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === "init") {
+                setDownloadTask({
+                  status: "zipping",
+                  total: data.total || docIds.length,
+                  current: 0,
+                  percent: 0,
+                  currentFile: "Starting parallel archive build..."
+                });
+              } else if (data.type === "progress") {
+                setDownloadTask(prev => ({
+                  status: "zipping",
+                  total: data.total || docIds.length,
+                  current: data.current,
+                  percent: data.percent,
+                  currentFile: data.filename || prev?.currentFile || ""
+                }));
+              } else if (data.type === "complete") {
+                setDownloadTask({
+                  status: "complete",
+                  total: data.total_files || docIds.length,
+                  current: data.total_files || docIds.length,
+                  percent: 100,
+                  currentFile: "Download complete!",
+                  totalSizeMb: data.total_size_mb
+                });
+
+                // Auto-trigger browser download
+                const downloadLink = document.createElement("a");
+                downloadLink.href = `${backendUrl}${data.download_url}`;
+                downloadLink.download = data.filename || `NotbookLM_Sources_${docIds.length}_files.zip`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+              }
+            } catch (pErr) {
+              console.error("Error parsing download progress SSE:", pErr);
+            }
+          }
+        }
+      }
+    } catch (err: any) {
       console.error("Bulk download error:", err);
+      setDownloadTask({
+        status: "error",
+        total: docIds.length,
+        current: 0,
+        percent: 0,
+        currentFile: "",
+        errorMsg: err?.message || "Failed to download ZIP archive"
+      });
     } finally {
       setIsBulkDownloading(false);
     }
@@ -500,7 +593,7 @@ export default function RightSidebar({
   // VIEW MODE: CONSENSUS.AI STYLE ACADEMIC PAPER READER VIEW (Overview & Full Paper)
   // =========================================================================
   if (viewingDoc) {
-    const title = paperDetails?.title || viewingDoc.filename.replace(/\.[^/.]+$/, "");
+    const title = (paperDetails?.title || viewingDoc.filename.replace(/\.[^/.]+$/, "")).replace(/<[^>]+>/g, "");
     const authorsStr = paperDetails?.authors && paperDetails.authors.length > 0 
       ? paperDetails.authors.join(", ") 
       : "Academic Researchers";
@@ -620,6 +713,21 @@ export default function RightSidebar({
                 </button>
               </div>
             )}
+
+            {/* Open Access vs Closed Access Verification Badge */}
+            <div className="pt-1">
+              {paperDetails?.is_oa ? (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span>Open Access · Full Original PDF Available</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                  <span>Closed Access / Paywalled · Publisher Abstract & Metadata</span>
+                </div>
+              )}
+            </div>
 
             {/* Divider */}
             <div className="border-t border-white/10 pt-2" />
@@ -812,19 +920,22 @@ export default function RightSidebar({
             )}
           </div>
 
-          {/* Right Side: PDF / External Landing Page Pill */}
-          {landingUrl && (
-            <a
-              href={landingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-gray-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-              title="Open full-text paper link in new tab"
-            >
-              <ExternalLink size={12} />
-              <span>PDF ↗</span>
-            </a>
-          )}
+          {/* Right Side: PDF / External Landing Page Pill - ALWAYS shown */}
+          {(() => {
+            const pdfLink = landingUrl || `https://scholar.google.com/scholar?q=${encodeURIComponent(title)}`;
+            return (
+              <a
+                href={pdfLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-gray-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                title={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"}
+              >
+                <ExternalLink size={12} />
+                <span>{landingUrl ? "PDF ↗" : "Find ↗"}</span>
+              </a>
+            );
+          })()}
         </div>
 
         {/* 5. Interactive Multi-Format Citation Modal */}
@@ -1170,8 +1281,8 @@ export default function RightSidebar({
                       <span className="text-[7.5px] font-bold tracking-tighter uppercase font-mono">{badge.label}</span>
                     </div>
 
-                    <span className="text-[11.5px] text-gray-300 truncate group-hover:text-white font-normal" title={doc.filename}>
-                      {doc.filename}
+                    <span className="text-[11.5px] text-gray-300 truncate group-hover:text-white font-normal" title={doc.filename.replace(/<[^>]+>/g, "")}>
+                      {doc.filename.replace(/<[^>]+>/g, "")}
                     </span>
                   </div>
 
@@ -1238,6 +1349,8 @@ export default function RightSidebar({
           </div>
         </div>
       )}
+      {/* Google Drive Style Download Floating Progress Toast */}
+      <DownloadManager task={downloadTask} onClose={() => setDownloadTask(null)} />
     </aside>
   );
 }
