@@ -23,7 +23,12 @@ from llama_index.core.agent import ReActAgent
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
 from .parsers import parse_document_to_markdown
-from .search import search_academic_papers
+from .search import (
+    search_academic_papers,
+    plan_academic_search,
+    search_academic_papers_planned,
+    get_existing_notebook_sources_signatures,
+)
 
 load_dotenv()
 
