@@ -223,19 +223,15 @@ export const ChatInputBox = memo(function ChatInputBox({
           className="w-full bg-transparent text-white placeholder-gray-400 text-[15px] focus:outline-none resize-none px-3 py-2 leading-relaxed custom-scrollbar max-h-[180px]"
         />
 
+        {/* Bottom Actions Row */}
         <div className="flex items-center justify-between pt-2 px-1">
-          <div className="flex items-center gap-2">
-            <button 
-              type="button"
-              onClick={onToggleRightSidebar}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium border border-white/5 transition-colors cursor-pointer"
-            >
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
-              <span>{documentsCount} sources</span>
-            </button>
-
+          {/* Left: Only ModelSelector */}
+          <div className="flex items-center">
             <ModelSelector backendUrl={backendUrl} />
+          </div>
 
+          {/* Right: Filter, Sources Badge, and Send/Stop Button */}
+          <div className="flex items-center gap-2">
             <SearchFilterPopover
               isOpen={isFilterOpen}
               onClose={() => setIsFilterOpen(false)}
@@ -243,9 +239,16 @@ export const ChatInputBox = memo(function ChatInputBox({
               filter={filter}
               onApplyFilter={setFilter}
             />
-          </div>
 
-          <div className="flex items-center gap-1">
+            <button 
+              type="button"
+              onClick={onToggleRightSidebar}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium border border-white/5 transition-colors cursor-pointer"
+            >
+              <FileText size={12} className="text-blue-400" />
+              <span>{documentsCount} sources</span>
+            </button>
+
             {isLoading && onStopGeneration && (
               <button
                 type="button"
