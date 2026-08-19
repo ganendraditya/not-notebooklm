@@ -33,20 +33,24 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
 
   if (!task || task.status === "idle") return null;
 
+  const displayPercent = typeof task.percent === "number" && !isNaN(task.percent) 
+    ? Math.min(100, Math.max(0, Math.round(task.percent))) 
+    : (task.total > 0 ? Math.min(100, Math.max(0, Math.round((task.current / task.total) * 100))) : 0);
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-88 max-w-[calc(100vw-2rem)] animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <div className="bg-[#1e1f20]/95 backdrop-blur-xl border border-[#333538] rounded-2xl shadow-2xl shadow-black/80 overflow-hidden transition-all duration-300">
+    <div className="absolute bottom-0 left-0 right-0 z-40 w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
+      <div className="bg-[#18191b] border-t border-[#333538] shadow-2xl shadow-black/80 overflow-hidden transition-all duration-200">
         {/* Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 bg-[#282a2c]/70 border-b border-[#383a3d]">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between px-3.5 py-2 bg-[#202124] border-b border-[#2e3033]">
+          <div className="flex items-center gap-2">
             {task.status === "complete" ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 animate-in zoom-in-50" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 animate-in zoom-in-50" />
             ) : task.status === "error" ? (
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
             ) : (
-              <Loader2 className="w-4 h-4 text-blue-400 shrink-0 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 text-blue-400 shrink-0 animate-spin" />
             )}
-            <span className="text-sm font-semibold text-gray-200">
+            <span className="text-xs font-semibold text-gray-200">
               {task.status === "complete"
                 ? "Download ready"
                 : task.status === "error"
@@ -55,33 +59,33 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-1 text-gray-400 hover:text-gray-200 hover:bg-[#383a3d] rounded-lg transition-colors"
+              className="p-1 text-gray-400 hover:text-gray-200 hover:bg-white/10 rounded transition-colors cursor-pointer"
               title={isCollapsed ? "Expand" : "Collapse"}
             >
-              {isCollapsed ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {isCollapsed ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
             <button
               onClick={onClose}
-              className="p-1 text-gray-400 hover:text-gray-200 hover:bg-[#383a3d] rounded-lg transition-colors"
+              className="p-1 text-gray-400 hover:text-gray-200 hover:bg-white/10 rounded transition-colors cursor-pointer"
               title="Close"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
         {/* Content Body (Collapsible) */}
         {!isCollapsed && (
-          <div className="p-4 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0">
-                <FileArchive className="w-5 h-5" />
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0">
+                <FileArchive className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between text-xs mb-1">
+                <div className="flex items-center justify-between text-[11px] mb-1">
                   <span className="font-medium text-gray-300 truncate">
                     {task.status === "complete"
                       ? `Zipped ${task.total} files (${task.totalSizeMb ? `${task.totalSizeMb} MB` : "Ready"})`
@@ -90,12 +94,12 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
                       : `Zipping ${task.total} files...`}
                   </span>
                   <span className="font-bold text-blue-400 shrink-0 ml-2">
-                    {task.status === "complete" ? "100%" : `${task.percent}%`}
+                    {task.status === "complete" ? "100%" : `${displayPercent}%`}
                   </span>
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full h-2 bg-[#2c2d30] rounded-full overflow-hidden border border-[#383a3d]">
+                <div className="w-full h-1.5 bg-[#2c2d30] rounded-full overflow-hidden border border-[#383a3d]">
                   <div
                     className={`h-full transition-all duration-300 rounded-full ${
                       task.status === "complete"
@@ -104,25 +108,25 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
                         ? "bg-red-500"
                         : "bg-gradient-to-r from-blue-500 to-cyan-400 animate-pulse"
                     }`}
-                    style={{ width: `${Math.max(4, task.percent)}%` }}
+                    style={{ width: `${Math.max(4, displayPercent)}%` }}
                   />
                 </div>
               </div>
             </div>
 
             {/* Current Item / Subtitle Status */}
-            <div className="flex items-center justify-between text-[11px] text-gray-400 pt-0.5">
+            <div className="flex items-center justify-between text-[10.5px] text-gray-400 pt-0.5">
               {task.status === "complete" ? (
-                <span className="text-emerald-400 flex items-center gap-1.5">
-                  <ArrowDownToLine className="w-3.5 h-3.5" />
+                <span className="text-emerald-400 flex items-center gap-1.5 truncate">
+                  <ArrowDownToLine className="w-3 h-3 shrink-0" />
                   Your archive is downloading automatically
                 </span>
               ) : task.status === "error" ? (
-                <span className="text-red-400">{task.errorMsg || "Please try again"}</span>
+                <span className="text-red-400 truncate">{task.errorMsg || "Please try again"}</span>
               ) : (
                 <>
                   <span className="truncate pr-2">
-                    {task.currentFile ? `Zipping: ${task.currentFile}` : "Fetching sources from journals..."}
+                    {task.currentFile ? `Zipping: ${task.currentFile}` : "Fetching sources..."}
                   </span>
                   <span className="shrink-0 font-medium text-gray-400">
                     {task.current} of {task.total}

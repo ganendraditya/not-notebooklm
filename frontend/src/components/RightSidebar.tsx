@@ -618,7 +618,7 @@ export default function RightSidebar({
     );
 
     return (
-      <aside className="w-80 sm:w-[460px] h-full bg-[#18191b] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all">
+      <aside className="w-80 sm:w-[460px] h-full bg-[#18191b] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
         {/* 1. Header Bar: ← Paper + Circular Close Button */}
         <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
           <button
@@ -1092,7 +1092,7 @@ export default function RightSidebar({
   // VIEW MODE: STANDARD SOURCES LIST PANEL
   // ==========================================
   return (
-    <aside className="w-80 h-full bg-[#1e1f20] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all">
+    <aside className="w-80 h-full bg-[#1e1f20] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
       {/* 1. Header: Sources Title & Collapse Button */}
       <div className="p-4 flex items-center justify-between border-b border-white/5">
         <h2 className="text-base font-semibold text-white tracking-tight">Sources</h2>
