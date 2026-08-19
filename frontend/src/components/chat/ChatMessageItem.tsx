@@ -118,11 +118,29 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       }
       if (!currentChatId) return;
 
-      const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
+      let res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sources: toImport })
       });
+
+      if (res.status === 404) {
+        // Fallback to non-streaming batch endpoint if stream endpoint not found
+        res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sources: toImport })
+        });
+        if (res.ok) {
+          const createdDocs = await res.json();
+          if (createdDocs && createdDocs.length > 0) {
+            createdDocs.forEach((d: DocType) => onDocumentAdded?.(d));
+            setImportedCount(createdDocs.length);
+          }
+          setIsImported(true);
+          return;
+        }
+      }
 
       if (!res.ok) {
         throw new Error(`Server responded with ${res.status}`);
@@ -224,6 +242,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 {parseCitationsInReactNode(children, documents, onOpenDocument)}
               </blockquote>
             ),
+            pre: ({ children }) => <>{children}</>,
             code: ({ inline, className, children, ...props }: any) => {
               if (inline) {
                 return (
