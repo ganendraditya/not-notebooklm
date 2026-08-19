@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+uploads/
+temp_zips/
+qdrant_data/
+not_notebooklm.db
+.env
