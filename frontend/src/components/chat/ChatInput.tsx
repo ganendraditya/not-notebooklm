@@ -249,27 +249,26 @@ export const ChatInputBox = memo(function ChatInputBox({
               <span>{documentsCount} sources</span>
             </button>
 
-            {isLoading && onStopGeneration && (
+            {isLoading && onStopGeneration ? (
               <button
                 type="button"
                 onClick={onStopGeneration}
-                className="h-8 px-3 rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+                className="p-2 rounded-full bg-white text-black hover:bg-gray-200 transition-all cursor-pointer shadow-md flex items-center justify-center"
                 title="Stop generation"
               >
-                <Square size={12} className="fill-current" />
-                <span className="hidden sm:inline">Stop</span>
+                <Square size={16} className="fill-current" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="p-2 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-white transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center"
+                title="Send message"
+              >
+                <ArrowUp size={18} strokeWidth={2.5} />
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!input.trim()}
-              className="p-2 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-white transition-all cursor-pointer disabled:cursor-not-allowed shadow-md"
-              title={isLoading ? "Queue prompt" : "Send message"}
-            >
-              <ArrowUp size={18} strokeWidth={2.5} />
-            </button>
           </div>
         </div>
       </div>
