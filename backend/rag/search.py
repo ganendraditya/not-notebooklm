@@ -36,13 +36,19 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
     Uses the AI model to understand conversational intent, context, multi-lingual requirements, and exact quantities.
     """
     # Clean colloquial Indonesian filler words before default fallback
-    clean_text = re.sub(r'\b(gw|gua|gue|aku|saya|lu|lo|kamu|dong|ya|coba|tolong|minta|lagi|bos|bro|nih|deh|aja|sih|buat|ke|source|sources)\b', ' ', query, flags=re.I)
+    clean_text = re.sub(
+        r'\b(cariin|carikan|cari|search|find|tentang|about|paper|jurnal|artikel|sumber|sources|buah|biji|referensi|makalah|dong|ya|tolong|minta|lagi|bos|bro|nih|deh|aja|sih|buat|ke|max|maksimal|tahun|terakhir|ke\s*belakang|jangan|lebih|dari|itu|gw|gua|gue|aku|saya|lu|lo|kamu)\b',
+        ' ',
+        query,
+        flags=re.I
+    )
+    clean_text = re.sub(r'\d+', ' ', clean_text)
     clean_text = ' '.join(clean_text.split()).strip()
 
     # 1. Default heuristic fallback (adaptive 15 by default)
     default_plan = {
-        "en_query": clean_text or query.strip(),
-        "id_query": clean_text or query.strip(),
+        "en_query": clean_text if len(clean_text) >= 3 else query.strip(),
+        "id_query": clean_text if len(clean_text) >= 3 else query.strip(),
         "target_count": 15,
         "language_preference": "mixed",
         "open_access_only": False,
