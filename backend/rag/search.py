@@ -840,7 +840,9 @@ def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper
         title_fallback = paper_title
     if not doi and not title_fallback:
         return None
-    clean_doi = doi.replace("https://doi.org/", "").strip() if doi else ""
+    clean_doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip() if doi else ""
+    if clean_doi:
+        clean_doi = re.sub(r'[;.,:)\s]+$', '', clean_doi).strip()
     cache_key = (clean_doi or title_fallback).strip().lower()
     if cache_key in _PAPER_METADATA_CACHE:
         return _PAPER_METADATA_CACHE[cache_key]
@@ -1092,7 +1094,9 @@ def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper
         is_oa=is_oa
     )
 
-    final_title = audited.get("title") or title or clean_doi
+    final_title = audited.get("title") or title or title_fallback or clean_doi
+    if final_title and final_title.lower() in ("abstract", "abstrak", "overview", "paper", "document"):
+        final_title = title_fallback or clean_doi
     final_authors = audited.get("authors") or authors
     final_year = audited.get("year") or pub_year
     final_journal = audited.get("journal") or journal

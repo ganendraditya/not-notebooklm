@@ -285,27 +285,38 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         
     res_data["content"] = raw_content
     
+    # 1. Parse Title
+    res_data["title"] = clean_filename_title
     title_match = re.search(r"#+\s*\**([^\n\*]+)\**", raw_content)
     if title_match:
-        extracted_title = title_match.group(1).strip()
-        year_in_title = re.search(r"\((\d{4})\)$", extracted_title)
+        cand_title = title_match.group(1).strip()
+        year_in_title = re.search(r"\((\d{4})\)$", cand_title)
         if year_in_title:
             res_data["year"] = year_in_title.group(1)
-            res_data["title"] = extracted_title[:year_in_title.start()].strip()
-        else:
-            res_data["title"] = extracted_title
-            
-    res_data["title"] = re.sub(r'<[^>]+>', '', res_data["title"]).strip()
+            cand_title = cand_title[:year_in_title.start()].strip()
+        cand_title = re.sub(r'<[^>]+>', '', cand_title).strip()
+        # Reject generic non-titles extracted from markdown headers
+        if cand_title and cand_title.lower() not in ("abstract", "abstrak", "overview", "paper", "document", "introduction", "keywords"):
+            res_data["title"] = cand_title
+
     clean_filename_title = re.sub(r'<[^>]+>', '', clean_filename_title).strip()
+    if not res_data["title"] or res_data["title"].lower() in ("abstract", "abstrak", "overview", "paper", "document"):
+        res_data["title"] = clean_filename_title
             
+    # 2. Parse and Clean DOI
     doi_match = re.search(r"DOI:\*?\*?\s*([^\s\n\*\)]+)", raw_content)
     extracted_doi = doi_match.group(1).strip() if doi_match else ""
     if not extracted_doi:
-        doi_regex_match = re.search(r"10\.\d{4,9}/[-._;()/:A-Za-z0-9]+", raw_content)
+        doi_regex_match = re.search(r"10\.\d{4,9}/[^\s\n<>\"'{}|\\^`]+", raw_content)
         if doi_regex_match:
             extracted_doi = doi_regex_match.group(0).strip()
+
+    # Clean trailing punctuation from DOI
+    if extracted_doi:
+        extracted_doi = re.sub(r'[;.,:)\s]+$', '', extracted_doi).strip()
     res_data["doi"] = extracted_doi
     
+    # 3. Parse URL
     url_match = re.search(r"URL:\*?\*?\s*([^\s\n\*\)]+)", raw_content)
     if url_match:
         res_data["url"] = url_match.group(1).strip()
@@ -325,7 +336,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         else:
             res_data["abstract_type"] = "official"
         
-    target_lookup_title = res_data["title"] or clean_filename_title
+    target_lookup_title = res_data["title"] if res_data["title"].lower() not in ("abstract", "abstrak", "overview", "paper") else clean_filename_title
     if extracted_doi or target_lookup_title:
         meta = await asyncio.to_thread(
             rag.resolve_paper_metadata_by_doi,
@@ -334,7 +345,11 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
             fast_only=(bool(extracted_doi) and bool(res_data["abstract"]))
         )
         if meta:
-            res_data["title"] = meta.get("title") or res_data["title"] or clean_filename_title
+            meta_title = meta.get("title", "").strip()
+            if meta_title and meta_title.lower() not in ("abstract", "abstrak", "overview", "paper"):
+                res_data["title"] = meta_title
+            else:
+                res_data["title"] = res_data["title"] or clean_filename_title
             res_data["authors"] = meta.get("authors", []) or res_data["authors"]
             res_data["publication_date"] = meta.get("publication_date", "") or res_data["publication_date"]
             res_data["year"] = meta.get("year", res_data["year"]) or res_data["year"]
@@ -342,7 +357,10 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
             res_data["journal_metric"] = meta.get("journal_metric", "Peer-Reviewed")
             res_data["quality_tier"] = meta.get("quality_tier", 4)
             res_data["citations"] = meta.get("citations", 0)
-            res_data["doi"] = meta.get("doi", extracted_doi)
+            clean_meta_doi = meta.get("doi", extracted_doi)
+            if clean_meta_doi:
+                clean_meta_doi = re.sub(r'[;.,:)\s]+$', '', clean_meta_doi).strip()
+            res_data["doi"] = clean_meta_doi
             res_data["url"] = meta.get("url", res_data["url"])
             res_data["pdf_url"] = meta.get("pdf_url", "")
             if not res_data["abstract"] and meta.get("abstract"):

@@ -593,7 +593,11 @@ export default function RightSidebar({
   // VIEW MODE: CONSENSUS.AI STYLE ACADEMIC PAPER READER VIEW (Overview & Full Paper)
   // =========================================================================
   if (viewingDoc) {
-    const title = (paperDetails?.title || viewingDoc.filename.replace(/\.[^/.]+$/, "")).replace(/<[^>]+>/g, "");
+    const filenameFallback = viewingDoc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+    let title = (paperDetails?.title || filenameFallback).replace(/<[^>]+>/g, "");
+    if (!title || title.trim().toLowerCase() === "abstract" || title.trim().toLowerCase() === "overview") {
+      title = filenameFallback;
+    }
     const authorsStr = paperDetails?.authors && paperDetails.authors.length > 0 
       ? paperDetails.authors.join(", ") 
       : "Academic Researchers";
