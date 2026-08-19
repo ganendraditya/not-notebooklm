@@ -67,10 +67,13 @@ Settings.embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", a
 
 def create_llm_instances():
     """Initializes LLM instances for 9Router, FreeLLMAPI, Gemini, and Groq."""
+    env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+    load_dotenv(dotenv_path=env_path, override=True)
     load_dotenv(override=True)
+    
     ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:20128/v1")
     ninerouter_key = os.getenv("NINEROUTER_API_KEY")
-    ninerouter_model = os.getenv("NINEROUTER_MODEL", "ag/claude-sonnet-4-6")
+    ninerouter_model = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
     
     ninerouter_llm = None
     if ninerouter_key and not ninerouter_key.startswith("your_"):
@@ -85,7 +88,7 @@ def create_llm_instances():
                 timeout=90.0
             )
         except Exception as e:
-            print(f"[RAG Engine] 9Router initialization failed: {e}")
+            logger.warning(f"[RAG Engine] 9Router initialization failed: {e}")
 
     gemini_key = os.getenv("GEMINI_API_KEY")
     groq_key = os.getenv("GROQ_API_KEY")
@@ -94,40 +97,55 @@ def create_llm_instances():
     freellm_model = os.getenv("FREELLMAPI_MODEL", "gpt-oss-120b")
     
     freellm_llm = None
-    try:
-        freellm_llm = OpenAILike(
-            api_base=freellm_url,
-            api_key=freellm_key or "dummy",
-            model=freellm_model or "gpt-4o-mini",
-            is_chat_model=True,
-            is_function_calling_model=True,
-            max_tokens=8192,
-            timeout=90.0
-        )
-    except Exception as e:
-        print(f"[RAG Engine] FreeLLMAPI not configured: {e}")
+    if freellm_key and not freellm_key.startswith("your_") and freellm_key != "dummy":
+        try:
+            freellm_llm = OpenAILike(
+                api_base=freellm_url,
+                api_key=freellm_key,
+                model=freellm_model or "gpt-4o-mini",
+                is_chat_model=True,
+                is_function_calling_model=True,
+                max_tokens=8192,
+                timeout=90.0
+            )
+        except Exception as e:
+            logger.warning(f"[RAG Engine] FreeLLMAPI not configured: {e}")
     
     gemini_llm = None
     if gemini_key and not gemini_key.startswith("your_"):
         try:
             gemini_llm = Gemini(
-                model="models/gemini-flash-latest", 
+                model="models/gemini-2.0-flash", 
                 api_key=gemini_key,
                 max_tokens=8192
             )
         except Exception as e:
-            print(f"[RAG Engine] Warning: Gemini initialization failed: {e}")
+            try:
+                gemini_llm = Gemini(
+                    model="models/gemini-2.5-flash", 
+                    api_key=gemini_key,
+                    max_tokens=8192
+                )
+            except Exception:
+                logger.warning(f"[RAG Engine] Gemini initialization failed: {e}")
             
     groq_llm = None
     if groq_key and not groq_key.startswith("your_"):
         try:
             groq_llm = Groq(
-                model="qwen/qwen-2.5-32b", 
+                model="llama-3.3-70b-versatile", 
                 api_key=groq_key,
                 max_tokens=8192
             )
         except Exception as e:
-            print(f"[RAG Engine] Warning: Groq initialization failed: {e}")
+            try:
+                groq_llm = Groq(
+                    model="llama-3.1-8b-instant", 
+                    api_key=groq_key,
+                    max_tokens=8192
+                )
+            except Exception:
+                logger.warning(f"[RAG Engine] Groq initialization failed: {e}")
             
     return ninerouter_llm, freellm_llm, gemini_llm, groq_llm
 
@@ -333,25 +351,28 @@ async def query_chat(
                 content = content.split("<!-- SOURCES_DATA")[0].strip()
             formatted_history.append(LlamaChatMessage(role=role, content=content))
             
+    # Re-read environment and get instances dynamically
+    n_llm, fl_llm, gm_llm, gq_llm = create_llm_instances()
+    
     selected_provider = os.getenv("LLM_PROVIDER", "9router").lower()
     
     # Priority list of available LLMs
     candidate_llms = []
-    if selected_provider == "9router" and ninerouter_llm:
-        candidate_llms.append((ninerouter_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"))
-    elif selected_provider == "freellmapi" and freellm_llm:
-        candidate_llms.append((freellm_llm, f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})"))
-    elif selected_provider == "groq" and groq_llm:
-        candidate_llms.append((groq_llm, "Groq (Qwen 2.5 32B)"))
-    elif selected_provider == "gemini" and gemini_llm:
-        candidate_llms.append((gemini_llm, "Google Gemini Flash"))
+    if selected_provider == "9router" and n_llm:
+        candidate_llms.append((n_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"))
+    elif selected_provider == "freellmapi" and fl_llm:
+        candidate_llms.append((fl_llm, f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})"))
+    elif selected_provider == "groq" and gq_llm:
+        candidate_llms.append((gq_llm, "Groq (Llama 3.3 70B)"))
+    elif selected_provider == "gemini" and gm_llm:
+        candidate_llms.append((gm_llm, "Google Gemini Flash"))
 
     # Add all other initialized LLMs as sequential fallbacks
     for llm_inst, name in [
-        (ninerouter_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"),
-        (groq_llm, "Groq (Qwen 2.5 32B)"),
-        (gemini_llm, "Google Gemini Flash"),
-        (freellm_llm, f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})")
+        (n_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"),
+        (gq_llm, "Groq (Llama 3.3 70B)"),
+        (gm_llm, "Google Gemini Flash"),
+        (fl_llm, f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})")
     ]:
         if llm_inst and not any(cand[0] == llm_inst for cand in candidate_llms):
             candidate_llms.append((llm_inst, name))
@@ -370,19 +391,38 @@ async def query_chat(
         return text.strip()
 
     def is_simple_conversational(text: str) -> bool:
-        t = text.lower().strip()
-        # Clean Indonesian slang prefix/suffix
-        clean_g = re.sub(r'^(halo|hai|hi|hello|woi|oy|hey|hei|p|bro|bos|min|assalamualaikum)\s+', '', t).strip()
-        greetings = [
-            "halo", "hai", "hi", "hello", "pagi", "siang", "sore", "malam",
-            "terima kasih", "makasih", "thanks", "thank you", "siapa kamu",
-            "bisa apa", "kamu siapa", "tes", "test", "ping", "bisa bantu apa",
-            "woi", "oy", "hey", "hei", "p", "bro", "bos", "min", "apa kabar",
-            "gimana kabarnya", "kabar apa", "sehat"
-        ]
-        if (any(t == g or t.startswith(g + " ") or t.endswith(" " + g) or t.startswith(g + "!") or t.startswith(g + "?") for g in greetings) or clean_g in greetings) and len(t.split()) <= 4:
+        # Strip punctuation and collapse spaces
+        t = re.sub(r'[^\w\s]', '', text.lower()).strip()
+        tokens = t.split()
+        if len(tokens) == 0 or len(tokens) > 6:
+            return False
+            
+        greetings_exact = {
+            "halo", "hai", "hi", "hello", "hey", "hei", "pagi", "siang", "sore", "malam",
+            "good morning", "good afternoon", "good evening", "good night",
+            "terima kasih", "makasih", "thanks", "thank you", "siapa kamu", "who are you",
+            "bisa apa", "kamu siapa", "what can you do", "tes", "test", "ping", "bisa bantu apa",
+            "woi", "oy", "p", "bro", "bos", "min", "apa kabar", "how are you", "how are you doing",
+            "hows it going", "how is it going", "sup", "whats up",
+            "gimana kabarnya", "kabar apa", "sehat",
+            "piye kabare", "piye kabare mas", "piye kabare mbak", "sugeng enjang", "sugeng siang", "sugeng sonten", "sugeng dalu", "matur nuwun",
+            "hola", "buenos dias", "buenas tardes", "buenas noches", "como estas", "que tal", "hola como estas", "gracias",
+            "안녕하세요", "안녕", "어떻게 지내세요", "어떻게 지내", "반갑습니다", "고마워", "감사합니다", "테스트",
+            "konnichiwa", "arigato", "ohayo", "ohayou", "ohayou gozaimasu", "kombanwa"
+        }
+        
+        # Strip Spanish accents/marks for normalization
+        t_clean = t.replace("¿", "").replace("?", "").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u").strip()
+        
+        if t in greetings_exact or t_clean in greetings_exact:
             return True
-        return False
+            
+        # Check prefix/suffix combinations
+        clean_prefix = re.sub(r'^(halo|hai|hi|hello|hey|hei|woi|oy|p|bro|bos|min|assalamualaikum|mas|mbak|pak|bu|hola)\s+', '', t_clean).strip()
+        clean_suffix = re.sub(r'\s+(mas|mbak|pak|bu|bro|bos|min|ya|dong|gan|rek)$', '', t_clean).strip()
+        clean_both = re.sub(r'\s+(mas|mbak|pak|bu|bro|bos|min|ya|dong|gan|rek)$', '', clean_prefix).strip()
+        
+        return clean_prefix in greetings_exact or clean_suffix in greetings_exact or clean_both in greetings_exact
 
     def is_technical_discussion(text: str) -> bool:
         """Identifies queries asking about NotbookLM system internals, RAG, databases, embeddings, or conceptual discussion."""
@@ -416,9 +456,11 @@ async def query_chat(
                 LlamaChatMessage(
                     role=MessageRole.SYSTEM,
                     content=(
-                        "Anda adalah NotbookLM, asisten riset AI yang cerdas, ramah, dan solutif (seperti Google NotebookLM). "
-                        "Jawab sapaan pengguna dengan gaya bahasa Indonesia yang natural, hangat, dan santun. "
-                        "Sebutkan bahwa Anda siap membantu menelusuri paper ilmiah, menganalisis dokumen yang diunggah, atau mengekstrak wawasan riset."
+                        "You are NotbookLM, an intelligent, friendly, and adaptive AI research assistant (like Google NotebookLM).\n"
+                        "LANGUAGE RULE (CRITICAL):\n"
+                        "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n"
+                        "- Keep your tone natural, helpful, and concise.\n"
+                        "- State that you are ready to search academic papers, analyze uploaded documents, or extract research insights."
                     )
                 ),
                 *(formatted_history if formatted_history else []),
@@ -434,15 +476,16 @@ async def query_chat(
                 LlamaChatMessage(
                     role=MessageRole.SYSTEM,
                     content=(
-                        "Anda adalah NotbookLM, asisten riset AI mutakhir yang transparan, cerdas, dan komunikatif (gaya Google NotebookLM).\n"
-                        "Pengguna menanyakan tentang sistem kerja, database, RAG, atau kemampuan Anda.\n\n"
-                        "FAKTA ARSITEKTUR NOTBOOKLM ANDA:\n"
-                        "1. Retrieval-Augmented Generation (RAG): Sistem utama menggunakan Qdrant Vector Database dan embedding BAAI/bge-small-en-v1.5.\n"
-                        "2. Penyimpanan Dokumen: Setiap dokumen yang diimpor/diunggah dipecah menjadi chunks, di-embed menjadi vektor, dan disimpan privat per-sesi chat.\n"
-                        "3. Penelusuran Paper: Terhubung langsung ke repositori akademik resmi OpenAlex (250M+ paper), Europe PMC, dan Crossref.\n"
-                        "4. Open Access & Paywall: Sistem membaca full-text PDF untuk paper Open Access. Untuk paper paywalled/berbayar, sistem mengekstrak metadata publik dan abstrak resmi, serta menyarankan pengguna mengunggah PDF manual jika memiliki akses institusi.\n"
-                        "5. Sitasi & Bukti: Jawaban riset selalu menyertakan referensi `[1]`, `[2]` yang terhubung langsung ke metadata dokumen.\n\n"
-                        "Gunakan Bahasa Indonesia yang luwes, santun, runtut, dan mudah dipahami."
+                        "You are NotbookLM, an advanced, transparent, and communicative AI research assistant (Google NotebookLM style).\n"
+                        "The user is asking about your internal workings, RAG system, vector database, or capabilities.\n\n"
+                        "LANGUAGE RULE (CRITICAL):\n"
+                        "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese -> Basa Jawa, Spanish -> Spanish).\n\n"
+                        "NOTBOOKLM ARCHITECTURE FACTS:\n"
+                        "1. Retrieval-Augmented Generation (RAG): Primary system uses Qdrant Vector Database with BAAI/bge-small-en-v1.5 embeddings.\n"
+                        "2. Document Storage: Every uploaded/imported document is chunked, vector-embedded, and stored privately per chat session.\n"
+                        "3. Paper Search: Connected directly to verified academic APIs: OpenAlex (250M+ papers), Europe PMC, and Crossref.\n"
+                        "4. Open Access & Paywalls: Full-text extraction for Open Access papers. For paywalled papers, official abstracts and public metadata are indexed, with guidance to upload manual PDFs if institutional access is available.\n"
+                        "5. Citations: Research answers cite document references `[1]`, `[2]` linked directly to document metadata.\n"
                     )
                 ),
                 *(formatted_history if formatted_history else []),
@@ -458,15 +501,18 @@ async def query_chat(
                 LlamaChatMessage(
                     role=MessageRole.SYSTEM,
                     content=(
-                        "Anda adalah NotbookLM, asisten riset cerdas. "
+                        "You are NotbookLM, an intelligent research assistant. "
                         f"{doc_context_info}\n\n"
-                        "Tugas: Jawab pertanyaan pengguna mengenai dokumen yang sudah diimpor ke workspace secara lugas, tepat, dan cepat dalam Bahasa Indonesia. "
-                        "Jika pengguna menanyakan berapa dokumen yang relevan dengan topik tertentu (misal: 'berapa yang bahas Prabowo?'), periksa daftar nama dokumen di atas, hitung secara akurat, dan sebutkan nomor referensinya."
+                        "Task: Answer the user's inquiry regarding the documents imported into this workspace accurately and concisely.\n"
+                        "LANGUAGE RULE: Always match the language used by the user in their prompt."
                     )
                 ),
                 *(formatted_history if formatted_history else []),
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
+            await report_status("Checking loaded workspace documents...")
+            resp = await target_llm.achat(chat_msgs)
+            return clean_response(resp.message.content)
             await report_status("Checking loaded workspace documents...")
             resp = await target_llm.achat(chat_msgs)
             return clean_response(resp.message.content)
@@ -516,20 +562,21 @@ async def query_chat(
             papers_context = "\n\n".join(paper_bullet_list)
 
             synthesis_prompt = (
-                "Anda adalah NotbookLM, asisten kurator riset dan penalaran literatur ilmiah yang cerdas, proaktif, dan solutif (seperti Google NotebookLM).\n"
-                "Gunakan BAHASA INDONESIA yang komunikatif, hangat, lugas, dan terstruktur rapi.\n\n"
-                f"Permintaan Pengguna: \"{query}\"\n\n"
-                f"Hasil Penelusuran Nyata Sistem: Berhasil menemukan dan menyaring {len(papers)} paper akademik Open Access terverifikasi dan bereputasi.\n\n"
-                f"Sampel Paper Utama:\n{papers_context}\n\n"
-                "STRUKTUR RESPON YANG WAJIB DIIKUTI (Gaya Google NotebookLM):\n"
-                "1. Pembuka Ramah & Penjelasan Realistis:\n"
-                "   - Jika pengguna meminta jumlah masif (misal 50–100 paper), sampaikan secara santun dan transparan bahwa menyajikan daftar puluhan/ratusan paper mentah sekaligus kurang efektif untuk analisis mendalam. Karena itu, sistem mengumpulkan {len(papers)} paper terbaik, paling relevan, dan terindeks dalam 5 tahun terakhir.\n"
-                "2. Sintesis Tren & Kluster Riset Utama (3-4 Tema Kunci):\n"
-                "   - Sajikan ringkasan tematis mendalam (misal: 'Evolusi Model Klasik ke LLM/Transformer', 'Analisis Sentimen Multimodal', 'Domain Aplikasi Sektor Riil', 'Low-Resource/Multilingual').\n"
-                "   - Jelaskan wawasan penting apa yang bisa ditarik dari paper-paper tersebut.\n"
-                "3. Call-to-Action / Laporan Sumber:\n"
-                "   - Beritahu pengguna: '📥 Seluruh {len(papers)} paper lengkap beserta ringkasan dan tautan DOI telah disiapkan pada kartu sumber di bawah. Anda bisa memilih dan mengimpornya langsung ke panel Sources dalam satu klik untuk mulai berdiskusi atau menganalisis metodologinya secara mendalam.'\n"
-                "4. DILARANG KERAS bersikap pasif, menolak mentah-mentah, atau menyuruh pengguna mencari sendiri di Google Scholar!"
+                "You are NotbookLM, an intelligent, proactive, and structured research curator & academic synthesis assistant (Google NotebookLM style).\n\n"
+                "LANGUAGE RULE (CRITICAL):\n"
+                "- Match the exact language of the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n\n"
+                f"User Request: \"{query}\"\n\n"
+                f"Verified Academic Search Results: Successfully retrieved and filtered {len(papers)} verified and reputable Open Access papers.\n\n"
+                f"Core Paper Samples:\n{papers_context}\n\n"
+                "RESPONSE STRUCTURE TO FOLLOW:\n"
+                "1. Friendly Opening & Realistic Context:\n"
+                "   - If the user requested a massive quantity (e.g. 50-100 papers), politely explain that presenting dozens of raw papers all at once in text is counterproductive for in-depth analysis. State that the system has curated the top {len(papers)} most relevant, high-impact papers published in the last 5 years.\n"
+                "2. Research Trends & Thematic Clusters (3-4 Key Themes):\n"
+                "   - Provide insightful thematic clusters synthesizing the landscape (e.g. architecture evolution, multimodal sentiment, domain applications, low-resource languages).\n"
+                "   - Highlight key methodologies, models, and findings.\n"
+                "3. Call-to-Action & Sources Report:\n"
+                "   - Inform the user that all {len(papers)} papers with metadata, DOI links, and summaries are ready in the interactive Source Card below for one-click import into the workspace panel.\n"
+                "4. NEVER be passive or tell the user to manually search Google Scholar."
             )
 
             synth_msgs = [
@@ -581,26 +628,21 @@ async def query_chat(
             system_msg = LlamaChatMessage(
                 role=MessageRole.SYSTEM,
                 content=(
-                    "Anda adalah NotbookLM, asisten riset dan komparasi literatur ilmiah tingkat tinggi. "
-                    "Gunakan BAHASA INDONESIA yang baku, profesional, dan komprehensif.\n\n"
-                    f"Sesi percakapan ini memiliki total {len(local_docs)} dokumen referensi aktif yang diimpor.\n"
-                    "Gunakan SELURUH data dokumen ini untuk menjawab instruksi pengguna secara lengkap, terstruktur, dan mendalam."
-                    "ATURAN SITASI REFERENSI GLOBAL (IEEE STYLE - SANGAT PENTING):\n"
-                    "- Setiap dokumen referensi memiliki Nomor Referensi Global tetap: [1], [2], [3], dst yang tertulis di header dokumen.\n"
-                    "- Saat mengutip, merujuk temuan, membandingkan metode, atau membuat tabel, SELALU sertakan sitasi bracket nomor yang sesuai, contoh: [1], [2], [3], [1, 2], atau [1]-[3].\n"
-                    "- Nomor referensi ini bersifat permanen dan konsisten di seluruh percakapan. Jangan mengubah nomor referensi sebuah dokumen!\n\n"
-                    "ATURAN STATUS INDEKSASI & KUARTIL JURNAL (SANGAT KETAT):\n"
-                    "- Selalu gunakan data status indeksasi resmi yang tertera pada header dokumen (**Status Indeksasi** dan **Jurnal/Venue**).\n"
-                    "- JANGAN PERNAH melabeli 'Conference Proceedings' sebagai Jurnal Q1/Q2/Q3/Q4.\n"
-                    "- Jika suatu jurnal terdaftar sebagai 'Scopus Q2 (SJR)', sebutlah secara akurat sebagai Q2. Jangan mengubahnya menjadi Q1.\n\n"
-                    "ATURAN MANAJEMEN PANJANG RESPON & TABEL MASIF (SANGAT KETAT):\n"
-                    "1. DILARANG KERAS memotong teks di tengah kalimat atau di tengah baris tabel!\n"
-                    "2. Jika pengguna meminta format tabel atau analisis mendalam untuk banyak dokumen (> 20 dokumen):\n"
-                    "   - Batasi tabel maksimal 20 dokumen per pesan (misalnya Bagian 1: Dokumen 1–20).\n"
-                    "   - Selesaikan dan tutup tabel Bagian 1 secara rapi dengan format markdown lengkap.\n"
-                    "   - Di baris paling bawah, berikan catatan transparan:\n"
-                    "     '💡 **Catatan**: Untuk menjaga kedalaman analisis setiap dokumen dan menghindari keterbatasan panjang teks, Bagian 1 menyajikan dokumen 1–20. Ketik **\"Lanjutkan bagian 2\"** untuk melihat sisa dokumen berikutnya.'\n"
-                    "3. Ketika pengguna meminta 'lanjutkan', 'bagian 2', atau 'next', lanjutkan secara mulus dari nomor dokumen berikutnya (misalnya Dokumen 21–35) sampai selesai tuntas."
+                    "You are NotbookLM, an advanced AI research assistant and academic literature comparison specialist.\n\n"
+                    "LANGUAGE RULE (CRITICAL):\n"
+                    "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n\n"
+                    f"This chat session has {len(local_docs)} imported reference documents in the workspace.\n"
+                    "Use ALL document data to answer the user's query comprehensively, accurately, and with clear structure.\n\n"
+                    "CITATION RULES (IEEE STYLE - VERY IMPORTANT):\n"
+                    "- Every reference document has a permanent Global Reference Number: [1], [2], [3], etc. as written in the document header.\n"
+                    "- When citing, quoting findings, comparing methods, or building tables, ALWAYS include bracketed number citations, e.g. [1], [2], [3], [1, 2], or [1]-[3].\n"
+                    "- Never alter or renumber reference IDs.\n\n"
+                    "INDEXING & QUARTILE RULES:\n"
+                    "- Rely strictly on the official indexing status in the document headers (**Indexing Status** and **Journal/Venue**).\n"
+                    "- Never label 'Conference Proceedings' as Q1/Q2/Q3/Q4 journals.\n\n"
+                    "MASSIVE TABLE & LENGTH MANAGEMENT:\n"
+                    "1. Never truncate in the middle of sentences or table rows.\n"
+                    "2. For large comparison requests (> 20 documents), present up to 20 documents per part and prompt the user to request the next part."
                 )
             )
             context_msg = LlamaChatMessage(
@@ -628,15 +670,12 @@ async def query_chat(
             max_iterations=6,
             timeout=timeout_sec,
             system_prompt=(
-                "You are NotbookLM, a powerful, proactive AI research assistant. "
-                "Always communicate in Indonesian (Bahasa Indonesia). "
-                "Always maintain conversation context from the chat history. "
+                "You are NotbookLM, a powerful, proactive AI research assistant.\n"
+                "LANGUAGE RULE: Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English, Indonesian, Javanese, Spanish).\n"
+                "Always maintain conversation context from the chat history.\n"
                 f"{doc_context_info}\n"
-                "PROAKTIF & EKSEKUTIF:\n"
-                "- Jika pengguna meminta data, mencari paper, menganalisis, atau merangkum, LAKUKAN LANGSUNG menggunakan tools yang ada.\n"
-                "- JANGAN PERNAH menyuruh pengguna menulis script Python, memanggil API manual, atau membuka website lain sendiri.\n"
-                "- Sajikan hasil akhir langsung secara lengkap, rapi, dan terstruktur.\n"
-                "- Do NOT output internal thoughts or monologues. Output only the final response."
+                "- If the user requests data, paper search, analysis, or summaries, perform it directly using tools.\n"
+                "- Never output internal thoughts or monologues. Output only the final response."
             )
         )
         res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
