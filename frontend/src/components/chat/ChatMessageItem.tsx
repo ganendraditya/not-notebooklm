@@ -111,6 +111,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     setIsImporting(true);
     setImportProgress({ current: 0, total: toImport.length });
     setImportedCount(0);
+
     try {
       let currentChatId = activeChatId;
       if (!currentChatId && onEnsureChatSession) {
@@ -118,73 +119,37 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       }
       if (!currentChatId) return;
 
-      let res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sources: toImport })
-      });
+      // Client-side granular batch ingestion (Chunked by 4 items)
+      // Guarantees real-time progress update (1/44 -> 4/44 -> 8/44) and instant sidebar append
+      const CHUNK_SIZE = 4;
+      let totalSuccessfullyAdded = 0;
 
-      if (res.status === 404) {
-        // Fallback to non-streaming batch endpoint if stream endpoint not found
-        res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sources: toImport })
-        });
-        if (res.ok) {
-          const createdDocs = await res.json();
-          if (createdDocs && createdDocs.length > 0) {
-            createdDocs.forEach((d: DocType) => onDocumentAdded?.(d));
-            setImportedCount(createdDocs.length);
-          }
-          setIsImported(true);
-          return;
-        }
-      }
+      for (let i = 0; i < toImport.length; i += CHUNK_SIZE) {
+        const chunk = toImport.slice(i, i + CHUNK_SIZE);
+        try {
+          const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sources: chunk })
+          });
 
-      if (!res.ok) {
-        throw new Error(`Server responded with ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) throw new Error("No readable stream");
-
-      let buffer = "";
-      let totalAdded = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        while (buffer.includes("\n\n")) {
-          const splitIdx = buffer.indexOf("\n\n");
-          const eventBlock = buffer.slice(0, splitIdx);
-          buffer = buffer.slice(splitIdx + 2);
-
-          const lines = eventBlock.split("\n");
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === "progress") {
-                  setImportProgress({ current: data.current, total: data.total });
-                  if (data.doc) {
-                    onDocumentAdded?.(data.doc);
-                    totalAdded++;
-                  }
-                } else if (data.type === "done") {
-                  setIsImported(true);
-                  setImportedCount(totalAdded);
-                }
-              } catch (e) {
-                console.error("Parse import progress error:", e);
-              }
+          if (res.ok) {
+            const createdDocs = await res.json();
+            if (createdDocs && createdDocs.length > 0) {
+              createdDocs.forEach((d: DocType) => onDocumentAdded?.(d));
+              totalSuccessfullyAdded += createdDocs.length;
             }
           }
+        } catch (chunkErr) {
+          console.error("Chunk import error:", chunkErr);
         }
+
+        const currentProgress = Math.min(i + chunk.length, toImport.length);
+        setImportProgress({ current: currentProgress, total: toImport.length });
       }
+
+      setIsImported(true);
+      setImportedCount(totalSuccessfullyAdded);
     } catch (e) {
       console.error("Import sources failed:", e);
     } finally {
