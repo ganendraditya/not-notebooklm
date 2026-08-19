@@ -404,7 +404,7 @@ async def query_chat(
             "bisa apa", "kamu siapa", "what can you do", "tes", "test", "ping", "bisa bantu apa",
             "woi", "oy", "p", "bro", "bos", "min", "apa kabar", "how are you", "how are you doing",
             "hows it going", "how is it going", "sup", "whats up",
-            "gimana kabarnya", "kabar apa", "sehat",
+            "gimana kabarnya", "kabar apa", "sehat", "apa kabarmu", "apa kabarmu bro",
             "piye kabare", "piye kabare mas", "piye kabare mbak", "sugeng enjang", "sugeng siang", "sugeng sonten", "sugeng dalu", "matur nuwun",
             "hola", "buenos dias", "buenas tardes", "buenas noches", "como estas", "que tal", "hola como estas", "gracias",
             "안녕하세요", "안녕", "어떻게 지내세요", "어떻게 지내", "반갑습니다", "고마워", "감사합니다", "테스트",
