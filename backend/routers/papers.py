@@ -67,38 +67,27 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
 
     allowed_sources = novel_sources[:remaining_slots]
     
+    # Process multiple sources concurrently with Semaphore
+    sem = asyncio.Semaphore(10)
     created_docs = []
-    for paper in allowed_sources:
-        filename = sanitize_paper_filename(paper.title)
-        
-        abstract_text = paper.snippet.strip()
-        if not rag.is_valid_abstract_content(abstract_text) and paper.doi:
-            fetched_abs = await asyncio.to_thread(rag.fetch_full_abstract_by_doi, paper.doi)
-            if fetched_abs and rag.is_valid_abstract_content(fetched_abs):
-                abstract_text = fetched_abs
-        
-        doc_text = f"# {paper.title} ({paper.year})\n\n"
-        if paper.doi:
-            doc_text += f"**DOI:** {paper.doi}  \n"
-        if paper.url:
-            doc_text += f"**URL:** {paper.url}  \n\n"
-        doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
-        
-        try:
-            await asyncio.to_thread(rag.ingest_document_text, doc_text, filename, chat_id)
+
+    async def process_single_paper(paper):
+        async with sem:
+            filename = sanitize_paper_filename(paper.title)
+            abstract_text = paper.snippet.strip()
+            
+            doc_text = f"# {paper.title} ({paper.year})\n\n"
+            if paper.doi:
+                doc_text += f"**DOI:** {paper.doi}  \n"
+            if paper.url:
+                doc_text += f"**URL:** {paper.url}  \n\n"
+            doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
+
             save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
             
-            oa_pdf = await asyncio.to_thread(
-                pdf_exporter.resolve_and_fetch_authentic_pdf,
-                doi=paper.doi or "",
-                title=paper.title,
-                direct_url=paper.url or "",
-                candidate_pdf_url=""
-            )
-            if oa_pdf and len(oa_pdf) >= 1024 and oa_pdf.startswith(b"%PDF-"):
-                with open(save_path, "wb") as f:
-                    f.write(oa_pdf)
-            else:
+            try:
+                await asyncio.to_thread(rag.ingest_document_text, doc_text, filename, chat_id)
+                # Fast synthetic PDF creation for instant indexing without blocking HTTP scrapes
                 pdf_bytes = await asyncio.to_thread(
                     pdf_exporter.generate_academic_pdf_bytes,
                     title=paper.title,
@@ -112,14 +101,22 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
                 )
                 with open(save_path, "wb") as f:
                     f.write(pdf_bytes)
-        except Exception as e:
-            logger.warning(f"[Import Source Warning]: {e}")
-            
-        db_doc = Document(chat_id=chat_id, filename=filename)
+            except Exception as e:
+                logger.warning(f"[Import Source Warning]: {e}")
+
+            return filename
+
+    # Run batch ingestion concurrently
+    saved_filenames = await asyncio.gather(*(process_single_paper(p) for p in allowed_sources))
+
+    for fname in saved_filenames:
+        db_doc = Document(chat_id=chat_id, filename=fname)
         db.add(db_doc)
-        db.commit()
-        db.refresh(db_doc)
         created_docs.append(db_doc)
+        
+    db.commit()
+    for d in created_docs:
+        db.refresh(d)
         
     all_current_docs = db.query(Document).filter(Document.chat_id == chat_id).order_by(Document.id.asc()).all()
     id_to_index = {d.id: idx for idx, d in enumerate(all_current_docs, start=1)}
