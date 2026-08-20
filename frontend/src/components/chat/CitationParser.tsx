@@ -11,7 +11,8 @@ export interface CitationContext {
 export function parseCitationsInReactNode(
   node: React.ReactNode, 
   documents?: DocType[], 
-  onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void
+  onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void,
+  activeCitationNum?: number | null
 ): React.ReactNode {
   if (typeof node === "string") {
     // Support standard bracket citations: [1], [2], [1, 2], [1]-[3], and parenthesis citations: (1), (2), (1, 2)
@@ -72,6 +73,7 @@ export function parseCitationsInReactNode(
               const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
               const docTitle = doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
 
+              const isSelected = activeCitationNum === num;
               return (
                 <button
                   key={`pill-${num}-${i}`}
@@ -85,7 +87,11 @@ export function parseCitationsInReactNode(
                       });
                     }
                   }}
-                  className="inline-flex items-center justify-center px-1.5 py-0 min-w-[20px] h-[19px] text-[10.5px] font-mono font-bold text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70 rounded-full cursor-pointer transition-all duration-150 transform hover:scale-110 active:scale-95 select-none shadow-sm group"
+                  className={`inline-flex items-center justify-center w-6 h-5 text-[10px] font-mono font-bold rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-none shadow-sm ${
+                    isSelected
+                      ? "bg-amber-400 text-black border border-amber-300 font-extrabold shadow-amber-400/20"
+                      : "text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70"
+                  }`}
                   title={`[${num}] ${docTitle}\nClick to view source and highlight referenced excerpt`}
                 >
                   {num}
@@ -110,13 +116,13 @@ export function parseCitationsInReactNode(
 
   if (Array.isArray(node)) {
     return node.map((child, idx) => (
-      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument)}</React.Fragment>
+      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationNum)}</React.Fragment>
     ));
   }
 
   if (React.isValidElement(node) && (node.props as any)?.children) {
     return React.cloneElement(node as React.ReactElement<any>, {
-      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument)
+      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument, activeCitationNum)
     });
   }
 

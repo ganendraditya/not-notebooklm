@@ -524,6 +524,7 @@ export default function ChatClient() {
         targetedSource={targetedSource}
         onClearTargetedSource={() => setTargetedSource(null)}
         activeStatus={activeStatus}
+        activeCitationNum={groundingHighlight?.num}
       />
 
       {/* Right Sidebar: Sources Panel (NotebookLM Style) */}

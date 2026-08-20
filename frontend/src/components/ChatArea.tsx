@@ -37,6 +37,7 @@ interface ChatAreaProps {
   targetedSource?: TargetedSource | null;
   onClearTargetedSource?: () => void;
   activeStatus?: string | null;
+  activeCitationNum?: number | null;
 }
 
 export default function ChatArea({ 
@@ -60,7 +61,8 @@ export default function ChatArea({
   onToggleRightSidebar,
   targetedSource,
   onClearTargetedSource,
-  activeStatus
+  activeStatus,
+  activeCitationNum
 }: ChatAreaProps) {
   const [copiedMessageIdx, setCopiedMessageIdx] = useState<number | null>(null);
   const [editingMessageIdx, setEditingMessageIdx] = useState<number | null>(null);
@@ -233,6 +235,7 @@ export default function ChatArea({
                           onDocumentAdded={onDocumentAdded}
                           onOpenDocument={onOpenDocument}
                           onEnsureChatSession={onEnsureChatSession}
+                          activeCitationNum={activeCitationNum}
                         />
                         <div className="mt-2 flex items-center gap-2">
                           <button
