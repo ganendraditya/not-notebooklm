@@ -756,19 +756,19 @@ export default function RightSidebar({
               </div>
             ) : null}
 
-            {/* Open Access vs Closed Access Verification Badge */}
+            {/* Access & Discovery Badge (Positive-Neutral Model) */}
             <div className="pt-1">
               {isLoadingDetails ? (
                 <div className="h-6 w-28 rounded-lg bg-white/10 animate-pulse" />
-              ) : paperDetails?.is_oa ? (
+              ) : paperDetails?.is_oa || paperDetails?.pdf_url ? (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  <span>Open Access</span>
+                  <span>Open Access (PDF Available)</span>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                  <span>Closed Access</span>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-400 text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+                  <span>Publisher Source</span>
                 </div>
               )}
             </div>
@@ -800,7 +800,7 @@ export default function RightSidebar({
                     <span>AI Synthesis Overview</span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-950/60 border border-purple-800/60 text-purple-300">
-                    Paywalled Source
+                    Publisher Metadata
                   </span>
                 </div>
 
@@ -808,7 +808,7 @@ export default function RightSidebar({
                 <div className="p-2.5 rounded-lg bg-purple-950/30 border border-purple-800/40 text-[11px] text-purple-200/90 leading-relaxed flex items-start gap-2">
                   <Info size={13} className="text-purple-400 shrink-0 mt-0.5" />
                   <p>
-                    <span className="font-semibold text-purple-200">AI Overview Note:</span> Original abstract is protected behind publisher paywall. This executive overview was automatically synthesized from verified official metadata.
+                    <span className="font-semibold text-purple-200">AI Overview Note:</span> Executive overview synthesized from verified indexing metadata.
                   </p>
                 </div>
 
