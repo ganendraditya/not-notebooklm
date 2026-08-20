@@ -23,7 +23,7 @@ import {
   Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Document } from "@/app/ChatClient";
+import { Document, CitationGroundingHighlight } from "@/app/ChatClient";
 import { DownloadManager, DownloadTask } from "./DownloadManager";
 
 interface RightSidebarProps {
@@ -35,6 +35,8 @@ interface RightSidebarProps {
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   onAskAboutDocument?: (doc: Document, paperTitle?: string) => void;
   externalViewingDoc?: Document | null;
+  groundingHighlight?: CitationGroundingHighlight | null;
+  onClearGroundingHighlight?: () => void;
   onClearViewingDoc?: () => void;
   backendUrl: string;
   onClose: () => void;
@@ -106,6 +108,68 @@ const cleanHtmlAbstract = (raw?: string): string => {
   text = text.replace(/\n\s*\n\s*\n+/g, "\n\n");
   return text.trim();
 };
+
+// Helper: Fuzzy find best matching sentence/excerpt in document text and render with interactive highlight
+function renderHighlightedText(fullText: string, targetQuery?: string, highlightRef?: React.RefObject<HTMLElement | null>) {
+  if (!fullText) return null;
+  if (!targetQuery || targetQuery.trim().length < 8) {
+    return <span>{fullText}</span>;
+  }
+
+  const cleanQueryWords = targetQuery
+    .toLowerCase()
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !["yang", "dari", "pada", "untuk", "dengan", "adalah", "dalam", "this", "that", "with", "from", "using", "study", "analysis"].includes(w));
+
+  if (cleanQueryWords.length === 0) {
+    return <span>{fullText}</span>;
+  }
+
+  // Split into sentences
+  const sentenceRegex = /([^.!?\n]+[.!?\n]+)/g;
+  const rawSentences = fullText.match(sentenceRegex) || [fullText];
+
+  let bestIndex = -1;
+  let highestScore = 0;
+
+  rawSentences.forEach((s, idx) => {
+    const sLower = s.toLowerCase();
+    let score = 0;
+    cleanQueryWords.forEach(w => {
+      if (sLower.includes(w)) score++;
+    });
+    const normalizedScore = score / Math.max(cleanQueryWords.length, 1);
+    if (normalizedScore > highestScore && normalizedScore >= 0.25) {
+      highestScore = normalizedScore;
+      bestIndex = idx;
+    }
+  });
+
+  if (bestIndex === -1) {
+    return <span>{fullText}</span>;
+  }
+
+  return (
+    <>
+      {rawSentences.map((sentence, idx) => {
+        if (idx === bestIndex) {
+          return (
+            <mark
+              key={idx}
+              ref={highlightRef as any}
+              className="bg-amber-500/25 text-amber-200 border-b-2 border-amber-400 font-medium px-1 py-0.5 rounded shadow-sm inline transition-all duration-300 animate-pulse"
+              title="Referenced text segment cited by AI"
+            >
+              {sentence}
+            </mark>
+          );
+        }
+        return <span key={idx}>{sentence}</span>;
+      })}
+    </>
+  );
+}
 
 const formatReadableDate = (dateStr?: string, yearFallback?: string) => {
   if (!dateStr && !yearFallback) return "Recent publication";
@@ -207,15 +271,17 @@ ${doi ? `DO  - ${doi}\n` : ""}${doiUrl ? `UR  - ${doiUrl}\n` : ""}ER  -`;
 export default function RightSidebar({ 
   activeChatId, 
   documents, 
-  onDocumentAdded,
-  onDocumentDeleted,
-  onBulkDocumentsDeleted,
-  onEnsureChatSession,
-  onAskAboutDocument,
-  externalViewingDoc,
-  onClearViewingDoc,
-  backendUrl,
-  onClose
+  onDocumentAdded, 
+  onDocumentDeleted, 
+  onBulkDocumentsDeleted, 
+  onEnsureChatSession, 
+  onAskAboutDocument, 
+  externalViewingDoc, 
+  groundingHighlight,
+  onClearGroundingHighlight,
+  onClearViewingDoc, 
+  backendUrl, 
+  onClose 
 }: RightSidebarProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedDocs, setSelectedDocs] = useState<Record<number, boolean>>({});
@@ -248,6 +314,17 @@ export default function RightSidebar({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const highlightElemRef = useRef<HTMLElement | null>(null);
+
+  // Auto-scroll to highlighted grounded segment when details are loaded or highlight target changes
+  useEffect(() => {
+    if (!isLoadingDetails && highlightElemRef.current) {
+      setTimeout(() => {
+        highlightElemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
+    }
+  }, [isLoadingDetails, groundingHighlight, activeTab]);
+
   // Fetch document details when viewingDoc is set
   useEffect(() => {
     if (!viewingDoc || !activeChatId) {
@@ -255,6 +332,7 @@ export default function RightSidebar({
       return;
     }
     setIsLoadingDetails(true);
+    // If opening with grounding sentence, default to overview/abstract first
     setActiveTab("overview");
     setIsCiteModalOpen(false);
     fetch(`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/content`)
@@ -813,7 +891,7 @@ export default function RightSidebar({
                 </div>
 
                 <p className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
-                  {cleanAbstract}
+                  {renderHighlightedText(cleanAbstract, groundingHighlight?.sentence, highlightElemRef)}
                 </p>
               </div>
             ) : (
@@ -831,7 +909,7 @@ export default function RightSidebar({
                 </div>
 
                 <p className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
-                  {cleanAbstract}
+                  {renderHighlightedText(cleanAbstract, groundingHighlight?.sentence, highlightElemRef)}
                 </p>
               </div>
             )}
@@ -904,7 +982,11 @@ export default function RightSidebar({
 
                   {/* Clean Formatted Document Body (Scrolls through the entire file) */}
                   <div className="text-[12.5px] sm:text-[13px] text-gray-200 leading-relaxed font-sans whitespace-pre-wrap select-text break-words">
-                    {paperDetails.content.replace(/^#\s+[^\n]+\n+/, "").replace(/##\s+Abstract & Overview\n+/, "")}
+                    {renderHighlightedText(
+                      paperDetails.content.replace(/^#\s+[^\n]+\n+/, "").replace(/##\s+Abstract & Overview\n+/, ""),
+                      groundingHighlight?.sentence,
+                      highlightElemRef
+                    )}
                   </div>
                 </div>
               ) : (

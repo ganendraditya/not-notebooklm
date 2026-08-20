@@ -26,6 +26,12 @@ export interface TargetedSource {
   title?: string;
 }
 
+export interface CitationGroundingHighlight {
+  docId: number;
+  sentence: string;
+  num?: number;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
@@ -41,6 +47,7 @@ export default function ChatClient() {
   const [targetedSource, setTargetedSource] = useState<TargetedSource | null>(null);
   const [activeStatus, setActiveStatus] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
+  const [groundingHighlight, setGroundingHighlight] = useState<CitationGroundingHighlight | null>(null);
   
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -453,8 +460,17 @@ export default function ChatClient() {
         onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
         documents={documents}
         onDocumentAdded={(doc) => setDocuments(prev => [...prev, doc])}
-        onOpenDocument={(doc) => {
+        onOpenDocument={(doc, citationContext) => {
           setViewingDoc(doc);
+          if (citationContext) {
+            setGroundingHighlight({
+              docId: doc.id,
+              sentence: citationContext.sentence,
+              num: citationContext.num
+            });
+          } else {
+            setGroundingHighlight(null);
+          }
           setIsRightSidebarOpen(true);
         }}
         onEnsureChatSession={handleEnsureChatSession}
@@ -489,9 +505,17 @@ export default function ChatClient() {
             setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
           }}
           externalViewingDoc={viewingDoc}
-          onClearViewingDoc={() => setViewingDoc(null)}
+          groundingHighlight={groundingHighlight}
+          onClearGroundingHighlight={() => setGroundingHighlight(null)}
+          onClearViewingDoc={() => {
+            setViewingDoc(null);
+            setGroundingHighlight(null);
+          }}
           backendUrl={backendUrl}
-          onClose={() => setIsRightSidebarOpen(false)}
+          onClose={() => {
+            setIsRightSidebarOpen(false);
+            setGroundingHighlight(null);
+          }}
         />
       )}
     </div>

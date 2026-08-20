@@ -13,6 +13,7 @@ import {
 import { ChatMessage, Document as DocType, TargetedSource } from "@/app/ChatClient";
 import { InChatMessageComponent } from "./chat/ChatMessageItem";
 import { ChatInputBox } from "./chat/ChatInput";
+import { CitationContext } from "./chat/CitationParser";
 
 interface ChatAreaProps {
   activeChatId: string | null;
@@ -26,7 +27,7 @@ interface ChatAreaProps {
   onPromoteQueuedPrompt?: (index: number) => void;
   documents: DocType[];
   onDocumentAdded?: (doc: DocType) => void;
-  onOpenDocument?: (doc: DocType) => void;
+  onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   backendUrl: string;
   isSidebarOpen?: boolean;

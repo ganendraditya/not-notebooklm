@@ -3,10 +3,15 @@
 import React from "react";
 import { Document as DocType } from "@/app/ChatClient";
 
+export interface CitationContext {
+  sentence: string;
+  num: number;
+}
+
 export function parseCitationsInReactNode(
   node: React.ReactNode, 
   documents?: DocType[], 
-  onOpenDocument?: (doc: DocType) => void
+  onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void
 ): React.ReactNode {
   if (typeof node === "string") {
     const regex = /\[(\d+(?:\s*,\s*\d+|\s*-\s*\d+)*)\]/g;
@@ -19,6 +24,27 @@ export function parseCitationsInReactNode(
       if (matchIndex > lastIndex) {
         parts.push(node.substring(lastIndex, matchIndex));
       }
+
+      // Extract the surrounding sentence/clause context for grounding & auto-highlighting in paper panel
+      const textBefore = node.substring(0, matchIndex);
+      const textAfter = node.substring(regex.lastIndex);
+      
+      // Find sentence boundary before match (. ! ? \n)
+      const lastSentenceEnd = Math.max(
+        textBefore.lastIndexOf(". "),
+        textBefore.lastIndexOf("! "),
+        textBefore.lastIndexOf("? "),
+        textBefore.lastIndexOf("\n")
+      );
+      const sentenceStart = lastSentenceEnd !== -1 ? lastSentenceEnd + 2 : 0;
+      
+      // Find sentence boundary after match
+      const nextSentenceEnd = Math.min(
+        ...[textAfter.indexOf(". "), textAfter.indexOf("! "), textAfter.indexOf("? "), textAfter.indexOf("\n")].filter(x => x !== -1)
+      );
+      const sentenceEnd = nextSentenceEnd !== -1 ? regex.lastIndex + nextSentenceEnd + 1 : node.length;
+      
+      const contextSentence = node.substring(sentenceStart, sentenceEnd).replace(/\[\d+(?:\s*,\s*\d+|\s*-\s*\d+)*\]/g, "").trim();
 
       const rawNumbers = match[1];
       const nums: number[] = [];
@@ -52,11 +78,14 @@ export function parseCitationsInReactNode(
                   onClick={(e) => {
                     e.stopPropagation();
                     if (doc && onOpenDocument) {
-                      onOpenDocument(doc);
+                      onOpenDocument(doc, {
+                        sentence: contextSentence,
+                        num: num
+                      });
                     }
                   }}
-                  className="inline-flex items-center justify-center px-1.5 py-0 min-w-[20px] h-[19px] text-[10.5px] font-mono font-bold text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70 rounded-full cursor-pointer transition-all duration-150 transform hover:scale-110 active:scale-95 select-none shadow-sm"
-                  title={`[${num}] ${docTitle}\nClick to open paper details in panel`}
+                  className="inline-flex items-center justify-center px-1.5 py-0 min-w-[20px] h-[19px] text-[10.5px] font-mono font-bold text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70 rounded-full cursor-pointer transition-all duration-150 transform hover:scale-110 active:scale-95 select-none shadow-sm group"
+                  title={`[${num}] ${docTitle}\nClick to view source and highlight referenced excerpt`}
                 >
                   {num}
                 </button>

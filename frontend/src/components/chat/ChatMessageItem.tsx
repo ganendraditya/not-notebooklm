@@ -16,7 +16,7 @@ import {
   Trash2 
 } from "lucide-react";
 import { ChatMessage, Document as DocType } from "@/app/ChatClient";
-import { parseCitationsInReactNode } from "./CitationParser";
+import { parseCitationsInReactNode, CitationContext } from "./CitationParser";
 
 export interface InChatMessageProps {
   msg: ChatMessage;
@@ -24,7 +24,7 @@ export interface InChatMessageProps {
   backendUrl: string;
   documents?: DocType[];
   onDocumentAdded?: (doc: DocType) => void;
-  onOpenDocument?: (doc: DocType) => void;
+  onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
 }
 
