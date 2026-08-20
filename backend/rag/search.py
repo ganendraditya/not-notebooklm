@@ -272,12 +272,10 @@ def get_existing_notebook_sources_signatures(chat_id: str) -> dict:
     finally:
         db.close()
 
-    # Also inspect actual file headers on disk for full titles & DOIs
-    uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
-    if os.path.exists(uploads_dir):
-        for fn in filenames:
-            fpath = os.path.join(uploads_dir, f"{chat_id}_{fn}")
-            if os.path.exists(fpath):
+    from helpers import get_doc_file_path
+    for fn in filenames:
+        fpath = get_doc_file_path(chat_id, fn)
+        if os.path.exists(fpath):
                 try:
                     with open(fpath, "r", encoding="utf-8", errors="ignore") as fp:
                         header = fp.readline().strip()

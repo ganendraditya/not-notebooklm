@@ -23,7 +23,7 @@ export interface InChatMessageProps {
   activeChatId: string | null;
   backendUrl: string;
   documents?: DocType[];
-  onDocumentAdded?: (doc: DocType) => void;
+  onDocumentAdded?: (doc: DocType, targetChatId?: string) => void;
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   activeCitationKey?: string | null;
@@ -39,22 +39,39 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   onEnsureChatSession,
   activeCitationKey
 }: InChatMessageProps) {
-  const { cleanContent, sources } = useMemo(() => {
+  const { cleanContent, sources, citationMap } = useMemo(() => {
     const sourcesMatch = msg.content.match(/<!-- SOURCES_DATA:\s*([\s\S]*?)\s*-->/);
+    const citationMapMatch = msg.content.match(/<!-- CITATION_MAP:\s*([\s\S]*?)\s*-->/);
+
     let clean = msg.content;
     let parsedSources: any[] = [];
+    let parsedCitationMap: Record<string, string[]> = {};
     
     if (sourcesMatch) {
-      clean = msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/, "").trim();
+      clean = clean.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/, "").trim();
       try {
         parsedSources = JSON.parse(sourcesMatch[1]);
       } catch (e) {
         console.error("Failed to parse sources data:", e);
       }
     }
+
+    if (citationMapMatch) {
+      clean = clean.replace(/<!-- CITATION_MAP:[\s\S]*?-->/, "").trim();
+      try {
+        // Robust JSON parse: strip markdown code fences, trailing commas
+        let rawJson = citationMapMatch[1].trim();
+        rawJson = rawJson.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+        rawJson = rawJson.replace(/,\s*([\]}])/g, "$1"); // trailing commas
+        parsedCitationMap = JSON.parse(rawJson);
+      } catch (e) {
+        console.error("Failed to parse citation map data:", e);
+      }
+    }
+
     // Clean any internal actions tag
     clean = clean.replace(/<!-- SOURCES_ACTION:[\s\S]*?-->/, "").trim();
-    return { cleanContent: clean, sources: parsedSources };
+    return { cleanContent: clean, sources: parsedSources, citationMap: parsedCitationMap };
   }, [msg.content]);
 
   const isDuplicateSource = useCallback((src: any) => {
@@ -140,7 +157,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           if (res.ok) {
             const createdDocs = await res.json();
             if (createdDocs && createdDocs.length > 0) {
-              createdDocs.forEach((d: DocType) => onDocumentAdded?.(d));
+              createdDocs.forEach((d: DocType) => onDocumentAdded?.(d, currentChatId));
               totalSuccessfullyAdded += createdDocs.length;
             }
           }
@@ -176,13 +193,13 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
-            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey)}</p>,
+            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</p>,
             h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{children}</h1>,
             h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{children}</h2>,
             h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{children}</h3>,
             ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ol>,
-            li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey)}</li>,
+            li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</li>,
             strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
             a: ({ href, children }) => (
               <a 
@@ -205,10 +222,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
             tr: ({ children }) => <tr className="hover:bg-white/[0.02] transition-colors">{children}</tr>,
             th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{children}</th>,
-            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey)}</td>,
+            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</td>,
             blockquote: ({ children }) => (
               <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-gray-300 bg-blue-500/5 rounded-r-lg italic">
-                {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey)}
+                {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}
               </blockquote>
             ),
             pre: ({ children }) => (

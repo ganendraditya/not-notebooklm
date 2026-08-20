@@ -18,6 +18,7 @@ import {
   Link as LinkIcon,
   ExternalLink,
   ChevronDown,
+  ChevronUp,
   BookOpen,
   Sparkles,
   Info,
@@ -29,7 +30,7 @@ import { DownloadManager, DownloadTask } from "./DownloadManager";
 interface RightSidebarProps {
   activeChatId: string | null;
   documents: Document[];
-  onDocumentAdded: (doc: Document) => void;
+  onDocumentAdded: (doc: Document, targetChatId?: string) => void;
   onDocumentDeleted?: (id: number) => void;
   onBulkDocumentsDeleted?: (ids: number[]) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
@@ -109,82 +110,439 @@ const cleanHtmlAbstract = (raw?: string): string => {
   return text.trim();
 };
 
-// Helper: Semantic grounding matcher for scientific claims & quotes (NotebookLM Style)
-// Finds the most relevant passage/sentence in the paper and highlights it with smooth auto-scroll.
-function renderHighlightedText(fullText: string, targetQuery?: string, highlightRef?: React.RefObject<HTMLElement | null>) {
-  if (!fullText) return null;
-  if (!targetQuery || targetQuery.trim().length < 5) {
-    return <span>{fullText}</span>;
+interface HighlightMatchResult {
+  nodes: React.ReactNode;
+  matchCount: number;
+}
+
+// Helper: Dynamic semantic grounding matcher for scientific claims & quotes (NotebookLM Style)
+// Primary path: AI-decided verbatim quotes from CITATION_MAP. Fallback: Contextual semantic matcher.
+function getHighlightedContent(
+  fullText: string, 
+  targetQuery?: string, 
+  highlightRefsMap?: React.MutableRefObject<Map<number, HTMLElement>>,
+  activeMatchIndex: number = 0,
+  aiQuotes?: string[]
+): HighlightMatchResult {
+  if (!fullText) return { nodes: null, matchCount: 0 };
+
+  // Tokenize document text into atomic chunks (sentences / table cells / headings)
+  // Preserve decimal numbers (92.23%) by not splitting on period between digits
+  const rawSentences: string[] = [];
+  // Split on sentence-ending punctuation (.!?) only when NOT between digits and followed by whitespace/EOL
+  const sentenceSplitRegex = /(?<!\d)(?<!\d\s)[.!?]+(?=\s|$)|[\n\r]+/g;
+  let lastSplitEnd = 0;
+  let splitMatch;
+  while ((splitMatch = sentenceSplitRegex.exec(fullText)) !== null) {
+    const chunk = fullText.substring(lastSplitEnd, splitMatch.index + splitMatch[0].length);
+    if (chunk.trim().length > 0) {
+      rawSentences.push(chunk);
+    }
+    lastSplitEnd = splitMatch.index + splitMatch[0].length;
+  }
+  if (lastSplitEnd < fullText.length) {
+    const tail = fullText.substring(lastSplitEnd);
+    if (tail.trim().length > 0) {
+      rawSentences.push(tail);
+    }
+  }
+  if (rawSentences.length === 0) return { nodes: <span>{fullText}</span>, matchCount: 0 };
+
+  // 1. PRIMARY AI-DRIVEN GROUNDING PATH:
+  // If Gemini 3.7 Flash High provided exact verbatim quote(s), match against them directly!
+  if (aiQuotes && aiQuotes.length > 0) {
+    const aiHighlightedIndices = new Set<number>();
+    const aiClusters: number[][] = [];
+
+    // If multiple quotes exist for this document, prioritize quotes matching the clicked cell context (targetQuery)
+    let selectedQuotes = aiQuotes;
+    if (aiQuotes.length > 1 && targetQuery && targetQuery.trim().length > 3) {
+      const cleanTarget = targetQuery.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim();
+      const targetTokens = new Set(cleanTarget.split(/\s+/).filter(w => w.length >= 3));
+
+      // Score each quote against the clicked targetQuery
+      const scoredQuotes = aiQuotes.map(q => {
+        const qClean = q.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ");
+        let hits = 0;
+        targetTokens.forEach(t => {
+          if (qClean.includes(t)) hits++;
+        });
+        return { quote: q, score: hits };
+      });
+
+      const maxScore = Math.max(...scoredQuotes.map(sq => sq.score));
+      // If one quote is clearly more relevant to the clicked cell, use only the relevant quote(s)
+      if (maxScore > 0) {
+        selectedQuotes = scoredQuotes.filter(sq => sq.score >= maxScore * 0.7).map(sq => sq.quote);
+      }
+    }
+
+    selectedQuotes.forEach(quote => {
+      if (!quote || quote.trim().length < 5) return;
+      const cleanQuote = quote.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+      const quoteWords = cleanQuote.split(/\s+/).filter(w => w.length >= 2);
+      if (quoteWords.length === 0) return;
+
+      // Extract numeric tokens from the quote (e.g. "92", "23", "0", "718") for metric-aware matching
+      const quoteNumbers = cleanQuote.match(/\b\d+\b/g) || [];
+
+      // Check for exact substring match first — only quote-in-sentence direction
+      // (sentence-in-quote would match any short fragment that happens to appear in a long quote)
+      let foundExact = false;
+      rawSentences.forEach((s, idx) => {
+        const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+        if (sClean.length >= 15 && sClean.includes(cleanQuote)) {
+          aiHighlightedIndices.add(idx);
+          foundExact = true;
+        }
+      });
+
+      if (!foundExact) {
+        // High-precision keyword overlap with numeric bonus
+        let bestSentenceIdx = -1;
+        let highestScore = 0;
+
+        rawSentences.forEach((s, idx) => {
+          const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+          // Skip very short fragments and metadata lines
+          if (sClean.length < 15) return;
+          if (/https?\s|doi\s|issn|available online|halaman/.test(sClean)) return;
+
+          let wordOverlap = 0;
+          quoteWords.forEach(qw => {
+            if (sClean.includes(qw)) wordOverlap++;
+          });
+          const wordRatio = wordOverlap / quoteWords.length;
+
+          // Count how many numeric tokens from the quote appear in this sentence
+          let numericHits = 0;
+          if (quoteNumbers.length > 0) {
+            const sNumbers = sClean.match(/\b\d+\b/g) || [];
+            const sNumSet = new Set(sNumbers);
+            quoteNumbers.forEach(n => { if (sNumSet.has(n)) numericHits++; });
+          }
+          // ponytail: numeric bonus — upgrade path: use decimal-aware matching (e.g. "92.23" as single token)
+          const numericBonus = quoteNumbers.length > 0 ? (numericHits / quoteNumbers.length) * 0.25 : 0;
+          const combinedScore = wordRatio + numericBonus;
+
+          // Require at least 60% word overlap (up from 50%) to reduce false positives on generic sentences
+          if (wordRatio >= 0.60 && combinedScore > highestScore) {
+            highestScore = combinedScore;
+            bestSentenceIdx = idx;
+          }
+        });
+
+        if (bestSentenceIdx !== -1) {
+          aiHighlightedIndices.add(bestSentenceIdx);
+        }
+      }
+    });
+
+    if (aiHighlightedIndices.size > 0) {
+      const sortedIndices = Array.from(aiHighlightedIndices).sort((a, b) => a - b);
+      let currentCluster: number[] = [];
+      sortedIndices.forEach(idx => {
+        if (currentCluster.length === 0) {
+          currentCluster.push(idx);
+        } else {
+          const last = currentCluster[currentCluster.length - 1];
+          if (idx === last + 1) {
+            currentCluster.push(idx);
+          } else {
+            aiClusters.push([...currentCluster]);
+            currentCluster = [idx];
+          }
+        }
+      });
+      if (currentCluster.length > 0) {
+        aiClusters.push(currentCluster);
+      }
+
+      const indexToClusterMap = new Map<number, number>();
+      aiClusters.forEach((clust, cIdx) => {
+        clust.forEach(idx => {
+          indexToClusterMap.set(idx, cIdx);
+        });
+      });
+
+      const nodes = (
+        <>
+          {rawSentences.map((sentence, idx) => {
+            const isHighlighted = aiHighlightedIndices.has(idx);
+            if (isHighlighted) {
+              const clusterIdx = indexToClusterMap.get(idx) ?? 0;
+              const isClusterAnchor = aiClusters[clusterIdx]?.[0] === idx;
+              const isActiveCluster = clusterIdx === activeMatchIndex;
+
+              return (
+                <mark
+                  key={idx}
+                  ref={(el) => {
+                    if (el && isClusterAnchor && highlightRefsMap) {
+                      highlightRefsMap.current.set(clusterIdx, el);
+                    }
+                  }}
+                  className={`font-medium px-0.5 py-0.5 rounded-sm inline leading-relaxed transition-all box-decoration-clone ${
+                    isActiveCluster
+                      ? "bg-amber-400/40 text-amber-100 ring-2 ring-amber-400/50 shadow-sm"
+                      : "bg-amber-400/20 text-amber-200/90 border-b border-amber-400/30"
+                  }`}
+                  title={`AI Grounded Evidence ${clusterIdx + 1} of ${aiClusters.length}`}
+                >
+                  {sentence}
+                </mark>
+              );
+            }
+            return <span key={idx}>{sentence}</span>;
+          })}
+        </>
+      );
+
+      return {
+        nodes,
+        matchCount: aiClusters.length
+      };
+    }
+  }
+
+  // Identify where the bibliography / reference list starts in the document to avoid grounding on references
+  let refSectionIndex = -1;
+  const refHeaderRegex = /^\s*(?:#+\s*)?(?:daftar\s+pustaka|references|bibliography|daftar\s+referensi|referensi)\b/i;
+  for (let i = 0; i < rawSentences.length; i++) {
+    if (refHeaderRegex.test(rawSentences[i].trim())) {
+      refSectionIndex = i;
+      break;
+    }
   }
 
   // Common stopwords in Indonesian and English
   const stopWords = new Set([
     "yang", "dari", "pada", "untuk", "dengan", "adalah", "dalam", "ini", "itu", "dan", "atau", "oleh", "ke", "di",
-    "the", "and", "for", "with", "this", "that", "from", "using", "study", "paper", "research", "results", "analysis",
-    "berikut", "tabel", "rekapitulasi", "dokumen", "terdapat", "adanya", "sebagai", "juga", "dapat", "akan", "telah",
-    "namun", "serta", "karena", "pada", "bisa", "lebih", "secara", "seperti"
+    "the", "and", "for", "with", "this", "that", "from", "using", "paper", "berikut", "tabel", "rekapitulasi",
+    "dokumen", "terdapat", "adanya", "sebagai", "juga", "dapat", "akan", "telah", "namun", "serta", "karena",
+    "bisa", "lebih", "secara", "seperti", "yaitu", "yakni", "merupakan", "berdasarkan", "parameter", "metode",
+    "hasil", "nilai", "sebesar", "ketika", "menggunakan"
   ]);
 
-  const cleanQueryWords = targetQuery
+  // Normalize query & strip LaTeX delimiters ($C=10$, \gamma=1 -> c=10, gamma=1)
+  const normQuery = (targetQuery || "")
     .toLowerCase()
+    .replace(/\$([^$]+)\$/g, "$1")
+    .replace(/\\(?:gamma|alpha|beta|sigma|lambda|theta)\b/gi, (m) => m.substring(1));
+  
+  // Extract explicit numerical metrics with decimals or %: e.g. "69,15%", "84.37%", "0.87"
+  const rawMetricMatches = (normQuery.match(/\b\d+[,.]\d+%?\b|\b\d+%\b/g) || []);
+  const metricsSet = new Set(
+    rawMetricMatches.map(m => m.toLowerCase().replace(/,/g, ".").replace(/%/g, ""))
+  );
+
+  // Extract parameter bindings: e.g. "c=10", "gamma=1", "k=5", "fold=10"
+  const paramBindings = (normQuery.match(/\b[a-z_]+\s*=\s*\d+(?:[,.]\d+)?\b/g) || []).map(p => p.replace(/\s+/g, ""));
+
+  // Extract model/algorithm/parameter specific terms: e.g. "svm", "rbf", "gamma", "tfidf", "kernel", "logistic", "naive"
+  const cleanTokens = normQuery
     .replace(/[^a-zA-Z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length >= 3 && !stopWords.has(w));
+    .filter(w => w.length >= 2 && !stopWords.has(w) && !/^\d+$/.test(w));
 
-  // If query consists only of short words, keep all words >= 3 chars
-  const effectiveWords = cleanQueryWords.length > 0 ? cleanQueryWords : targetQuery.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").split(/\s+/).filter(w => w.length >= 3);
-
-  if (effectiveWords.length === 0) {
-    return <span>{fullText}</span>;
+  // Extract keyphrases (2-word & 3-word n-grams)
+  const queryPhrases: string[] = [];
+  for (let i = 0; i < cleanTokens.length - 1; i++) {
+    queryPhrases.push(`${cleanTokens[i]} ${cleanTokens[i + 1]}`);
+    if (i < cleanTokens.length - 2) {
+      queryPhrases.push(`${cleanTokens[i]} ${cleanTokens[i + 1]} ${cleanTokens[i + 2]}`);
+    }
   }
 
-  // Split document into sentences / lines
-  const sentenceRegex = /([^.!?\n\r]+(?:[.!?\n\r]+|$))/g;
-  const rawSentences = fullText.match(sentenceRegex) || [fullText];
+  // Calculate scores for each sentence with semantic entity weighting
+  let maxSingleScore = 0;
+  const sentenceScores = rawSentences.map((s, idx) => {
+    if (refSectionIndex !== -1 && idx >= refSectionIndex) {
+      return 0;
+    }
 
-  let bestIndex = -1;
-  let highestScore = 0;
-
-  rawSentences.forEach((s, idx) => {
-    const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ");
-    const sWords = new Set(sClean.split(/\s+/).filter(w => w.length >= 3));
-    let matchCount = 0;
+    const sLower = s.toLowerCase();
     
-    effectiveWords.forEach(w => {
-      if (sWords.has(w) || sClean.includes(w)) {
-        matchCount++;
+    // Ignore bibliography, page numbers, journal header lines, URL lines, and short metadata fragments
+    if (/https?:\/\/|doi\.org|\bvol(?:ume)?\s*\d+|\bp-issn\b|\be-issn\b|\bissn\b|\bhalaman\b|\bavailable online\b|\.ac\.id|\.org\/index/i.test(sLower)) {
+      return 0;
+    }
+    // Skip very short lines (single chars, roman numerals, table separators)
+    if (s.trim().length < 8) {
+      return 0;
+    }
+
+    const sNormalizedNumbers = sLower
+      .replace(/(\d+)\s*[,.]\s*(\d+)/g, "$1.$2")
+      .replace(/(\d+)\s+%/g, "$1%");
+    const sClean = sNormalizedNumbers.replace(/[^a-zA-Z0-9\s]/g, " ");
+    const sWords = new Set(sClean.split(/\s+/).filter(w => w.length >= 2));
+
+    let score = 0;
+
+    // 1. Parameter bindings match (e.g. "c=10", "gamma=1" matching "c = 10", "c=10", "gamma = 1") (Weight: 35 points)
+    paramBindings.forEach(pb => {
+      const parts = pb.split("=");
+      if (parts.length === 2) {
+        const paramName = parts[0];
+        const paramVal = parts[1];
+        const paramRegex = new RegExp(`\\b${paramName}\\s*=\\s*${paramVal}\\b`, "i");
+        if (paramRegex.test(sLower) || (sWords.has(paramName) && sNormalizedNumbers.includes(paramVal))) {
+          score += 35;
+        }
       }
     });
 
-    if (matchCount > 0) {
-      // Score based on matched keywords and density
-      const score = matchCount / effectiveWords.length;
-      if (score > highestScore) {
-        highestScore = score;
-        bestIndex = idx;
+    // 1. Exact Decimal/Percentage/Value Metric match
+    // Matches "0,87", "0.87", "87%", "87", "0,88", "0.88"
+    metricsSet.forEach(m => {
+      const mComma = m.replace(/\./g, ",");
+      const isDecimalMatch = sNormalizedNumbers.includes(m) || sLower.includes(mComma);
+      if (isDecimalMatch) {
+        score += 35;
+      } else if (m.startsWith("0.")) {
+        // Convert decimal to percentage or integer representation: e.g. 0.87 -> 87% / 87
+        const pctInt = `${Math.round(parseFloat(m) * 100)}`;
+        if (sNormalizedNumbers.includes(`${pctInt}%`) || sClean.includes(pctInt)) {
+          score += 35;
+        }
+      } else if (/^\d+$/.test(m) && parseInt(m, 10) > 10) {
+        // Integer percentage representation: e.g. 87 -> 0.87 or 87%
+        const decVal = (parseInt(m, 10) / 100).toFixed(2);
+        if (sNormalizedNumbers.includes(decVal) || sLower.includes(decVal.replace(/\./g, ","))) {
+          score += 35;
+        }
+      }
+    });
+
+    // 2. Specific keyphrase n-grams (e.g. "akurasi tertinggi", "model terbaik", "kata positif", "sentimen netral")
+    queryPhrases.forEach(ph => {
+      if (sClean.includes(ph)) {
+        score += 16;
+      }
+    });
+
+    // 3. Domain Entity / Model / Sentiment keywords (Weight: 5 points)
+    // Matches "bahagia", "rajin", "senang", "capek", "muak", "bosen", "netral", "akurasi"
+    cleanTokens.forEach(w => {
+      if (sWords.has(w) || sClean.includes(w)) {
+        score += 5;
+      }
+    });
+
+    if (score > maxSingleScore) {
+      maxSingleScore = score;
+    }
+
+    return score;
+  });
+
+  // Dynamic Multi-Highlight Selection & Clustering:
+  const highlightedIndices = new Set<number>();
+  const clusters: number[][] = [];
+
+  if (maxSingleScore > 0) {
+    // Selectivity threshold: Keep top evidence passages matching query claims
+    const threshold = Math.max(14, maxSingleScore * 0.60);
+    
+    // Pick candidate sentences meeting threshold
+    const candidateIndices: number[] = [];
+    sentenceScores.forEach((sc, idx) => {
+      if (sc >= threshold) {
+        candidateIndices.push(idx);
+      }
+    });
+
+    // Add candidates to highlighted set
+    candidateIndices.forEach(idx => highlightedIndices.add(idx));
+
+    // Connect adjacent 1-to-2 sentence gaps in the same paragraph if context flows cohesively
+    for (let i = 0; i < candidateIndices.length - 1; i++) {
+      const curr = candidateIndices[i];
+      const next = candidateIndices[i + 1];
+      const gap = next - curr;
+      if (gap >= 2 && gap <= 3) {
+        for (let g = curr + 1; g < next; g++) {
+          highlightedIndices.add(g);
+        }
+      }
+    }
+  }
+
+  // Fallback: If no match above threshold, highlight best matching sentence ONLY if it scored > 0
+  if (highlightedIndices.size === 0) {
+    let fallbackIdx = -1;
+    let bestScore = 0; // Must have at least some score to be highlighted
+    sentenceScores.forEach((sc, idx) => {
+      if (sc > bestScore) {
+        bestScore = sc;
+        fallbackIdx = idx;
+      }
+    });
+    if (fallbackIdx >= 0) {
+      highlightedIndices.add(fallbackIdx);
+    }
+  }
+
+  // If still nothing matched, return unhighlighted text (no random highlight)
+  if (highlightedIndices.size === 0) {
+    return {
+      nodes: <span>{fullText}</span>,
+      matchCount: 0
+    };
+  }
+
+  // Group highlighted contiguous indices into distinct clusters/passages
+  const sortedIndices = Array.from(highlightedIndices).sort((a, b) => a - b);
+  let currentCluster: number[] = [];
+  sortedIndices.forEach(idx => {
+    if (currentCluster.length === 0) {
+      currentCluster.push(idx);
+    } else {
+      const last = currentCluster[currentCluster.length - 1];
+      if (idx === last + 1) {
+        currentCluster.push(idx);
+      } else {
+        clusters.push([...currentCluster]);
+        currentCluster = [idx];
       }
     }
   });
-
-  // Fallback: if no multi-sentence match, highlight top match or title line
-  if (bestIndex === -1 && rawSentences.length > 0) {
-    bestIndex = 0;
+  if (currentCluster.length > 0) {
+    clusters.push(currentCluster);
   }
 
-  if (bestIndex === -1) {
-    return <span>{fullText}</span>;
-  }
+  // Map each highlighted sentence index to its cluster index
+  const indexToClusterMap = new Map<number, number>();
+  clusters.forEach((clust, cIdx) => {
+    clust.forEach(idx => {
+      indexToClusterMap.set(idx, cIdx);
+    });
+  });
 
-  return (
+  const nodes = (
     <>
       {rawSentences.map((sentence, idx) => {
-        if (idx === bestIndex) {
+        const isHighlighted = highlightedIndices.has(idx);
+        if (isHighlighted) {
+          const clusterIdx = indexToClusterMap.get(idx) ?? 0;
+          const isClusterAnchor = clusters[clusterIdx]?.[0] === idx;
+          const isActiveCluster = clusterIdx === activeMatchIndex;
+
           return (
             <mark
               key={idx}
-              ref={highlightRef as any}
-              className="bg-amber-400/25 text-amber-200 px-0.5 py-0 rounded-none inline font-normal leading-tight transition-colors box-decoration-clone"
-              title="Referenced Citation Context"
+              ref={(el) => {
+                if (el && isClusterAnchor && highlightRefsMap) {
+                  highlightRefsMap.current.set(clusterIdx, el);
+                }
+              }}
+              className={`font-medium px-0.5 py-0.5 rounded-sm inline leading-relaxed transition-all box-decoration-clone ${
+                isActiveCluster
+                  ? "bg-amber-400/40 text-amber-100 ring-2 ring-amber-400/50 shadow-sm"
+                  : "bg-amber-400/20 text-amber-200/90 border-b border-amber-400/30"
+              }`}
+              title={`Evidence Match ${clusterIdx + 1} of ${clusters.length}`}
             >
               {sentence}
             </mark>
@@ -194,6 +552,11 @@ function renderHighlightedText(fullText: string, targetQuery?: string, highlight
       })}
     </>
   );
+
+  return {
+    nodes,
+    matchCount: clusters.length
+  };
 }
 
 const formatReadableDate = (dateStr?: string, yearFallback?: string) => {
@@ -339,17 +702,28 @@ export default function RightSidebar({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const highlightElemRef = useRef<HTMLElement | null>(null);
+  const [activeMatchIndex, setActiveMatchIndex] = useState<number>(0);
+  const [totalMatches, setTotalMatches] = useState<number>(0);
+  const highlightRefsMap = useRef<Map<number, HTMLElement>>(new Map());
 
-  // Auto-scroll to highlighted grounded segment when details are loaded or highlight target changes
+  // Reset active highlight match index when highlighted target changes (or same citation re-clicked)
   useEffect(() => {
-    if (!isLoadingDetails && highlightElemRef.current) {
+    setActiveMatchIndex(0);
+    highlightRefsMap.current.clear();
+  }, [groundingHighlight?.clickId, groundingHighlight?.sentence, viewingDoc?.id]);
+
+  // Auto-scroll to current active highlighted cluster
+  useEffect(() => {
+    if (!isLoadingDetails) {
       const timer = setTimeout(() => {
-        highlightElemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 200);
+        const targetEl = highlightRefsMap.current.get(activeMatchIndex);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 150);
       return () => clearTimeout(timer);
     }
-  }, [isLoadingDetails, groundingHighlight, activeTab, paperDetails?.content]);
+  }, [isLoadingDetails, activeMatchIndex, groundingHighlight, activeTab, paperDetails?.content]);
 
   // Fetch document details when viewingDoc is set
   useEffect(() => {
@@ -358,12 +732,6 @@ export default function RightSidebar({
       return;
     }
     setIsLoadingDetails(true);
-    // When opened via citation pill click with context sentence, open directly in Full Paper tab
-    if (groundingHighlight?.sentence) {
-      setActiveTab("preview");
-    } else {
-      setActiveTab("overview");
-    }
     setIsCiteModalOpen(false);
     fetch(`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/content`)
       .then(res => res.json())
@@ -376,7 +744,14 @@ export default function RightSidebar({
       .finally(() => {
         setIsLoadingDetails(false);
       });
-  }, [viewingDoc, activeChatId, backendUrl, groundingHighlight?.sentence]);
+  }, [viewingDoc, activeChatId, backendUrl]);
+
+  // Switch to preview tab when citation grounding highlight is active
+  useEffect(() => {
+    if (groundingHighlight?.sentence) {
+      setActiveTab("preview");
+    }
+  }, [groundingHighlight?.clickId, groundingHighlight?.sentence]);
 
   // Close sort menu on click outside
   useEffect(() => {
@@ -447,7 +822,7 @@ export default function RightSidebar({
       });
       if (res.ok) {
         const newDoc = await res.json();
-        onDocumentAdded(newDoc);
+        onDocumentAdded(newDoc, currentChatId);
       } else {
         const err = await res.json();
         alert(`Upload failed: ${err.detail || "An error occurred"}`);
@@ -951,16 +1326,43 @@ export default function RightSidebar({
             <div className="px-3.5 py-2 bg-[#1e1f22] border-b border-white/10 flex items-center justify-between text-xs text-gray-300 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
-                <span className="truncate max-w-[200px] font-mono text-[11px] text-gray-300">
+                <span className="truncate max-w-[170px] font-mono text-[11px] text-gray-300">
                   {viewingDoc.filename}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                {paperDetails?.content && (
-                  <span className="text-[10px] text-gray-500 font-mono hidden sm:inline">
-                    {paperDetails.content.length.toLocaleString()} chars
-                  </span>
+              <div className="flex items-center gap-1.5">
+                {/* Evidence Passage Navigator (Chevron Up / Down for multiple disjoint matches) */}
+                {totalMatches > 1 && (
+                  <div className="flex items-center gap-1 bg-amber-400/10 border border-amber-400/30 rounded-lg px-2 py-0.5 mr-1">
+                    <span className="text-[10px] font-mono font-semibold text-amber-300">
+                      {activeMatchIndex + 1}/{totalMatches}
+                    </span>
+                    <div className="flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const prev = activeMatchIndex > 0 ? activeMatchIndex - 1 : totalMatches - 1;
+                          setActiveMatchIndex(prev);
+                        }}
+                        className="p-0.5 hover:bg-amber-400/20 text-amber-300 hover:text-white rounded transition-colors"
+                        title="Previous evidence section"
+                      >
+                        <ChevronUp size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = activeMatchIndex < totalMatches - 1 ? activeMatchIndex + 1 : 0;
+                          setActiveMatchIndex(next);
+                        }}
+                        className="p-0.5 hover:bg-amber-400/20 text-amber-300 hover:text-white rounded transition-colors"
+                        title="Next evidence section"
+                      >
+                        <ChevronDown size={13} />
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 {activeChatId && (
@@ -991,9 +1393,15 @@ export default function RightSidebar({
                     <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-800/40 flex items-start gap-2.5 text-xs text-amber-200">
                       <Info size={15} className="text-amber-400 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-amber-100">Publication Brief & Abstract (Full Manuscript Paywalled)</p>
+                        <p className="font-semibold text-amber-100">
+                          {paperDetails.is_oa
+                            ? "Publication Brief & Abstract (Direct Download Restricted / HTTP 403)"
+                            : "Publication Brief & Abstract (Full Manuscript Paywalled)"}
+                        </p>
                         <p className="text-[11.5px] text-amber-300/80 mt-0.5">
-                          Full publisher manuscript is protected by publisher paywall. Displaying verified academic metadata and official author abstract.
+                          {paperDetails.is_oa
+                            ? "This paper is Open Access, but automatic PDF retrieval was restricted by the publisher repository (HTTP 403 / Bot Challenge). Displaying verified academic metadata and official author abstract."
+                            : "Full publisher manuscript is protected by publisher paywall. Displaying verified academic metadata and official author abstract."}
                         </p>
                       </div>
                     </div>
@@ -1030,11 +1438,29 @@ export default function RightSidebar({
 
                   {/* Clean Formatted Document Body (Scrolls through the entire file) */}
                   <div className="text-[12.5px] sm:text-[13px] text-gray-200 leading-relaxed font-sans whitespace-pre-wrap select-text break-words">
-                    {renderHighlightedText(
-                      paperDetails.content.replace(/^#\s+[^\n]+\n+/, "").replace(/##\s+Abstract & Overview\n+/, ""),
-                      groundingHighlight?.sentence,
-                      highlightElemRef
-                    )}
+                    {(() => {
+                      // Strip repeated journal header/footer lines injected by PyMuPDF on every page
+                      let cleanedContent = paperDetails.content
+                        .replace(/^#\s+[^\n]+\n+/, "")
+                        .replace(/##\s+Abstract & Overview\n+/, "");
+                      // Remove repeated journal masthead blocks (ISSN, page numbers, author footers, "available online at" lines)
+                      cleanedContent = cleanedContent.replace(/\n*(?:Author\s*\d*\s*\|[^\n]*\n?)+/gi, "\n");
+                      cleanedContent = cleanedContent.replace(/\n*\*\*_?[A-Za-z]+:.*?Journal.*?_?\*\*[^\n]*\n(?:[^\n]*ISSN[^\n]*\n)?(?:[^\n]*Halaman[^\n]*\n)?(?:[^\n]*available online at[^\n]*\n)?/gi, "\n");
+                      cleanedContent = cleanedContent.replace(/\n*_?available online at_?\s*https?:\/\/[^\n]+\n*/gi, "\n");
+                      cleanedContent = cleanedContent.replace(/\n{3,}/g, "\n\n");
+
+                      const res = getHighlightedContent(
+                        cleanedContent,
+                        groundingHighlight?.sentence,
+                        highlightRefsMap,
+                        activeMatchIndex,
+                        groundingHighlight?.aiQuotes
+                      );
+                      if (res.matchCount !== totalMatches) {
+                        setTimeout(() => setTotalMatches(res.matchCount), 0);
+                      }
+                      return res.nodes;
+                    })()}
                   </div>
                 </div>
               ) : (

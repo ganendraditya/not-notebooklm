@@ -401,8 +401,11 @@ async def query_chat(
         for msg in chat_history:
             role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
             content = msg.get("content", "")
-            if role == MessageRole.ASSISTANT and "<!-- SOURCES_DATA" in content:
-                content = content.split("<!-- SOURCES_DATA")[0].strip()
+            if role == MessageRole.ASSISTANT:
+                if "<!-- SOURCES_DATA" in content:
+                    content = content.split("<!-- SOURCES_DATA")[0].strip()
+                if "<!-- CITATION_MAP" in content:
+                    content = content.split("<!-- CITATION_MAP")[0].strip()
             formatted_history.append(LlamaChatMessage(role=role, content=content))
             
     # Re-read environment and get instances dynamically
@@ -442,6 +445,31 @@ async def query_chat(
         text = re.sub(r'Action Input:[\s\S]*?(?=Answer:|$)', '', text)
         text = re.sub(r'Observation:[\s\S]*?(?=Answer:|$)', '', text)
         text = re.sub(r'^Answer:\s*', '', text, flags=re.MULTILINE)
+        
+        # 1. Preserve and separate <!-- CITATION_MAP --> hidden comment at the very end
+        citation_map_comment = ""
+        if "<!-- CITATION_MAP:" in text:
+            parts = text.split("<!-- CITATION_MAP:", 1)
+            text = parts[0]
+            citation_map_comment = "\n\n<!-- CITATION_MAP:" + parts[1]
+
+        # 2. Strip conversational excuses / hallucinations about UI text limitations
+        text = re.sub(r'(?:Antarmuka\s+berbasis\s+teks|The\s+text-based\s+interface)[^\n]*\n+', '', text, flags=re.IGNORECASE)
+        
+        # 3. Strip pseudo-button text hallucinated in tables: e.g. "🔍 Bukti Metode", "🔍 Bukti Temuan", "[Lihat Bukti]"
+        text = re.sub(r'<br\s*/?>\s*🔍\s*Bukti\s*(?:Metode|Temuan|Klaim|Rujukan)[^\n<|]*', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'🔍\s*Bukti\s*(?:Metode|Temuan|Klaim|Rujukan)[^\n<|]*', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\[(?:Lihat\s+Bukti|Bukti\s+Metode|Bukti\s+Temuan)\](?:\([^)]*\))?', '', text, flags=re.IGNORECASE)
+
+        # 4. Strip heading and text for manual quote sections, verification panels, anchor links (<a id=...>), and bulleted quote lists
+        text = re.sub(r'\n+#{1,4}\s*(?:Teks\s+Sitasi|Verifikasi\s+Teks|Panel\s+Verifikasi|Highlight\s+Bukti|Kutipan\s+Rujukan|Bukti\s+Klaim)[\s\S]*$', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\n+(?:Teks\s+Sitasi\s+Rujukan|Verifikasi\s+Teks\s+Sitasi|Panel\s+Verifikasi\s+Bukti|Highlight\s+Bukti\s+Klaim)[\s\S]*$', '', text, flags=re.IGNORECASE)
+        
+        # 5. Remove any lingering HTML anchors, raw link anchors, or mark tags that LLM attempts to output in chat body
+        text = re.sub(r'<a\s+id=[\'"][^\'"]*[\'"]\s*>\s*(?:</a>)?', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'<a\s+href=[\'"]#[^\'"]*[\'"]\s*>([\s\S]*?)</a>', r'\1', text, flags=re.IGNORECASE)
+        
+        text = text.strip() + citation_map_comment
         return text.strip()
 
     def is_simple_conversational(text: str) -> bool:
@@ -613,9 +641,8 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                         ).all()
                         for dd in docs_to_del:
                             deleted_titles.append(dd.title or dd.filename.replace(".pdf", ""))
-                            # Remove physical file if exists
-                            uploads_d = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
-                            fp = os.path.join(uploads_d, f"{chat_id}_{dd.filename}")
+                            from helpers import get_doc_file_path
+                            fp = get_doc_file_path(chat_id, dd.filename)
                             if os.path.exists(fp):
                                 try: os.remove(fp)
                                 except Exception: pass
@@ -711,28 +738,35 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
             except Exception:
                 pass
 
+            from helpers import get_doc_file_path
+
             for i, fname in enumerate(local_docs):
-                fpath = os.path.join(uploads_dir, f"{chat_id}_{fname}")
-                if not os.path.exists(fpath):
-                    fpath = os.path.abspath(os.path.join(os.getcwd(), "uploads", f"{chat_id}_{fname}"))
+                fpath = get_doc_file_path(chat_id, fname)
                     
                 content_snippet = ""
                 db_record = db_docs_by_filename.get(fname)
+                is_full_paper = False
                 
-                # 1. Try reading physical file first
+                # 1. Try parsing full document text properly (PDF/DOCX/TXT/MD)
                 if os.path.exists(fpath):
+                    fsize = os.path.getsize(fpath)
                     try:
-                        with open(fpath, "r", encoding="utf-8", errors="ignore") as fp:
-                            raw_text = fp.read()
-                            # If file is real text/markdown, use it
-                            if len(raw_text.strip()) >= 150:
-                                max_chars = 1200 if len(local_docs) > 20 else 3000
-                                content_snippet = raw_text[:max_chars]
-                    except Exception:
-                        pass
+                        parsed_text = parse_document_to_markdown(fpath)
+                        if parsed_text and len(parsed_text.strip()) >= 150:
+                            # If it contains our fallback archive header or file is small, it's an abstract brief
+                            if "NOTBOOKLM SCHOLARLY ARCHIVE" in parsed_text or fsize < 35000:
+                                is_full_paper = False
+                            else:
+                                is_full_paper = True
+                            # Dynamic allocation: keep rich content without blowing context limits
+                            max_chars = 2500 if len(local_docs) > 20 else 6000
+                            content_snippet = parsed_text[:max_chars]
+                    except Exception as parse_err:
+                        logger.debug(f"[Doc Parse Error for {fname}]: {parse_err}")
                         
-                # 2. If physical file is missing, empty, or short stub: read from DB metadata
+                # 2. If physical file parse failed or short stub: read from DB metadata
                 if (not content_snippet or len(content_snippet.strip()) < 150) and db_record:
+                    is_full_paper = False
                     meta_parts = []
                     d_title = db_record.title or fname.replace(".pdf", "").replace("_", " ")
                     d_year = db_record.year or ""
@@ -750,11 +784,14 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                 if not content_snippet:
                     content_snippet = f"(Dokumen: {fname})"
                     
+                status_header = "FULL PAPER / NASKAH LENGKAP TERVERIFIKASI (Full Manuscript Berhasil Diunduh)" if is_full_paper else "PUBLICATION BRIEF & ABSTRAK SAJA (Naskah lengkap tidak dapat diunduh otomatis / HTTP 403 / Paywalled)"
+
                 full_docs_context_parts.append(
                     f"--- DOKUMEN [{i+1}] ---\n"
                     f"Nomor Dokumen: [{i+1}]\n"
                     f"Nama File: {fname}\n"
-                    f"Isi/Abstrak/Metadata:\n{content_snippet}\n"
+                    f"Status Naskah: {status_header}\n"
+                    f"Teks Dokumen:\n{content_snippet}\n"
                 )
             
             full_docs_context = "\n\n".join(full_docs_context_parts)
@@ -768,15 +805,48 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                     f"This chat session has {len(local_docs)} imported reference documents in the workspace.\n"
                     "Use ALL document data to answer the user's query comprehensively, accurately, and with clear structure.\n\n"
                     "USER INSTRUCTION DISCIPLINE (CRITICAL):\n"
-                    "- If the user is ASKING A QUESTION (e.g. 'apakah ada yang ga relevan?', 'sebutkan yang ga cocok', 'crosscheck dong'): ANSWER THE QUESTION FIRST clearly with the list of documents and reasons. DO NOT delete or remove anything autonomously unless the user explicitly commands you with action words (e.g. 'tolong hapus', 'hapusin', 'delete these').\n"
+                    "- If the user is ASKING A QUESTION (e.g. 'apakah ada yang ga relevan?', 'sebutkan yang ga cocok', 'crosscheck dong', 'paper mana yang gagal di-download?', 'paper mana yang cuma abstrak?'): ANSWER THE QUESTION FIRST clearly with the list of documents and reasons. DO NOT delete or remove anything autonomously unless the user explicitly commands you with action words (e.g. 'tolong hapus', 'hapusin', 'delete these').\n"
+                    "- DOCUMENT FULL-TEXT STATUS EVALUATION (CRITICAL):\n"
+                    "  Each document in your context includes an explicit 'Status Naskah:' header line:\n"
+                    "  - 'FULL PAPER / NASKAH LENGKAP TERVERIFIKASI' means the full multi-page academic manuscript was successfully downloaded.\n"
+                    "  - 'PUBLICATION BRIEF & ABSTRAK SAJA' means the paper only contains verified metadata and the author abstract (because full-text was restricted/blocked/paywalled).\n"
+                    "  When the user asks which papers failed to download or are abstract-only, check the 'Status Naskah:' header for EACH document and list ONLY the documents marked 'PUBLICATION BRIEF & ABSTRAK SAJA'. Never falsely claim all papers are abstract-only when full papers exist.\n"
                     "- If the user explicitly asks to delete specific papers, confirm and remove only the requested papers.\n\n"
                     "CAPABILITY REMINDER:\n"
                     "- You have backend access to remove documents when explicitly commanded.\n\n"
-                    "CITATION & TABLE RULES (CRITICAL - STRICT GROUNDING):\n"
-                    "- Every reference document has a permanent Global Reference Number: [1], [2], [3], etc. as written in the document header.\n"
-                    "- When creating tables, comparison matrices, or literature summaries: ALWAYS include the bracketed citations [1], [2], [3] in the relevant specific columns (such as 'Methods', 'Key Findings', 'Limitations') AND throughout body paragraphs, NOT just in the title column.\n"
-                    "- When citing claims, synthesize accurately using the exact technical terminology, metrics (e.g. RMSE, R², MAPE), and keywords present in the document to ensure 100% precise grounding.\n"
+                    "CITATION & TABLE RULES (CRITICAL - STRICT GROUNDING & MANDATORY CITATIONS):\n"
+                    "- Every reference document in workspace has a permanent Global Reference Number: [1], [2], [3], etc. as written in its header.\n"
+                    "- SYSTEM CAPABILITY NOTE:\n"
+                    "  The Web Application UI ALREADY HAS a built-in interactive citation & sidebar highlighting engine (like Google NotebookLM). Every single time you write standard brackets like `[1]` or `[2]`, the frontend automatically converts it into a clickable blue button pill that opens the right sidebar and highlights the source document text for the user.\n"
+                    "- MANDATORY CITATIONS ON ALL CLAIMS & SUMMARIES:\n"
+                    "  Whenever discussing, comparing, listing, or summarizing information from workspace documents (including in comparison tables, thematic bullet points, metric findings, or essay sections), you MUST explicitly attach bracketed citations [1], [2], [3] directly to EVERY factual statement, algorithm name, metric, and title.\n"
+                    "- IN COMPARISON TABLES: Place bracketed citations [1], [2], etc. in the relevant cells (e.g. Title column `[1]`, Method column `SVM [1]`, Findings column `Akurasi 87% [1]`). NEVER output table cells or bullet points about documents without their reference number [X].\n"
+                    "- STRICT SYNTAX & ANTI-HALLUCINATION RULES:\n"
+                    "  1. Use ONLY clean standard numeric bracket citations: `[1]`, `[2]`, `[3]`.\n"
+                    "  2. NEVER invent fake buttons or links such as `🔍 Bukti Metode`, `🔍 Bukti Temuan`, `[Lihat Bukti]`, `[M-01]`, `[T-01]`, or `#ref-xx`.\n"
+                    "  3. NEVER apologize or claim that text interfaces cannot open sidebars. The Web UI handles this automatically.\n"
+                    "  4. NEVER output manual quote panels, verification text sections, anchor links (`<a id=...>`), or `<mark>` tags in your chat message body.\n"
+                    "  5. End your response IMMEDIATELY after the table/synthesis, followed ONLY by the hidden `<!-- CITATION_MAP -->` comment.\n"
+                    "- REPUTABLE GROUNDING INTEGRITY:\n"
+                    "  Synthesize findings directly from the narrative, abstract, methods, and results described in the document text. DO NOT cite secondary bibliography entries or papers listed in the 'Daftar Pustaka / References' section as if they were the primary research methods of this paper.\n"
+                    "- When citing claims, synthesize accurately using the exact technical terminology, metrics (e.g. RMSE, R², MAPE, Akurasi), and keywords present in the document to ensure 100% precise grounding.\n"
                     "- Never alter or renumber reference IDs.\n\n"
+                    "AI CITATION GROUNDING MAP (CRITICAL REQUIREMENT):\n"
+                    "At the very end of your response, you MUST append a hidden JSON metadata block.\n"
+                    "For EACH cited document number [X], copy the EXACT verbatim sentence(s) from that document that contain the specific metric, percentage, score, parameter value, or method name you cited.\n\n"
+                    "STRICT RULES FOR CITATION_MAP QUOTES:\n"
+                    "1. MUST contain the exact numbers/metrics mentioned in your claim (e.g. '92.23%', 'RMSE 0.718', 'akurasi 0.943').\n"
+                    "2. NEVER quote generic/introductory sentences (e.g. 'tidak ada metode yang dapat memberikan prediksi yang akurat...').\n"
+                    "3. NEVER quote background context, literature review, or problem statements. Quote ONLY the result/finding/conclusion sentence.\n"
+                    "4. Copy the FULL sentence from the document — do not truncate with '...' in the middle of a number or metric.\n"
+                    "5. If the document uses comma as decimal separator (e.g. '92,23%'), copy it exactly as-is.\n"
+                    "6. Each quote MUST be long enough (at least 20 words) to uniquely identify the passage in the source document.\n\n"
+                    "Format strictly as:\n"
+                    "<!-- CITATION_MAP: {\n"
+                    "  \"1\": [\"Prediksi menggunakan RF dengan seleksi fitur menghasilkan F1 score sebesar 92.23%, yang lebih baik 5.02% dibandingkan tanpa menggunakan seleksi fitur.\"],\n"
+                    "  \"2\": [\"Optimasi menggunakan GA berhasil menurunkan nilai error dari RMSE 0,718 menjadi 0,708 pada prediksi kekuatan magnitudo.\"]\n"
+                    "} -->\n"
+                    "Ensure every cited document number in your response has its exact proof excerpt in CITATION_MAP.\n\n"
                     "INDEXING & QUARTILE RULES:\n"
                     "- Rely strictly on the official indexing status in the document headers (**Indexing Status** and **Journal/Venue**).\n"
                     "- Never label 'Conference Proceedings' as Q1/Q2/Q3/Q4 journals.\n\n"
@@ -815,6 +885,7 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                 "Always maintain conversation context from the chat history.\n"
                 f"{doc_context_info}\n"
                 "- If the user requests data, paper search, analysis, or summaries, perform it directly using tools.\n"
+                "- MANDATORY CITATION RULE: Whenever referring to local workspace documents, always cite using square brackets [1], [2], [3] directly on every factual claim, method, finding, and metric.\n"
                 "- Never output internal thoughts or monologues. Output only the final response."
             )
         )

@@ -26,7 +26,7 @@ interface ChatAreaProps {
   onRemoveQueuedPrompt?: (index: number) => void;
   onPromoteQueuedPrompt?: (index: number) => void;
   documents: DocType[];
-  onDocumentAdded?: (doc: DocType) => void;
+  onDocumentAdded?: (doc: DocType, targetChatId?: string) => void;
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   backendUrl: string;

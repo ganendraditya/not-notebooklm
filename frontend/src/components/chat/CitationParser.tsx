@@ -7,17 +7,25 @@ export interface CitationContext {
   sentence: string;
   num: number;
   citationKey?: string;
+  fullSourceText?: string;
+  aiQuotes?: string[];
 }
 
 export function parseCitationsInReactNode(
   node: React.ReactNode, 
   documents?: DocType[], 
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void,
-  activeCitationKey?: string | null
+  activeCitationKey?: string | null,
+  parentFullText?: string,
+  citationMap?: Record<string, string[]>
 ): React.ReactNode {
   if (typeof node === "string") {
-    // Support standard bracket citations: [1], [2], [1, 2], [1]-[3], and parenthesis citations: (1), (2), (1, 2)
-    const regex = /(?:\[|\()(\d+(?:\s*,\s*\d+|\s*-\s*\d+)*)(?:\]|\))/g;
+    // Determine the full text available (use parent/container text if node is a partial string)
+    const effectiveFullText = parentFullText || node;
+    // Support standard bracket citations: [1], [2], [1, 2], [1]-[3], [Dokumen 1], [Document 1]
+    // Also support fallback prefixes like [M-01], [T-01], [M-1], [T-1], [ref-1], [P-01]
+    // Citation numbers correspond to document indices (1 to 500)
+    const regex = /\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\]/gi;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
@@ -28,26 +36,51 @@ export function parseCitationsInReactNode(
         parts.push(node.substring(lastIndex, matchIndex));
       }
 
-      // Extract the full sentence / clause context for grounding & auto-highlighting in paper panel
-      const textBefore = node.substring(0, matchIndex);
-      const textAfter = node.substring(regex.lastIndex);
-      
-      // Find sentence boundary before match (. ! ? \n)
-      const lastSentenceEnd = Math.max(
-        textBefore.lastIndexOf(". "),
-        textBefore.lastIndexOf("! "),
-        textBefore.lastIndexOf("? "),
-        textBefore.lastIndexOf("\n")
-      );
-      const sentenceStart = lastSentenceEnd !== -1 ? lastSentenceEnd + 2 : 0;
-      
-      // Find sentence boundary after match
-      const nextSentenceEnd = Math.min(
-        ...[textAfter.indexOf(". "), textAfter.indexOf("! "), textAfter.indexOf("? "), textAfter.indexOf("\n")].filter(x => x !== -1)
-      );
-      const sentenceEnd = nextSentenceEnd !== -1 ? regex.lastIndex + nextSentenceEnd + 1 : node.length;
-      
-      const contextSentence = node.substring(sentenceStart, sentenceEnd).replace(/(?:\[|\()\d+(?:\s*,\s*\d+|\s*-\s*\d+)*(?:\]|\))/g, "").trim();
+      // Extract precise context sentence/cell text for grounding
+      let contextSentence = "";
+
+      if (effectiveFullText.includes("|")) {
+        // Inside table: extract the specific cell or current row containing this citation
+        const lines = effectiveFullText.split("\n");
+        const matchingLine = lines.find(l => l.includes(match![0])) || effectiveFullText;
+        contextSentence = matchingLine
+          .split("|")
+          .map(c => c.trim())
+          .filter(c => c.length > 0 && !/^\d+$/.test(c))
+          .join(" . ")
+          .replace(/\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]/gi, "")
+          .trim();
+      } else {
+        // In natural text/paragraphs: find sentence boundaries
+        const textBefore = node.substring(0, matchIndex);
+        const textAfter = node.substring(regex.lastIndex);
+
+        const lastSentenceEnd = Math.max(
+          textBefore.lastIndexOf(". "),
+          textBefore.lastIndexOf("! "),
+          textBefore.lastIndexOf("? "),
+          textBefore.lastIndexOf("\n\n"),
+          textBefore.lastIndexOf(";\n")
+        );
+        const sentenceStart = lastSentenceEnd !== -1 ? lastSentenceEnd + 1 : 0;
+        
+        const nextSentenceEnd = Math.min(
+          ...[
+            textAfter.indexOf(". "),
+            textAfter.indexOf("! "),
+            textAfter.indexOf("? "),
+            textAfter.indexOf("\n\n"),
+            textAfter.indexOf(";\n")
+          ].filter(x => x !== -1)
+        );
+        const sentenceEnd = nextSentenceEnd !== -1 ? regex.lastIndex + nextSentenceEnd + 1 : node.length;
+        
+        contextSentence = node
+          .substring(sentenceStart, sentenceEnd)
+          .replace(/\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]/gi, "")
+          .replace(/^[|\s*#_-]+|[|\s*#_-]+$/g, "")
+          .trim();
+      }
 
       const rawNumbers = match[1];
       const nums: number[] = [];
@@ -68,13 +101,20 @@ export function parseCitationsInReactNode(
       }
 
       if (nums.length > 0) {
+        // Create context hash from cell/sentence text so each citation button has a globally unique key
+        const contextHash = contextSentence
+          ? contextSentence.slice(0, 30).replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()
+          : "raw";
+
         parts.push(
-          <span key={`cite-group-${matchIndex}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
+          <span key={`cite-group-${matchIndex}-${contextHash}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
             {nums.map((num, i) => {
               const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
               const docTitle = doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
+              const aiQuotesForDoc = citationMap?.[num.toString()] || citationMap?.[`[${num}]`];
 
-              const citeUniqueKey = `cite-${matchIndex}-${num}-${i}`;
+              // Key includes contextHash to prevent two citations of the same document (e.g. Method cell vs Finding cell) from conflicting
+              const citeUniqueKey = `cite-${num}-${contextHash}-${matchIndex}-${i}`;
               const isSelected = activeCitationKey === citeUniqueKey;
               return (
                 <button
@@ -86,7 +126,8 @@ export function parseCitationsInReactNode(
                       onOpenDocument(doc, {
                         sentence: contextSentence,
                         num: num,
-                        citationKey: citeUniqueKey
+                        citationKey: citeUniqueKey,
+                        aiQuotes: aiQuotesForDoc
                       });
                     }
                   }}
@@ -95,7 +136,7 @@ export function parseCitationsInReactNode(
                       ? "bg-amber-400 text-black border border-amber-300 font-extrabold shadow-amber-400/20"
                       : "text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70"
                   }`}
-                  title={`[${num}] ${docTitle}\nClick to view source and highlight referenced excerpt`}
+                  title={`[${num}] ${docTitle}\nClick to view source and highlight AI-verified evidence`}
                 >
                   <span className="sr-only">[</span>
                   <span>{num}</span>
@@ -121,13 +162,13 @@ export function parseCitationsInReactNode(
 
   if (Array.isArray(node)) {
     return node.map((child, idx) => (
-      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey)}</React.Fragment>
+      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap)}</React.Fragment>
     ));
   }
 
   if (React.isValidElement(node) && (node.props as any)?.children) {
     return React.cloneElement(node as React.ReactElement<any>, {
-      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument, activeCitationKey)
+      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap)
     });
   }
 

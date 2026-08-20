@@ -31,6 +31,9 @@ export interface CitationGroundingHighlight {
   sentence: string;
   num?: number;
   citationKey?: string;
+  aiQuotes?: string[];
+  /** Monotonic click ID — ensures re-click on the same citation resets highlight state */
+  clickId?: number;
 }
 
 export interface ChatMessage {
@@ -117,79 +120,117 @@ export default function ChatClient() {
     }
   };
 
+  const activeChatIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId;
+  }, [activeChatId]);
+
+  // Per-chat background generation tracker
+  interface ChatJobState {
+    controller: AbortController | null;
+    queue: string[];
+    isProcessing: boolean;
+    status: string | null;
+  }
+  const chatJobsRef = useRef<Map<string, ChatJobState>>(new Map());
+
+  const getChatJob = (chatId: string): ChatJobState => {
+    if (!chatJobsRef.current.has(chatId)) {
+      chatJobsRef.current.set(chatId, {
+        controller: null,
+        queue: [],
+        isProcessing: false,
+        status: null,
+      });
+    }
+    return chatJobsRef.current.get(chatId)!;
+  };
+
   const [queuedPrompts, setQueuedPrompts] = useState<string[]>([]);
-  const messageQueueRef = useRef<string[]>([]);
-  const isProcessingRef = useRef<boolean>(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleStopGeneration = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
+    const currentChatId = activeChatIdRef.current;
+    if (!currentChatId) return;
+
+    const job = getChatJob(currentChatId);
+    if (job.controller) {
+      job.controller.abort();
+      job.controller = null;
     }
-    messageQueueRef.current = [];
+    job.queue = [];
+    job.isProcessing = false;
+    job.status = null;
+
     setQueuedPrompts([]);
-    isProcessingRef.current = false;
     setIsLoading(false);
+    setActiveStatus(null);
   };
 
   const handleRemoveQueuedPrompt = (index: number) => {
-    setQueuedPrompts(prev => prev.filter((_, i) => i !== index));
-    messageQueueRef.current = messageQueueRef.current.filter((_, i) => i !== index);
+    const currentChatId = activeChatIdRef.current;
+    if (!currentChatId) return;
+    const job = getChatJob(currentChatId);
+    job.queue = job.queue.filter((_, i) => i !== index);
+    setQueuedPrompts([...job.queue]);
   };
 
   const handlePromoteQueuedPrompt = async (index: number) => {
-    const promptToPromote = queuedPrompts[index];
+    const currentChatId = activeChatIdRef.current;
+    if (!currentChatId) return;
+    const job = getChatJob(currentChatId);
+    const promptToPromote = job.queue[index];
     if (!promptToPromote) return;
 
     // 1. Remove this item from the queue list
-    const remainingQueued = queuedPrompts.filter((_, i) => i !== index);
-    setQueuedPrompts(remainingQueued);
-    messageQueueRef.current = remainingQueued;
+    job.queue = job.queue.filter((_, i) => i !== index);
+    setQueuedPrompts([...job.queue]);
 
-    // 2. Abort current ongoing generation
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
+    // 2. Abort current ongoing generation for this chat
+    if (job.controller) {
+      job.controller.abort();
+      job.controller = null;
     }
 
     // 3. Put the promoted prompt as next and start processing immediately
-    messageQueueRef.current = [promptToPromote, ...remainingQueued];
-    isProcessingRef.current = false;
+    job.queue = [promptToPromote, ...job.queue];
+    job.isProcessing = false;
     setIsLoading(false);
 
-    await processNextInQueue();
+    await processNextInQueue(currentChatId);
   };
 
-  const processNextInQueue = async () => {
-    if (messageQueueRef.current.length === 0) {
-      isProcessingRef.current = false;
-      setIsLoading(false);
-      setActiveStatus(null);
+  const processNextInQueue = async (targetChatId: string) => {
+    const job = getChatJob(targetChatId);
+    if (job.queue.length === 0) {
+      job.isProcessing = false;
+      job.status = null;
+      if (activeChatIdRef.current === targetChatId) {
+        setIsLoading(false);
+        setActiveStatus(null);
+        setQueuedPrompts([]);
+      }
       return;
     }
 
-    const nextMessage = messageQueueRef.current.shift()!;
-    setQueuedPrompts(prev => prev.slice(1));
-    isProcessingRef.current = true;
-    setIsLoading(true);
-    setActiveStatus("Analyzing query & reasoning...");
+    const nextMessage = job.queue.shift()!;
+    job.isProcessing = true;
+    job.status = "Analyzing query & reasoning...";
 
-    // Optimistically add the user message into the chat stream WHEN IT ACTUALLY STARTS PROCESSING!
-    const newMsg: ChatMessage = { role: "user", content: nextMessage, created_at: new Date().toISOString() };
-    setMessages(prev => [...prev, newMsg]);
+    if (activeChatIdRef.current === targetChatId) {
+      setQueuedPrompts([...job.queue]);
+      setIsLoading(true);
+      setActiveStatus(job.status);
+      const newMsg: ChatMessage = { role: "user", content: nextMessage, created_at: new Date().toISOString() };
+      setMessages(prev => [...prev, newMsg]);
+    }
 
     const controller = new AbortController();
-    abortControllerRef.current = controller;
+    job.controller = controller;
 
-    let currentChatId = activeChatId;
     try {
-      if (!currentChatId) {
-        currentChatId = await handleEnsureChatSession(nextMessage);
-      }
-      bumpSessionToTop(currentChatId);
+      bumpSessionToTop(targetChatId);
 
-      const res = await fetch(`${backendUrl}/chats/${currentChatId}/message_stream`, {
+      const res = await fetch(`${backendUrl}/chats/${targetChatId}/message_stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: nextMessage }),
@@ -224,16 +265,23 @@ export default function ChatClient() {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === "title_update" && data.title) {
                   const updatedTitle = data.title;
-                  setSessions(prev => prev.map(s => s.id === currentChatId ? { ...s, title: updatedTitle } : s));
-                  if (activeChatId === currentChatId || !activeChatId) {
+                  setSessions(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
+                  if (activeChatIdRef.current === targetChatId) {
                     document.title = `${updatedTitle} - NotbookLM`;
                   }
                 } else if (data.type === "status") {
                   const statusText = data.text || data.data;
-                  if (statusText) setActiveStatus(statusText);
+                  if (statusText) {
+                    job.status = statusText;
+                    if (activeChatIdRef.current === targetChatId) {
+                      setActiveStatus(statusText);
+                    }
+                  }
                 } else if (data.type === "done") {
                   const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
-                  setMessages(prev => [...prev, asstMsg]);
+                  if (activeChatIdRef.current === targetChatId) {
+                    setMessages(prev => [...prev, asstMsg]);
+                  }
 
                   // Check if response contains an action payload like deleting documents
                   const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
@@ -242,10 +290,12 @@ export default function ChatClient() {
                       const actionObj = JSON.parse(actionMatch[1]);
                       if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
                         const idSet = new Set(actionObj.deleted_doc_ids);
-                        setDocuments(prev => {
-                          const remaining = prev.filter(d => !idSet.has(d.id));
-                          return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                        });
+                        if (activeChatIdRef.current === targetChatId) {
+                          setDocuments(prev => {
+                            const remaining = prev.filter(d => !idSet.has(d.id));
+                            return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                          });
+                        }
                       }
                     } catch (e) {
                       console.error("Failed to parse sources action:", e);
@@ -253,7 +303,9 @@ export default function ChatClient() {
                   }
                 } else if (data.type === "error") {
                   const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
-                  setMessages(prev => [...prev, errorMsg]);
+                  if (activeChatIdRef.current === targetChatId) {
+                    setMessages(prev => [...prev, errorMsg]);
+                  }
                 }
               } catch (e) {
                 console.error("SSE parse error:", e);
@@ -264,73 +316,99 @@ export default function ChatClient() {
       }
     } catch (err: any) {
       if (err?.name === "AbortError") {
-        console.log("Generation stopped by user");
-        setMessages(prev => [
-          ...prev,
-          { role: "assistant", content: "*(Response generation stopped by user)*", created_at: new Date().toISOString() }
-        ]);
+        console.log(`Generation stopped by user for chat ${targetChatId}`);
+        if (activeChatIdRef.current === targetChatId) {
+          setMessages(prev => [
+            ...prev,
+            { role: "assistant", content: "*(Response generation stopped by user)*", created_at: new Date().toISOString() }
+          ]);
+        }
         return; // Halt further queued processing on user abort
       } else {
         console.error("Failed to send queued message:", err);
-        setMessages(prev => [
-          ...prev,
-          { role: "assistant", content: "⚠️ Sorry, an error occurred while connecting to the AI server.", created_at: new Date().toISOString() }
-        ]);
+        if (activeChatIdRef.current === targetChatId) {
+          setMessages(prev => [
+            ...prev,
+            { role: "assistant", content: "⚠️ Sorry, an error occurred while connecting to the AI server.", created_at: new Date().toISOString() }
+          ]);
+        }
       }
     } finally {
-      setActiveStatus(null);
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
+      if (job.controller === controller) {
+        job.controller = null;
       }
-      // Recursively process the next message in queue if still processing
-      if (isProcessingRef.current) {
-        await processNextInQueue();
+      job.status = null;
+      if (activeChatIdRef.current === targetChatId) {
+        setActiveStatus(null);
+      }
+      // Recursively process the next message in queue for this chat
+      if (job.queue.length > 0) {
+        await processNextInQueue(targetChatId);
+      } else {
+        job.isProcessing = false;
+        if (activeChatIdRef.current === targetChatId) {
+          setIsLoading(false);
+        }
       }
     }
   };
 
   const handleSendMessage = async (message: string) => {
-    if (isProcessingRef.current) {
-      // If AI is currently generating, add to the floating queue state without inserting into the chat stream yet
-      messageQueueRef.current.push(message);
-      setQueuedPrompts(prev => [...prev, message]);
+    let currentChatId = activeChatIdRef.current;
+    if (!currentChatId) {
+      currentChatId = await handleEnsureChatSession(message);
+    }
+    if (!currentChatId) return;
+
+    const job = getChatJob(currentChatId);
+
+    if (job.isProcessing) {
+      // If AI is currently generating for this chat, add to queue
+      job.queue.push(message);
+      if (activeChatIdRef.current === currentChatId) {
+        setQueuedPrompts([...job.queue]);
+      }
       return;
     }
 
-    messageQueueRef.current.push(message);
-    await processNextInQueue();
+    job.queue.push(message);
+    await processNextInQueue(currentChatId);
   };
 
   const handleEditMessage = async (messageIndex: number, newContent: string) => {
-    // Abort any ongoing request and clear pending queue on edit
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    messageQueueRef.current = [];
-    isProcessingRef.current = true;
-    setIsLoading(true);
-    setActiveStatus("Analyzing query & reasoning...");
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    let currentChatId = activeChatId;
+    let currentChatId = activeChatIdRef.current;
     if (!currentChatId) {
       currentChatId = await handleEnsureChatSession(newContent);
     }
+    if (!currentChatId) return;
 
-    if (!currentChatId) {
-      isProcessingRef.current = false;
-      setIsLoading(false);
-      setActiveStatus(null);
-      return;
+    const job = getChatJob(currentChatId);
+
+    // Abort any ongoing request and clear pending queue on edit
+    if (job.controller) {
+      job.controller.abort();
+      job.controller = null;
     }
+    job.queue = [];
+    job.isProcessing = true;
+    job.status = "Analyzing query & reasoning...";
+
+    if (activeChatIdRef.current === currentChatId) {
+      setQueuedPrompts([]);
+      setIsLoading(true);
+      setActiveStatus(job.status);
+    }
+
+    const controller = new AbortController();
+    job.controller = controller;
+
     bumpSessionToTop(currentChatId);
 
     // Optimistically update message list: keep messages up to messageIndex, replace at messageIndex, remove subsequent responses
     const updatedUserMsg: ChatMessage = { role: "user", content: newContent, created_at: new Date().toISOString() };
-    setMessages(prev => [...prev.slice(0, messageIndex), updatedUserMsg]);
+    if (activeChatIdRef.current === currentChatId) {
+      setMessages(prev => [...prev.slice(0, messageIndex), updatedUserMsg]);
+    }
 
     try {
       const res = await fetch(`${backendUrl}/chats/${currentChatId}/edit_message_stream`, {
@@ -371,10 +449,17 @@ export default function ChatClient() {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === "status") {
                   const statusText = data.text || data.data;
-                  if (statusText) setActiveStatus(statusText);
+                  if (statusText) {
+                    job.status = statusText;
+                    if (activeChatIdRef.current === currentChatId) {
+                      setActiveStatus(statusText);
+                    }
+                  }
                 } else if (data.type === "done") {
                   const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
-                  setMessages(prev => [...prev, asstMsg]);
+                  if (activeChatIdRef.current === currentChatId) {
+                    setMessages(prev => [...prev, asstMsg]);
+                  }
 
                   const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
                   if (actionMatch) {
@@ -382,10 +467,12 @@ export default function ChatClient() {
                       const actionObj = JSON.parse(actionMatch[1]);
                       if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
                         const idSet = new Set(actionObj.deleted_doc_ids);
-                        setDocuments(prev => {
-                          const remaining = prev.filter(d => !idSet.has(d.id));
-                          return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                        });
+                        if (activeChatIdRef.current === currentChatId) {
+                          setDocuments(prev => {
+                            const remaining = prev.filter(d => !idSet.has(d.id));
+                            return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                          });
+                        }
                       }
                     } catch (e) {
                       console.error("Failed to parse sources action:", e);
@@ -393,7 +480,9 @@ export default function ChatClient() {
                   }
                 } else if (data.type === "error") {
                   const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
-                  setMessages(prev => [...prev, errorMsg]);
+                  if (activeChatIdRef.current === currentChatId) {
+                    setMessages(prev => [...prev, errorMsg]);
+                  }
                 }
               } catch (e) {
                 console.error("SSE parse error:", e);
@@ -404,39 +493,57 @@ export default function ChatClient() {
       }
     } catch (err: any) {
       if (err?.name === "AbortError") {
-        console.log("Edit request aborted");
+        console.log(`Edit request aborted for chat ${currentChatId}`);
       } else {
         console.error("Failed to edit message:", err);
-        setMessages(prev => [
-          ...prev,
-          { role: "assistant", content: "⚠️ Sorry, an error occurred while editing the message.", created_at: new Date().toISOString() }
-        ]);
+        if (activeChatIdRef.current === currentChatId) {
+          setMessages(prev => [
+            ...prev,
+            { role: "assistant", content: "⚠️ Sorry, an error occurred while editing the message.", created_at: new Date().toISOString() }
+          ]);
+        }
       }
     } finally {
-      setActiveStatus(null);
-      if (abortControllerRef.current === controller) {
-        abortControllerRef.current = null;
+      if (job.controller === controller) {
+        job.controller = null;
       }
-      isProcessingRef.current = false;
-      setIsLoading(false);
+      job.isProcessing = false;
+      job.status = null;
+      if (activeChatIdRef.current === currentChatId) {
+        setActiveStatus(null);
+        setIsLoading(false);
+      }
     }
   };
 
   const handleCreateChat = () => {
-    handleStopGeneration();
     setActiveChatId(null);
     setDocuments([]);
     setMessages([]);
+    setIsLoading(false);
+    setActiveStatus(null);
+    setQueuedPrompts([]);
   };
 
   const handleSelectChat = (id: string) => {
-    handleStopGeneration();
+    if (activeChatId === id) return;
+
     setActiveChatId(id);
+
+    // Sync loading & queue state for the selected chat
+    const job = getChatJob(id);
+    setIsLoading(job.isProcessing);
+    setActiveStatus(job.status);
+    setQueuedPrompts([...job.queue]);
+
     fetch(`${backendUrl}/chats/${id}`)
         .then(res => res.json())
         .then(data => {
-          setDocuments(data.documents || []);
-          setMessages(data.messages || []);
+          // Only apply if user is still looking at this chat
+          if (activeChatIdRef.current === id) {
+            setDocuments(data.documents || []);
+            setMessages(data.messages || []);
+          }
         })
         .catch(err => {
           console.error("Failed to fetch chat details:", err);
@@ -483,6 +590,16 @@ export default function ChatClient() {
     });
   };
 
+  const handleDocumentAdded = (doc: Document, targetChatId?: string) => {
+    // Only append to the visible documents list if the user is currently viewing the target chat
+    if (!targetChatId || targetChatId === activeChatIdRef.current) {
+      setDocuments(prev => {
+        if (prev.some(d => d.id === doc.id)) return prev;
+        return [...prev, doc];
+      });
+    }
+  };
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
 
@@ -513,7 +630,7 @@ export default function ChatClient() {
         onRemoveQueuedPrompt={handleRemoveQueuedPrompt}
         onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
         documents={documents}
-        onDocumentAdded={(doc) => setDocuments(prev => [...prev, doc])}
+        onDocumentAdded={handleDocumentAdded}
         onOpenDocument={(doc, citationContext) => {
           setViewingDoc(doc);
           if (citationContext) {
@@ -521,7 +638,9 @@ export default function ChatClient() {
               docId: doc.id,
               sentence: citationContext.sentence,
               num: citationContext.num,
-              citationKey: citationContext.citationKey
+              citationKey: citationContext.citationKey,
+              aiQuotes: citationContext.aiQuotes,
+              clickId: Date.now()
             });
           } else {
             setGroundingHighlight(null);
@@ -545,7 +664,7 @@ export default function ChatClient() {
         <RightSidebar 
           activeChatId={activeChatId} 
           documents={documents} 
-          onDocumentAdded={(doc) => setDocuments(prev => [...prev, doc])} 
+          onDocumentAdded={handleDocumentAdded} 
           onDocumentDeleted={(id) => {
             setDocuments(prev => prev.filter(d => d.id !== id));
             if (targetedSource?.id === id) setTargetedSource(null);
