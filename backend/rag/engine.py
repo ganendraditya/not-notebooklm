@@ -18,6 +18,10 @@ from qdrant_client import QdrantClient
 from llama_index.core.vector_stores.types import MetadataFilter, MetadataFilters, FilterOperator
 from llama_index.llms.gemini import Gemini
 from llama_index.embeddings.gemini import GeminiEmbedding
+try:
+    from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+except Exception:
+    HuggingFaceEmbedding = None
 from llama_index.llms.groq import Groq
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.tools import FunctionTool
@@ -58,12 +62,36 @@ else:
         except Exception:
             qdrant_client = QdrantClient(location=":memory:")
 
-collection_name = "not_notebooklm"
+def init_embedding_and_vector_store():
+    """Initializes high-performance embeddings (Local BGE or Gemini) and associates with Qdrant collection."""
+    env_provider = os.getenv("EMBEDDING_PROVIDER", "local").lower()
+    gemini_key = os.getenv("GEMINI_API_KEY")
 
-vector_store = QdrantVectorStore(client=qdrant_client, collection_name=collection_name, path=None, url=None, api_key=None)
+    if env_provider == "gemini" and gemini_key and not gemini_key.startswith("your_"):
+        try:
+            embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
+            coll_name = "not_notebooklm_gemini"
+            vstore = QdrantVectorStore(client=qdrant_client, collection_name=coll_name, path=None, url=None, api_key=None)
+            return embed_model, vstore
+        except Exception as e:
+            logger.warning(f"[RAG Engine] Gemini Embedding initialization failed ({e}), falling back to local BGE embeddings.")
 
-# Setup default embeddings
-Settings.embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=os.getenv("GEMINI_API_KEY"))
+    # Default Local Offline Embeddings (Zero API Quota limit, zero rate limit)
+    if HuggingFaceEmbedding is not None:
+        try:
+            embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+            coll_name = "not_notebooklm_bge"
+            vstore = QdrantVectorStore(client=qdrant_client, collection_name=coll_name, path=None, url=None, api_key=None)
+            return embed_model, vstore
+        except Exception as e:
+            logger.warning(f"[RAG Engine] HuggingFace Embedding loading failed: {e}")
+
+    # Ultimate fallback to Gemini
+    embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
+    vstore = QdrantVectorStore(client=qdrant_client, collection_name="not_notebooklm", path=None, url=None, api_key=None)
+    return embed_model, vstore
+
+Settings.embed_model, vector_store = init_embedding_and_vector_store()
 
 def create_llm_instances():
     """Initializes LLM instances for 9Router, FreeLLMAPI, Gemini, and Groq."""

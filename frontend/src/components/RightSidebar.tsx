@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { 
   Plus, 
   Check, 
@@ -25,6 +25,7 @@ import {
   Search,
   UploadCloud,
   AlertCircle,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight } from "@/app/ChatClient";
@@ -33,7 +34,9 @@ import { DownloadManager, DownloadTask } from "./DownloadManager";
 interface RightSidebarProps {
   activeChatId: string | null;
   documents: Document[];
+  pendingSources?: PendingSourceItem[];
   onDocumentAdded: (doc: Document, targetChatId?: string) => void;
+  onDocumentUpdated?: (doc: Document) => void;
   onDocumentDeleted?: (id: number) => void;
   onBulkDocumentsDeleted?: (ids: number[]) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
@@ -44,6 +47,15 @@ interface RightSidebarProps {
   onClearViewingDoc?: () => void;
   backendUrl: string;
   onClose: () => void;
+}
+
+export interface PendingSourceItem {
+  id: string;
+  filename: string;
+  type: "file" | "doi";
+  doi?: string;
+  status: "uploading" | "error";
+  error?: string;
 }
 
 interface PaperDetailData {
@@ -664,7 +676,9 @@ ${doi ? `DO  - ${doi}\n` : ""}${doiUrl ? `UR  - ${doiUrl}\n` : ""}ER  -`;
 export default function RightSidebar({ 
   activeChatId, 
   documents, 
+  pendingSources: externalPendingSources = [],
   onDocumentAdded, 
+  onDocumentUpdated,
   onDocumentDeleted, 
   onBulkDocumentsDeleted, 
   onEnsureChatSession, 
@@ -777,10 +791,63 @@ export default function RightSidebar({
   const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
   const [isAddSourcesModalOpen, setIsAddSourcesModalOpen] = useState(false);
   const [doiInput, setDoiInput] = useState("");
-  const [isResolvingDoi, setIsResolvingDoi] = useState(false);
-  const [doiError, setDoiError] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [internalPendingSources, setInternalPendingSources] = useState<PendingSourceItem[]>([]);
+  const pendingSources = useMemo(() => {
+    return [...internalPendingSources, ...externalPendingSources];
+  }, [internalPendingSources, externalPendingSources]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  // Rename source state
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [renamingDoc, setRenamingDoc] = useState<Document | null>(null);
+  const [renameTitleInput, setRenameTitleInput] = useState("");
+  const [isSavingRename, setIsSavingRename] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+
+  const handleOpenRename = () => {
+    if (selectedCount !== 1) return;
+    const targetDoc = selectedDocList[0];
+    setRenamingDoc(targetDoc);
+    setRenameTitleInput(targetDoc.title || targetDoc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " "));
+    setRenameError(null);
+    setIsRenameModalOpen(true);
+  };
+
+  const handleSaveRename = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activeChatId || !renamingDoc || isSavingRename) return;
+    const cleanTitle = renameTitleInput.trim();
+    if (!cleanTitle) {
+      setRenameError("Document title cannot be empty.");
+      return;
+    }
+    setIsSavingRename(true);
+    setRenameError(null);
+    try {
+      const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/${renamingDoc.id}/rename`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: cleanTitle })
+      });
+      if (res.ok) {
+        const updatedDoc = await res.json();
+        onDocumentUpdated?.(updatedDoc);
+        if (viewingDoc && viewingDoc.id === renamingDoc.id) {
+          setViewingDoc(prev => prev ? { ...prev, title: updatedDoc.title } : null);
+          setPaperDetails(prev => prev ? { ...prev, title: updatedDoc.title } : null);
+        }
+        setIsRenameModalOpen(false);
+        setRenamingDoc(null);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setRenameError(err.detail || "Failed to rename document.");
+      }
+    } catch (err: any) {
+      setRenameError(err?.message || "Network error while renaming document.");
+    } finally {
+      setIsSavingRename(false);
+    }
+  };
 
   const handleCleanDuplicates = async () => {
     if (!activeChatId || isCleaningDuplicates || documents.length === 0) return;
@@ -799,67 +866,157 @@ export default function RightSidebar({
         } else {
           setCleanFeedback("No duplicates found");
         }
-        setTimeout(() => setCleanFeedback(null), 3000);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setCleanFeedback(err.detail || "Failed to clean duplicates");
       }
-    } catch (e) {
+      setTimeout(() => setCleanFeedback(null), 3500);
+    } catch (e: any) {
       console.error("Clean duplicates failed:", e);
+      setCleanFeedback("Network error connecting to server");
+      setTimeout(() => setCleanFeedback(null), 3500);
     } finally {
       setIsCleaningDuplicates(false);
     }
   };
 
-  const uploadSingleFile = async (file: File) => {
-    if (!file) return;
-    setIsUploading(true);
-    setUploadError(null);
-    const formData = new FormData();
-    formData.append("file", file);
+  const SUPPORTED_EXTENSIONS = new Set([
+    ".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris", ".csv", ".tsv"
+  ]);
+
+  const handleUploadBatch = async (files: File[]) => {
+    if (!files || files.length === 0) return;
+
+    // Filter out unsupported files (e.g. .exe, .zip, etc.)
+    const validFiles = files.filter(f => {
+      const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
+      return SUPPORTED_EXTENSIONS.has(ext);
+    });
+
+    if (validFiles.length === 0) {
+      alert("Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv");
+      return;
+    }
+
+    if (validFiles.length < files.length) {
+      const skippedCount = files.length - validFiles.length;
+      console.warn(`[Upload] Skipped ${skippedCount} unsupported file(s).`);
+    }
+
+    // Check capacity limit of 300
+    const availableSlots = Math.max(0, 300 - (documents.length + pendingSources.length));
+    if (availableSlots <= 0) {
+      alert("Source limit reached! Maximum capacity is 300 sources per notebook.");
+      return;
+    }
+
+    const filesToUpload = validFiles.slice(0, availableSlots);
+    if (validFiles.length > availableSlots) {
+      alert(`Capacity limit warning: Only uploading ${availableSlots} out of ${validFiles.length} valid files to respect the 300 source cap.`);
+    }
+
+    const newPendingItems: { item: PendingSourceItem; file: File }[] = filesToUpload.map((f) => ({
+      item: {
+        id: `pending-file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        filename: f.name,
+        type: "file",
+        status: "uploading",
+      },
+      file: f,
+    }));
+
+    // Instantly append pending items to sidebar & close modal dialog immediately (NotebookLM UX)
+    setInternalPendingSources(prev => [...prev, ...newPendingItems.map(n => n.item)]);
+    setIsAddSourcesModalOpen(false);
 
     try {
       let currentChatId = activeChatId;
       if (!currentChatId && onEnsureChatSession) {
-        currentChatId = await onEnsureChatSession(file.name.replace(/\.[^/.]+$/, ""));
+        const firstTitle = filesToUpload[0].name.replace(/\.[^/.]+$/, "");
+        currentChatId = await onEnsureChatSession(firstTitle);
       }
 
       if (!currentChatId) {
-        setUploadError("Failed to initialize chat session.");
+        const targetIds = new Set(newPendingItems.map(n => n.item.id));
+        setInternalPendingSources(prev => prev.map(p => targetIds.has(p.id) ? {
+          ...p,
+          status: "error",
+          error: "Failed to initialize notebook chat session."
+        } : p));
         return;
       }
 
-      const res = await fetch(`${backendUrl}/chats/${currentChatId}/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      if (res.ok) {
-        const newDoc = await res.json();
-        onDocumentAdded(newDoc, currentChatId);
-        setIsAddSourcesModalOpen(false);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setUploadError(err.detail || "Failed to upload and parse document.");
-      }
-    } catch (err: any) {
-      console.error("Upload failed", err);
-      setUploadError(err?.message || "Failed to connect to server for document upload.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
+      // Concurrency Pool Worker: upload up to 3 files simultaneously
+      const queue = [...newPendingItems];
+      const CONCURRENCY_LIMIT = 3;
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0]) return;
-    const file = e.target.files[0];
-    await uploadSingleFile(file);
-    if (e.target) e.target.value = "";
+      const worker = async () => {
+        while (queue.length > 0) {
+          const task = queue.shift();
+          if (!task) break;
+          const { item, file } = task;
+          const formData = new FormData();
+          formData.append("file", file);
+
+          try {
+            const res = await fetch(`${backendUrl}/chats/${currentChatId}/upload`, {
+              method: "POST",
+              body: formData,
+            });
+            if (res.ok) {
+              const newDoc = await res.json();
+              onDocumentAdded(newDoc, currentChatId);
+              // Successfully indexed, remove from pending list
+              setInternalPendingSources(prev => prev.filter(p => p.id !== item.id));
+            } else {
+              const err = await res.json().catch(() => ({}));
+              setInternalPendingSources(prev => prev.map(p => p.id === item.id ? {
+                ...p,
+                status: "error",
+                error: err.detail || "Failed to upload and parse document."
+              } : p));
+            }
+          } catch (err: any) {
+            setInternalPendingSources(prev => prev.map(p => p.id === item.id ? {
+              ...p,
+              status: "error",
+              error: err?.message || "Failed to connect to server."
+            } : p));
+          }
+        }
+      };
+
+      const pool = Array.from({ length: Math.min(CONCURRENCY_LIMIT, newPendingItems.length) }, () => worker());
+      await Promise.all(pool);
+    } catch (e) {
+      console.error("Batch upload failed:", e);
+    }
   };
 
   const handleImportDoi = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const cleanDoi = doiInput.trim();
-    if (!cleanDoi || isResolvingDoi) return;
+    if (!cleanDoi) return;
 
-    setIsResolvingDoi(true);
-    setDoiError(null);
+    // Check capacity
+    if (documents.length + pendingSources.length >= 300) {
+      alert("Source limit reached! Maximum capacity is 300 sources per notebook.");
+      return;
+    }
+
+    const tempId = `pending-doi-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const pendingItem: PendingSourceItem = {
+      id: tempId,
+      filename: cleanDoi.startsWith("10.") || cleanDoi.includes("doi.org") ? `DOI: ${cleanDoi}` : cleanDoi,
+      type: "doi",
+      doi: cleanDoi,
+      status: "uploading",
+    };
+
+    // Instantly append to sources list and close modal dialog immediately
+    setInternalPendingSources(prev => [...prev, pendingItem]);
+    setDoiInput("");
+    setIsAddSourcesModalOpen(false);
 
     try {
       let currentChatId = activeChatId;
@@ -867,7 +1024,11 @@ export default function RightSidebar({
         currentChatId = await onEnsureChatSession("Research Paper");
       }
       if (!currentChatId) {
-        setDoiError("Failed to initialize chat session.");
+        setInternalPendingSources(prev => prev.map(p => p.id === tempId ? {
+          ...p,
+          status: "error",
+          error: "Failed to initialize notebook chat session."
+        } : p));
         return;
       }
 
@@ -880,16 +1041,21 @@ export default function RightSidebar({
       if (res.ok) {
         const newDoc = await res.json();
         onDocumentAdded(newDoc, currentChatId);
-        setDoiInput("");
-        setIsAddSourcesModalOpen(false);
+        setInternalPendingSources(prev => prev.filter(p => p.id !== tempId));
       } else {
         const err = await res.json().catch(() => ({}));
-        setDoiError(err.detail || "Publication not found for the provided DOI.");
+        setInternalPendingSources(prev => prev.map(p => p.id === tempId ? {
+          ...p,
+          status: "error",
+          error: err.detail || "Publication not found for the provided DOI."
+        } : p));
       }
     } catch (err: any) {
-      setDoiError(err?.message || "Failed to resolve DOI from academic registries.");
-    } finally {
-      setIsResolvingDoi(false);
+      setInternalPendingSources(prev => prev.map(p => p.id === tempId ? {
+        ...p,
+        status: "error",
+        error: err?.message || "Failed to resolve DOI from academic registries."
+      } : p));
     }
   };
 
@@ -899,6 +1065,9 @@ export default function RightSidebar({
   const isPartiallySelected = isSomeSelected && !isAllSelected;
 
   const getFileBadgeInfo = (filename: string) => {
+    if (filename.startsWith("10.") || filename.startsWith("DOI:") || filename.includes("doi.org")) {
+      return { label: "DOI", bg: "bg-blue-950/70 border-blue-800/80 text-blue-400" };
+    }
     const ext = filename.split(".").pop()?.toLowerCase() || "doc";
     if (ext === "pdf") {
       return { label: "PDF", bg: "bg-red-950/70 border-red-800/80 text-red-400" };
@@ -1837,8 +2006,13 @@ export default function RightSidebar({
         id="sources-file-upload"
         className="hidden"
         accept=".pdf,.docx,.doc,.txt,.md,.bib,.bibtex,.ris,.csv,.tsv"
-        onChange={handleFileUpload}
-        disabled={isUploading}
+        multiple
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            handleUploadBatch(Array.from(e.target.files));
+          }
+          if (e.target) e.target.value = "";
+        }}
       />
 
       <div className="p-3.5 space-y-2.5 flex-1 flex flex-col overflow-y-auto custom-scrollbar min-h-0">
@@ -1848,19 +2022,9 @@ export default function RightSidebar({
             variant="outline"
             className="w-full h-11 rounded-full bg-[#262729] hover:bg-[#2e3033] border border-white/15 text-gray-100 hover:text-white font-medium text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-colors"
             onClick={() => setIsAddSourcesModalOpen(true)}
-            disabled={isUploading}
           >
-            {isUploading ? (
-              <>
-                <Loader2 size={16} className="animate-spin text-blue-400" />
-                <span>Processing...</span>
-              </>
-            ) : (
-              <>
-                <Plus size={18} className="text-gray-300" />
-                <span>Add sources</span>
-              </>
-            )}
+            <Plus size={18} className="text-gray-300" />
+            <span>Add sources</span>
           </Button>
         </div>
 
@@ -1872,15 +2036,24 @@ export default function RightSidebar({
           </div>
         )}
 
-        {/* 3. Controls Row: Sort (3 descending bars), Contextual Actions (Download & Delete), and Select All */}
+        {/* 3. Controls Row: Sort (3 descending bars), Contextual Actions (Clean Dupes, Rename, Download, Delete), and Select All */}
         <div className="flex items-center justify-between pt-1 px-0 text-xs text-gray-400 relative">
           <div className="flex items-center gap-1">
-            {/* Sort Button & Dropdown */}
+            {/* Sort Button & Dropdown (Disabled if <= 1 document) */}
             <div className="relative" ref={sortMenuRef}>
               <button 
-                onClick={() => setIsSortMenuOpen(prev => !prev)}
-                className="w-6 h-6 -ml-1 rounded text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors cursor-pointer flex items-center justify-center"
-                title="Sort sources"
+                onClick={() => {
+                  if (documents.length > 1) {
+                    setIsSortMenuOpen(prev => !prev);
+                  }
+                }}
+                disabled={documents.length <= 1}
+                className={`w-6 h-6 -ml-1 rounded transition-colors flex items-center justify-center ${
+                  documents.length > 1
+                    ? "text-gray-400 hover:text-gray-200 hover:bg-white/5 cursor-pointer"
+                    : "text-gray-600 opacity-30 cursor-not-allowed"
+                }`}
+                title={documents.length > 1 ? "Sort sources" : "Add more sources to enable sorting"}
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" className="opacity-90">
                   <rect x="2" y="3" width="12" height="1.6" rx="0.8" />
@@ -1943,7 +2116,7 @@ export default function RightSidebar({
                 className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
                   documents.length > 1 && !isCleaningDuplicates
                     ? "text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
-                    : "text-gray-600 opacity-40 cursor-not-allowed"
+                    : "text-gray-600 opacity-30 cursor-not-allowed"
                 }`}
                 title="Clean duplicate sources automatically"
               >
@@ -1952,6 +2125,28 @@ export default function RightSidebar({
                 ) : (
                   <Sparkles size={14} />
                 )}
+              </button>
+
+              {/* Rename Button (Enabled strictly when exactly 1 source is selected) */}
+              <button
+                onClick={handleOpenRename}
+                disabled={selectedCount !== 1}
+                className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                  selectedCount === 1
+                    ? "text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 cursor-pointer"
+                    : selectedCount > 1
+                    ? "text-gray-600 opacity-25 cursor-not-allowed"
+                    : "text-gray-600 opacity-30 cursor-not-allowed"
+                }`}
+                title={
+                  selectedCount === 1
+                    ? "Rename selected source"
+                    : selectedCount > 1
+                    ? `Can only rename 1 source at a time (${selectedCount} selected)`
+                    : "Select 1 source to rename"
+                }
+              >
+                <Pencil size={14} />
               </button>
 
               {/* Download Button */}
@@ -1995,7 +2190,7 @@ export default function RightSidebar({
                 className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
                   selectedCount > 0
                     ? "text-gray-400 hover:text-red-400 hover:bg-white/5 cursor-pointer"
-                    : "text-gray-600 opacity-40 cursor-not-allowed"
+                    : "text-gray-600 opacity-30 cursor-not-allowed"
                 }`}
                 title={selectedCount > 0 ? `Delete ${selectedCount} selected file(s)` : "Select sources to delete"}
               >
@@ -2004,18 +2199,25 @@ export default function RightSidebar({
             </div>
           </div>
 
-          {/* Select all label and checkbox (Clickable ONLY on the checkbox) */}
-          <div className="flex items-center gap-2 pr-0.5 whitespace-nowrap select-none">
+          {/* Select all label and checkbox (Disabled when 0 documents) */}
+          <div className={`flex items-center gap-2 pr-0.5 whitespace-nowrap select-none ${
+            documents.length === 0 ? "opacity-30 pointer-events-none" : ""
+          }`}>
             <span className="text-[11px] font-medium text-gray-400 select-none">Select all</span>
             <button
               type="button"
               onClick={handleToggleSelectAll}
-              className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer hover:border-gray-300 ${
-                isAllSelected || isPartiallySelected ? "bg-blue-600 border-blue-600 text-white" : "border-gray-500 bg-transparent"
+              disabled={documents.length === 0}
+              className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                documents.length === 0 
+                  ? "border-gray-600 bg-transparent cursor-not-allowed"
+                  : isAllSelected || isPartiallySelected 
+                  ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:border-gray-300" 
+                  : "border-gray-500 bg-transparent cursor-pointer hover:border-gray-300"
               }`}
-              title={isAllSelected ? "Unselect all" : "Select all"}
+              title={documents.length === 0 ? "No sources available" : isAllSelected ? "Unselect all" : "Select all"}
             >
-              {isAllSelected ? (
+              {isAllSelected && documents.length > 0 ? (
                 <Check size={10} strokeWidth={3} />
               ) : isPartiallySelected ? (
                 <Minus size={10} strokeWidth={3} />
@@ -2026,77 +2228,135 @@ export default function RightSidebar({
 
         {/* 4. Saved Documents / Sources List (Compact height per item, flush left & right align) */}
         <div className="flex-1 space-y-0.5 pt-0.5">
-          {sortedDocuments.length === 0 ? (
+          {sortedDocuments.length === 0 && pendingSources.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center text-gray-400 px-3">
               <FileText size={30} className="text-gray-600 mb-2 stroke-[1.5]" />
               <h4 className="text-xs font-semibold text-gray-300">Saved sources will appear here</h4>
               <p className="text-[11px] text-gray-500 mt-1 max-w-[220px] leading-relaxed">
                 Add files, websites, or more. Then ask questions or create things based on these sources.
               </p>
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="text-[11px] text-blue-400 hover:text-blue-300 underline font-medium mt-2 cursor-pointer"
-              >
-                Drop files here or add a source
-              </button>
             </div>
           ) : (
-            sortedDocuments.map((doc) => {
-              const isChecked = selectedDocs[doc.id] !== undefined ? selectedDocs[doc.id] : true;
-              const badge = getFileBadgeInfo(doc.filename);
-              const docIndex = (documents.findIndex(d => d.id === doc.id) + 1) || doc.index || 1;
+            <>
+              {/* Existing indexed documents */}
+              {sortedDocuments.map((doc) => {
+                const isChecked = selectedDocs[doc.id] !== undefined ? selectedDocs[doc.id] : true;
+                const badge = getFileBadgeInfo(doc.filename);
+                const docIndex = (documents.findIndex(d => d.id === doc.id) + 1) || doc.index || 1;
 
-              return (
-                <div
-                  key={doc.id}
-                  onClick={() => setViewingDoc(doc)}
-                  className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-white/5 transition-colors cursor-pointer group"
-                >
-                  {/* Left: Clean Monospace Index + Compact Format Badge + File Name */}
-                  <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
-                    {/* Clean Minimalist Index (Fixed w-7 text-left tabular-nums for 100% straight vertical icon alignment) */}
-                    <span 
-                      className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-gray-500 group-hover:text-gray-300 transition-colors shrink-0 select-none tabular-nums"
-                      title={`Permanent Reference Index [${docIndex}]`}
-                    >
-                      {docIndex}.
-                    </span>
-
-                    <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${badge.bg}`}>
-                      <span className="text-[7.5px] font-bold tracking-tighter uppercase font-mono">{badge.label}</span>
-                    </div>
-
-                    {(() => {
-                      let displayTitle = (doc.title || doc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ")).replace(/<[^>]+>/g, "").trim();
-                      if (displayTitle.length > 8 && displayTitle === displayTitle.toUpperCase()) {
-                        displayTitle = displayTitle.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
-                      }
-                      return (
-                        <span className="text-[11.5px] text-gray-300 truncate group-hover:text-white font-normal" title={displayTitle}>
-                          {displayTitle}
-                        </span>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Right: Checkbox ONLY toggles selection */}
-                  <div 
-                    className="flex items-center shrink-0 p-1 -m-1 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleDocSelection(doc.id);
-                    }}
-                    title={isChecked ? "Exclude from AI context" : "Include in AI context"}
+                return (
+                  <div
+                    key={doc.id}
+                    onClick={() => setViewingDoc(doc)}
+                    className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-white/5 transition-colors cursor-pointer group"
                   >
-                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
-                      isChecked ? "bg-blue-600 border-blue-600 text-white" : "border-gray-500 bg-transparent"
-                    }`}>
-                      {isChecked && <Check size={9} strokeWidth={3} />}
+                    {/* Left: Clean Monospace Index + Compact Format Badge + File Name */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
+                      {/* Clean Minimalist Index */}
+                      <span 
+                        className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-gray-500 group-hover:text-gray-300 transition-colors shrink-0 select-none tabular-nums"
+                        title={`Permanent Reference Index [${docIndex}]`}
+                      >
+                        {docIndex}.
+                      </span>
+
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${badge.bg}`}>
+                        <span className="text-[7.5px] font-bold tracking-tighter uppercase font-mono">{badge.label}</span>
+                      </div>
+
+                      {(() => {
+                        let displayTitle = (doc.title || doc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ")).replace(/<[^>]+>/g, "").trim();
+                        if (displayTitle.length > 8 && displayTitle === displayTitle.toUpperCase()) {
+                          displayTitle = displayTitle.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
+                        }
+                        return (
+                          <span className="text-[11.5px] text-gray-300 truncate group-hover:text-white font-normal" title={displayTitle}>
+                            {displayTitle}
+                          </span>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Right: Checkbox ONLY toggles selection */}
+                    <div 
+                      className="flex items-center shrink-0 p-1 -m-1 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleDocSelection(doc.id);
+                      }}
+                      title={isChecked ? "Exclude from AI context" : "Include in AI context"}
+                    >
+                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                        isChecked ? "bg-blue-600 border-blue-600 text-white" : "border-gray-500 bg-transparent"
+                      }`}>
+                        {isChecked && <Check size={9} strokeWidth={3} />}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+
+              {/* Pending Uploading & Resolving Sources (NotebookLM Circular Progress Spinner) */}
+              {pendingSources.map((item: PendingSourceItem, pIdx: number) => {
+                const badge = getFileBadgeInfo(item.filename);
+                const itemNumber = documents.length + pIdx + 1;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-white/5 transition-colors select-none group"
+                  >
+                    {/* Left: Monospace Number + Badge + File / DOI Name */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
+                      <span 
+                        className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-gray-500 shrink-0 select-none tabular-nums"
+                      >
+                        {itemNumber}.
+                      </span>
+
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${badge.bg}`}>
+                        <span className="text-[7.5px] font-bold tracking-tighter uppercase font-mono">{badge.label}</span>
+                      </div>
+
+                      <span 
+                        className={`text-[11.5px] truncate font-normal ${
+                          item.status === "error" ? "text-red-300 line-through opacity-80" : "text-gray-300"
+                        }`} 
+                        title={item.filename}
+                      >
+                        {item.filename}
+                      </span>
+                    </div>
+
+                    {/* Right: Circular Spinner (NotebookLM Ring Loader) or Error Icon */}
+                    <div className="flex items-center shrink-0 pr-0.5">
+                      {item.status === "uploading" ? (
+                        <div className="w-3.5 h-3.5 flex items-center justify-center" title="Uploading and indexing...">
+                          <svg className="animate-spin w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                            <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <span title={item.error || "Upload failed"} className="text-red-400 cursor-help">
+                            <AlertCircle size={13} />
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setInternalPendingSources(prev => prev.filter(p => p.id !== item.id))}
+                            className="text-gray-500 hover:text-gray-300 p-0.5 rounded cursor-pointer"
+                            title="Dismiss"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       </div>
@@ -2106,7 +2366,6 @@ export default function RightSidebar({
         <div 
           onClick={() => {
             setIsAddSourcesModalOpen(false);
-            setDoiError(null);
             setDoiInput("");
           }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-150"
@@ -2119,7 +2378,6 @@ export default function RightSidebar({
             <button
               onClick={() => {
                 setIsAddSourcesModalOpen(false);
-                setDoiError(null);
                 setDoiInput("");
               }}
               className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
@@ -2148,38 +2406,19 @@ export default function RightSidebar({
                   <input
                     type="text"
                     value={doiInput}
-                    onChange={(e) => {
-                      setDoiInput(e.target.value);
-                      if (doiError) setDoiError(null);
-                    }}
-                    placeholder="Enter DOI (e.g. 10.25126/jtiik.201855983 or https://doi.org/...)"
-                    disabled={isResolvingDoi || isUploading}
+                    onChange={(e) => setDoiInput(e.target.value)}
+                    placeholder="Enter DOI"
                     className="w-full h-11 pl-10 pr-24 rounded-full bg-[#131416] border border-white/15 focus:border-blue-500 text-xs text-white placeholder-gray-500 focus:outline-none transition-all"
                   />
                 </div>
                 <button
                   type="submit"
-                  disabled={!doiInput.trim() || isResolvingDoi || isUploading}
+                  disabled={!doiInput.trim()}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 px-3.5 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
                 >
-                  {isResolvingDoi ? (
-                    <>
-                      <Loader2 size={13} className="animate-spin" />
-                      <span>Resolving...</span>
-                    </>
-                  ) : (
-                    <span>Import</span>
-                  )}
+                  <span>Import</span>
                 </button>
               </form>
-
-              {/* DOI Error Feedback */}
-              {doiError && (
-                <div className="px-3 py-1.5 rounded-lg bg-red-950/40 border border-red-800/50 text-red-300 text-[11.5px] flex items-center gap-2 animate-in fade-in duration-150">
-                  <AlertCircle size={14} className="shrink-0 text-red-400" />
-                  <span>{doiError}</span>
-                </div>
-              )}
             </div>
 
             {/* Section 2: Drag and Drop Dropzone */}
@@ -2194,62 +2433,48 @@ export default function RightSidebar({
                 e.stopPropagation();
                 setIsDraggingOver(false);
               }}
-              onDrop={async (e) => {
+              onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 setIsDraggingOver(false);
-                if (e.dataTransfer.files && e.dataTransfer.files[0] && !isUploading) {
-                  await uploadSingleFile(e.dataTransfer.files[0]);
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  handleUploadBatch(Array.from(e.dataTransfer.files));
                 }
               }}
               onClick={() => {
-                if (!isUploading) {
-                  fileInputRef.current?.click();
-                }
+                fileInputRef.current?.click();
               }}
               className={`p-8 sm:p-10 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-3 ${
                 isDraggingOver
                   ? "border-blue-500 bg-blue-500/10 scale-[1.01]"
                   : "border-white/15 hover:border-white/30 bg-[#161719] hover:bg-[#191a1d]"
-              } ${isUploading ? "opacity-60 pointer-events-none" : ""}`}
+              }`}
             >
               <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
-                {isUploading ? (
-                  <Loader2 size={24} className="animate-spin text-blue-400" />
-                ) : (
-                  <UploadCloud size={24} className="text-gray-300" />
-                )}
+                <UploadCloud size={24} className="text-gray-300" />
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-gray-200">
-                  {isUploading ? "Uploading and indexing document..." : "or drop your files here"}
+                  or drop your files here
                 </p>
                 <p className="text-xs text-gray-400">
-                  {isUploading ? "Extracting metadata and vector embeddings" : "PDF, Word (.docx), TXT, Markdown, BibTeX, RIS, CSV"}
+                  .pdf, .docx, .txt, .md, and more
                 </p>
               </div>
             </div>
-
-            {/* Inline Upload Error Feedback */}
-            {uploadError && (
-              <div className="px-3 py-2 rounded-lg bg-red-950/40 border border-red-800/50 text-red-300 text-xs flex items-center gap-2 animate-in fade-in duration-150">
-                <AlertCircle size={15} className="shrink-0 text-red-400" />
-                <span>{uploadError}</span>
-              </div>
-            )}
 
             {/* Section 3: Capacity Progress Bar (300 Sources Max) */}
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between text-xs text-gray-400">
                 <span>Sources capacity</span>
                 <span className="font-medium text-gray-300 font-mono">
-                  {documents.length} / 300
+                  {documents.length + pendingSources.length} / 300
                 </span>
               </div>
               <div className="w-full h-1.5 bg-[#131416] rounded-full overflow-hidden border border-white/5">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, Math.max(2, (documents.length / 300) * 100))}%` }}
+                  style={{ width: `${Math.min(100, ((documents.length + pendingSources.length) / 300) * 100)}%` }}
                 />
               </div>
             </div>
@@ -2304,6 +2529,79 @@ export default function RightSidebar({
           </div>
         </div>
       )}
+      {/* Centered Modal for Renaming Single Document */}
+      {isRenameModalOpen && renamingDoc && (
+        <div 
+          onClick={() => !isSavingRename && setIsRenameModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-gray-200"
+          >
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold text-white">Rename source</h3>
+              <p className="text-xs text-gray-400 truncate" title={renamingDoc.filename}>
+                File: {renamingDoc.filename}
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveRename} className="space-y-3">
+              <div>
+                <input
+                  type="text"
+                  value={renameTitleInput}
+                  onChange={(e) => {
+                    setRenameTitleInput(e.target.value);
+                    if (renameError) setRenameError(null);
+                  }}
+                  autoFocus
+                  placeholder="Enter source title..."
+                  className="w-full h-10 px-3.5 rounded-xl bg-[#1a1b1d] border border-white/15 focus:border-blue-500 text-xs text-white placeholder-gray-500 focus:outline-none transition-all"
+                  disabled={isSavingRename}
+                />
+              </div>
+
+              {renameError && (
+                <div className="px-3 py-1.5 rounded-lg bg-red-950/40 border border-red-800/50 text-red-300 text-[11.5px] flex items-center gap-2 animate-in fade-in duration-150">
+                  <AlertCircle size={14} className="shrink-0 text-red-400" />
+                  <span>{renameError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsRenameModalOpen(false)}
+                  disabled={isSavingRename}
+                  className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isSavingRename || !renameTitleInput.trim()}
+                  className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow flex items-center gap-1.5"
+                >
+                  {isSavingRename ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save</span>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Google Drive Style Download Floating Progress Toast */}
       <DownloadManager task={downloadTask} onClose={() => setDownloadTask(null)} />
     </aside>

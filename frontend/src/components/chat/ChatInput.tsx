@@ -90,8 +90,8 @@ export const ChatInputBox = memo(function ChatInputBox({
       filterClauses.push("open access only");
     }
 
-    if (filter.language && filter.language !== "all") {
-      filterClauses.push(`language: ${filter.language}`);
+    if (filter.languages && filter.languages.length > 0) {
+      filterClauses.push(`languages: ${filter.languages.join(", ")}`);
     }
 
     if (filter.fieldsOfStudy && filter.fieldsOfStudy.length > 0) {
@@ -122,7 +122,7 @@ export const ChatInputBox = memo(function ChatInputBox({
     filter.sintaTiers.length > 0 ||
     filter.excludePreprints ||
     filter.openAccessOnly ||
-    (filter.language && filter.language !== "all") ||
+    (filter.languages && filter.languages.length > 0) ||
     filter.fieldsOfStudy.length > 0
   );
 

@@ -73,3 +73,7 @@ class EditMessageRequest(BaseModel):
 class BulkDeleteRequest(BaseModel):
     doc_ids: List[int]
 
+class RenameDocumentRequest(BaseModel):
+    title: str
+
+

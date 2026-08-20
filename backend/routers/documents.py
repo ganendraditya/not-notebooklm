@@ -1,6 +1,7 @@
 import os
 import re
 import io
+import json
 import shutil
 import zipfile
 import asyncio
@@ -29,6 +30,14 @@ logger = logging.getLogger("uvicorn.error")
 
 @router.post("/chats/{chat_id}/upload", response_model=models.DocumentResponse)
 async def upload_document(chat_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    SUPPORTED_EXTS = {".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris", ".csv", ".tsv"}
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in SUPPORTED_EXTS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file format '{ext}'. Supported formats: {', '.join(sorted(SUPPORTED_EXTS))}"
+        )
+
     db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not db_chat:
         raise HTTPException(status_code=404, detail="Chat not found")
@@ -163,6 +172,40 @@ def delete_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "success"}
 
+@router.patch("/chats/{chat_id}/documents/{doc_id}/rename", response_model=models.DocumentResponse)
+def rename_document(chat_id: str, doc_id: int, payload: models.RenameDocumentRequest, db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == doc_id, Document.chat_id == chat_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    clean_title = payload.title.strip()
+    if not clean_title:
+        raise HTTPException(status_code=400, detail="Document title cannot be empty.")
+        
+    doc.title = clean_title
+    db.commit()
+    db.refresh(doc)
+    
+    fp = get_doc_file_path(chat_id, doc.filename)
+    is_valid_pdf = False
+    if os.path.exists(fp) and os.path.getsize(fp) >= 35000:
+        try:
+            with open(fp, "rb") as f:
+                fb = f.read(2048)
+                if fb.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in fb and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in fb:
+                    is_valid_pdf = True
+        except Exception:
+            is_valid_pdf = False
+
+    return models.DocumentResponse(
+        id=doc.id,
+        filename=doc.filename,
+        title=doc.title,
+        created_at=doc.created_at,
+        has_full_pdf=is_valid_pdf,
+        is_oa=is_valid_pdf
+    )
+
 @router.post("/chats/{chat_id}/documents/bulk_delete")
 def bulk_delete_documents(chat_id: str, req: models.BulkDeleteRequest, db: Session = Depends(get_db)):
     docs = db.query(Document).filter(Document.id.in_(req.doc_ids), Document.chat_id == chat_id).all()
@@ -178,9 +221,9 @@ def bulk_delete_documents(chat_id: str, req: models.BulkDeleteRequest, db: Sessi
     return {"status": "success", "deleted_count": len(docs)}
 
 @router.post("/chats/{chat_id}/clean_duplicates")
-def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
-    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-    if not chat:
+async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
+    db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not db_chat:
         raise HTTPException(status_code=404, detail="Chat not found")
 
     docs = db.query(Document).filter(Document.chat_id == chat_id).all()
@@ -217,7 +260,6 @@ def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
 
     # Group documents by DOI and Normalized Title
     groups = [] # list of lists: [[doc1, doc2], [doc3]]
-    doc_to_group = {}
 
     for doc in docs:
         fp = get_doc_file_path(chat_id, doc.filename)
@@ -303,12 +345,17 @@ def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
             if not cand_title:
                 cand_title = keeper.filename.replace(".pdf", "").replace("_", " ").strip().title()
 
-            # 2. Query Academic Registry (Crossref / OpenAlex) for the ground-truth metadata
-            verified_meta = rag.resolve_paper_metadata_by_doi(
-                doi=cand_doi,
-                title_fallback=cand_title,
-                fast_only=False
-            )
+            # 2. Query Academic Registry (Crossref / OpenAlex) for the ground-truth metadata in thread pool
+            verified_meta = None
+            try:
+                verified_meta = await asyncio.to_thread(
+                    rag.resolve_paper_metadata_by_doi,
+                    doi=cand_doi,
+                    title_fallback=cand_title,
+                    fast_only=False
+                )
+            except Exception as e:
+                logger.error(f"[CleanDuplicates Registry Error]: {e}")
 
             needs_db_update = False
             if verified_meta and verified_meta.get("title") and len(verified_meta["title"]) > 5:
@@ -371,6 +418,17 @@ def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
 
             if needs_db_update:
                 db.add(keeper)
+
+    if cleaned_doc_ids:
+        db.commit()
+
+    remaining = db.query(Document).filter(Document.chat_id == chat_id).count()
+    return {
+        "status": "success",
+        "cleaned_count": len(cleaned_doc_ids),
+        "remaining_count": remaining,
+        "cleaned_doc_ids": cleaned_doc_ids
+    }
 
     if cleaned_doc_ids:
         db.commit()

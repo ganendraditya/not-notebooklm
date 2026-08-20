@@ -17,6 +17,7 @@ export interface Document {
   id: number;
   filename: string;
   title?: string;
+  doi?: string;
   created_at: string;
   index?: number;
   has_full_pdf?: boolean;
@@ -45,10 +46,20 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export interface PendingSourceItem {
+  id: string;
+  filename: string;
+  type: "file" | "doi";
+  doi?: string;
+  status: "uploading" | "error";
+  error?: string;
+}
+
 export default function ChatClient() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [pendingSources, setPendingSources] = useState<PendingSourceItem[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [targetedSource, setTargetedSource] = useState<TargetedSource | null>(null);
@@ -522,16 +533,21 @@ export default function ChatClient() {
   const handleCreateChat = () => {
     setActiveChatId(null);
     setDocuments([]);
+    setPendingSources([]);
     setMessages([]);
+    setTargetedSource(null);
+    setViewingDoc(null);
+    setQueuedPrompts([]);
     setIsLoading(false);
     setActiveStatus(null);
-    setQueuedPrompts([]);
   };
 
   const handleSelectChat = (id: string) => {
     if (activeChatId === id) return;
 
     setActiveChatId(id);
+    setViewingDoc(null);
+    setPendingSources([]);
 
     // Sync loading & queue state for the selected chat
     const job = getChatJob(id);
@@ -600,6 +616,32 @@ export default function ChatClient() {
         if (prev.some(d => d.id === doc.id)) return prev;
         return [...prev, doc];
       });
+      // Remove matching pending item by doi or filename matching
+      setPendingSources(prev => prev.filter(p => {
+        if (p.doi && doc.doi && p.doi.toLowerCase().trim() === doc.doi.toLowerCase().trim()) return false;
+        const normP = (p.filename || "").toLowerCase().replace(/\.pdf$/i, "").replace(/[^a-z0-9]/g, "");
+        const normDocFn = (doc.filename || "").toLowerCase().replace(/\.pdf$/i, "").replace(/[^a-z0-9]/g, "");
+        const normDocTitle = (doc.title || "").toLowerCase().replace(/\.pdf$/i, "").replace(/[^a-z0-9]/g, "");
+        if (normP && (normP === normDocFn || normP === normDocTitle || normDocFn.includes(normP) || normP.includes(normDocFn))) {
+          return false;
+        }
+        return true;
+      }));
+    }
+  };
+
+  const handleAddPendingSources = (items: PendingSourceItem[]) => {
+    setPendingSources(prev => [...prev, ...items]);
+  };
+
+  const handleResolvePendingSource = (pendingId: string) => {
+    setPendingSources(prev => prev.filter(p => p.id !== pendingId));
+  };
+
+  const handleDocumentUpdated = (updatedDoc: Document) => {
+    setDocuments(prev => prev.map(d => d.id === updatedDoc.id ? { ...d, title: updatedDoc.title } : d));
+    if (viewingDoc && viewingDoc.id === updatedDoc.id) {
+      setViewingDoc(prev => prev ? { ...prev, title: updatedDoc.title } : null);
     }
   };
 
@@ -634,6 +676,8 @@ export default function ChatClient() {
         onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
         documents={documents}
         onDocumentAdded={handleDocumentAdded}
+        onAddPendingSources={handleAddPendingSources}
+        onResolvePendingSource={handleResolvePendingSource}
         onOpenDocument={(doc, citationContext) => {
           setViewingDoc(doc);
           if (citationContext) {
@@ -667,7 +711,9 @@ export default function ChatClient() {
         <RightSidebar 
           activeChatId={activeChatId} 
           documents={documents} 
+          pendingSources={pendingSources}
           onDocumentAdded={handleDocumentAdded} 
+          onDocumentUpdated={handleDocumentUpdated}
           onDocumentDeleted={(id) => {
             setDocuments(prev => prev.filter(d => d.id !== id));
             if (targetedSource?.id === id) setTargetedSource(null);

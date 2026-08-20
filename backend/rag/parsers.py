@@ -3,7 +3,8 @@ import re
 import pymupdf4llm
 
 def parse_docx_file(file_path: str) -> str:
-    """Extracts text and tables from Word (.docx) document as clean Markdown."""
+    """Extracts text and tables from Word (.docx/.doc) document as clean Markdown with multi-layer fallback."""
+    # Method 1: Standard python-docx parser
     try:
         import docx
         doc = docx.Document(file_path)
@@ -11,7 +12,11 @@ def parse_docx_file(file_path: str) -> str:
         for p in doc.paragraphs:
             text = p.text.strip()
             if text:
-                style_name = p.style.name.lower() if p.style else ""
+                style_name = ""
+                try:
+                    style_name = p.style.name.lower() if p.style and hasattr(p.style, 'name') else ""
+                except Exception:
+                    style_name = ""
                 if 'heading 1' in style_name:
                     lines.append(f"\n# {text}\n")
                 elif 'heading 2' in style_name:
@@ -28,10 +33,45 @@ def parse_docx_file(file_path: str) -> str:
                 if row_idx == 0:
                     lines.append("| " + " | ".join(['---'] * len(row_cells)) + " |")
             lines.append("\n")
-        return "\n\n".join(lines).strip()
+        res = "\n\n".join(lines).strip()
+        if res and len(res) > 20:
+            return res
     except Exception as e:
-        print(f"[RAG Parsers] Warning: DOCX extraction error: {e}")
-        return ""
+        print(f"[RAG Parsers] Warning: python-docx parser failed ({e}), attempting XML zip fallback...")
+
+    # Method 2: Direct word/document.xml extraction from ZIP archive
+    try:
+        import zipfile
+        import xml.etree.ElementTree as ET
+        with zipfile.ZipFile(file_path) as z:
+            if "word/document.xml" in z.namelist():
+                xml_content = z.read("word/document.xml")
+                tree = ET.fromstring(xml_content)
+                text_pieces = []
+                for node in tree.iter():
+                    if node.tag.endswith('}t') and node.text:
+                        text_pieces.append(node.text)
+                    elif node.tag.endswith('}p'):
+                        text_pieces.append("\n")
+                res_xml = "".join(text_pieces).strip()
+                if res_xml and len(res_xml) > 20:
+                    return res_xml
+    except Exception as e:
+        print(f"[RAG Parsers] Warning: XML zip extraction failed ({e}), attempting PyMuPDF fallback...")
+
+    # Method 3: PyMuPDF document text reader
+    try:
+        import pymupdf
+        doc = pymupdf.open(file_path)
+        pages_text = [page.get_text() for page in doc]
+        doc.close()
+        res_mupdf = "\n\n".join(pages_text).strip()
+        if res_mupdf and len(res_mupdf) > 20:
+            return res_mupdf
+    except Exception as e:
+        print(f"[RAG Parsers] Warning: PyMuPDF reader fallback failed: {e}")
+
+    return ""
 
 def parse_bibtex_text(text: str) -> str:
     """Converts BibTeX bibliographic references into clean structured Markdown summaries."""

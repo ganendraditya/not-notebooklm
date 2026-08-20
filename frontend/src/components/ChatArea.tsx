@@ -27,6 +27,8 @@ interface ChatAreaProps {
   onPromoteQueuedPrompt?: (index: number) => void;
   documents: DocType[];
   onDocumentAdded?: (doc: DocType, targetChatId?: string) => void;
+  onAddPendingSources?: (items: { id: string; filename: string; type: "file" | "doi"; status: "uploading" }[]) => void;
+  onResolvePendingSource?: (pendingId: string) => void;
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   backendUrl: string;
@@ -52,7 +54,9 @@ export default function ChatArea({
   onPromoteQueuedPrompt,
   documents, 
   onDocumentAdded, 
-  onOpenDocument,
+  onAddPendingSources,
+  onResolvePendingSource,
+  onOpenDocument, 
   onEnsureChatSession,
   backendUrl,
   isSidebarOpen = true,
@@ -240,6 +244,8 @@ export default function ChatArea({
                           backendUrl={backendUrl}
                           documents={documents}
                           onDocumentAdded={onDocumentAdded}
+                          onAddPendingSources={onAddPendingSources}
+                          onResolvePendingSource={onResolvePendingSource}
                           onOpenDocument={onOpenDocument}
                           onEnsureChatSession={onEnsureChatSession}
                           activeCitationKey={activeCitationKey}

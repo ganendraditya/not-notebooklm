@@ -24,6 +24,8 @@ export interface InChatMessageProps {
   backendUrl: string;
   documents?: DocType[];
   onDocumentAdded?: (doc: DocType, targetChatId?: string) => void;
+  onAddPendingSources?: (items: { id: string; filename: string; type: "file" | "doi"; status: "uploading" }[]) => void;
+  onResolvePendingSource?: (pendingId: string) => void;
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   activeCitationKey?: string | null;
@@ -35,7 +37,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   backendUrl, 
   documents = [],
   onDocumentAdded, 
-  onOpenDocument,
+  onAddPendingSources,
+  onResolvePendingSource,
+  onOpenDocument, 
   onEnsureChatSession,
   activeCitationKey
 }: InChatMessageProps) {
@@ -100,14 +104,14 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
   const [userSelectionOverrides, setUserSelectionOverrides] = useState<Record<number, boolean>>({});
   const [isImporting, setIsImporting] = useState(false);
-  const [isImported, setIsImported] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const isSourceChecked = useCallback((src: any, index: number) => {
+    if (isDuplicateSource(src)) return false;
     if (userSelectionOverrides[index] !== undefined) {
       return userSelectionOverrides[index];
     }
-    return !isDuplicateSource(src);
+    return true;
   }, [userSelectionOverrides, isDuplicateSource]);
 
   const toggleSelectAll = () => {
@@ -122,16 +126,24 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     setUserSelectionOverrides(updated);
   };
 
-  const [importedCount, setImportedCount] = useState<number>(0);
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
 
   const handleImport = async () => {
-    const toImport = sources.filter((src, i) => isSourceChecked(src, i));
+    const toImport = sources.filter((src, i) => !isDuplicateSource(src) && isSourceChecked(src, i));
     if (toImport.length === 0) return;
 
     setIsImporting(true);
     setImportProgress({ current: 0, total: toImport.length });
-    setImportedCount(0);
+
+    // Register pending placeholder sources immediately in the sidebar so circular spinners appear
+    const pendingItems = toImport.map((src, idx) => ({
+      id: `pending-import-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      filename: `${(src.title || src.doi || "Research Paper").trim()}.pdf`,
+      type: "doi" as const,
+      doi: src.doi,
+      status: "uploading" as const,
+    }));
+    onAddPendingSources?.(pendingItems);
 
     try {
       let currentChatId = activeChatId;
@@ -147,6 +159,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
       for (let i = 0; i < toImport.length; i += CHUNK_SIZE) {
         const chunk = toImport.slice(i, i + CHUNK_SIZE);
+        const chunkPendingIds = pendingItems.slice(i, i + CHUNK_SIZE).map(p => p.id);
         try {
           const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources`, {
             method: "POST",
@@ -163,14 +176,15 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           }
         } catch (chunkErr) {
           console.error("Chunk import error:", chunkErr);
+        } finally {
+          chunkPendingIds.forEach(id => onResolvePendingSource?.(id));
         }
 
         const currentProgress = Math.min(i + chunk.length, toImport.length);
         setImportProgress({ current: currentProgress, total: toImport.length });
       }
 
-      setIsImported(true);
-      setImportedCount(totalSuccessfullyAdded);
+      setUserSelectionOverrides({});
     } catch (e) {
       console.error("Import sources failed:", e);
     } finally {
@@ -180,7 +194,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   };
 
   const novelSourcesCount = useMemo(() => sources.filter(s => !isDuplicateSource(s)).length, [sources, isDuplicateSource]);
-  const selectedCount = useMemo(() => sources.filter((s, i) => isSourceChecked(s, i)).length, [sources, isSourceChecked]);
+  const selectedCount = useMemo(() => sources.filter((s, i) => !isDuplicateSource(s) && isSourceChecked(s, i)).length, [sources, isDuplicateSource, isSourceChecked]);
   const allNovelSelected = useMemo(() => {
     const novelIndices = sources.map((s, i) => (!isDuplicateSource(s) ? i : -1)).filter(i => i !== -1);
     return novelIndices.length > 0 && novelIndices.every(i => isSourceChecked(sources[i], i));
@@ -376,7 +390,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 <button
                   type="button"
                   onClick={handleImport}
-                  disabled={isImporting || selectedCount === 0 || isImported}
+                  disabled={isImporting || selectedCount === 0}
                   className="h-8 px-4 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border-0 outline-none transition-colors"
                 >
                   {isImporting ? (
@@ -386,15 +400,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                         {importProgress ? `Adding ${importProgress.current}/${importProgress.total}...` : "Adding sources..."}
                       </span>
                     </>
-                  ) : isImported ? (
-                    <>
-                      <Check size={12} className="text-emerald-300" />
-                      <span>Added {importedCount || selectedCount} sources</span>
-                    </>
                   ) : (
                     <>
                       <Plus size={13} />
-                      <span>Add to sources</span>
+                      <span>Add {selectedCount > 0 ? `${selectedCount} ` : ""}to sources</span>
                     </>
                   )}
                 </button>
