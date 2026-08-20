@@ -74,7 +74,9 @@ export default function ChatArea({
 
   useEffect(() => {
     if (!isChatEmpty) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      }
     }
   }, [messages, isLoading, isChatEmpty]);
 
