@@ -9,6 +9,8 @@ export interface DownloadTask {
   current: number;
   percent: number;
   currentFile: string;
+  downloadedCount?: number;
+  skippedCount?: number;
   totalSizeMb?: number;
   errorMsg?: string;
 }
@@ -88,10 +90,12 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
                 <div className="flex items-center justify-between text-[11px] mb-1">
                   <span className="font-medium text-gray-300 truncate">
                     {task.status === "complete"
-                      ? `Zipped ${task.total} files (${task.totalSizeMb ? `${task.totalSizeMb} MB` : "Ready"})`
+                      ? task.skippedCount && task.skippedCount > 0
+                        ? `Zipped ${task.downloadedCount ?? task.total} of ${task.total} files (${task.skippedCount} skipped)`
+                        : `Zipped ${task.total} files (${task.totalSizeMb ? `${task.totalSizeMb} MB` : "Ready"})`
                       : task.status === "error"
                       ? (task.errorMsg || "An error occurred")
-                      : `Zipping ${task.total} files...`}
+                      : `Processing ${task.total} files...`}
                   </span>
                   <span className="font-bold text-blue-400 shrink-0 ml-2">
                     {task.status === "complete" ? "100%" : `${displayPercent}%`}
@@ -103,7 +107,9 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
                   <div
                     className={`h-full transition-all duration-300 rounded-full ${
                       task.status === "complete"
-                        ? "bg-gradient-to-r from-emerald-500 to-teal-400"
+                        ? task.skippedCount && task.skippedCount > 0
+                          ? "bg-gradient-to-r from-teal-500 to-amber-400"
+                          : "bg-gradient-to-r from-emerald-500 to-teal-400"
                         : task.status === "error"
                         ? "bg-red-500"
                         : "bg-gradient-to-r from-blue-500 to-cyan-400 animate-pulse"
@@ -117,16 +123,25 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
             {/* Current Item / Subtitle Status */}
             <div className="flex items-center justify-between text-[10.5px] text-gray-400 pt-0.5">
               {task.status === "complete" ? (
-                <span className="text-emerald-400 flex items-center gap-1.5 truncate">
-                  <ArrowDownToLine className="w-3 h-3 shrink-0" />
-                  Your archive is downloading automatically
-                </span>
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-emerald-400 flex items-center gap-1.5 truncate">
+                    <ArrowDownToLine className="w-3 h-3 shrink-0" />
+                    {task.skippedCount && task.skippedCount > 0
+                      ? `${task.downloadedCount} full manuscript PDF(s) zipped (${task.skippedCount} skipped)`
+                      : "ZIP archive is downloading automatically"}
+                  </span>
+                  {task.totalSizeMb && (
+                    <span className="text-gray-400 font-mono text-[10px] shrink-0 ml-2">
+                      {task.totalSizeMb} MB
+                    </span>
+                  )}
+                </div>
               ) : task.status === "error" ? (
                 <span className="text-red-400 truncate">{task.errorMsg || "Please try again"}</span>
               ) : (
                 <>
                   <span className="truncate pr-2">
-                    {task.currentFile ? `Zipping: ${task.currentFile}` : "Fetching sources..."}
+                    {task.currentFile ? `Checking: ${task.currentFile}` : "Fetching sources..."}
                   </span>
                   <span className="shrink-0 font-medium text-gray-400">
                     {task.current} of {task.total}

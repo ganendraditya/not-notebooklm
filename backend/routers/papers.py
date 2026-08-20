@@ -120,23 +120,13 @@ async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, 
                 except Exception as e:
                     logger.debug(f"[OA Fetch on Import]: {e}")
             
-            # 2. If OA PDF is paywalled/not downloadable, generate high quality Publication Brief
+            # 2. If OA PDF is paywalled/not downloadable, save structured markdown metadata & abstract (no synthetic PDF)
             if not has_downloaded_pdf:
                 try:
-                    pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
-                        title=paper.title,
-                        authors=paper.authors or [],
-                        year=str(paper.year or ""),
-                        journal=paper.venue or "Academic Research Publication",
-                        journal_metric=paper.journal_metric or "Peer-Reviewed",
-                        doi=clean_doi,
-                        abstract=abstract_text,
-                        url=paper.url or ""
-                    )
-                    with open(save_path, "wb") as f:
-                        f.write(pdf_bytes)
+                    with open(save_path, "w", encoding="utf-8") as f:
+                        f.write(doc_text)
                 except Exception as e:
-                    logger.warning(f"[PDF Creation Warning]: {e}")
+                    logger.warning(f"[Doc text save Warning]: {e}")
 
             # Save to DB with full metadata persisted
             local_db = SessionLocal()
@@ -262,23 +252,13 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
             except Exception as e:
                 logger.debug(f"[OA Fetch on Import]: {e}")
 
-        # 2. If OA PDF is paywalled/not downloadable, generate high quality Publication Brief
+        # 2. If OA PDF is paywalled/not downloadable, save structured markdown metadata & abstract (no synthetic PDF)
         if not has_downloaded_pdf:
             try:
-                pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
-                    title=paper.title,
-                    authors=paper.authors or [],
-                    year=str(paper.year or ""),
-                    journal=paper.venue or "Academic Research Publication",
-                    journal_metric=paper.journal_metric or "Peer-Reviewed",
-                    doi=clean_doi,
-                    abstract=abstract_text,
-                    url=paper.url or ""
-                )
-                with open(save_path, "wb") as f:
-                    f.write(pdf_bytes)
+                with open(save_path, "w", encoding="utf-8") as f:
+                    f.write(doc_text)
             except Exception as e:
-                logger.warning(f"[PDF Creation Warning]: {e}")
+                logger.warning(f"[Doc text save Warning]: {e}")
 
         return (doc_text, filename, chat_id, paper, clean_doi)
 
@@ -336,3 +316,112 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
         )
         for d in created_docs
     ]
+
+@router.post("/chats/{chat_id}/import_doi", response_model=models.DocumentResponse)
+async def import_doi_source(chat_id: str, req: models.ImportDoiRequest, db: Session = Depends(get_db)):
+    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+        
+    current_doc_count = db.query(Document).filter(Document.chat_id == chat_id).count()
+    if current_doc_count >= MAX_SOURCES_PER_CHAT:
+        raise HTTPException(status_code=400, detail=f"Source limit reached! (Max {MAX_SOURCES_PER_CHAT} sources per notebook). Please remove some sources first.")
+
+    raw_doi = (req.doi or "").strip()
+    clean_doi = raw_doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+    clean_doi = re.sub(r'[;.,:)\s]+$', '', clean_doi).strip()
+    
+    doi_match = re.search(r'10\.\d{4,9}/[^\s\n<>\"\'{}|\\^`]+', clean_doi)
+    if not doi_match:
+        raise HTTPException(status_code=422, detail="Invalid DOI format. Expected format: 10.xxxx/xxxx or https://doi.org/10.xxxx/xxxx")
+    
+    extracted_doi = doi_match.group(0).strip().rstrip(".")
+    
+    # Check duplicate in current chat
+    existing_sigs = rag.get_existing_notebook_sources_signatures(chat_id)
+    if extracted_doi.lower() in existing_sigs.get("dois", set()):
+        raise HTTPException(status_code=409, detail=f"This paper (DOI: {extracted_doi}) has already been added to your sources.")
+        
+    # Resolve metadata from academic APIs
+    meta = await asyncio.to_thread(rag.resolve_paper_metadata_by_doi, extracted_doi, fast_only=False)
+    if not meta or not meta.get("title"):
+        raise HTTPException(status_code=404, detail=f"Publication not found in Crossref/OpenAlex registries for DOI: {extracted_doi}")
+
+    title = meta.get("title", "").strip()
+    filename = sanitize_paper_filename(title)
+    authors = meta.get("authors") or []
+    year = str(meta.get("year") or "N/A")
+    venue = meta.get("journal") or meta.get("venue") or "Academic Publication"
+    journal_metric = meta.get("journal_metric") or "Peer-Reviewed"
+    url = meta.get("url") or f"https://doi.org/{extracted_doi}"
+    pdf_url = meta.get("pdf_url") or ""
+    abstract_text = meta.get("abstract") or f"Official academic record for '{title}' ({year}). Indexed in Crossref under DOI {extracted_doi}."
+    is_oa = meta.get("is_oa", True)
+
+    save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
+    has_downloaded_pdf = False
+
+    # Attempt fetching authentic OA PDF
+    try:
+        fetched_oa = await asyncio.to_thread(
+            pdf_exporter.resolve_and_fetch_authentic_pdf,
+            doi=extracted_doi,
+            title=title,
+            direct_url=url,
+            candidate_pdf_url=pdf_url
+        )
+        if fetched_oa and len(fetched_oa) >= 35000 and fetched_oa.startswith(b"%PDF-"):
+            with open(save_path, "wb") as f:
+                f.write(fetched_oa)
+            has_downloaded_pdf = True
+    except Exception as e:
+        logger.debug(f"[DOI Fetch OA]: {e}")
+
+    if not has_downloaded_pdf:
+        doc_text = f"# {title} ({year})\n\n**DOI:** {extracted_doi}  \n**URL:** {url}  \n\n## Abstract & Overview\n\n{abstract_text}\n"
+        try:
+            with open(save_path, "w", encoding="utf-8") as f:
+                f.write(doc_text)
+        except Exception as e:
+            logger.warning(f"[Save doc text Warning]: {e}")
+
+    # Ingest into vector store
+    try:
+        await asyncio.to_thread(rag.ingest_document, save_path, chat_id)
+    except Exception as e:
+        logger.warning(f"[DOI Ingest Vector Warning]: {e}")
+
+    authors_json = json.dumps(authors, ensure_ascii=False)
+    db_doc = Document(
+        chat_id=chat_id,
+        filename=filename,
+        title=title,
+        authors=authors_json,
+        year=year,
+        journal=venue,
+        journal_metric=journal_metric,
+        doi=extracted_doi,
+        url=url,
+        pdf_url=pdf_url,
+        abstract=abstract_text,
+        abstract_type="official" if abstract_text and len(abstract_text) > 80 else "ai_summary",
+        is_oa=is_oa,
+        access_status="Open Access (Full PDF Available)" if has_downloaded_pdf else "Publication Brief & Abstract (Direct Download Restricted / HTTP 403)",
+        snippet=abstract_text,
+        venue=venue,
+        citations=meta.get("citations", 0),
+        quality_tier=4,
+    )
+    db.add(db_doc)
+    db.commit()
+    db.refresh(db_doc)
+
+    total_count = db.query(Document).filter(Document.chat_id == chat_id).count()
+    return models.DocumentResponse(
+        id=db_doc.id,
+        filename=db_doc.filename,
+        created_at=db_doc.created_at,
+        index=total_count,
+        has_full_pdf=has_downloaded_pdf,
+        is_oa=is_oa
+    )

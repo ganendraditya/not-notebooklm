@@ -16,8 +16,11 @@ export interface ChatSession {
 export interface Document {
   id: number;
   filename: string;
+  title?: string;
   created_at: string;
   index?: number;
+  has_full_pdf?: boolean;
+  is_oa?: boolean;
 }
 
 export interface TargetedSource {

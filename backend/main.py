@@ -50,19 +50,15 @@ def heal_legacy_upload_files():
                     
             if needs_repair:
                 clean_title = re.sub(r'<[^>]+>', '', os.path.splitext(d.filename)[0]).replace("_", " ").strip()
-                pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
-                    title=clean_title,
-                    authors=[],
-                    year="",
-                    journal="Academic Publication",
-                    journal_metric="Peer-Reviewed",
-                    doi="",
-                    abstract=f"Scholarly publication reference '{clean_title}'. Full document indexed in workspace.",
-                    url=""
-                )
+                doc_text = f"# {d.title or clean_title} ({d.year or 'N/A'})\n\n"
+                if d.doi:
+                    doc_text += f"**DOI:** {d.doi}  \n"
+                if d.url:
+                    doc_text += f"**URL:** {d.url}  \n\n"
+                doc_text += f"## Abstract & Overview\n\n{d.abstract or d.snippet or 'Metadata & abstract indexed in workspace.'}\n"
                 try:
-                    with open(file_path, "wb") as fp:
-                        fp.write(pdf_bytes)
+                    with open(file_path, "w", encoding="utf-8") as fp:
+                        fp.write(doc_text)
                 except Exception as e:
                     logger.debug(f"[Heal File Warning]: {e}")
     except Exception as e:

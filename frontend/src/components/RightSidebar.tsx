@@ -22,6 +22,9 @@ import {
   BookOpen,
   Sparkles,
   Info,
+  Search,
+  UploadCloud,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight } from "@/app/ChatClient";
@@ -63,6 +66,8 @@ interface PaperDetailData {
   abstract_type?: "official" | "ai_summary";
   is_oa?: boolean;
   access_status?: string;
+  has_full_pdf?: boolean;
+  is_abstract_only?: boolean;
   content: string;
 }
 
@@ -770,6 +775,12 @@ export default function RightSidebar({
 
   const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
   const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
+  const [isAddSourcesModalOpen, setIsAddSourcesModalOpen] = useState(false);
+  const [doiInput, setDoiInput] = useState("");
+  const [isResolvingDoi, setIsResolvingDoi] = useState(false);
+  const [doiError, setDoiError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const handleCleanDuplicates = async () => {
     if (!activeChatId || isCleaningDuplicates || documents.length === 0) return;
@@ -797,11 +808,10 @@ export default function RightSidebar({
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0]) return;
-    
+  const uploadSingleFile = async (file: File) => {
+    if (!file) return;
     setIsUploading(true);
-    const file = e.target.files[0];
+    setUploadError(null);
     const formData = new FormData();
     formData.append("file", file);
 
@@ -812,7 +822,7 @@ export default function RightSidebar({
       }
 
       if (!currentChatId) {
-        alert("Failed to initialize chat session.");
+        setUploadError("Failed to initialize chat session.");
         return;
       }
 
@@ -823,16 +833,63 @@ export default function RightSidebar({
       if (res.ok) {
         const newDoc = await res.json();
         onDocumentAdded(newDoc, currentChatId);
+        setIsAddSourcesModalOpen(false);
       } else {
-        const err = await res.json();
-        alert(`Upload failed: ${err.detail || "An error occurred"}`);
+        const err = await res.json().catch(() => ({}));
+        setUploadError(err.detail || "Failed to upload and parse document.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upload failed", err);
-      alert("Failed to connect to server for document upload.");
+      setUploadError(err?.message || "Failed to connect to server for document upload.");
     } finally {
       setIsUploading(false);
-      if (e.target) e.target.value = "";
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    await uploadSingleFile(file);
+    if (e.target) e.target.value = "";
+  };
+
+  const handleImportDoi = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanDoi = doiInput.trim();
+    if (!cleanDoi || isResolvingDoi) return;
+
+    setIsResolvingDoi(true);
+    setDoiError(null);
+
+    try {
+      let currentChatId = activeChatId;
+      if (!currentChatId && onEnsureChatSession) {
+        currentChatId = await onEnsureChatSession("Research Paper");
+      }
+      if (!currentChatId) {
+        setDoiError("Failed to initialize chat session.");
+        return;
+      }
+
+      const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_doi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doi: cleanDoi })
+      });
+
+      if (res.ok) {
+        const newDoc = await res.json();
+        onDocumentAdded(newDoc, currentChatId);
+        setDoiInput("");
+        setIsAddSourcesModalOpen(false);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setDoiError(err.detail || "Publication not found for the provided DOI.");
+      }
+    } catch (err: any) {
+      setDoiError(err?.message || "Failed to resolve DOI from academic registries.");
+    } finally {
+      setIsResolvingDoi(false);
     }
   };
 
@@ -906,18 +963,42 @@ export default function RightSidebar({
     setIsBulkDownloading(true);
     const docIds = selectedDocList.map(d => d.id);
 
-    // If only 1 document is selected, trigger immediate direct single PDF download
+    // If only 1 document is selected, trigger single PDF download with proper error handling
     if (docIds.length === 1) {
       try {
         const doc = selectedDocList[0];
+        const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/${doc.id}/download`);
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          setDownloadTask({
+            status: "error",
+            total: 1,
+            current: 0,
+            percent: 0,
+            currentFile: doc.filename,
+            errorMsg: errJson.detail || "Naskah lengkap PDF tidak tersedia untuk diunduh (hanya abstrak/paywalled)."
+          });
+          return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.href = `${backendUrl}/chats/${activeChatId}/documents/${doc.id}/download`;
-        link.download = doc.filename;
+        link.href = url;
+        link.download = doc.filename.endsWith(".pdf") ? doc.filename : `${doc.filename}.pdf`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-      } catch (err) {
+        window.URL.revokeObjectURL(url);
+      } catch (err: any) {
         console.error("Single download error:", err);
+        setDownloadTask({
+          status: "error",
+          total: 1,
+          current: 0,
+          percent: 0,
+          currentFile: "",
+          errorMsg: err?.message || "Gagal mengunduh dokumen."
+        });
       } finally {
         setIsBulkDownloading(false);
       }
@@ -982,14 +1063,27 @@ export default function RightSidebar({
                   total: data.total || docIds.length,
                   current: data.current,
                   percent: calculatedPercent,
-                  currentFile: data.filename || prev?.currentFile || ""
+                  currentFile: data.filename || prev?.currentFile || "",
+                  downloadedCount: data.downloaded_count,
+                  skippedCount: data.skipped_count
                 }));
+              } else if (data.type === "error") {
+                setDownloadTask({
+                  status: "error",
+                  total: docIds.length,
+                  current: 0,
+                  percent: 0,
+                  currentFile: "",
+                  errorMsg: data.message || "Failed to download ZIP archive"
+                });
               } else if (data.type === "complete") {
                 setDownloadTask({
                   status: "complete",
-                  total: data.total_files || docIds.length,
-                  current: data.total_files || docIds.length,
+                  total: data.total || data.total_files || docIds.length,
+                  current: data.total || data.total_files || docIds.length,
                   percent: 100,
+                  downloadedCount: data.downloaded_count,
+                  skippedCount: data.skipped_count,
                   currentFile: "Download complete!",
                   totalSizeMb: data.total_size_mb
                 });
@@ -1325,7 +1419,7 @@ export default function RightSidebar({
             {/* Top Preview Controls Bar */}
             <div className="px-3.5 py-2 bg-[#1e1f22] border-b border-white/10 flex items-center justify-between text-xs text-gray-300 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
+                <span className={`w-2 h-2 rounded-full shrink-0 ${paperDetails?.has_full_pdf ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
                 <span className="truncate max-w-[170px] font-mono text-[11px] text-gray-300">
                   {viewingDoc.filename}
                 </span>
@@ -1386,31 +1480,79 @@ export default function RightSidebar({
                   <Loader2 size={24} className="animate-spin text-blue-400" />
                   <p className="text-xs text-gray-400">Loading document content...</p>
                 </div>
+              ) : (paperDetails?.has_full_pdf === false || paperDetails?.is_abstract_only || (paperDetails?.content && (paperDetails.content.length < 3500 || paperDetails.content.includes("NOTBOOKLM SCHOLARLY ARCHIVE") || paperDetails.content.includes("OFFICIAL PUBLICATION ARCHIVE RECORD")))) ? (
+                <div className="p-4 sm:p-5 rounded-xl bg-[#1b1c1e] border border-white/10 shadow-lg space-y-4">
+                  {/* Status Banner for Abstract Only */}
+                  <div className="p-3.5 rounded-lg bg-amber-950/30 border border-amber-800/40 space-y-2 text-xs text-amber-200">
+                    <div className="flex items-center gap-2 font-semibold text-amber-100">
+                      <Info size={16} className="text-amber-400 shrink-0" />
+                      <span>
+                        {paperDetails?.is_oa
+                          ? "Full Manuscript Restricted (HTTP 403 / Bot Challenge)"
+                          : "Full Manuscript Restricted (Publisher Paywalled)"}
+                      </span>
+                    </div>
+                    <p className="text-[11.5px] text-amber-300/80 leading-relaxed">
+                      {paperDetails?.is_oa
+                        ? "This publication is Open Access, but automatic PDF retrieval was restricted by the publisher repository (HTTP 403 / Bot Challenge). Verified metadata and official author abstract are indexed for AI synthesis."
+                        : "The full manuscript is protected behind a publisher paywall. Verified academic metadata and official author abstract are indexed for scholarly synthesis and citations."}
+                    </p>
+                    {landingUrl && (
+                      <div className="pt-1">
+                        <a
+                          href={landingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-amber-100 font-medium text-xs border border-amber-500/30 transition-colors"
+                        >
+                          <ExternalLink size={13} />
+                          <span>Open Official Publisher Portal (DOI) ↗</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Paper Title & Authors */}
+                  <div className="pb-3 border-b border-white/10 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase bg-amber-950/70 border border-amber-800/80 text-amber-400">
+                        METADATA & ABSTRACT
+                      </span>
+                      {paperDetails?.year && (
+                        <span className="text-[11px] text-gray-400">
+                          {paperDetails.year}
+                        </span>
+                      )}
+                    </div>
+
+                    <h2 className="text-sm sm:text-[15px] font-bold text-white leading-snug">
+                      {title}
+                    </h2>
+
+                    {authorsStr && (
+                      <p className="text-xs text-gray-400">
+                        By {authorsStr}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Official Abstract Content */}
+                  <div className="space-y-2">
+                    <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                      Official Author Abstract
+                    </h3>
+                    <div className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans whitespace-pre-wrap select-text break-words bg-black/20 p-3.5 rounded-lg border border-white/5">
+                      {cleanAbstract || "No additional abstract text provided."}
+                    </div>
+                  </div>
+                </div>
               ) : paperDetails?.content ? (
                 <div className="p-4 sm:p-5 rounded-xl bg-[#1b1c1e] border border-white/10 shadow-lg space-y-4">
-                  {/* Status Banner for Abstract Only vs Full Manuscript */}
-                  {paperDetails.content.length < 3500 || paperDetails.content.includes("NOTBOOKLM SCHOLARLY ARCHIVE") ? (
-                    <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-800/40 flex items-start gap-2.5 text-xs text-amber-200">
-                      <Info size={15} className="text-amber-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-amber-100">
-                          {paperDetails.is_oa
-                            ? "Publication Brief & Abstract (Direct Download Restricted / HTTP 403)"
-                            : "Publication Brief & Abstract (Full Manuscript Paywalled)"}
-                        </p>
-                        <p className="text-[11.5px] text-amber-300/80 mt-0.5">
-                          {paperDetails.is_oa
-                            ? "This paper is Open Access, but automatic PDF retrieval was restricted by the publisher repository (HTTP 403 / Bot Challenge). Displaying verified academic metadata and official author abstract."
-                            : "Full publisher manuscript is protected by publisher paywall. Displaying verified academic metadata and official author abstract."}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 flex items-center gap-2 text-xs text-emerald-300">
-                      <Check size={14} className="text-emerald-400 shrink-0" />
-                      <span className="font-medium">Full Manuscript Verified</span>
-                    </div>
-                  )}
+                  {/* Status Banner for Full Manuscript */}
+                  <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 flex items-center gap-2 text-xs text-emerald-300">
+                    <Check size={14} className="text-emerald-400 shrink-0" />
+                    <span className="font-medium">Full Manuscript Verified</span>
+                  </div>
 
                   {/* Paper Sheet Header */}
                   <div className="pb-3 border-b border-white/10 space-y-2">
@@ -1522,18 +1664,30 @@ export default function RightSidebar({
             </button>
 
             {/* Download Icon Button */}
-            {activeChatId && (
-              <a
-                href={isLoadingDetails ? undefined : `${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
-                download={viewingDoc.filename}
-                className={`w-8 h-8 rounded-full hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors ${
-                  isLoadingDetails ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"
-                }`}
-                title="Download original document"
-              >
-                <Download size={14} />
-              </a>
-            )}
+            {activeChatId && (() => {
+              const isDownloadable = Boolean(!isLoadingDetails && paperDetails?.has_full_pdf);
+              if (!isDownloadable) {
+                return (
+                  <button
+                    disabled
+                    className="w-8 h-8 rounded-full text-gray-600 opacity-30 flex items-center justify-center cursor-not-allowed"
+                    title="Full manuscript PDF is not available for download (metadata & abstract only)"
+                  >
+                    <Download size={14} />
+                  </button>
+                );
+              }
+              return (
+                <a
+                  href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
+                  download={viewingDoc.filename}
+                  className="w-8 h-8 rounded-full hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  title="Download original manuscript PDF"
+                >
+                  <Download size={14} />
+                </a>
+              );
+            })()}
           </div>
 
           {/* Right Side: PDF / External Landing Page Pill - ALWAYS shown */}
@@ -1693,13 +1847,13 @@ export default function RightSidebar({
           <Button
             variant="outline"
             className="w-full h-11 rounded-full bg-[#262729] hover:bg-[#2e3033] border border-white/15 text-gray-100 hover:text-white font-medium text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-colors"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setIsAddSourcesModalOpen(true)}
             disabled={isUploading}
           >
             {isUploading ? (
               <>
                 <Loader2 size={16} className="animate-spin text-blue-400" />
-                <span>Uploading...</span>
+                <span>Processing...</span>
               </>
             ) : (
               <>
@@ -1708,9 +1862,6 @@ export default function RightSidebar({
               </>
             )}
           </Button>
-          <p className="text-[10.5px] text-gray-500 text-center mt-1.5">
-            Supports PDF, Word (.docx), TXT, Markdown, BibTeX, RIS, CSV
-          </p>
         </div>
 
         {/* Dynamic Clean Feedback Notification */}
@@ -1804,22 +1955,38 @@ export default function RightSidebar({
               </button>
 
               {/* Download Button */}
-              <button
-                onClick={handleBulkDownload}
-                disabled={selectedCount === 0 || isBulkDownloading}
-                className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-                  selectedCount > 0
-                    ? "text-gray-400 hover:text-gray-200 hover:bg-white/5 cursor-pointer"
-                    : "text-gray-600 opacity-40 cursor-not-allowed"
-                }`}
-                title={selectedCount > 0 ? `Download ${selectedCount} selected file(s)` : "Select sources to download"}
-              >
-                {isBulkDownloading ? (
-                  <Loader2 size={15} className="animate-spin text-blue-400" />
-                ) : (
-                  <Download size={15} />
-                )}
-              </button>
+              {(() => {
+                const downloadableSelectedCount = selectedDocList.filter(d => d.has_full_pdf !== false).length;
+                const canDownload = selectedCount > 0 && downloadableSelectedCount > 0 && !isBulkDownloading;
+                const tooltipText = selectedCount === 0 
+                  ? "Select sources to download"
+                  : downloadableSelectedCount === 0
+                  ? "Full manuscript PDF is not available for download (metadata & abstract only)"
+                  : selectedCount === 1
+                  ? "Download full manuscript PDF"
+                  : downloadableSelectedCount === selectedCount
+                  ? `Download ${selectedCount} selected file(s)`
+                  : `Download ${downloadableSelectedCount} manuscript PDF(s) (${selectedCount - downloadableSelectedCount} skipped)`;
+
+                return (
+                  <button
+                    onClick={handleBulkDownload}
+                    disabled={!canDownload}
+                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                      canDownload
+                        ? "text-gray-400 hover:text-gray-200 hover:bg-white/5 cursor-pointer"
+                        : "text-gray-600 opacity-30 cursor-not-allowed"
+                    }`}
+                    title={tooltipText}
+                  >
+                    {isBulkDownloading ? (
+                      <Loader2 size={15} className="animate-spin text-blue-400" />
+                    ) : (
+                      <Download size={15} />
+                    )}
+                  </button>
+                );
+              })()}
 
               {/* Delete Button */}
               <button
@@ -1899,9 +2066,17 @@ export default function RightSidebar({
                       <span className="text-[7.5px] font-bold tracking-tighter uppercase font-mono">{badge.label}</span>
                     </div>
 
-                    <span className="text-[11.5px] text-gray-300 truncate group-hover:text-white font-normal" title={doc.filename.replace(/<[^>]+>/g, "")}>
-                      {doc.filename.replace(/<[^>]+>/g, "")}
-                    </span>
+                    {(() => {
+                      let displayTitle = (doc.title || doc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ")).replace(/<[^>]+>/g, "").trim();
+                      if (displayTitle.length > 8 && displayTitle === displayTitle.toUpperCase()) {
+                        displayTitle = displayTitle.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
+                      }
+                      return (
+                        <span className="text-[11.5px] text-gray-300 truncate group-hover:text-white font-normal" title={displayTitle}>
+                          {displayTitle}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   {/* Right: Checkbox ONLY toggles selection */}
@@ -1926,10 +2101,172 @@ export default function RightSidebar({
         </div>
       </div>
 
+      {/* Google NotebookLM Style 'Add Sources' Centered Modal Dialog */}
+      {isAddSourcesModalOpen && (
+        <div 
+          onClick={() => {
+            setIsAddSourcesModalOpen(false);
+            setDoiError(null);
+            setDoiInput("");
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#1e1f22] border border-white/15 rounded-3xl w-full max-w-xl p-6 sm:p-7 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 relative text-gray-200"
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setIsAddSourcesModalOpen(false);
+                setDoiError(null);
+                setDoiInput("");
+              }}
+              className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X size={18} />
+            </button>
+
+            {/* Modal Header */}
+            <div className="space-y-1.5 pr-8">
+              <h2 className="text-xl font-bold text-white tracking-tight leading-snug">
+                Add sources to your notebook
+              </h2>
+              <p className="text-xs text-gray-400">
+                Import research papers by DOI or upload local documents for AI synthesis.
+              </p>
+            </div>
+
+            {/* Section 1: Fast DOI Input Bar */}
+            <div className="space-y-2">
+              <form onSubmit={handleImportDoi} className="relative flex items-center">
+                <div className="relative w-full">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                    <Search size={15} />
+                  </div>
+                  <input
+                    type="text"
+                    value={doiInput}
+                    onChange={(e) => {
+                      setDoiInput(e.target.value);
+                      if (doiError) setDoiError(null);
+                    }}
+                    placeholder="Enter DOI (e.g. 10.25126/jtiik.201855983 or https://doi.org/...)"
+                    disabled={isResolvingDoi || isUploading}
+                    className="w-full h-11 pl-10 pr-24 rounded-full bg-[#131416] border border-white/15 focus:border-blue-500 text-xs text-white placeholder-gray-500 focus:outline-none transition-all"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!doiInput.trim() || isResolvingDoi || isUploading}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 px-3.5 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
+                >
+                  {isResolvingDoi ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Resolving...</span>
+                    </>
+                  ) : (
+                    <span>Import</span>
+                  )}
+                </button>
+              </form>
+
+              {/* DOI Error Feedback */}
+              {doiError && (
+                <div className="px-3 py-1.5 rounded-lg bg-red-950/40 border border-red-800/50 text-red-300 text-[11.5px] flex items-center gap-2 animate-in fade-in duration-150">
+                  <AlertCircle size={14} className="shrink-0 text-red-400" />
+                  <span>{doiError}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Section 2: Drag and Drop Dropzone */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(false);
+              }}
+              onDrop={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingOver(false);
+                if (e.dataTransfer.files && e.dataTransfer.files[0] && !isUploading) {
+                  await uploadSingleFile(e.dataTransfer.files[0]);
+                }
+              }}
+              onClick={() => {
+                if (!isUploading) {
+                  fileInputRef.current?.click();
+                }
+              }}
+              className={`p-8 sm:p-10 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-3 ${
+                isDraggingOver
+                  ? "border-blue-500 bg-blue-500/10 scale-[1.01]"
+                  : "border-white/15 hover:border-white/30 bg-[#161719] hover:bg-[#191a1d]"
+              } ${isUploading ? "opacity-60 pointer-events-none" : ""}`}
+            >
+              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
+                {isUploading ? (
+                  <Loader2 size={24} className="animate-spin text-blue-400" />
+                ) : (
+                  <UploadCloud size={24} className="text-gray-300" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-gray-200">
+                  {isUploading ? "Uploading and indexing document..." : "or drop your files here"}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {isUploading ? "Extracting metadata and vector embeddings" : "PDF, Word (.docx), TXT, Markdown, BibTeX, RIS, CSV"}
+                </p>
+              </div>
+            </div>
+
+            {/* Inline Upload Error Feedback */}
+            {uploadError && (
+              <div className="px-3 py-2 rounded-lg bg-red-950/40 border border-red-800/50 text-red-300 text-xs flex items-center gap-2 animate-in fade-in duration-150">
+                <AlertCircle size={15} className="shrink-0 text-red-400" />
+                <span>{uploadError}</span>
+              </div>
+            )}
+
+            {/* Section 3: Capacity Progress Bar (300 Sources Max) */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs text-gray-400">
+                <span>Sources capacity</span>
+                <span className="font-medium text-gray-300 font-mono">
+                  {documents.length} / 300
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-[#131416] rounded-full overflow-hidden border border-white/5">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, Math.max(2, (documents.length / 300) * 100))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Centered Modal for Bulk Delete Confirmation */}
       {showBulkDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+        <div 
+          onClick={() => !isBulkDeleting && setShowBulkDeleteConfirm(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+          >
             <div className="space-y-1.5">
               <h3 className="text-base font-semibold text-white">Delete {selectedCount} selected source(s)?</h3>
               <p className="text-xs text-gray-400 leading-relaxed">

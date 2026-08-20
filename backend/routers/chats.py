@@ -1,3 +1,4 @@
+import os
 import uuid
 import json
 import logging
@@ -36,12 +37,29 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
         
     sorted_docs = sorted(chat.documents, key=lambda d: d.id)
     doc_responses = []
+    from helpers import get_doc_file_path
+    import pdf_exporter
+    
     for idx, d in enumerate(sorted_docs, start=1):
+        fp = get_doc_file_path(chat_id, d.filename)
+        has_pdf = False
+        if os.path.exists(fp) and os.path.getsize(fp) >= 35000:
+            try:
+                with open(fp, "rb") as f:
+                    fb = f.read(2048)
+                    if fb.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in fb and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in fb:
+                        has_pdf = True
+            except Exception:
+                has_pdf = False
+                
         doc_responses.append(models.DocumentResponse(
             id=d.id,
             filename=d.filename,
+            title=d.title or d.filename.replace(".pdf", "").replace("_", " ").strip(),
             created_at=d.created_at,
-            index=idx
+            index=idx,
+            has_full_pdf=has_pdf,
+            is_oa=d.is_oa if d.is_oa is not None else True
         ))
         
     return models.ChatSessionDetailResponse(
@@ -69,6 +87,27 @@ def delete_chat(chat_id: str, db: Session = Depends(get_db)):
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
+        
+    # 1. Clean physical files from disk in uploads directory
+    from helpers import UPLOAD_DIR
+    try:
+        if os.path.exists(UPLOAD_DIR):
+            for fname in os.listdir(UPLOAD_DIR):
+                if fname.startswith(f"{chat_id}_"):
+                    fp = os.path.join(UPLOAD_DIR, fname)
+                    try:
+                        if os.path.isfile(fp):
+                            os.remove(fp)
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.warning(f"[Delete Chat File Cleanup Warning]: {e}")
+
+    # 2. Delete all related documents and chat messages explicitly
+    db.query(Document).filter(Document.chat_id == chat_id).delete(synchronize_session=False)
+    db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).delete(synchronize_session=False)
+    
+    # 3. Delete chat session record
     db.delete(chat)
     db.commit()
     return {"status": "success", "message": "Chat deleted"}

@@ -784,11 +784,16 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                 if not content_snippet:
                     content_snippet = f"(Dokumen: {fname})"
                     
+                doc_display_title = (db_record.title if db_record and db_record.title else fname.replace(".pdf", "").replace("_", " ").strip())
+                if doc_display_title.isupper() and len(doc_display_title) > 8:
+                    doc_display_title = doc_display_title.title()
+
                 status_header = "FULL PAPER / NASKAH LENGKAP TERVERIFIKASI (Full Manuscript Berhasil Diunduh)" if is_full_paper else "PUBLICATION BRIEF & ABSTRAK SAJA (Naskah lengkap tidak dapat diunduh otomatis / HTTP 403 / Paywalled)"
 
                 full_docs_context_parts.append(
                     f"--- DOKUMEN [{i+1}] ---\n"
                     f"Nomor Dokumen: [{i+1}]\n"
+                    f"Judul Publikasi: {doc_display_title}\n"
                     f"Nama File: {fname}\n"
                     f"Status Naskah: {status_header}\n"
                     f"Teks Dokumen:\n{content_snippet}\n"

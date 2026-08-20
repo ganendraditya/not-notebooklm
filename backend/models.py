@@ -20,8 +20,11 @@ class ChatSessionResponse(BaseModel):
 class DocumentResponse(BaseModel):
     id: int
     filename: str
+    title: Optional[str] = None
     created_at: datetime
     index: Optional[int] = None
+    has_full_pdf: Optional[bool] = True
+    is_oa: Optional[bool] = True
     
     class Config:
         from_attributes = True
@@ -56,6 +59,9 @@ class PaperCandidate(BaseModel):
     is_oa: Optional[bool] = True
     journal_metric: Optional[str] = ""
     citations: Optional[int] = 0
+
+class ImportDoiRequest(BaseModel):
+    doi: str
 
 class ImportSourcesRequest(BaseModel):
     sources: List[PaperCandidate]
