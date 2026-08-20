@@ -574,12 +574,18 @@ async def query_chat(
         # 3. Handle query routing
         def resolve_intent_fast(user_query: str, has_docs: bool) -> str:
             uq = user_query.lower()
-            delete_triggers = [
-                "hapus", "hapusin", "remove", "delete", "bersihkan", "buang", "drop",
-                "ga relevan", "tidak relevan", "irrelevant", "unrelated", "bantu hapus",
-                "hapus yang", "hapuskan", "delete sources", "remove sources"
-            ]
-            if any(dt in uq for dt in delete_triggers) and has_docs:
+            
+            # Check if user EXPLICITLY asks to delete / remove / drop specific files
+            # (Strict command: "hapus...", "tolong hapus...", "remove...", "delete paper...")
+            # NOT questions: "apakah ada yang ga relevan?", "ada yang perlu dihapus ga?", "crosscheck dong"
+            is_question = any(q in uq for q in ["apakah", "apakah ada", "ada yang", "ada gak", "ada kah", "?", "crosscheck", "cek", "evaluasi", "review"])
+            explicit_delete_command = any(dt in uq for dt in [
+                "tolong hapus", "hapusin dong", "hapus dong", "bantu hapus", "hapuskan", 
+                "hapus yang", "hapus paper", "hapus dokumen", "hapus file", "remove sources",
+                "delete sources", "delete these", "remove these", "buang paper", "bersihkan paper"
+            ]) or (any(dt in uq for dt in ["hapus", "remove", "delete"]) and not is_question)
+            
+            if explicit_delete_command and has_docs:
                 return "REMOVE_SOURCES"
 
             search_triggers = [
@@ -598,9 +604,9 @@ async def query_chat(
         intent = resolve_intent_fast(query, has_local_docs)
         print(f"[RAG Engine] Fast Resolved Intent: {intent}")
 
-        # 3. Handle Intelligent Source Removal Intent
+        # 3. Handle Explicit Source Removal Intent (ONLY when explicitly instructed by user)
         if intent == "REMOVE_SOURCES" and has_local_docs:
-            await report_status("Analyzing documents to identify and remove irrelevant sources...")
+            await report_status("Processing document deletion request...")
             from database import SessionLocal, Document as DBDocument
             db_s = SessionLocal()
             current_db_docs = []
@@ -615,12 +621,12 @@ async def query_chat(
                 snippet = (d.abstract or d.snippet or "")[:200]
                 doc_summaries.append(f"- ID: {d.id} | Filename: {d.filename} | Title: {t} | Abstract: {snippet}")
 
-            # If user provides explicit list or asks to delete irrelevant
             eval_prompt = (
-                "You are an AI Document Cleaner for academic workspaces.\n"
-                f"User Request: \"{query}\"\n\n"
+                "You are an AI Document Management Assistant.\n"
+                f"User Deletion Request: \"{query}\"\n\n"
                 "List of loaded documents in this workspace:\n" + "\n".join(doc_summaries) + "\n\n"
-                "Task: Identify ALL document IDs from the list above that the user wants to delete/remove, OR that are not relevant according to the user's criteria (e.g. non-rainfall targets, floods, covid, landslides, etc.).\n"
+                "Task: Identify STRICTLY the specific document IDs that match the user's explicit deletion instruction.\n"
+                "If the user named specific papers (e.g. 'hapus paper a, b, c' or 'hapus yang tidak relevan'), identify ONLY those matching IDs.\n"
                 "Return ONLY a valid JSON object matching:\n"
                 "{\n"
                 "  \"remove_doc_ids\": [1, 2, 3],\n"
@@ -656,18 +662,17 @@ async def query_chat(
                     finally:
                         db_del.close()
 
-                # Re-sync local vector store / state
                 num_deleted = len(deleted_titles)
-                resp_text = f"Successfully removed **{num_deleted} irrelevant document(s)** from sources:\n\n"
+                resp_text = f"Successfully removed **{num_deleted} requested document(s)** from sources:\n\n"
                 for dt in deleted_titles:
                     resp_text += f"- ❌ {dt}\n"
-                resp_text += f"\nYour workspace sources are now focused strictly on your research topic."
+                resp_text += f"\nYour workspace sources have been updated per your request."
                 
                 action_payload = json.dumps({"action": "bulk_delete", "deleted_doc_ids": to_delete_ids})
                 return f"{resp_text}\n\n<!-- SOURCES_ACTION: {action_payload} -->"
             except Exception as eval_err:
                 logger.error(f"[Source Clean Error]: {eval_err}")
-                return f"Gagal memproses pembersihan dokumen otomatis: {str(eval_err)}"
+                return f"Failed to remove requested documents: {str(eval_err)}"
 
         # 4. Direct Academic Literature Search Pipeline (OpenAlex, Europe PMC, Crossref with Sources Card UI)
         if intent == "SEARCH_NEW":
@@ -800,8 +805,11 @@ async def query_chat(
                     "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n\n"
                     f"This chat session has {len(local_docs)} imported reference documents in the workspace.\n"
                     "Use ALL document data to answer the user's query comprehensively, accurately, and with clear structure.\n\n"
+                    "USER INSTRUCTION DISCIPLINE (CRITICAL):\n"
+                    "- If the user is ASKING A QUESTION (e.g. 'apakah ada yang ga relevan?', 'sebutkan yang ga cocok', 'crosscheck dong'): ANSWER THE QUESTION FIRST clearly with the list of documents and reasons. DO NOT delete or remove anything autonomously unless the user explicitly commands you with action words (e.g. 'tolong hapus', 'hapusin', 'delete these').\n"
+                    "- If the user explicitly asks to delete specific papers, confirm and remove only the requested papers.\n\n"
                     "CAPABILITY REMINDER:\n"
-                    "- You CAN delete/remove documents directly from the workspace if the user asks you to remove irrelevant sources or clean up documents.\n\n"
+                    "- You have backend access to remove documents when explicitly commanded.\n\n"
                     "CITATION RULES (IEEE STYLE - VERY IMPORTANT):\n"
                     "- Every reference document has a permanent Global Reference Number: [1], [2], [3], etc. as written in the document header.\n"
                     "- When citing, quoting findings, comparing methods, or building tables, ALWAYS include bracketed number citations, e.g. [1], [2], [3], [1, 2], or [1]-[3].\n"
