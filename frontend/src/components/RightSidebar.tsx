@@ -597,8 +597,18 @@ export default function RightSidebar({
   // =========================================================================
   if (viewingDoc) {
     const filenameFallback = viewingDoc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+    
+    // Generic publisher headers that should never be displayed as paper title
+    const GENERIC_HEADERS = new Set([
+      "abstract", "abstrak", "overview", "paper", "document", "introduction", "keywords",
+      "article in press", "in press", "journal pre-proof", "uncorrected proof",
+      "corrected proof", "original article", "research article", "full length article",
+      "short communication", "review article", "full paper", "research paper",
+      "accepted manuscript", "author's copy",
+    ]);
+    
     let title = (paperDetails?.title || filenameFallback).replace(/<[^>]+>/g, "");
-    if (!title || title.trim().toLowerCase() === "abstract" || title.trim().toLowerCase() === "overview") {
+    if (!title || GENERIC_HEADERS.has(title.trim().toLowerCase())) {
       title = filenameFallback;
     }
     const authorsStr = paperDetails?.authors && paperDetails.authors.length > 0 

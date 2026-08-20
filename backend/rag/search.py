@@ -22,11 +22,21 @@ def is_valid_academic_title(title: str) -> bool:
         return False
     junk_patterns = [
         "[front cover]", "[copyright", "table of contents", "author index", "itu k programme",
-        "itu k 2018", "keynote summary", "chairman’s message", "foreword", "committees",
+        "itu k 2018", "keynote summary", "chairman's message", "foreword", "committees",
         "figure 1:", "table 3:", "table 5:", "peer review #", "cover page", "back cover",
-        "editorial board", "preliminary pages", "conference report"
+        "editorial board", "preliminary pages", "conference report",
     ]
     if any(j in t for j in junk_patterns):
+        return False
+    # Reject generic publisher artifact headers that are not real paper titles
+    generic_exact = {
+        "article in press", "in press", "journal pre-proof", "uncorrected proof",
+        "corrected proof", "original article", "research article", "full length article",
+        "short communication", "review article", "full paper", "research paper",
+        "accepted manuscript", "author's copy", "analytical index", "index",
+        "abstract", "abstrak", "overview", "paper", "document",
+    }
+    if t in generic_exact:
         return False
     return True
 
@@ -939,6 +949,8 @@ def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper
         return None
     clean_doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip() if doi else ""
     if clean_doi:
+        # Strip markdown artifacts and trailing punctuation
+        clean_doi = clean_doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
         clean_doi = re.sub(r'[;.,:)\s]+$', '', clean_doi).strip()
     cache_key = (clean_doi or title_fallback).strip().lower()
     if cache_key in _PAPER_METADATA_CACHE:
@@ -1192,7 +1204,14 @@ def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper
     )
 
     final_title = audited.get("title") or title or title_fallback or clean_doi
-    if final_title and final_title.lower() in ("abstract", "abstrak", "overview", "paper", "document"):
+    _GENERIC_TITLE_BLACKLIST = {
+        "abstract", "abstrak", "overview", "paper", "document",
+        "article in press", "in press", "journal pre-proof", "uncorrected proof",
+        "corrected proof", "original article", "research article", "full length article",
+        "short communication", "review article", "full paper", "research paper",
+        "accepted manuscript", "author's copy", "analytical index", "index",
+    }
+    if final_title and final_title.lower().strip() in _GENERIC_TITLE_BLACKLIST:
         final_title = title_fallback or clean_doi
     final_authors = audited.get("authors") or authors
     final_year = audited.get("year") or pub_year

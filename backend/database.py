@@ -1,7 +1,7 @@
 import os
 import uuid
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "not_notebooklm.db"))
@@ -31,6 +31,24 @@ class Document(Base):
     filename = Column(String, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    # Persistent metadata (populated at import time, never overwritten by re-parsing)
+    title = Column(Text, nullable=True)
+    authors = Column(Text, nullable=True)       # JSON string: ["Author A", "Author B"]
+    year = Column(String, nullable=True)
+    journal = Column(String, nullable=True)
+    journal_metric = Column(String, nullable=True)
+    doi = Column(String, nullable=True)
+    url = Column(String, nullable=True)
+    pdf_url = Column(String, nullable=True)
+    abstract = Column(Text, nullable=True)
+    abstract_type = Column(String, nullable=True)  # "official" or "ai_summary"
+    is_oa = Column(Boolean, nullable=True, default=True)
+    access_status = Column(String, nullable=True)
+    snippet = Column(Text, nullable=True)
+    venue = Column(String, nullable=True)
+    citations = Column(Integer, nullable=True, default=0)
+    quality_tier = Column(Integer, nullable=True, default=4)
+    
     chat_session = relationship("ChatSession", back_populates="documents")
 
 class ChatMessage(Base):
@@ -56,6 +74,32 @@ try:
             conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN updated_at DATETIME"))
             conn.execute(text("UPDATE chat_sessions SET updated_at = created_at WHERE updated_at IS NULL"))
             conn.commit()
+
+        # Auto-migrate Document metadata columns
+        res_docs = conn.execute(text("PRAGMA table_info(documents)")).fetchall()
+        doc_cols = [r[1] for r in res_docs]
+        new_doc_columns = {
+            "title": "TEXT",
+            "authors": "TEXT",
+            "year": "VARCHAR",
+            "journal": "VARCHAR",
+            "journal_metric": "VARCHAR",
+            "doi": "VARCHAR",
+            "url": "VARCHAR",
+            "pdf_url": "VARCHAR",
+            "abstract": "TEXT",
+            "abstract_type": "VARCHAR",
+            "is_oa": "BOOLEAN",
+            "access_status": "VARCHAR",
+            "snippet": "TEXT",
+            "venue": "VARCHAR",
+            "citations": "INTEGER DEFAULT 0",
+            "quality_tier": "INTEGER DEFAULT 4",
+        }
+        for col_name, col_type in new_doc_columns.items():
+            if col_name not in doc_cols:
+                conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col_name} {col_type}"))
+        conn.commit()
 except Exception as e:
     print(f"[DB Migration Warning]: {e}")
 

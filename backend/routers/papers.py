@@ -39,7 +39,13 @@ async def search_papers(query: str, limit: int = 10):
             year=str(p.get("year", "N/A")),
             doi=p.get("doi", ""),
             url=p.get("url", ""),
-            snippet=p.get("snippet", "")
+            snippet=p.get("snippet", ""),
+            authors=p.get("authors", []),
+            venue=p.get("venue", ""),
+            pdf_url=p.get("pdf_url", ""),
+            is_oa=p.get("is_oa", True),
+            journal_metric=p.get("journal_metric", ""),
+            citations=p.get("citations", 0),
         )
         for p in papers
     ]
@@ -79,9 +85,17 @@ async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, 
             filename = sanitize_paper_filename(paper.title)
             abstract_text = paper.snippet.strip()
             
+            # Sanitize DOI: strip markdown artifacts and trailing punctuation
+            clean_doi = (paper.doi or "").strip()
+            clean_doi = clean_doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
+            clean_doi = clean_doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+            import re as _re
+            clean_doi = _re.sub(r'[;.,:)\s]+$', '', clean_doi).strip()
+            full_doi = f"https://doi.org/{clean_doi}" if clean_doi and not clean_doi.startswith("http") else clean_doi
+            
             doc_text = f"# {paper.title} ({paper.year})\n\n"
-            if paper.doi:
-                doc_text += f"**DOI:** {paper.doi}  \n"
+            if full_doi:
+                doc_text += f"**DOI:** {full_doi}  \n"
             if paper.url:
                 doc_text += f"**URL:** {paper.url}  \n\n"
             doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
@@ -90,11 +104,11 @@ async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, 
             try:
                 pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
                     title=paper.title,
-                    authors=[],
+                    authors=paper.authors or [],
                     year=str(paper.year or ""),
-                    journal="Academic Research Publication",
-                    journal_metric="Peer-Reviewed",
-                    doi=paper.doi or "",
+                    journal=paper.venue or "Academic Research Publication",
+                    journal_metric=paper.journal_metric or "Peer-Reviewed",
+                    doi=clean_doi,
                     abstract=abstract_text,
                     url=paper.url or ""
                 )
@@ -103,12 +117,32 @@ async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, 
             except Exception as e:
                 logger.warning(f"[PDF Creation Warning]: {e}")
 
-            # Save to DB immediately so frontend receives it
+            # Save to DB with full metadata persisted
             local_db = SessionLocal()
             created_doc_id = None
             created_at_str = ""
             try:
-                db_doc = Document(chat_id=chat_id, filename=filename)
+                authors_json = json.dumps(paper.authors or [], ensure_ascii=False)
+                db_doc = Document(
+                    chat_id=chat_id,
+                    filename=filename,
+                    title=paper.title,
+                    authors=authors_json,
+                    year=str(paper.year or ""),
+                    journal=paper.venue or "",
+                    journal_metric=paper.journal_metric or "",
+                    doi=clean_doi,
+                    url=paper.url or "",
+                    pdf_url=paper.pdf_url or "",
+                    abstract=abstract_text,
+                    abstract_type="official" if abstract_text and len(abstract_text) > 80 else "ai_summary",
+                    is_oa=paper.is_oa if paper.is_oa is not None else True,
+                    access_status="Open Access" if paper.is_oa else "Closed Access",
+                    snippet=abstract_text,
+                    venue=paper.venue or "",
+                    citations=paper.citations or 0,
+                    quality_tier=4,
+                )
                 local_db.add(db_doc)
                 local_db.commit()
                 local_db.refresh(db_doc)
@@ -173,9 +207,17 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
         filename = sanitize_paper_filename(paper.title)
         abstract_text = paper.snippet.strip()
         
+        # Sanitize DOI
+        import re as _re
+        clean_doi = (paper.doi or "").strip()
+        clean_doi = clean_doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
+        clean_doi = clean_doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+        clean_doi = _re.sub(r'[;.,:)\s]+$', '', clean_doi).strip()
+        full_doi = f"https://doi.org/{clean_doi}" if clean_doi and not clean_doi.startswith("http") else clean_doi
+        
         doc_text = f"# {paper.title} ({paper.year})\n\n"
-        if paper.doi:
-            doc_text += f"**DOI:** {paper.doi}  \n"
+        if full_doi:
+            doc_text += f"**DOI:** {full_doi}  \n"
         if paper.url:
             doc_text += f"**URL:** {paper.url}  \n\n"
         doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
@@ -184,11 +226,11 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
         try:
             pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
                 title=paper.title,
-                authors=[],
+                authors=paper.authors or [],
                 year=str(paper.year or ""),
-                journal="Academic Research Publication",
-                journal_metric="Peer-Reviewed",
-                doi=paper.doi or "",
+                journal=paper.venue or "Academic Research Publication",
+                journal_metric=paper.journal_metric or "Peer-Reviewed",
+                doi=clean_doi,
                 abstract=abstract_text,
                 url=paper.url or ""
             )
@@ -197,20 +239,43 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
         except Exception as e:
             logger.warning(f"[PDF Creation Warning]: {e}")
 
-        return (doc_text, filename, chat_id)
+        return (doc_text, filename, chat_id, paper, clean_doi)
 
     # Disk files prepared in thread pool
     docs_to_ingest = await asyncio.gather(*(asyncio.to_thread(prepare_paper_file, p) for p in allowed_sources))
 
     # 2. Single batch vector embedding into Qdrant (1 single API call instead of 50 separate calls)
+    embedding_tuples = [(d[0], d[1], d[2]) for d in docs_to_ingest]
     try:
-        await asyncio.to_thread(rag.ingest_documents_batch, docs_to_ingest)
+        await asyncio.to_thread(rag.ingest_documents_batch, embedding_tuples)
     except Exception as e:
         logger.warning(f"[Batch Vector Ingestion Warning]: {e}")
 
-    # 3. Database commit
-    for _, fname, _ in docs_to_ingest:
-        db_doc = Document(chat_id=chat_id, filename=fname)
+    # 3. Database commit with full metadata
+    import json as _json
+    for doc_text, fname, _cid, paper, clean_doi in docs_to_ingest:
+        abstract_text = paper.snippet.strip()
+        authors_json = _json.dumps(paper.authors or [], ensure_ascii=False)
+        db_doc = Document(
+            chat_id=chat_id,
+            filename=fname,
+            title=paper.title,
+            authors=authors_json,
+            year=str(paper.year or ""),
+            journal=paper.venue or "",
+            journal_metric=paper.journal_metric or "",
+            doi=clean_doi,
+            url=paper.url or "",
+            pdf_url=paper.pdf_url or "",
+            abstract=abstract_text,
+            abstract_type="official" if abstract_text and len(abstract_text) > 80 else "ai_summary",
+            is_oa=paper.is_oa if paper.is_oa is not None else True,
+            access_status="Open Access" if paper.is_oa else "Closed Access",
+            snippet=abstract_text,
+            venue=paper.venue or "",
+            citations=paper.citations or 0,
+            quality_tier=4,
+        )
         db.add(db_doc)
         created_docs.append(db_doc)
         

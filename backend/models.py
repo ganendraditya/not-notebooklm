@@ -50,6 +50,12 @@ class PaperCandidate(BaseModel):
     doi: Optional[str] = ""
     url: Optional[str] = ""
     snippet: Optional[str] = ""
+    authors: Optional[List[str]] = []
+    venue: Optional[str] = ""
+    pdf_url: Optional[str] = ""
+    is_oa: Optional[bool] = True
+    journal_metric: Optional[str] = ""
+    citations: Optional[int] = 0
 
 class ImportSourcesRequest(BaseModel):
     sources: List[PaperCandidate]
