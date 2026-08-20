@@ -1435,7 +1435,7 @@ export default function RightSidebar({
             sortedDocuments.map((doc) => {
               const isChecked = selectedDocs[doc.id] !== undefined ? selectedDocs[doc.id] : true;
               const badge = getFileBadgeInfo(doc.filename);
-              const docIndex = doc.index || (documents.findIndex(d => d.id === doc.id) + 1);
+              const docIndex = (documents.findIndex(d => d.id === doc.id) + 1) || doc.index || 1;
 
               return (
                 <div

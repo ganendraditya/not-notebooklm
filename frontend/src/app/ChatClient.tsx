@@ -236,7 +236,10 @@ export default function ChatClient() {
                       const actionObj = JSON.parse(actionMatch[1]);
                       if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
                         const idSet = new Set(actionObj.deleted_doc_ids);
-                        setDocuments(prev => prev.filter(d => !idSet.has(d.id)));
+                        setDocuments(prev => {
+                          const remaining = prev.filter(d => !idSet.has(d.id));
+                          return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                        });
                       }
                     } catch (e) {
                       console.error("Failed to parse sources action:", e);
@@ -373,7 +376,10 @@ export default function ChatClient() {
                       const actionObj = JSON.parse(actionMatch[1]);
                       if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
                         const idSet = new Set(actionObj.deleted_doc_ids);
-                        setDocuments(prev => prev.filter(d => !idSet.has(d.id)));
+                        setDocuments(prev => {
+                          const remaining = prev.filter(d => !idSet.has(d.id));
+                          return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                        });
                       }
                     } catch (e) {
                       console.error("Failed to parse sources action:", e);
@@ -459,7 +465,10 @@ export default function ChatClient() {
 
   const handleBulkDocumentsDeleted = (docIds: number[]) => {
     const idSet = new Set(docIds);
-    setDocuments(prev => prev.filter(d => !idSet.has(d.id)));
+    setDocuments(prev => {
+      const remaining = prev.filter(d => !idSet.has(d.id));
+      return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+    });
   };
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
