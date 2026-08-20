@@ -14,7 +14,8 @@ export function parseCitationsInReactNode(
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void
 ): React.ReactNode {
   if (typeof node === "string") {
-    const regex = /\[(\d+(?:\s*,\s*\d+|\s*-\s*\d+)*)\]/g;
+    // Support standard bracket citations: [1], [2], [1, 2], [1]-[3], and parenthesis citations: (1), (2), (1, 2)
+    const regex = /(?:\[|\()(\d+(?:\s*,\s*\d+|\s*-\s*\d+)*)(?:\]|\))/g;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
@@ -25,7 +26,7 @@ export function parseCitationsInReactNode(
         parts.push(node.substring(lastIndex, matchIndex));
       }
 
-      // Extract the surrounding sentence/clause context for grounding & auto-highlighting in paper panel
+      // Extract the full sentence / clause context for grounding & auto-highlighting in paper panel
       const textBefore = node.substring(0, matchIndex);
       const textAfter = node.substring(regex.lastIndex);
       
@@ -44,7 +45,7 @@ export function parseCitationsInReactNode(
       );
       const sentenceEnd = nextSentenceEnd !== -1 ? regex.lastIndex + nextSentenceEnd + 1 : node.length;
       
-      const contextSentence = node.substring(sentenceStart, sentenceEnd).replace(/\[\d+(?:\s*,\s*\d+|\s*-\s*\d+)*\]/g, "").trim();
+      const contextSentence = node.substring(sentenceStart, sentenceEnd).replace(/(?:\[|\()\d+(?:\s*,\s*\d+|\s*-\s*\d+)*(?:\]|\))/g, "").trim();
 
       const rawNumbers = match[1];
       const nums: number[] = [];

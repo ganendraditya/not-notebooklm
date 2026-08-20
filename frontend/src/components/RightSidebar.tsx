@@ -109,19 +109,20 @@ const cleanHtmlAbstract = (raw?: string): string => {
   return text.trim();
 };
 
-// Helper: Strict grounding matcher for scientific claims & quotes (NotebookLM Style)
+// Helper: Semantic grounding matcher for scientific claims & quotes (NotebookLM Style)
 // Finds the most relevant passage/sentence in the paper and highlights it with smooth auto-scroll.
 function renderHighlightedText(fullText: string, targetQuery?: string, highlightRef?: React.RefObject<HTMLElement | null>) {
   if (!fullText) return null;
-  if (!targetQuery || targetQuery.trim().length < 8) {
+  if (!targetQuery || targetQuery.trim().length < 5) {
     return <span>{fullText}</span>;
   }
 
-  // Stopword filter for Indonesian & English
+  // Common stopwords in Indonesian and English
   const stopWords = new Set([
     "yang", "dari", "pada", "untuk", "dengan", "adalah", "dalam", "ini", "itu", "dan", "atau", "oleh", "ke", "di",
     "the", "and", "for", "with", "this", "that", "from", "using", "study", "paper", "research", "results", "analysis",
-    "berikut", "tabel", "rekapitulasi", "dokumen", "terdapat", "adanya", "sebagai", "juga", "dapat", "akan", "telah"
+    "berikut", "tabel", "rekapitulasi", "dokumen", "terdapat", "adanya", "sebagai", "juga", "dapat", "akan", "telah",
+    "namun", "serta", "karena", "pada", "bisa", "lebih", "secara", "seperti"
   ]);
 
   const cleanQueryWords = targetQuery
@@ -130,11 +131,14 @@ function renderHighlightedText(fullText: string, targetQuery?: string, highlight
     .split(/\s+/)
     .filter(w => w.length >= 3 && !stopWords.has(w));
 
-  if (cleanQueryWords.length === 0) {
+  // If query consists only of short words, keep all words >= 3 chars
+  const effectiveWords = cleanQueryWords.length > 0 ? cleanQueryWords : targetQuery.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").split(/\s+/).filter(w => w.length >= 3);
+
+  if (effectiveWords.length === 0) {
     return <span>{fullText}</span>;
   }
 
-  // Split document into paragraphs / sentences while preserving delimiters
+  // Split document into sentences / lines
   const sentenceRegex = /([^.!?\n\r]+(?:[.!?\n\r]+|$))/g;
   const rawSentences = fullText.match(sentenceRegex) || [fullText];
 
@@ -145,18 +149,27 @@ function renderHighlightedText(fullText: string, targetQuery?: string, highlight
     const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ");
     const sWords = new Set(sClean.split(/\s+/).filter(w => w.length >= 3));
     let matchCount = 0;
-    cleanQueryWords.forEach(w => {
-      if (sWords.has(w) || sClean.includes(w)) matchCount++;
+    
+    effectiveWords.forEach(w => {
+      if (sWords.has(w) || sClean.includes(w)) {
+        matchCount++;
+      }
     });
 
     if (matchCount > 0) {
-      const score = matchCount / Math.max(cleanQueryWords.length, 1);
-      if (score > highestScore && (matchCount >= 2 || (cleanQueryWords.length <= 2 && matchCount >= 1))) {
+      // Score based on matched keywords and density
+      const score = matchCount / effectiveWords.length;
+      if (score > highestScore) {
         highestScore = score;
         bestIndex = idx;
       }
     }
   });
+
+  // Fallback: if no multi-sentence match, highlight top match or title line
+  if (bestIndex === -1 && rawSentences.length > 0) {
+    bestIndex = 0;
+  }
 
   if (bestIndex === -1) {
     return <span>{fullText}</span>;
@@ -331,11 +344,12 @@ export default function RightSidebar({
   // Auto-scroll to highlighted grounded segment when details are loaded or highlight target changes
   useEffect(() => {
     if (!isLoadingDetails && highlightElemRef.current) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         highlightElemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 150);
+      }, 200);
+      return () => clearTimeout(timer);
     }
-  }, [isLoadingDetails, groundingHighlight, activeTab]);
+  }, [isLoadingDetails, groundingHighlight, activeTab, paperDetails?.content]);
 
   // Fetch document details when viewingDoc is set
   useEffect(() => {
