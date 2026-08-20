@@ -360,7 +360,7 @@ export default function RightSidebar({
       .finally(() => {
         setIsLoadingDetails(false);
       });
-  }, [viewingDoc, activeChatId, backendUrl, groundingHighlight]);
+  }, [viewingDoc, activeChatId, backendUrl, groundingHighlight?.sentence]);
 
   // Close sort menu on click outside
   useEffect(() => {
