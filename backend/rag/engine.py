@@ -493,13 +493,16 @@ async def query_chat(
 
     def is_sources_meta_query(text: str) -> bool:
         t = text.lower().strip()
+        # Do not capture if user explicitly asks to delete / remove
+        if any(dt in t for dt in ["hapus", "hapusin", "remove", "delete", "bersihkan", "buang", "drop"]):
+            return False
         meta_phrases = [
             "berapa dokumen", "berapa file", "berapa banyak dokumen", "berapa jumlah dokumen",
             "berapa total dokumen", "jumlah dokumen", "daftar dokumen", "ada berapa dokumen",
             "ada dokumen apa", "dokumen apa saja", "list dokumen", "sebutkan dokumen",
             "dokumen yang diupload", "dokumen yang diimpor", "berapa source", "jumlah source",
             "berapa referensi", "daftar referensi", "ada referensi apa", "berapa doang", "berapa yang",
-            "yang mana saja", "yang relevan", "relevan berapa", "yang cocok berapa"
+            "yang mana saja", "relevan berapa", "yang cocok berapa"
         ]
         return any(p in t for p in meta_phrases)
 
@@ -567,13 +570,18 @@ async def query_chat(
             await report_status("Checking loaded workspace documents...")
             resp = await target_llm.achat(chat_msgs)
             return clean_response(resp.message.content)
-            await report_status("Checking loaded workspace documents...")
-            resp = await target_llm.achat(chat_msgs)
-            return clean_response(resp.message.content)
 
         # 3. Handle query routing
         def resolve_intent_fast(user_query: str, has_docs: bool) -> str:
             uq = user_query.lower()
+            delete_triggers = [
+                "hapus", "hapusin", "remove", "delete", "bersihkan", "buang", "drop",
+                "ga relevan", "tidak relevan", "irrelevant", "unrelated", "bantu hapus",
+                "hapus yang", "hapuskan", "delete sources", "remove sources"
+            ]
+            if any(dt in uq for dt in delete_triggers) and has_docs:
+                return "REMOVE_SOURCES"
+
             search_triggers = [
                 "cariin", "carikan", "cari paper", "cari jurnal", "search paper", "find paper",
                 "tambah paper", "tambah referensi", "more paper", "find more", "paper", "jurnal",
@@ -589,6 +597,77 @@ async def query_chat(
 
         intent = resolve_intent_fast(query, has_local_docs)
         print(f"[RAG Engine] Fast Resolved Intent: {intent}")
+
+        # 3. Handle Intelligent Source Removal Intent
+        if intent == "REMOVE_SOURCES" and has_local_docs:
+            await report_status("Analyzing documents to identify and remove irrelevant sources...")
+            from database import SessionLocal, Document as DBDocument
+            db_s = SessionLocal()
+            current_db_docs = []
+            try:
+                current_db_docs = db_s.query(DBDocument).filter(DBDocument.chat_id == chat_id).all()
+            finally:
+                db_s.close()
+
+            doc_summaries = []
+            for d in current_db_docs:
+                t = d.title or d.filename.replace(".pdf", "")
+                snippet = (d.abstract or d.snippet or "")[:200]
+                doc_summaries.append(f"- ID: {d.id} | Filename: {d.filename} | Title: {t} | Abstract: {snippet}")
+
+            # If user provides explicit list or asks to delete irrelevant
+            eval_prompt = (
+                "You are an AI Document Cleaner for academic workspaces.\n"
+                f"User Request: \"{query}\"\n\n"
+                "List of loaded documents in this workspace:\n" + "\n".join(doc_summaries) + "\n\n"
+                "Task: Identify ALL document IDs from the list above that the user wants to delete/remove, OR that are not relevant according to the user's criteria (e.g. non-rainfall targets, floods, covid, landslides, etc.).\n"
+                "Return ONLY a valid JSON object matching:\n"
+                "{\n"
+                "  \"remove_doc_ids\": [1, 2, 3],\n"
+                "  \"reason\": \"Summary reason for removal\"\n"
+                "}"
+            )
+            try:
+                eval_resp = await target_llm.acomplete(eval_prompt)
+                clean_json_text = eval_resp.text.strip()
+                clean_json_text = re.sub(r'^```(?:json)?\s*', '', clean_json_text, flags=re.I)
+                clean_json_text = re.sub(r'\s*```$', '', clean_json_text)
+                eval_data = json.loads(clean_json_text)
+                to_delete_ids = eval_data.get("remove_doc_ids", [])
+                
+                deleted_titles = []
+                if to_delete_ids:
+                    db_del = SessionLocal()
+                    try:
+                        docs_to_del = db_del.query(DBDocument).filter(
+                            DBDocument.id.in_(to_delete_ids),
+                            DBDocument.chat_id == chat_id
+                        ).all()
+                        for dd in docs_to_del:
+                            deleted_titles.append(dd.title or dd.filename.replace(".pdf", ""))
+                            # Remove physical file if exists
+                            uploads_d = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+                            fp = os.path.join(uploads_d, f"{chat_id}_{dd.filename}")
+                            if os.path.exists(fp):
+                                try: os.remove(fp)
+                                except Exception: pass
+                            db_del.delete(dd)
+                        db_del.commit()
+                    finally:
+                        db_del.close()
+
+                # Re-sync local vector store / state
+                num_deleted = len(deleted_titles)
+                resp_text = f"Berhasil menghapus **{num_deleted} dokumen** yang tidak relevan dari sources:\n\n"
+                for dt in deleted_titles:
+                    resp_text += f"- ❌ {dt}\n"
+                resp_text += f"\nSisa dokumen di workspace Anda sekarang lebih fokus dan relevan dengan topik riset."
+                
+                action_payload = json.dumps({"action": "bulk_delete", "deleted_doc_ids": to_delete_ids})
+                return f"{resp_text}\n\n<!-- SOURCES_ACTION: {action_payload} -->"
+            except Exception as eval_err:
+                logger.error(f"[Source Clean Error]: {eval_err}")
+                return f"Gagal memproses pembersihan dokumen otomatis: {str(eval_err)}"
 
         # 4. Direct Academic Literature Search Pipeline (OpenAlex, Europe PMC, Crossref with Sources Card UI)
         if intent == "SEARCH_NEW":
@@ -721,6 +800,8 @@ async def query_chat(
                     "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n\n"
                     f"This chat session has {len(local_docs)} imported reference documents in the workspace.\n"
                     "Use ALL document data to answer the user's query comprehensively, accurately, and with clear structure.\n\n"
+                    "CAPABILITY REMINDER:\n"
+                    "- You CAN delete/remove documents directly from the workspace if the user asks you to remove irrelevant sources or clean up documents.\n\n"
                     "CITATION RULES (IEEE STYLE - VERY IMPORTANT):\n"
                     "- Every reference document has a permanent Global Reference Number: [1], [2], [3], etc. as written in the document header.\n"
                     "- When citing, quoting findings, comparing methods, or building tables, ALWAYS include bracketed number citations, e.g. [1], [2], [3], [1, 2], or [1]-[3].\n"

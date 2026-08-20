@@ -50,6 +50,8 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         console.error("Failed to parse sources data:", e);
       }
     }
+    // Clean any internal actions tag
+    clean = clean.replace(/<!-- SOURCES_ACTION:[\s\S]*?-->/, "").trim();
     return { cleanContent: clean, sources: parsedSources };
   }, [msg.content]);
 

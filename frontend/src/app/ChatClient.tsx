@@ -228,6 +228,20 @@ export default function ChatClient() {
                 } else if (data.type === "done") {
                   const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
                   setMessages(prev => [...prev, asstMsg]);
+
+                  // Check if response contains an action payload like deleting documents
+                  const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
+                  if (actionMatch) {
+                    try {
+                      const actionObj = JSON.parse(actionMatch[1]);
+                      if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
+                        const idSet = new Set(actionObj.deleted_doc_ids);
+                        setDocuments(prev => prev.filter(d => !idSet.has(d.id)));
+                      }
+                    } catch (e) {
+                      console.error("Failed to parse sources action:", e);
+                    }
+                  }
                 } else if (data.type === "error") {
                   const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
                   setMessages(prev => [...prev, errorMsg]);
@@ -352,6 +366,19 @@ export default function ChatClient() {
                 } else if (data.type === "done") {
                   const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
                   setMessages(prev => [...prev, asstMsg]);
+
+                  const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
+                  if (actionMatch) {
+                    try {
+                      const actionObj = JSON.parse(actionMatch[1]);
+                      if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
+                        const idSet = new Set(actionObj.deleted_doc_ids);
+                        setDocuments(prev => prev.filter(d => !idSet.has(d.id)));
+                      }
+                    } catch (e) {
+                      console.error("Failed to parse sources action:", e);
+                    }
+                  }
                 } else if (data.type === "error") {
                   const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
                   setMessages(prev => [...prev, errorMsg]);

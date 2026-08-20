@@ -442,6 +442,30 @@ def search_academic_papers_planned(
             if not has_subject:
                 return False
 
+        # Rainfall / Precipitation domain topic validation
+        if any(k in en_query.lower() or k in id_query.lower() for k in ["rainfall", "curah hujan", "precipitation", "rain"]):
+            rain_terms = [
+                "rainfall", "curah hujan", "precipitation", "hujan", "rain", "presipitasi", "rainy", "pluvial"
+            ]
+            has_rain = any(r in full for r in rain_terms)
+            
+            predict_terms = [
+                "predict", "prediksi", "forecast", "forecasting", "peramalan", "prakiraan", 
+                "estimat", "model", "lstm", "arima", "deep learning", "machine learning", 
+                "neural", "xgboost", "catboost", "random forest", "prophet", "nowcast", "time series", "deret waktu"
+            ]
+            has_predict = any(p in full for p in predict_terms)
+            
+            # Reject clear non-rainfall targets (e.g. covid, disease, wildfire, purely general flood depth)
+            unrelated_targets = [
+                "covid-19", "covid", "leishmaniasis", "leishmania", "mortality", "visceral", 
+                "fire in", "fires in", "karhutla", "wildfire"
+            ]
+            if any(u in full for u in unrelated_targets):
+                return False
+                
+            return has_rain and has_predict
+
         if any(k in en_query.lower() or k in id_query.lower() for k in ["sentiment", "sentimen", "opinion", "opini"]):
             sentiment_keys = [
                 "sentiment", "sentimen", "opinion", "opini", "ulasan", 
