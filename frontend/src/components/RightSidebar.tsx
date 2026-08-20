@@ -921,7 +921,7 @@ export default function RightSidebar({
                 </div>
 
                 <p className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
-                  {renderHighlightedText(cleanAbstract, groundingHighlight?.sentence, highlightElemRef)}
+                  {cleanAbstract}
                 </p>
               </div>
             ) : (
@@ -939,7 +939,7 @@ export default function RightSidebar({
                 </div>
 
                 <p className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
-                  {renderHighlightedText(cleanAbstract, groundingHighlight?.sentence, highlightElemRef)}
+                  {cleanAbstract}
                 </p>
               </div>
             )}
