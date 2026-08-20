@@ -26,7 +26,7 @@ export interface InChatMessageProps {
   onDocumentAdded?: (doc: DocType) => void;
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
-  activeCitationNum?: number | null;
+  activeCitationKey?: string | null;
 }
 
 export const InChatMessageComponent = memo(function InChatMessageComponent({ 
@@ -37,7 +37,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   onDocumentAdded, 
   onOpenDocument,
   onEnsureChatSession,
-  activeCitationNum
+  activeCitationKey
 }: InChatMessageProps) {
   const { cleanContent, sources } = useMemo(() => {
     const sourcesMatch = msg.content.match(/<!-- SOURCES_DATA:\s*([\s\S]*?)\s*-->/);
@@ -176,13 +176,13 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
-            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationNum)}</p>,
+            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey)}</p>,
             h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{children}</h1>,
             h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{children}</h2>,
             h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{children}</h3>,
             ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ol>,
-            li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationNum)}</li>,
+            li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey)}</li>,
             strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
             a: ({ href, children }) => (
               <a 
@@ -205,10 +205,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
             tr: ({ children }) => <tr className="hover:bg-white/[0.02] transition-colors">{children}</tr>,
             th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{children}</th>,
-            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationNum)}</td>,
+            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey)}</td>,
             blockquote: ({ children }) => (
               <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-gray-300 bg-blue-500/5 rounded-r-lg italic">
-                {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationNum)}
+                {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey)}
               </blockquote>
             ),
             pre: ({ children }) => (

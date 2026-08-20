@@ -30,6 +30,7 @@ export interface CitationGroundingHighlight {
   docId: number;
   sentence: string;
   num?: number;
+  citationKey?: string;
 }
 
 export interface ChatMessage {
@@ -508,7 +509,8 @@ export default function ChatClient() {
             setGroundingHighlight({
               docId: doc.id,
               sentence: citationContext.sentence,
-              num: citationContext.num
+              num: citationContext.num,
+              citationKey: citationContext.citationKey
             });
           } else {
             setGroundingHighlight(null);
@@ -524,7 +526,7 @@ export default function ChatClient() {
         targetedSource={targetedSource}
         onClearTargetedSource={() => setTargetedSource(null)}
         activeStatus={activeStatus}
-        activeCitationNum={groundingHighlight?.num}
+        activeCitationKey={groundingHighlight?.citationKey}
       />
 
       {/* Right Sidebar: Sources Panel (NotebookLM Style) */}

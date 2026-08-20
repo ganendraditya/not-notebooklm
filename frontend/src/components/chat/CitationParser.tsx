@@ -6,13 +6,14 @@ import { Document as DocType } from "@/app/ChatClient";
 export interface CitationContext {
   sentence: string;
   num: number;
+  citationKey?: string;
 }
 
 export function parseCitationsInReactNode(
   node: React.ReactNode, 
   documents?: DocType[], 
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void,
-  activeCitationNum?: number | null
+  activeCitationKey?: string | null
 ): React.ReactNode {
   if (typeof node === "string") {
     // Support standard bracket citations: [1], [2], [1, 2], [1]-[3], and parenthesis citations: (1), (2), (1, 2)
@@ -73,17 +74,19 @@ export function parseCitationsInReactNode(
               const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
               const docTitle = doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
 
-              const isSelected = activeCitationNum === num;
+              const citeUniqueKey = `cite-${matchIndex}-${num}-${i}`;
+              const isSelected = activeCitationKey === citeUniqueKey;
               return (
                 <button
-                  key={`pill-${num}-${i}`}
+                  key={citeUniqueKey}
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (doc && onOpenDocument) {
                       onOpenDocument(doc, {
                         sentence: contextSentence,
-                        num: num
+                        num: num,
+                        citationKey: citeUniqueKey
                       });
                     }
                   }}
@@ -118,13 +121,13 @@ export function parseCitationsInReactNode(
 
   if (Array.isArray(node)) {
     return node.map((child, idx) => (
-      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationNum)}</React.Fragment>
+      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey)}</React.Fragment>
     ));
   }
 
   if (React.isValidElement(node) && (node.props as any)?.children) {
     return React.cloneElement(node as React.ReactElement<any>, {
-      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument, activeCitationNum)
+      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument, activeCitationKey)
     });
   }
 
