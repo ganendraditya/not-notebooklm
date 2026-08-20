@@ -170,7 +170,7 @@ function renderHighlightedText(fullText: string, targetQuery?: string, highlight
             <mark
               key={idx}
               ref={highlightRef as any}
-              className="bg-amber-500/25 text-amber-200 border-l-4 border-amber-400 font-medium px-1.5 py-0.5 rounded-r inline-block shadow-sm transition-all duration-300 animate-pulse"
+              className="bg-amber-400/25 text-amber-200 px-1 py-0.5 rounded inline font-normal transition-colors box-decoration-clone"
               title="Referenced Citation Context"
             >
               {sentence}
