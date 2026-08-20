@@ -87,14 +87,16 @@ export function parseCitationsInReactNode(
                       });
                     }
                   }}
-                  className={`inline-flex items-center justify-center w-6 h-5 text-[10px] font-mono font-bold rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-none shadow-sm ${
+                  className={`inline-flex items-center justify-center w-6 h-5 text-[10px] font-mono font-bold rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-text shadow-sm ${
                     isSelected
                       ? "bg-amber-400 text-black border border-amber-300 font-extrabold shadow-amber-400/20"
                       : "text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70"
                   }`}
                   title={`[${num}] ${docTitle}\nClick to view source and highlight referenced excerpt`}
                 >
-                  {num}
+                  <span className="sr-only">[</span>
+                  <span>{num}</span>
+                  <span className="sr-only">]</span>
                 </button>
               );
             })}

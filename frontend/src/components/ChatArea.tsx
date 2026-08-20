@@ -83,9 +83,14 @@ export default function ChatArea({
   }, [onSendMessage]);
 
   const handleCopy = useCallback((text: string, idx: number) => {
-    navigator.clipboard.writeText(text);
+    // Convert bracket or parenthesis citations into clean academic brackets e.g. [2], [13]
+    let cleanText = text
+      .replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "")
+      .replace(/<!-- SOURCES_ACTION:[\s\S]*?-->/g, "")
+      .trim();
+    navigator.clipboard.writeText(cleanText);
     setCopiedMessageIdx(idx);
-    setTimeout(() => setCopiedMessageIdx(null), 1500);
+    setTimeout(() => setCopiedMessageIdx(null), 2000);
   }, []);
 
   const handleStartEdit = useCallback((text: string, idx: number) => {
