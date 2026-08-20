@@ -35,7 +35,7 @@ async def upload_document(chat_id: str, file: UploadFile = File(...), db: Sessio
         
     existing_count = db.query(Document).filter(Document.chat_id == chat_id).count()
     if existing_count >= MAX_SOURCES_PER_CHAT:
-        raise HTTPException(status_code=400, detail=f"Batas maksimal tercapai! Percakapan ini sudah memiliki {existing_count}/250 sumber.")
+        raise HTTPException(status_code=400, detail=f"Source limit reached! This conversation already contains {existing_count}/{MAX_SOURCES_PER_CHAT} sources.")
         
     file_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{file.filename}")
     with open(file_path, "wb") as buffer:

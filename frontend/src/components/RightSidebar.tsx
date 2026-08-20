@@ -977,14 +977,14 @@ export default function RightSidebar({
                       <div>
                         <p className="font-semibold text-amber-100">Publication Brief & Abstract (Full Manuscript Paywalled)</p>
                         <p className="text-[11.5px] text-amber-300/80 mt-0.5">
-                          Naskah lengkap 10-20 halaman dilindungi hak cipta penerbit. Sistem menampilkan ringkasan & abstrak resmi berhak cipta untuk referensi AI.
+                          Full publisher manuscript is protected by publisher paywall. Displaying verified academic metadata and official author abstract.
                         </p>
                       </div>
                     </div>
                   ) : (
                     <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 flex items-center gap-2 text-xs text-emerald-300">
                       <Check size={14} className="text-emerald-400 shrink-0" />
-                      <span className="font-medium">Full Manuscript Verified (Naskah Asli Lengkap)</span>
+                      <span className="font-medium">Full Manuscript Verified</span>
                     </div>
                   )}
 

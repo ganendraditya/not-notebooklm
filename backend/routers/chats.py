@@ -90,7 +90,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
         response_text = await rag.query_chat(chat_id, query.message, chat_history=chat_history)
     except Exception as e:
         logger.error(f"[Chat Query Error]: {e}")
-        response_text = f"Maaf, terjadi kesalahan: {str(e)}"
+        response_text = f"Sorry, an error occurred: {str(e)}"
         
     asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
     db.add(asst_msg)
@@ -174,7 +174,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                 })
             except Exception as e:
                 logger.error(f"[Chat Stream Worker Error]: {e}")
-                await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Maaf, terjadi kesalahan: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
+                await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Sorry, an error occurred: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
             finally:
                 await queue.put(None)
                 
@@ -214,8 +214,8 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     try:
         response_text = await rag.query_chat(chat_id, req.message, chat_history=truncated_history)
     except Exception as e:
-        logger.error(f"[Edit Message Error]: {e}")
-        response_text = f"Maaf, terjadi kesalahan: {str(e)}"
+        logger.error(f"[Chat Edit Error]: {e}")
+        response_text = f"Sorry, an error occurred: {str(e)}"
         
     asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
     db.add(asst_msg)
@@ -286,8 +286,8 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
                     }
                 })
             except Exception as e:
-                logger.error(f"[Edit Message Stream Worker Error]: {e}")
-                await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Maaf, terjadi kesalahan: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
+                logger.error(f"[Chat Edit Stream Worker Error]: {e}")
+                await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Sorry, an error occurred: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
             finally:
                 await queue.put(None)
                 

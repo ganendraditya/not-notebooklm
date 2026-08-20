@@ -658,10 +658,10 @@ async def query_chat(
 
                 # Re-sync local vector store / state
                 num_deleted = len(deleted_titles)
-                resp_text = f"Berhasil menghapus **{num_deleted} dokumen** yang tidak relevan dari sources:\n\n"
+                resp_text = f"Successfully removed **{num_deleted} irrelevant document(s)** from sources:\n\n"
                 for dt in deleted_titles:
                     resp_text += f"- ❌ {dt}\n"
-                resp_text += f"\nSisa dokumen di workspace Anda sekarang lebih fokus dan relevan dengan topik riset."
+                resp_text += f"\nYour workspace sources are now focused strictly on your research topic."
                 
                 action_payload = json.dumps({"action": "bulk_delete", "deleted_doc_ids": to_delete_ids})
                 return f"{resp_text}\n\n<!-- SOURCES_ACTION: {action_payload} -->"
