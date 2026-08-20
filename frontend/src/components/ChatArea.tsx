@@ -148,7 +148,7 @@ export default function ChatArea({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 sm:px-6 pt-10 sm:pt-12 pb-6 w-full min-h-0 scroll-smooth"
       >
-        <div className="max-w-3xl mx-auto space-y-6 min-h-full flex flex-col justify-center">
+        <div className={`max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
           {isChatEmpty ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4 w-full max-w-2xl mx-auto my-auto">
               <div className="p-3.5 rounded-full bg-white/5 border border-white/10 mb-4 shadow-sm">
