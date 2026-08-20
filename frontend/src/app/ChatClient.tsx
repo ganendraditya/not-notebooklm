@@ -438,7 +438,13 @@ export default function ChatClient() {
           setDocuments(data.documents || []);
           setMessages(data.messages || []);
         })
-        .catch(err => console.error("Failed to fetch chat details:", err));
+        .catch(err => {
+          console.error("Failed to fetch chat details:", err);
+          // Fallback to query all documents if detail endpoint fails
+          fetch(`${backendUrl}/chats`)
+            .then(r => r.json())
+            .then(sList => setSessions(sList));
+        });
   };
 
   const handleDeleteChat = async (id: string) => {
