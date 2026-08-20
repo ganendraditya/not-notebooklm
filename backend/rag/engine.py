@@ -598,23 +598,57 @@ async def query_chat(
             uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
             full_docs_context_parts = []
             
+            # Fetch all documents from DB for this chat session to use as primary/fallback metadata
+            db_docs_by_filename = {}
+            try:
+                from database import SessionLocal, Document as DBDocument
+                _db = SessionLocal()
+                try:
+                    for db_d in _db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all():
+                        db_docs_by_filename[db_d.filename] = db_d
+                finally:
+                    _db.close()
+            except Exception:
+                pass
+
             for i, fname in enumerate(local_docs):
                 fpath = os.path.join(uploads_dir, f"{chat_id}_{fname}")
                 if not os.path.exists(fpath):
                     fpath = os.path.abspath(os.path.join(os.getcwd(), "uploads", f"{chat_id}_{fname}"))
                     
                 content_snippet = ""
+                db_record = db_docs_by_filename.get(fname)
+                
+                # 1. Try reading physical file first
                 if os.path.exists(fpath):
                     try:
                         with open(fpath, "r", encoding="utf-8", errors="ignore") as fp:
                             raw_text = fp.read()
-                            # Efficient context compression when loading large document sets (> 15 docs)
-                            max_chars = 1200 if len(local_docs) > 20 else 3000
-                            content_snippet = raw_text[:max_chars]
+                            # If file is real text/markdown, use it
+                            if len(raw_text.strip()) >= 150:
+                                max_chars = 1200 if len(local_docs) > 20 else 3000
+                                content_snippet = raw_text[:max_chars]
                     except Exception:
-                        content_snippet = f"(Nama file: {fname})"
-                else:
-                    content_snippet = f"(Nama file: {fname})"
+                        pass
+                        
+                # 2. If physical file is missing, empty, or short stub: read from DB metadata
+                if (not content_snippet or len(content_snippet.strip()) < 150) and db_record:
+                    meta_parts = []
+                    d_title = db_record.title or fname.replace(".pdf", "").replace("_", " ")
+                    d_year = db_record.year or ""
+                    d_venue = db_record.journal or db_record.venue or ""
+                    d_doi = db_record.doi or ""
+                    d_abstract = db_record.abstract or db_record.snippet or ""
+                    
+                    meta_parts.append(f"# {d_title} ({d_year})")
+                    if d_venue: meta_parts.append(f"**Venue/Journal:** {d_venue}")
+                    if d_doi: meta_parts.append(f"**DOI:** {d_doi}")
+                    if d_abstract: meta_parts.append(f"## Abstract & Overview\n{d_abstract}")
+                    
+                    content_snippet = "\n\n".join(meta_parts)
+                    
+                if not content_snippet:
+                    content_snippet = f"(Dokumen: {fname})"
                     
                 full_docs_context_parts.append(
                     f"--- DOKUMEN [{i+1}] ---\n"
