@@ -110,49 +110,51 @@ const cleanHtmlAbstract = (raw?: string): string => {
 };
 
 // Helper: Strict grounding matcher for scientific claims & quotes (NotebookLM Style)
-// Only highlights when there is a strong, definitive semantic overlap (>= 45%) to prevent false highlights on general lists/tables.
+// Finds the most relevant passage/sentence in the paper and highlights it with smooth auto-scroll.
 function renderHighlightedText(fullText: string, targetQuery?: string, highlightRef?: React.RefObject<HTMLElement | null>) {
   if (!fullText) return null;
-  if (!targetQuery || targetQuery.trim().length < 15) {
+  if (!targetQuery || targetQuery.trim().length < 8) {
     return <span>{fullText}</span>;
   }
 
-  // Stopword filter for Indo & Eng to keep only core subject/predicate tokens
+  // Stopword filter for Indonesian & English
   const stopWords = new Set([
     "yang", "dari", "pada", "untuk", "dengan", "adalah", "dalam", "ini", "itu", "dan", "atau", "oleh", "ke", "di",
     "the", "and", "for", "with", "this", "that", "from", "using", "study", "paper", "research", "results", "analysis",
-    "berikut", "tabel", "rekapitulasi", "dokumen", "terdapat", "adanya", "sebagai"
+    "berikut", "tabel", "rekapitulasi", "dokumen", "terdapat", "adanya", "sebagai", "juga", "dapat", "akan", "telah"
   ]);
 
   const cleanQueryWords = targetQuery
     .toLowerCase()
     .replace(/[^a-zA-Z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length >= 4 && !stopWords.has(w));
+    .filter(w => w.length >= 3 && !stopWords.has(w));
 
-  // Must have at least 3 distinctive content keywords to attempt citation grounding
-  if (cleanQueryWords.length < 3) {
+  if (cleanQueryWords.length === 0) {
     return <span>{fullText}</span>;
   }
 
-  // Split document into sentences
-  const sentenceRegex = /([^.!?\n]+[.!?\n]+)/g;
+  // Split document into paragraphs / sentences while preserving delimiters
+  const sentenceRegex = /([^.!?\n\r]+(?:[.!?\n\r]+|$))/g;
   const rawSentences = fullText.match(sentenceRegex) || [fullText];
 
   let bestIndex = -1;
   let highestScore = 0;
 
   rawSentences.forEach((s, idx) => {
-    const sLower = s.toLowerCase();
+    const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ");
+    const sWords = new Set(sClean.split(/\s+/).filter(w => w.length >= 3));
     let matchCount = 0;
     cleanQueryWords.forEach(w => {
-      if (sLower.includes(w)) matchCount++;
+      if (sWords.has(w) || sClean.includes(w)) matchCount++;
     });
-    const overlapRatio = matchCount / cleanQueryWords.length;
-    // Strict threshold: at least 45% of claim words and >= 2 unique keyword hits
-    if (overlapRatio > highestScore && overlapRatio >= 0.45 && matchCount >= 2) {
-      highestScore = overlapRatio;
-      bestIndex = idx;
+
+    if (matchCount > 0) {
+      const score = matchCount / Math.max(cleanQueryWords.length, 1);
+      if (score > highestScore && (matchCount >= 2 || (cleanQueryWords.length <= 2 && matchCount >= 1))) {
+        highestScore = score;
+        bestIndex = idx;
+      }
     }
   });
 
@@ -168,8 +170,8 @@ function renderHighlightedText(fullText: string, targetQuery?: string, highlight
             <mark
               key={idx}
               ref={highlightRef as any}
-              className="bg-amber-500/20 text-amber-200 border-l-2 border-amber-400 font-normal px-1 py-0.5 rounded-r inline transition-colors"
-              title="Grounding citation: Referenced source passage"
+              className="bg-amber-500/25 text-amber-200 border-l-4 border-amber-400 font-medium px-1.5 py-0.5 rounded-r inline-block shadow-sm transition-all duration-300 animate-pulse"
+              title="Referenced Citation Context"
             >
               {sentence}
             </mark>
