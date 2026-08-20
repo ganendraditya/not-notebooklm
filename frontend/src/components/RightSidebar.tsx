@@ -966,10 +966,28 @@ export default function RightSidebar({
               {isLoadingDetails ? (
                 <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
                   <Loader2 size={24} className="animate-spin text-blue-400" />
-                  <p className="text-xs text-gray-400">Loading full paper content...</p>
+                  <p className="text-xs text-gray-400">Loading document content...</p>
                 </div>
               ) : paperDetails?.content ? (
                 <div className="p-4 sm:p-5 rounded-xl bg-[#1b1c1e] border border-white/10 shadow-lg space-y-4">
+                  {/* Status Banner for Abstract Only vs Full Manuscript */}
+                  {paperDetails.content.length < 3500 || paperDetails.content.includes("NOTBOOKLM SCHOLARLY ARCHIVE") ? (
+                    <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-800/40 flex items-start gap-2.5 text-xs text-amber-200">
+                      <Info size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-amber-100">Publication Brief & Abstract (Full Manuscript Paywalled)</p>
+                        <p className="text-[11.5px] text-amber-300/80 mt-0.5">
+                          Naskah lengkap 10-20 halaman dilindungi hak cipta penerbit. Sistem menampilkan ringkasan & abstrak resmi berhak cipta untuk referensi AI.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 flex items-center gap-2 text-xs text-emerald-300">
+                      <Check size={14} className="text-emerald-400 shrink-0" />
+                      <span className="font-medium">Full Manuscript Verified (Naskah Asli Lengkap)</span>
+                    </div>
+                  )}
+
                   {/* Paper Sheet Header */}
                   <div className="pb-3 border-b border-white/10 space-y-2">
                     <div className="flex items-center gap-2">

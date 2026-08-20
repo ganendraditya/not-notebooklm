@@ -291,25 +291,15 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         else:
             res_data["content"] = f"# {doc.title}\n\n*Document file is registered as a reference source.*"
         
-        # Background: try to upgrade to full OA PDF if file is small stub
-        if os.path.exists(file_path) and os.path.getsize(file_path) >= 50000:
+        # Check if local file is a full paper PDF or publication brief template
+        file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+        if file_size >= 40000:
             res_data["is_oa"] = True
             res_data["access_status"] = "Open Access (Full PDF Available)"
-        elif db_doi or res_data.get("pdf_url"):
-            try:
-                fetched_oa = await asyncio.to_thread(
-                    pdf_exporter.resolve_and_fetch_authentic_pdf,
-                    doi=db_doi,
-                    title=doc.title,
-                    candidate_pdf_url=res_data.get("pdf_url")
-                )
-                if fetched_oa and len(fetched_oa) >= 50000:
-                    with open(file_path, "wb") as f:
-                        f.write(fetched_oa)
-                    res_data["is_oa"] = True
-                    res_data["access_status"] = "Open Access (Full PDF Available)"
-            except Exception:
-                pass
+            res_data["is_full_text"] = True
+        else:
+            res_data["is_full_text"] = False
+            res_data["access_status"] = "Publication Brief (Abstract & Overview)"
         
         return res_data
     
@@ -397,11 +387,12 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
     if not res_data["title"] or res_data["title"].lower() in _GENERIC_HEADERS:
         res_data["title"] = clean_filename_title
             
-    # 2. Parse and Clean DOI
-    doi_match = re.search(r"DOI:\*?\*?\s*([^\s\n\*\)]+)", raw_content)
+    # 2. Parse and Clean DOI (restrict regex search to first 2500 chars / header area to avoid catching cited references)
+    header_scope = raw_content[:2500] if len(raw_content) > 2500 else raw_content
+    doi_match = re.search(r"DOI:\*?\*?\s*([^\s\n\*\)]+)", header_scope, re.I)
     extracted_doi = doi_match.group(1).strip() if doi_match else ""
     if not extracted_doi:
-        doi_regex_match = re.search(r"10\.\d{4,9}/[^\s\n<>\"'{}|\\^`]+", raw_content)
+        doi_regex_match = re.search(r"10\.\d{4,9}/[^\s\n<>\"'{}|\\^`]+", header_scope)
         if doi_regex_match:
             extracted_doi = doi_regex_match.group(0).strip()
 
@@ -412,7 +403,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
     res_data["doi"] = extracted_doi
     
     # 3. Parse URL
-    url_match = re.search(r"URL:\*?\*?\s*([^\s\n\*\)]+)", raw_content)
+    url_match = re.search(r"URL:\*?\*?\s*([^\s\n\*\)]+)", header_scope, re.I)
     if url_match:
         res_data["url"] = url_match.group(1).strip()
     elif extracted_doi:
@@ -444,7 +435,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         )
         if meta:
             meta_title = meta.get("title", "").strip()
-            # Only accept meta title if it's NOT a generic publisher header
+            # Only accept meta title if it's NOT a generic publisher header and matches the document
             if meta_title and meta_title.lower() not in _GENERIC_HEADERS:
                 res_data["title"] = meta_title
             else:
@@ -461,7 +452,10 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
                 clean_meta_doi = clean_meta_doi.replace("**", "").replace("*", "")
                 clean_meta_doi = re.sub(r'[;.,:)\s]+$', '', clean_meta_doi).strip()
             res_data["doi"] = clean_meta_doi
-            res_data["url"] = meta.get("url", res_data["url"])
+            if meta.get("url"):
+                res_data["url"] = meta.get("url")
+            elif clean_meta_doi:
+                res_data["url"] = f"https://doi.org/{clean_meta_doi}"
             res_data["pdf_url"] = meta.get("pdf_url", "")
             if not res_data["abstract"] and meta.get("abstract"):
                 res_data["abstract"] = meta.get("abstract")

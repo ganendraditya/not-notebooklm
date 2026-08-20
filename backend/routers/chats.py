@@ -115,6 +115,9 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
     all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
     chat_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs]
     
+    # Check if chat is still using default/raw initial title and needs smart AI naming
+    is_initial_chat_state = len(all_msgs) <= 1 or chat.title in ("New Chat", "New Research", "") or (chat.title and chat.title.endswith("..."))
+    
     async def event_generator():
         import asyncio
         queue = asyncio.Queue()
@@ -124,6 +127,25 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
             
         async def worker():
             try:
+                # 1. Background smart title generation if new chat
+                if is_initial_chat_state:
+                    try:
+                        ai_title = await rag.generate_chat_title(query.message)
+                        if ai_title:
+                            from database import SessionLocal
+                            t_db = SessionLocal()
+                            try:
+                                t_chat = t_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+                                if t_chat:
+                                    t_chat.title = ai_title
+                                    t_db.commit()
+                            finally:
+                                t_db.close()
+                            await queue.put({"type": "title_update", "title": ai_title, "chat_id": chat_id})
+                    except Exception as title_err:
+                        logger.debug(f"[Title Update Error]: {title_err}")
+
+                # 2. Main response generation
                 resp_text = await rag.query_chat(
                     chat_id, 
                     query.message, 

@@ -1031,37 +1031,43 @@ def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper
             req = urllib.request.Request(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
             with urllib.request.urlopen(req, timeout=3) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-                title = data.get("title") or title
-                pub_date = data.get("publication_date") or ""
-                pub_year = str(data.get("publication_year") or "")
-                authors = [a.get("author", {}).get("display_name") for a in data.get("authorships", []) if a.get("author", {}).get("display_name")]
-                loc = data.get("primary_location") or {}
-                src = loc.get("source") or {}
-                if src.get("display_name"):
-                    journal = src.get("display_name")
-                if src.get("issn_l"):
-                    issns.append(src.get("issn_l"))
-                if src.get("issn"):
-                    if isinstance(src.get("issn"), list): issns.extend(src.get("issn"))
-                    else: issns.append(str(src.get("issn")))
-                src_type = src.get("type") or data.get("type", "journal")
-                host_org = src.get("host_organization_name", "")
+                cand_title = data.get("title") or ""
                 
-                citations = data.get("cited_by_count", 0)
-                landing = loc.get("landing_page_url") or data.get("doi") or landing
-                pdf_url = loc.get("pdf_url") or (landing if landing and ".pdf" in landing else "")
-                is_oa = loc.get("is_oa", False)
+                # Check if resolved paper matches the target title (prevent bibliography DOI hijacking)
+                if (title or title_fallback) and cand_title and not is_title_match(cand_title, (title or title_fallback)):
+                    logger.debug(f"[OpenAlex DOI] Rejecting mismatched DOI {clean_doi}: '{cand_title}' vs '{title or title_fallback}'")
+                else:
+                    title = cand_title or title
+                    pub_date = data.get("publication_date") or ""
+                    pub_year = str(data.get("publication_year") or "")
+                    authors = [a.get("author", {}).get("display_name") for a in data.get("authorships", []) if a.get("author", {}).get("display_name")]
+                    loc = data.get("primary_location") or {}
+                    src = loc.get("source") or {}
+                    if src.get("display_name"):
+                        journal = src.get("display_name")
+                    if src.get("issn_l"):
+                        issns.append(src.get("issn_l"))
+                    if src.get("issn"):
+                        if isinstance(src.get("issn"), list): issns.extend(src.get("issn"))
+                        else: issns.append(str(src.get("issn")))
+                    src_type = src.get("type") or data.get("type", "journal")
+                    host_org = src.get("host_organization_name", "")
                     
-                idx = data.get("abstract_inverted_index")
-                if idx:
-                    pos = []
-                    for w, p in idx.items():
-                        for x in p: pos.append((x, w))
-                    pos.sort()
-                    cand_abs = clean_academic_abstract(" ".join([w[1] for w in pos]).strip())
-                    if is_valid_abstract_content(cand_abs):
-                        abstract = cand_abs
-                        abstract_type = "official"
+                    citations = data.get("cited_by_count", 0)
+                    landing = loc.get("landing_page_url") or data.get("doi") or landing
+                    pdf_url = loc.get("pdf_url") or (landing if landing and ".pdf" in landing else "")
+                    is_oa = loc.get("is_oa", False)
+                        
+                    idx = data.get("abstract_inverted_index")
+                    if idx:
+                        pos = []
+                        for w, p in idx.items():
+                            for x in p: pos.append((x, w))
+                        pos.sort()
+                        cand_abs = clean_academic_abstract(" ".join([w[1] for w in pos]).strip())
+                        if is_valid_abstract_content(cand_abs):
+                            abstract = cand_abs
+                            abstract_type = "official"
         except Exception as e:
             logger.debug(f"[OpenAlex DOI] Failed fetching {clean_doi}: {e}")
 
@@ -1112,27 +1118,33 @@ def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper
                 c_data = json.loads(resp.read().decode("utf-8"))
                 msg = c_data.get("message", {})
                 title_list = msg.get("title", [])
-                if not title and title_list:
-                    title = title_list[0]
-                if not authors:
-                    authors = [f"{a.get('given', '')} {a.get('family', '')}".strip() for a in msg.get("author", []) if a.get("family") or a.get("given")]
-                container = msg.get("container-title", [])
-                if container and (not journal or journal == "Peer-reviewed Publication"):
-                    journal = container[0]
-                if not pub_year:
-                    created = msg.get("created", {}).get("date-parts", [[]])[0]
-                    if created: pub_year = str(created[0])
-                if not citations:
-                    citations = msg.get("is-referenced-by-count", 0)
-                if not landing:
-                    landing = msg.get("URL", f"https://doi.org/{clean_doi}")
-                if not abstract:
-                    raw_abstract = msg.get("abstract", "")
-                    if raw_abstract:
-                        cand_abs = clean_academic_abstract(raw_abstract)
-                        if is_valid_abstract_content(cand_abs):
-                            abstract = cand_abs
-                            abstract_type = "official"
+                cr_cand_title = title_list[0] if title_list else ""
+                
+                # Check title match for Crossref DOI resolution
+                if (title or title_fallback) and cr_cand_title and not is_title_match(cr_cand_title, (title or title_fallback)):
+                    logger.debug(f"[Crossref DOI] Rejecting mismatched DOI {clean_doi}: '{cr_cand_title}' vs '{title or title_fallback}'")
+                else:
+                    if not title and cr_cand_title:
+                        title = cr_cand_title
+                    if not authors:
+                        authors = [f"{a.get('given', '')} {a.get('family', '')}".strip() for a in msg.get("author", []) if a.get("family") or a.get("given")]
+                    container = msg.get("container-title", [])
+                    if container and (not journal or journal == "Peer-reviewed Publication"):
+                        journal = container[0]
+                    if not pub_year:
+                        created = msg.get("created", {}).get("date-parts", [[]])[0]
+                        if created: pub_year = str(created[0])
+                    if not citations:
+                        citations = msg.get("is-referenced-by-count", 0)
+                    if not landing:
+                        landing = msg.get("URL", f"https://doi.org/{clean_doi}")
+                    if not abstract:
+                        raw_abstract = msg.get("abstract", "")
+                        if raw_abstract:
+                            cand_abs = clean_academic_abstract(raw_abstract)
+                            if is_valid_abstract_content(cand_abs):
+                                abstract = cand_abs
+                                abstract_type = "official"
         except Exception as e:
             logger.debug(f"[Crossref Fallback] Error resolving DOI {clean_doi}: {e}")
 
@@ -1143,20 +1155,24 @@ def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper
             req = urllib.request.Request(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
             with urllib.request.urlopen(req, timeout=3) as resp:
                 s2_data = json.loads(resp.read().decode("utf-8"))
-                if not authors and s2_data.get("authors"):
-                    authors = [a.get("name") for a in s2_data.get("authors", []) if a.get("name")]
-                if not pub_year and s2_data.get("year"):
-                    pub_year = str(s2_data.get("year"))
-                if not citations and s2_data.get("citationCount"):
-                    citations = s2_data.get("citationCount", 0)
-                if not pdf_url and s2_data.get("openAccessPdf", {}).get("url"):
-                    pdf_url = s2_data.get("openAccessPdf", {}).get("url")
-                s2_abs = s2_data.get("abstract")
-                if s2_abs and not abstract:
-                    cand_abs = clean_academic_abstract(s2_abs)
-                    if is_valid_abstract_content(cand_abs):
-                        abstract = cand_abs
-                        abstract_type = "official"
+                s2_title = s2_data.get("title") or ""
+                if (title or title_fallback) and s2_title and not is_title_match(s2_title, (title or title_fallback)):
+                    logger.debug(f"[S2 DOI] Rejecting mismatched DOI {clean_doi}: '{s2_title}' vs '{title or title_fallback}'")
+                else:
+                    if not authors and s2_data.get("authors"):
+                        authors = [a.get("name") for a in s2_data.get("authors", []) if a.get("name")]
+                    if not pub_year and s2_data.get("year"):
+                        pub_year = str(s2_data.get("year"))
+                    if not citations and s2_data.get("citationCount"):
+                        citations = s2_data.get("citationCount", 0)
+                    if not pdf_url and s2_data.get("openAccessPdf", {}).get("url"):
+                        pdf_url = s2_data.get("openAccessPdf", {}).get("url")
+                    s2_abs = s2_data.get("abstract")
+                    if s2_abs and not abstract:
+                        cand_abs = clean_academic_abstract(s2_abs)
+                        if is_valid_abstract_content(cand_abs):
+                            abstract = cand_abs
+                            abstract_type = "official"
         except Exception as e:
             logger.debug(f"[Semantic Scholar] Error resolving DOI {clean_doi}: {e}")
 

@@ -260,6 +260,60 @@ def fetch_and_ingest_doi(doi: str, chat_id: str) -> str:
     except Exception as e:
         return f"An error occurred while fetching DOI {clean_doi}: {str(e)}"
 
+async def generate_chat_title(first_user_message: str) -> str:
+    """
+    Generates a concise, professional, and descriptive conversation title (max 4-6 words)
+    like standard ChatGPT/Claude from the user's first prompt, eliminating colloquial filler.
+    """
+    clean_prompt = first_user_message.strip()
+    if not clean_prompt:
+        return "New Research"
+        
+    fallback_title = re.sub(
+        r'\b(halo|hai|hey|bro|sis|gan|min|tolong|coba|dong|ya|nih|deh|gw|gua|gue|aku|saya|kamu|lu|lo|bisa|cariin|carikan|cari|search|find|tentang|about|paper|jurnal|artikel|sumber|sources|buah|biji|referensi|makalah|lagi|bos|buat|ke|max|maksimal|tahun|terakhir|ke\s*belakang|jangan|lebih|dari|itu|open access|gratis|free)\b',
+        ' ',
+        clean_prompt,
+        flags=re.I
+    )
+    fallback_title = ' '.join(fallback_title.split()).strip()
+    if len(fallback_title) < 4:
+        fallback_title = clean_prompt[:35]
+    fallback_title = fallback_title.title()[:45].strip()
+
+    candidate_llms = []
+    if ninerouter_llm: candidate_llms.append(ninerouter_llm)
+    if gemini_llm: candidate_llms.append(gemini_llm)
+    if groq_llm: candidate_llms.append(groq_llm)
+    if freellm_llm: candidate_llms.append(freellm_llm)
+
+    if not candidate_llms:
+        return fallback_title or "New Research"
+
+    title_prompt = (
+        "You are an AI conversation title generator.\n"
+        "Task: Create a concise, professional title (2 to 5 words max) summarizing the topic of the user's message.\n"
+        "Guidelines:\n"
+        "- Match the EXACT language/dialect of the user's prompt (if English -> English; if Indonesian -> Indonesian; if Portuguese/Spanish/other -> that exact language).\n"
+        "- If the prompt is just a greeting or short test word like 'tes', 'test', 'ping', 'halo', 'hi', simply return 'Test Conversation' or 'New Chat' in the corresponding language.\n"
+        "- Do not translate or assume Indonesian if the prompt is English or ambiguous.\n"
+        "- Output ONLY the title text. No quotes, no markdown, no punctuation, no 'Title:' prefix.\n\n"
+        f"User Message: {clean_prompt}\n"
+        "Title:"
+    )
+
+    for llm in candidate_llms:
+        try:
+            resp = await llm.acomplete(title_prompt)
+            raw_title = resp.text.strip().strip('"\'*`#').strip()
+            raw_title = re.sub(r'^(Title|Judul|Topic)\s*:\s*', '', raw_title, flags=re.I).strip()
+            if raw_title and len(raw_title) >= 3:
+                return raw_title[:45].strip()
+        except Exception as e:
+            logger.debug(f"[Chat Title Gen Error]: {e}")
+            continue
+
+    return fallback_title or "New Research"
+
 async def query_chat(
     chat_id: str, 
     query: str, 

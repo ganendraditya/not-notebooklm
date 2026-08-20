@@ -131,6 +131,13 @@ def resolve_and_fetch_authentic_pdf(
             upw_resp = requests.get(upw_url, timeout=5)
             if upw_resp.status_code == 200:
                 upw_data = upw_resp.json()
+                upw_title = upw_data.get("title") or ""
+                # Prevent downloading unpaywall PDF if title mismatches target paper
+                if title and upw_title and not (title.lower() in upw_title.lower() or upw_title.lower() in title.lower()):
+                    import difflib
+                    ratio = difflib.SequenceMatcher(None, title.lower(), upw_title.lower()).ratio()
+                    if ratio < 0.6:
+                        upw_data = {}
                 best_oa = upw_data.get("best_oa_location") or {}
                 oa_pdf_url = best_oa.get("url_for_pdf") or best_oa.get("url")
                 if oa_pdf_url:
@@ -173,6 +180,12 @@ def resolve_and_fetch_authentic_pdf(
             oa_resp = requests.get(oa_api_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=5)
             if oa_resp.status_code == 200:
                 work_data = oa_resp.json()
+                oa_work_title = work_data.get("title") or ""
+                if title and oa_work_title and not (title.lower() in oa_work_title.lower() or oa_work_title.lower() in title.lower()):
+                    import difflib
+                    ratio = difflib.SequenceMatcher(None, title.lower(), oa_work_title.lower()).ratio()
+                    if ratio < 0.6:
+                        work_data = {}
                 best_oa = work_data.get("best_oa_location") or {}
                 prim_oa = work_data.get("primary_location") or {}
                 for target_loc in [best_oa, prim_oa]:

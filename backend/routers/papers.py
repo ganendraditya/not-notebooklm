@@ -101,21 +101,42 @@ async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, 
             doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
 
             save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
-            try:
-                pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
-                    title=paper.title,
-                    authors=paper.authors or [],
-                    year=str(paper.year or ""),
-                    journal=paper.venue or "Academic Research Publication",
-                    journal_metric=paper.journal_metric or "Peer-Reviewed",
-                    doi=clean_doi,
-                    abstract=abstract_text,
-                    url=paper.url or ""
-                )
-                with open(save_path, "wb") as f:
-                    f.write(pdf_bytes)
-            except Exception as e:
-                logger.warning(f"[PDF Creation Warning]: {e}")
+            has_downloaded_pdf = False
+            
+            # 1. Proactively try fetching authentic Open Access PDF during import
+            if clean_doi or paper.pdf_url or paper.url:
+                try:
+                    fetched_oa = await asyncio.to_thread(
+                        pdf_exporter.resolve_and_fetch_authentic_pdf,
+                        doi=clean_doi,
+                        title=paper.title,
+                        direct_url=paper.url or "",
+                        candidate_pdf_url=paper.pdf_url or ""
+                    )
+                    if fetched_oa and len(fetched_oa) >= 40000 and fetched_oa.startswith(b"%PDF-"):
+                        with open(save_path, "wb") as f:
+                            f.write(fetched_oa)
+                        has_downloaded_pdf = True
+                except Exception as e:
+                    logger.debug(f"[OA Fetch on Import]: {e}")
+            
+            # 2. If OA PDF is paywalled/not downloadable, generate high quality Publication Brief
+            if not has_downloaded_pdf:
+                try:
+                    pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
+                        title=paper.title,
+                        authors=paper.authors or [],
+                        year=str(paper.year or ""),
+                        journal=paper.venue or "Academic Research Publication",
+                        journal_metric=paper.journal_metric or "Peer-Reviewed",
+                        doi=clean_doi,
+                        abstract=abstract_text,
+                        url=paper.url or ""
+                    )
+                    with open(save_path, "wb") as f:
+                        f.write(pdf_bytes)
+                except Exception as e:
+                    logger.warning(f"[PDF Creation Warning]: {e}")
 
             # Save to DB with full metadata persisted
             local_db = SessionLocal()
@@ -223,21 +244,41 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
         doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
 
         save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
-        try:
-            pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
-                title=paper.title,
-                authors=paper.authors or [],
-                year=str(paper.year or ""),
-                journal=paper.venue or "Academic Research Publication",
-                journal_metric=paper.journal_metric or "Peer-Reviewed",
-                doi=clean_doi,
-                abstract=abstract_text,
-                url=paper.url or ""
-            )
-            with open(save_path, "wb") as f:
-                f.write(pdf_bytes)
-        except Exception as e:
-            logger.warning(f"[PDF Creation Warning]: {e}")
+        has_downloaded_pdf = False
+
+        # 1. Proactively try fetching authentic Open Access PDF during import
+        if clean_doi or paper.pdf_url or paper.url:
+            try:
+                fetched_oa = pdf_exporter.resolve_and_fetch_authentic_pdf(
+                    doi=clean_doi,
+                    title=paper.title,
+                    direct_url=paper.url or "",
+                    candidate_pdf_url=paper.pdf_url or ""
+                )
+                if fetched_oa and len(fetched_oa) >= 40000 and fetched_oa.startswith(b"%PDF-"):
+                    with open(save_path, "wb") as f:
+                        f.write(fetched_oa)
+                    has_downloaded_pdf = True
+            except Exception as e:
+                logger.debug(f"[OA Fetch on Import]: {e}")
+
+        # 2. If OA PDF is paywalled/not downloadable, generate high quality Publication Brief
+        if not has_downloaded_pdf:
+            try:
+                pdf_bytes = pdf_exporter.generate_academic_pdf_bytes(
+                    title=paper.title,
+                    authors=paper.authors or [],
+                    year=str(paper.year or ""),
+                    journal=paper.venue or "Academic Research Publication",
+                    journal_metric=paper.journal_metric or "Peer-Reviewed",
+                    doi=clean_doi,
+                    abstract=abstract_text,
+                    url=paper.url or ""
+                )
+                with open(save_path, "wb") as f:
+                    f.write(pdf_bytes)
+            except Exception as e:
+                logger.warning(f"[PDF Creation Warning]: {e}")
 
         return (doc_text, filename, chat_id, paper, clean_doi)
 

@@ -86,11 +86,11 @@ export default function ChatClient() {
   const handleEnsureChatSession = async (suggestedTitle?: string): Promise<string> => {
     if (activeChatId) return activeChatId;
     
-    // Auto generate clean title from search query or paper name
+    // Initial placeholder title while AI generates the smart topic name
     let title = (suggestedTitle || "New Research").trim();
-    title = title.replace(/^(find|search|look up|get|paper on|journal about|research on)\s+/i, "");
-    if (title.length > 35) {
-      title = title.substring(0, 35) + "...";
+    title = title.replace(/^(find|search|look up|get|paper on|journal about|research on|tolong carikan|cariin)\s+/i, "");
+    if (title.length > 30) {
+      title = title.substring(0, 30) + "...";
     }
     if (!title) title = "New Research";
     title = title.charAt(0).toUpperCase() + title.slice(1);
@@ -216,7 +216,13 @@ export default function ChatClient() {
             if (line.startsWith("data: ")) {
               try {
                 const data = JSON.parse(line.slice(6));
-                if (data.type === "status") {
+                if (data.type === "title_update" && data.title) {
+                  const updatedTitle = data.title;
+                  setSessions(prev => prev.map(s => s.id === currentChatId ? { ...s, title: updatedTitle } : s));
+                  if (activeChatId === currentChatId || !activeChatId) {
+                    document.title = `${updatedTitle} - NotbookLM`;
+                  }
+                } else if (data.type === "status") {
                   const statusText = data.text || data.data;
                   if (statusText) setActiveStatus(statusText);
                 } else if (data.type === "done") {

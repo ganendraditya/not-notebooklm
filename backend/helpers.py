@@ -94,11 +94,13 @@ def get_or_generate_document_pdf(chat_id: str, doc_filename: str) -> tuple:
         else:
             title = first_line
 
-    doi_match = re.search(r'10\.\d{4,9}/[-._;()/:A-Za-z0-9]+', raw_content)
+    # Restrict regex to header area (first 2500 chars) to prevent capturing citations in bibliography
+    header_scope = raw_content[:2500] if len(raw_content) > 2500 else raw_content
+    doi_match = re.search(r'10\.\d{4,9}/[-._;()/:A-Za-z0-9]+', header_scope)
     if doi_match:
         doi = doi_match.group(0).strip().rstrip(".")
 
-    url_match = re.search(r'(?:https?://[^\s\n\)\"]+)', raw_content)
+    url_match = re.search(r'(?:https?://[^\s\n\)\"]+)', header_scope)
     if url_match and "doi.org" in url_match.group(0):
         url = url_match.group(0)
 
