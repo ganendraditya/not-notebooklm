@@ -62,11 +62,16 @@ export default function ChatClient() {
     });
   };
 
-  // Fetch all sessions on mount
+  // Fetch all sessions on mount & auto-select the latest active chat if none selected
   useEffect(() => {
     fetch(`${backendUrl}/chats`)
       .then(res => res.json())
-      .then(data => setSessions(data))
+      .then(data => {
+        setSessions(data);
+        if (data && data.length > 0 && !activeChatId) {
+          handleSelectChat(data[0].id);
+        }
+      })
       .catch(err => console.error("Failed to fetch sessions:", err));
   }, []);
 
