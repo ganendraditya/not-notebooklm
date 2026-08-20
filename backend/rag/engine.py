@@ -507,17 +507,56 @@ async def query_chat(
         return any(p in t for p in meta_phrases)
 
     async def execute_agent(target_llm, timeout_sec=60.0):
-        # 1. Handle casual conversational messages
-        if is_simple_conversational(query):
+        # 1. First, let the LLM semantically classify what the user wants
+        async def classify_user_intent(user_query: str, has_docs: bool) -> str:
+            system_intent_prompt = f"""You are the Master Intent Classifier for NotbookLM research workspace.
+Current Workspace Status: {'Contains ' + str(len(local_docs)) + ' imported documents' if has_docs else 'No documents imported yet'}.
+
+Analyze the user's latest prompt carefully and determine their true intention. Choose strictly ONE of the following 4 categories:
+
+1. 'REMOVE_SOURCES':
+   - ONLY when the user is giving an EXPLICIT, DIRECT COMMAND to delete or remove documents from their sources (e.g. 'tolong hapus 12 paper tadi', 'hapusin paper yang ga relevan', 'delete paper A, B, C', 'buang dokumen yang tidak cocok').
+   - DO NOT choose this if the user is merely asking a question or seeking evaluation (e.g. 'apakah ada yang ga relevan?', 'ada berapa paper yang tidak cocok?').
+
+2. 'SEARCH_NEW':
+   - When the user is asking to find, discover, search, fetch, or recommend NEW academic papers or literature from the internet (e.g. 'cariin 50 paper tentang rainfall', 'find papers about machine learning', 'tambah 20 paper lagi', 'rekomendasiin paper terkini').
+   - DO NOT choose this if the user is asking about the documents already inside their workspace (e.g. 'ada berapa paper di sources?', 'apakah di dokumen saya ada paper Indo?').
+
+3. 'ANALYZE_WORKSPACE':
+   - When the user is asking questions about, crosschecking, synthesizing, summarizing, comparing, or listing the documents ALREADY inside their workspace (e.g. 'ada berapa paper indo di sources?', 'analisis perbandingan metode dari dokumen ini', 'buat ringkasan bab 1', 'apakah ada dokumen yang tidak relevan di sources saya?').
+
+4. 'GENERAL_CHAT':
+   - For greetings, casual questions, thanking, testing, system explanations, or general knowledge questions.
+
+User Prompt: "{user_query}"
+
+Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_WORKSPACE, or GENERAL_CHAT) without quotes or explanations."""
+            try:
+                resp = await target_llm.acomplete(system_intent_prompt)
+                raw_intent = resp.text.strip().upper().replace("'", "").replace('"', "").replace("`", "")
+                for valid in ["REMOVE_SOURCES", "SEARCH_NEW", "ANALYZE_WORKSPACE", "GENERAL_CHAT"]:
+                    if valid in raw_intent:
+                        return valid
+            except Exception as e:
+                logger.debug(f"[Intent Classifier Error]: {e}")
+
+            if has_docs:
+                return "ANALYZE_WORKSPACE"
+            return "GENERAL_CHAT"
+
+        intent = await classify_user_intent(query, has_local_docs)
+        print(f"[RAG Engine] LLM Semantic Intent: {intent}")
+
+        # 1. Handle General Conversational & Technical Discussion
+        if intent == "GENERAL_CHAT":
             chat_msgs = [
                 LlamaChatMessage(
                     role=MessageRole.SYSTEM,
                     content=(
-                        "You are NotbookLM, an intelligent, friendly, and adaptive AI research assistant (like Google NotebookLM).\n"
+                        "You are NotbookLM, an intelligent, transparent, and friendly AI research assistant (like Google NotebookLM).\n"
                         "LANGUAGE RULE (CRITICAL):\n"
-                        "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n"
-                        "- Keep your tone natural, helpful, and concise.\n"
-                        "- State that you are ready to search academic papers, analyze uploaded documents, or extract research insights."
+                        "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese -> Basa Jawa, Spanish -> Spanish).\n"
+                        "- If asked about capabilities or system workings, explain clearly that you are connected to verified academic APIs (OpenAlex, Europe PMC, Crossref) and Qdrant RAG vector database."
                     )
                 ),
                 *(formatted_history if formatted_history else []),
@@ -526,83 +565,6 @@ async def query_chat(
             await report_status("Thinking...")
             resp = await target_llm.achat(chat_msgs)
             return clean_response(resp.message.content)
-
-        # 2. Handle Technical / Conceptual / System Mechanism Discussion (Fast Direct Synthesis)
-        if is_technical_discussion(query):
-            chat_msgs = [
-                LlamaChatMessage(
-                    role=MessageRole.SYSTEM,
-                    content=(
-                        "You are NotbookLM, an advanced, transparent, and communicative AI research assistant (Google NotebookLM style).\n"
-                        "The user is asking about your internal workings, RAG system, vector database, or capabilities.\n\n"
-                        "LANGUAGE RULE (CRITICAL):\n"
-                        "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese -> Basa Jawa, Spanish -> Spanish).\n\n"
-                        "NOTBOOKLM ARCHITECTURE FACTS:\n"
-                        "1. Retrieval-Augmented Generation (RAG): Primary system uses Qdrant Vector Database with BAAI/bge-small-en-v1.5 embeddings.\n"
-                        "2. Document Storage: Every uploaded/imported document is chunked, vector-embedded, and stored privately per chat session.\n"
-                        "3. Paper Search: Connected directly to verified academic APIs: OpenAlex (250M+ papers), Europe PMC, and Crossref.\n"
-                        "4. Open Access & Paywalls: Full-text extraction for Open Access papers. For paywalled papers, official abstracts and public metadata are indexed, with guidance to upload manual PDFs if institutional access is available.\n"
-                        "5. Citations: Research answers cite document references `[1]`, `[2]` linked directly to document metadata.\n"
-                    )
-                ),
-                *(formatted_history if formatted_history else []),
-                LlamaChatMessage(role=MessageRole.USER, content=query)
-            ]
-            await report_status("Explaining system architecture...")
-            resp = await target_llm.achat(chat_msgs)
-            return clean_response(resp.message.content)
-
-        # 2. Fast Meta/Capacity Queries (Direct LLM call with metadata list, no agentic loop)
-        if is_sources_meta_query(query) and has_local_docs:
-            chat_msgs = [
-                LlamaChatMessage(
-                    role=MessageRole.SYSTEM,
-                    content=(
-                        "You are NotbookLM, an intelligent research assistant. "
-                        f"{doc_context_info}\n\n"
-                        "Task: Answer the user's inquiry regarding the documents imported into this workspace accurately and concisely.\n"
-                        "LANGUAGE RULE: Always match the language used by the user in their prompt."
-                    )
-                ),
-                *(formatted_history if formatted_history else []),
-                LlamaChatMessage(role=MessageRole.USER, content=query)
-            ]
-            await report_status("Checking loaded workspace documents...")
-            resp = await target_llm.achat(chat_msgs)
-            return clean_response(resp.message.content)
-
-        # 3. Handle query routing
-        def resolve_intent_fast(user_query: str, has_docs: bool) -> str:
-            uq = user_query.lower()
-            
-            # Check if user EXPLICITLY asks to delete / remove / drop specific files
-            # (Strict command: "hapus...", "tolong hapus...", "remove...", "delete paper...")
-            # NOT questions: "apakah ada yang ga relevan?", "ada yang perlu dihapus ga?", "crosscheck dong"
-            is_question = any(q in uq for q in ["apakah", "apakah ada", "ada yang", "ada gak", "ada kah", "?", "crosscheck", "cek", "evaluasi", "review"])
-            explicit_delete_command = any(dt in uq for dt in [
-                "tolong hapus", "hapusin dong", "hapus dong", "bantu hapus", "hapuskan", 
-                "hapus yang", "hapus paper", "hapus dokumen", "hapus file", "remove sources",
-                "delete sources", "delete these", "remove these", "buang paper", "bersihkan paper"
-            ]) or (any(dt in uq for dt in ["hapus", "remove", "delete"]) and not is_question)
-            
-            if explicit_delete_command and has_docs:
-                return "REMOVE_SOURCES"
-
-            search_triggers = [
-                "cariin", "carikan", "cari paper", "cari jurnal", "search paper", "find paper",
-                "tambah paper", "tambah referensi", "more paper", "find more", "paper", "jurnal",
-                "artikel", "literatur", "makalah", "rekomendasi", "rekomendasikan", "import ke source",
-                "import to source", "masukin ke source", "masukkan ke source", "add to source", "add source",
-                "bisa diimport", "bisa di-import", "masuk ke sources", "masuk sources"
-            ]
-            if any(st in uq for st in search_triggers):
-                return "SEARCH_NEW"
-            if has_docs:
-                return "ANALYZE_WORKSPACE"
-            return "GENERAL_CHAT"
-
-        intent = resolve_intent_fast(query, has_local_docs)
-        print(f"[RAG Engine] Fast Resolved Intent: {intent}")
 
         # 3. Handle Explicit Source Removal Intent (ONLY when explicitly instructed by user)
         if intent == "REMOVE_SOURCES" and has_local_docs:
