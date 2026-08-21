@@ -7,7 +7,8 @@ import {
   MoreHorizontal, 
   Pencil, 
   Trash2, 
-  Share2, 
+  Pin,
+  PinOff,
   Check, 
   X,
   SquarePen,
@@ -24,6 +25,7 @@ interface LeftSidebarProps {
   onCreateChat: () => void;
   onDeleteChat: (id: string) => void;
   onRenameChat: (id: string, newTitle: string) => void;
+  onTogglePinChat?: (id: string) => void;
   onToggleSidebar?: () => void;
 }
 
@@ -34,12 +36,12 @@ export default function LeftSidebar({
   onCreateChat,
   onDeleteChat,
   onRenameChat,
+  onTogglePinChat,
   onToggleSidebar
 }: LeftSidebarProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [chatToRename, setChatToRename] = useState<ChatSession | null>(null);
   const [renameTitleInput, setRenameTitleInput] = useState("");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<ChatSession | null>(null);
@@ -107,18 +109,23 @@ export default function LeftSidebar({
     }
   };
 
-  const handleCopyLink = (id: string, e: React.MouseEvent) => {
+  const handleTogglePin = (session: ChatSession, e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/?chat=${id}`;
-    navigator.clipboard.writeText(url);
-    setCopiedId(id);
-    setTimeout(() => {
-      setCopiedId(null);
-      setOpenMenuId(null);
-    }, 1200);
+    onTogglePinChat?.(session.id);
+    setOpenMenuId(null);
   };
 
-  const filteredSessions = sessions.filter(session => 
+  // Sort sessions: pinned first, then by updated_at / created_at desc
+  const sortedSessions = [...sessions].sort((a, b) => {
+    if (Boolean(a.is_pinned) !== Boolean(b.is_pinned)) {
+      return a.is_pinned ? -1 : 1;
+    }
+    const timeA = new Date(a.updated_at || a.created_at).getTime();
+    const timeB = new Date(b.updated_at || b.created_at).getTime();
+    return timeB - timeA;
+  });
+
+  const filteredSessions = sortedSessions.filter(session => 
     session.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -201,96 +208,132 @@ export default function LeftSidebar({
         )}
       </div>
 
-      {/* Chat History Header */}
-      <div className="mt-3 px-4 text-xs font-medium text-gray-400">
-        Recent chats
-      </div>
-
       {/* History List */}
-      <div className="flex-1 overflow-y-auto px-2 mt-1.5 space-y-0.5 min-h-0">
+      <div className="flex-1 overflow-y-auto px-2 mt-1.5 space-y-4 min-h-0 custom-scrollbar">
         {filteredSessions.length === 0 ? (
           <div className="text-center text-xs text-gray-500 py-8 px-4">
             {searchQuery ? "No conversations found" : "No chat history yet"}
           </div>
         ) : (
-          filteredSessions.map((session) => {
-            const isActive = activeChatId === session.id;
-            const isMenuOpen = openMenuId === session.id;
+          (() => {
+            const pinnedList = filteredSessions.filter(s => s.is_pinned);
+            const recentList = filteredSessions.filter(s => !s.is_pinned);
+
+            const renderSessionItem = (session: ChatSession) => {
+              const isActive = activeChatId === session.id;
+              const isMenuOpen = openMenuId === session.id;
+
+              return (
+                <div key={session.id} className="relative group">
+                  <div
+                    onClick={() => onSelectChat(session.id)}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg transition-all cursor-pointer text-xs ${
+                      isActive 
+                        ? "bg-[#2a2a2a] text-white font-medium shadow-sm" 
+                        : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 truncate mr-1">
+                      {session.is_pinned ? (
+                        <Pin size={13} className="shrink-0 text-amber-400 fill-amber-400/20" />
+                      ) : (
+                        <MessageSquare size={14} className="shrink-0 text-gray-400" />
+                      )}
+                      <span className="truncate">{session.title}</span>
+                    </div>
+
+                    {/* Three-dots button on hover */}
+                    <div className="shrink-0 flex items-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(isMenuOpen ? null : session.id);
+                        }}
+                        className={`p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-opacity cursor-pointer ${
+                          isMenuOpen || isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}
+                        title="Options"
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {isMenuOpen && (
+                    <div
+                      ref={menuRef}
+                      className="absolute right-1 top-9 z-50 w-44 rounded-xl bg-[#222222] border border-white/10 shadow-2xl p-1 text-xs text-gray-200 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                    >
+                      {/* Rename */}
+                      <button
+                        onClick={(e) => handleStartRename(session, e)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                      >
+                        <Pencil size={13} className="text-gray-400" />
+                        <span>Rename</span>
+                      </button>
+
+                      {/* Pin / Unpin */}
+                      <button
+                        onClick={(e) => handleTogglePin(session, e)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                      >
+                        {session.is_pinned ? (
+                          <>
+                            <PinOff size={13} className="text-amber-400" />
+                            <span>Unpin chat</span>
+                          </>
+                        ) : (
+                          <>
+                            <Pin size={13} className="text-gray-400" />
+                            <span>Pin chat</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Delete */}
+                      <button
+                        onClick={(e) => handleRequestDelete(session, e)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                        <span>Delete conversation</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            };
 
             return (
-              <div 
-                key={session.id}
-                className="relative group"
-              >
-                <div
-                  onClick={() => onSelectChat(session.id)}
-                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg transition-all cursor-pointer text-xs ${
-                    isActive 
-                      ? "bg-[#2a2a2a] text-white font-medium shadow-sm" 
-                      : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 truncate mr-1">
-                    <MessageSquare size={14} className="shrink-0 text-gray-400" />
-                    <span className="truncate">{session.title}</span>
+              <div className="space-y-4">
+                {/* Pinned Section */}
+                {pinnedList.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="px-2 text-xs font-medium text-gray-400">
+                      Pinned
+                    </div>
+                    <div className="space-y-0.5">
+                      {pinnedList.map(renderSessionItem)}
+                    </div>
                   </div>
+                )}
 
-                  {/* Three-dots button on hover */}
-                  <div className="shrink-0 flex items-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(isMenuOpen ? null : session.id);
-                      }}
-                      className={`p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-opacity cursor-pointer ${
-                        isMenuOpen || isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                      }`}
-                      title="Options"
-                    >
-                      <MoreHorizontal size={14} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Dropdown Menu */}
-                {isMenuOpen && (
-                  <div
-                    ref={menuRef}
-                    className="absolute right-1 top-9 z-50 w-44 rounded-xl bg-[#222222] border border-white/10 shadow-2xl py-1 text-xs text-gray-200 animate-in fade-in zoom-in-95 duration-100"
-                  >
-                    {/* Rename */}
-                    <button
-                      onClick={(e) => handleStartRename(session, e)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                    >
-                      <Pencil size={13} className="text-gray-400" />
-                      <span>Rename</span>
-                    </button>
-
-                    {/* Share / Copy Link */}
-                    <button
-                      onClick={(e) => handleCopyLink(session.id, e)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                    >
-                      <Share2 size={13} className="text-gray-400" />
-                      <span>{copiedId === session.id ? "Copied! ✅" : "Copy link"}</span>
-                    </button>
-
-                    <div className="h-px bg-white/10 my-1" />
-
-                    {/* Delete */}
-                    <button
-                      onClick={(e) => handleRequestDelete(session, e)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
-                    >
-                      <Trash2 size={13} />
-                      <span>Delete conversation</span>
-                    </button>
+                {/* Recent Section */}
+                {recentList.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="px-2 text-xs font-medium text-gray-400">
+                      Recent chats
+                    </div>
+                    <div className="space-y-0.5">
+                      {recentList.map(renderSessionItem)}
+                    </div>
                   </div>
                 )}
               </div>
             );
-          })
+          })()
         )}
       </div>
 

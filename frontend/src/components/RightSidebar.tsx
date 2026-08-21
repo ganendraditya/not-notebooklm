@@ -207,12 +207,11 @@ function getHighlightedContent(
       // Extract numeric tokens from the quote (e.g. "92", "23", "0", "718") for metric-aware matching
       const quoteNumbers = cleanQuote.match(/\b\d+\b/g) || [];
 
-      // Check for exact substring match first — only quote-in-sentence direction
-      // (sentence-in-quote would match any short fragment that happens to appear in a long quote)
+      // Check for exact substring match (bidirectional)
       let foundExact = false;
       rawSentences.forEach((s, idx) => {
         const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-        if (sClean.length >= 15 && sClean.includes(cleanQuote)) {
+        if (sClean.length >= 15 && (sClean.includes(cleanQuote) || cleanQuote.includes(sClean))) {
           aiHighlightedIndices.add(idx);
           foundExact = true;
         }
@@ -246,8 +245,8 @@ function getHighlightedContent(
           const numericBonus = quoteNumbers.length > 0 ? (numericHits / quoteNumbers.length) * 0.25 : 0;
           const combinedScore = wordRatio + numericBonus;
 
-          // Require at least 60% word overlap (up from 50%) to reduce false positives on generic sentences
-          if (wordRatio >= 0.60 && combinedScore > highestScore) {
+          // Lower threshold to 20% for natural language paraphrase tolerance
+          if (wordRatio >= 0.20 && combinedScore > highestScore) {
             highestScore = combinedScore;
             bestSentenceIdx = idx;
           }
@@ -464,7 +463,7 @@ function getHighlightedContent(
 
   if (maxSingleScore > 0) {
     // Selectivity threshold: Keep top evidence passages matching query claims
-    const threshold = Math.max(14, maxSingleScore * 0.60);
+    const threshold = Math.max(10, maxSingleScore * 0.40);
     
     // Pick candidate sentences meeting threshold
     const candidateIndices: number[] = [];

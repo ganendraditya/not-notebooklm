@@ -11,6 +11,7 @@ export interface ChatSession {
   title: string;
   created_at: string;
   updated_at?: string;
+  is_pinned?: boolean;
 }
 
 export interface Document {
@@ -84,9 +85,15 @@ export default function ChatClient() {
     fetch(`${backendUrl}/chats`)
       .then(res => res.json())
       .then(data => {
-        setSessions(data);
-        if (data && data.length > 0 && !activeChatId) {
-          handleSelectChat(data[0].id);
+        const pinnedStorage = JSON.parse(localStorage.getItem("pinned_chats") || "[]") as string[];
+        const pinnedSet = new Set(pinnedStorage);
+        const hydrated = (data || []).map((s: ChatSession) => ({
+          ...s,
+          is_pinned: pinnedSet.has(s.id)
+        }));
+        setSessions(hydrated);
+        if (hydrated.length > 0 && !activeChatId) {
+          handleSelectChat(hydrated[0].id);
         }
       })
       .catch(err => console.error("Failed to fetch sessions:", err));
@@ -573,7 +580,18 @@ export default function ChatClient() {
           // Fallback to query all documents if detail endpoint fails
           fetch(`${backendUrl}/chats`)
             .then(r => r.json())
-            .then(sList => setSessions(sList));
+            .then(sList => {
+              try {
+                const pinnedStorage = JSON.parse(localStorage.getItem("pinned_chats") || "[]") as string[];
+                const pinnedSet = new Set(pinnedStorage);
+                setSessions((sList || []).map((s: ChatSession) => ({
+                  ...s,
+                  is_pinned: pinnedSet.has(s.id)
+                })));
+              } catch {
+                setSessions(sList || []);
+              }
+            });
         });
   };
 
@@ -603,6 +621,35 @@ export default function ChatClient() {
     } catch (err) {
       console.error("Failed to rename chat:", err);
     }
+  };
+
+  const handleTogglePinChat = (id: string) => {
+    setSessions(prev => {
+      let pinnedStorage: string[] = [];
+      try {
+        pinnedStorage = JSON.parse(localStorage.getItem("pinned_chats") || "[]") as string[];
+      } catch (e) {
+        pinnedStorage = [];
+      }
+
+      const targetSession = prev.find(s => s.id === id);
+      const willPin = targetSession ? !targetSession.is_pinned : true;
+
+      let updatedPinned: string[];
+      if (willPin) {
+        updatedPinned = Array.from(new Set([...pinnedStorage, id]));
+      } else {
+        updatedPinned = pinnedStorage.filter(pId => pId !== id);
+      }
+
+      try {
+        localStorage.setItem("pinned_chats", JSON.stringify(updatedPinned));
+      } catch (e) {
+        console.error("Failed to save pinned chats to localStorage:", e);
+      }
+
+      return prev.map(s => s.id === id ? { ...s, is_pinned: willPin } : s);
+    });
   };
 
   const handleBulkDocumentsDeleted = (docIds: number[]) => {
@@ -663,6 +710,7 @@ export default function ChatClient() {
           onCreateChat={handleCreateChat}
           onDeleteChat={handleDeleteChat}
           onRenameChat={handleRenameChat}
+          onTogglePinChat={handleTogglePinChat}
           onToggleSidebar={() => setIsSidebarOpen(false)}
         />
       )}

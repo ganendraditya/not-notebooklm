@@ -272,6 +272,11 @@ export const ChatInputBox = memo(function ChatInputBox({
           </div>
         </div>
       </div>
+
+      {/* Bottom Disclaimer / Caveat */}
+      <p className="text-center text-[11px] text-gray-400 mt-2 px-2 select-none">
+        NotbookLM can make mistakes. Verify critical facts and citations with original sources.
+      </p>
     </div>
   );
 });
