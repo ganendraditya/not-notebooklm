@@ -490,8 +490,8 @@ async def query_chat(
         text = re.sub(r'\[(?:Lihat\s+Bukti|Bukti\s+Metode|Bukti\s+Temuan)\](?:\([^)]*\))?', '', text, flags=re.IGNORECASE)
 
         # 4. Strip heading and text for manual quote sections, verification panels, anchor links (<a id=...>), and bulleted quote lists
-        text = re.sub(r'\n+#{1,4}\s*(?:Teks\s+Sitasi|Verifikasi\s+Teks|Panel\s+Verifikasi|Highlight\s+Bukti|Kutipan\s+Rujukan|Bukti\s+Klaim|Bukti\s+Kutipan|Kutipan\s+Verbatim)[\s\S]*$', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\n+(?:Teks\s+Sitasi\s+Rujukan|Verifikasi\s+Teks\s+Sitasi|Panel\s+Verifikasi\s+Bukti|Highlight\s+Bukti\s+Klaim|Bukti\s+Kutipan\s+Verbatim|Bukti\s+kutipan\s+langsung)[\s\S]*$', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\n+#{1,4}\s*(?:Teks\s+Sitasi|Verifikasi\s+Teks|Panel\s+Verifikasi|Highlight\s+Bukti|Kutipan\s+Rujukan|Bukti\s+Klaim|Bukti\s+Kutipan|Kutipan\s+Verbatim|Pemetaan\s+Langsung|Bukti\s+Validasi)[\s\S]*$', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\n+(?:Teks\s+Sitasi\s+Rujukan|Verifikasi\s+Teks\s+Sitasi|Panel\s+Verifikasi\s+Bukti|Highlight\s+Bukti\s+Klaim|Bukti\s+Kutipan\s+Verbatim|Bukti\s+kutipan\s+langsung|Berikut\s+adalah\s+pemetaan\s+langsung|Berikut\s+adalah\s+bukti\s+validasi)[\s\S]*$', '', text, flags=re.IGNORECASE)
         
         # 5. Remove any lingering HTML anchors, raw link anchors, or mark tags that LLM attempts to output in chat body
         text = re.sub(r'<a\s+id=[\'"][^\'"]*[\'"]\s*>\s*(?:</a>)?', '', text, flags=re.IGNORECASE)
@@ -853,14 +853,18 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                     "  The Web Application UI ALREADY HAS a built-in interactive citation & sidebar highlighting engine (like Google NotebookLM). Every single time you write standard brackets like `[1]` or `[2]`, the frontend automatically converts it into a clickable blue button pill that opens the right sidebar and highlights the source document text for the user.\n"
                     "- MANDATORY CITATIONS ON ALL CLAIMS & SUMMARIES:\n"
                     "  Whenever discussing, comparing, listing, or summarizing information from workspace documents (including in comparison tables, thematic bullet points, metric findings, or essay sections), you MUST explicitly attach bracketed citations [1], [2], [3] directly to EVERY factual statement, algorithm name, metric, and title.\n"
-                    "- IN COMPARISON TABLES (ZERO QUOTE DRIFT RULE):\n"
-                    "  1. Keep table cells concise and clean. Place bracketed citations [1], [2], etc. directly beside each item/metric in every column (e.g. Dokumen: `[1] Judul Paper`, Metode: `Naïve Bayes [1]`, Temuan: `Akurasi 86.4% [1]`, Limitasi: `Class imbalance [1]`, Rekomendasi: `5 strategi fiskal [1]`).\n"
-                    "  2. DO NOT create dedicated columns or rows for 'Bukti Teks', 'Kutipan', 'Text Proof', or 'Evidence'. Never paste long raw quotes into table cells. The user inspects evidence by clicking the [X] citation buttons.\n"
-                    "- STRICT RULE WHEN USER ASKS FOR PROOF ('BUKTIKAN / VALIDASI / CROSSCHECK / JANGAN ASAL KLAIM'):\n"
-                    "  1. DO NOT dump long verbatim quotes or manual quote sections into the chat body (e.g. DO NOT write 'Bukti kutipan verbatim langsung dari teks dokumen: ...' or lists of long paragraph quotes).\n"
-                    "  2. Provide a crisp, direct summary or comparison table with bracketed citations [1], [2], [3] attached to each verified claim.\n"
-                    "  3. Remind the user concisely that they can click any [1], [2], [3] pill button to instantly open and highlight the exact proof in the source document.\n"
-                    "  4. Put the verbatim excerpt sentences into the hidden <!-- CITATION_MAP --> block at the very end.\n"
+                    "- MASTER COMPARISON TABLE ARCHITECTURE (MANDATORY):\n"
+                    "  1. When comparing documents or presenting synthesis, ALWAYS output strictly ONE single Master Table encompassing all documents (1 row = 1 document).\n"
+                    "  2. Standard columns: `Dokumen / Judul | Metode yang Dipakai | Temuan Utama | Limitasi (Eksplisit) | Rekomendasi (Eksplisit)` (or appropriate columns requested by user).\n"
+                    "  3. STRICTLY FORBIDDEN: NEVER create separate sub-tables per document (e.g. NEVER make 'Tabel Dokumen 1', 'Tabel Dokumen 2', etc.).\n"
+                    "  4. IN EVERY TABLE CELL: Attach bracketed citations [1], [2], etc. directly beside EVERY claim and metric (e.g. Title column: `[1] Judul Paper`, Method column: `• Twitter API [1]<br>• Naïve Bayes [1]`, Findings column: `• Akurasi 86.4% [1]`, Limitation: `• Class imbalance [1]`, Recommendation: `• 5 strategi fiskal [1]`).\n"
+                    "  5. NEVER output table cells or bullet points about documents without their reference number [X].\n"
+                    "- ZERO QUOTE DRIFT & ZERO MANUAL LOCATION TEXT RULE:\n"
+                    "  1. DO NOT create dedicated columns or rows for 'Teks Asli', 'Bukti Teks', 'Kutipan', 'Text Proof', or 'Lokasi' (e.g. NEVER write 'Halaman X, Paragraf Y' or 'Abstrak Baris Z').\n"
+                    "  2. When the user asks to 'buktikan', 'validasi', 'crosscheck', 'jangan asal klaim', or 'mana buktinya':\n"
+                    "     - Provide the clean Master Comparison Table with bracketed citations [1], [2], [3] attached to EVERY fact/claim across all columns.\n"
+                    "     - Remind the user in 1 short sentence: Klik tombol sitasi [1], [2], [3] pada tabel di atas untuk membuka naskah asli dan melihat bukti teks yang disorot (highlight) di sidebar.\n"
+                    "     - Store the exact verbatim sentences in the hidden <!-- CITATION_MAP --> block for precision highlighting.\n"
                     "- STRICT SYNTAX & ANTI-HALLUCINATION RULES:\n"
                     "  1. Use ONLY clean standard numeric bracket citations: `[1]`, `[2]`, `[3]`.\n"
                     "  2. NEVER invent fake buttons or links such as `🔍 Bukti Metode`, `🔍 Bukti Temuan`, `[Lihat Bukti]`, `[M-01]`, `[T-01]`, or `#ref-xx`.\n"
