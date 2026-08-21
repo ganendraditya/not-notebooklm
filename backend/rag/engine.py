@@ -490,8 +490,8 @@ async def query_chat(
         text = re.sub(r'\[(?:Lihat\s+Bukti|Bukti\s+Metode|Bukti\s+Temuan)\](?:\([^)]*\))?', '', text, flags=re.IGNORECASE)
 
         # 4. Strip heading and text for manual quote sections, verification panels, anchor links (<a id=...>), and bulleted quote lists
-        text = re.sub(r'\n+#{1,4}\s*(?:Teks\s+Sitasi|Verifikasi\s+Teks|Panel\s+Verifikasi|Highlight\s+Bukti|Kutipan\s+Rujukan|Bukti\s+Klaim)[\s\S]*$', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\n+(?:Teks\s+Sitasi\s+Rujukan|Verifikasi\s+Teks\s+Sitasi|Panel\s+Verifikasi\s+Bukti|Highlight\s+Bukti\s+Klaim)[\s\S]*$', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\n+#{1,4}\s*(?:Teks\s+Sitasi|Verifikasi\s+Teks|Panel\s+Verifikasi|Highlight\s+Bukti|Kutipan\s+Rujukan|Bukti\s+Klaim|Bukti\s+Kutipan|Kutipan\s+Verbatim)[\s\S]*$', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\n+(?:Teks\s+Sitasi\s+Rujukan|Verifikasi\s+Teks\s+Sitasi|Panel\s+Verifikasi\s+Bukti|Highlight\s+Bukti\s+Klaim|Bukti\s+Kutipan\s+Verbatim|Bukti\s+kutipan\s+langsung)[\s\S]*$', '', text, flags=re.IGNORECASE)
         
         # 5. Remove any lingering HTML anchors, raw link anchors, or mark tags that LLM attempts to output in chat body
         text = re.sub(r'<a\s+id=[\'"][^\'"]*[\'"]\s*>\s*(?:</a>)?', '', text, flags=re.IGNORECASE)
@@ -856,7 +856,11 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                     "- IN COMPARISON TABLES (ZERO QUOTE DRIFT RULE):\n"
                     "  1. Keep table cells concise and clean. Place bracketed citations [1], [2], etc. directly beside each item/metric in every column (e.g. Dokumen: `[1] Judul Paper`, Metode: `Naïve Bayes [1]`, Temuan: `Akurasi 86.4% [1]`, Limitasi: `Class imbalance [1]`, Rekomendasi: `5 strategi fiskal [1]`).\n"
                     "  2. DO NOT create dedicated columns or rows for 'Bukti Teks', 'Kutipan', 'Text Proof', or 'Evidence'. Never paste long raw quotes into table cells. The user inspects evidence by clicking the [X] citation buttons.\n"
-                    "  3. When the user asks to 'buktikan', 'crosscheck', 'tunjukkan bukti', or 'validasi', do NOT dump manual quotes into the chat text. Instead, provide the clean structured synthesis with [X] citations attached to each claim, and store the exact proof sentences in the hidden <!-- CITATION_MAP --> block.\n"
+                    "- STRICT RULE WHEN USER ASKS FOR PROOF ('BUKTIKAN / VALIDASI / CROSSCHECK / JANGAN ASAL KLAIM'):\n"
+                    "  1. DO NOT dump long verbatim quotes or manual quote sections into the chat body (e.g. DO NOT write 'Bukti kutipan verbatim langsung dari teks dokumen: ...' or lists of long paragraph quotes).\n"
+                    "  2. Provide a crisp, direct summary or comparison table with bracketed citations [1], [2], [3] attached to each verified claim.\n"
+                    "  3. Remind the user concisely that they can click any [1], [2], [3] pill button to instantly open and highlight the exact proof in the source document.\n"
+                    "  4. Put the verbatim excerpt sentences into the hidden <!-- CITATION_MAP --> block at the very end.\n"
                     "- STRICT SYNTAX & ANTI-HALLUCINATION RULES:\n"
                     "  1. Use ONLY clean standard numeric bracket citations: `[1]`, `[2]`, `[3]`.\n"
                     "  2. NEVER invent fake buttons or links such as `🔍 Bukti Metode`, `🔍 Bukti Temuan`, `[Lihat Bukti]`, `[M-01]`, `[T-01]`, or `#ref-xx`.\n"
@@ -922,6 +926,7 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                 f"{doc_context_info}\n"
                 "- If the user requests data, paper search, analysis, or summaries, perform it directly using tools.\n"
                 "- MANDATORY CITATION RULE: Whenever referring to local workspace documents, always cite using square brackets [1], [2], [3] directly on every factual claim, method, finding, and metric.\n"
+                "- ZERO QUOTE DUMP RULE: Never dump raw manual quotes into the chat text. The user inspects evidence by clicking [X] buttons which highlight text directly in the document.\n"
                 "- Never output internal thoughts or monologues. Output only the final response."
             )
         )
