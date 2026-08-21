@@ -125,6 +125,7 @@ export default function ChatClient() {
         body: JSON.stringify({ title })
       });
       const newChat = await res.json();
+      activeChatIdRef.current = newChat.id;
       setSessions(prev => [newChat, ...prev]);
       setActiveChatId(newChat.id);
       return newChat.id;
@@ -558,10 +559,13 @@ export default function ChatClient() {
     fetch(`${backendUrl}/chats/${id}`)
         .then(res => res.json())
         .then(data => {
-          // Only apply if user is still looking at this chat
+          // Only apply if user is still looking at this chat and not currently in active streaming
           if (activeChatIdRef.current === id) {
+            const currentJob = getChatJob(id);
             setDocuments(data.documents || []);
-            setMessages(data.messages || []);
+            if (!currentJob.isProcessing) {
+              setMessages(data.messages || []);
+            }
           }
         })
         .catch(err => {
