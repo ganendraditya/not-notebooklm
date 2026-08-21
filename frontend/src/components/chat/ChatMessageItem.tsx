@@ -207,15 +207,15 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
-            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</p>,
-            h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</h1>,
-            h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</h2>,
-            h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</h3>,
+            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "p")}</p>,
+            h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h1")}</h1>,
+            h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h2")}</h2>,
+            h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h3")}</h3>,
             ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ol>,
-            li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</li>,
-            em: ({ children }) => <em className="italic">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</em>,
-            strong: ({ children }) => <strong className="font-semibold text-white">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</strong>,
+            li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "li")}</li>,
+            em: ({ children }) => <em className="italic">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "em")}</em>,
+            strong: ({ children }) => <strong className="font-semibold text-white">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "strong")}</strong>,
             a: ({ href, children }) => (
               <a 
                 href={href} 
@@ -236,11 +236,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             thead: ({ children }) => <thead className="bg-[#24262b] text-gray-200 border-b border-white/10 font-semibold">{children}</thead>,
             tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
             tr: ({ children }) => <tr className="hover:bg-white/[0.02] transition-colors">{children}</tr>,
-            th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</th>,
-            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</td>,
+            th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "th")}</th>,
+            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "td")}</td>,
             blockquote: ({ children }) => (
               <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-gray-300 bg-blue-500/5 rounded-r-lg italic">
-                {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}
+                {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "blockquote")}
               </blockquote>
             ),
             pre: ({ children }) => (

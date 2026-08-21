@@ -91,7 +91,11 @@ const cleanHtmlAbstract = (raw?: string): string => {
   text = text.replace(/<\s*br\s*\/?>/gi, "\n\n");
   text = text.replace(/<\s*\/p\s*>/gi, "\n\n");
   text = text.replace(/<\s*p\s*>/gi, "");
-  // Unescape standard entities
+  // Unescape standard and hex HTML entities (e.g. &#x0D;, &#13;, &#10;)
+  text = text.replace(/&#x0*d;/gi, "\n");
+  text = text.replace(/&#x0*a;/gi, "\n");
+  text = text.replace(/&#13;/g, "\n");
+  text = text.replace(/&#10;/g, "\n");
   text = text.replace(/&amp;/g, "&");
   text = text.replace(/&lt;/g, "<");
   text = text.replace(/&gt;/g, ">");

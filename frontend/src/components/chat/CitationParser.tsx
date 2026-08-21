@@ -17,7 +17,8 @@ export function parseCitationsInReactNode(
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void,
   activeCitationKey?: string | null,
   parentFullText?: string,
-  citationMap?: Record<string, string[]>
+  citationMap?: Record<string, string[]>,
+  elementPrefix: string = "node"
 ): React.ReactNode {
   if (typeof node === "string") {
     // Determine the full text available (use parent/container text if node is a partial string)
@@ -107,14 +108,14 @@ export function parseCitationsInReactNode(
           : "ctx";
 
         parts.push(
-          <span key={`cite-grp-${matchIndex}-${sentenceSnippet}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
+          <span key={`cite-grp-${elementPrefix}-${matchIndex}-${sentenceSnippet}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
             {nums.map((num, i) => {
               const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
               const docTitle = doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
               const aiQuotesForDoc = citationMap?.[num.toString()] || citationMap?.[`[${num}]`];
 
-              // Key includes unique matchIndex to ensure ONLY the clicked citation turns amber/active
-              const citeUniqueKey = `cite-${num}-${matchIndex}-${i}`;
+              // Key includes elementPrefix & unique matchIndex to ensure ONLY the clicked citation turns amber/active
+              const citeUniqueKey = `cite-${elementPrefix}-${num}-${matchIndex}-${i}`;
               const isSelected = activeCitationKey === citeUniqueKey;
               return (
                 <button
@@ -162,13 +163,13 @@ export function parseCitationsInReactNode(
 
   if (Array.isArray(node)) {
     return node.map((child, idx) => (
-      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap)}</React.Fragment>
+      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap, `${elementPrefix}-${idx}`)}</React.Fragment>
     ));
   }
 
   if (React.isValidElement(node) && (node.props as any)?.children) {
     return React.cloneElement(node as React.ReactElement<any>, {
-      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap)
+      children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap, elementPrefix)
     });
   }
 
