@@ -208,12 +208,13 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           remarkPlugins={[remarkGfm]}
           components={{
             p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</p>,
-            h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{children}</h1>,
-            h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{children}</h2>,
-            h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{children}</h3>,
+            h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</h1>,
+            h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</h2>,
+            h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</h3>,
             ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ol>,
             li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</li>,
+            em: ({ children }) => <em className="italic">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</em>,
             strong: ({ children }) => <strong className="font-semibold text-white">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</strong>,
             a: ({ href, children }) => (
               <a 
