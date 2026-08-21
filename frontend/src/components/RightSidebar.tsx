@@ -1711,7 +1711,20 @@ export default function RightSidebar({
                       Official Author Abstract
                     </h3>
                     <div className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans whitespace-pre-wrap select-text break-words bg-black/20 p-3.5 rounded-lg border border-white/5">
-                      {cleanAbstract || "No additional abstract text provided."}
+                      {(() => {
+                        const targetAbstract = cleanAbstract || paperDetails?.abstract || "No additional abstract text provided.";
+                        const res = getHighlightedContent(
+                          targetAbstract,
+                          groundingHighlight?.sentence,
+                          highlightRefsMap,
+                          activeMatchIndex,
+                          groundingHighlight?.aiQuotes
+                        );
+                        if (res.matchCount !== totalMatches) {
+                          setTimeout(() => setTotalMatches(res.matchCount), 0);
+                        }
+                        return res.nodes;
+                      })()}
                     </div>
                   </div>
                 </div>

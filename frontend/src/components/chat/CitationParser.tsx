@@ -102,19 +102,19 @@ export function parseCitationsInReactNode(
 
       if (nums.length > 0) {
         // Create context hash from cell/sentence text so each citation button has a globally unique key
-        const contextHash = contextSentence
-          ? contextSentence.slice(0, 30).replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()
-          : "raw";
+        const sentenceSnippet = contextSentence
+          ? contextSentence.slice(0, 20).replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()
+          : "ctx";
 
         parts.push(
-          <span key={`cite-group-${matchIndex}-${contextHash}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
+          <span key={`cite-grp-${matchIndex}-${sentenceSnippet}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
             {nums.map((num, i) => {
               const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
               const docTitle = doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
               const aiQuotesForDoc = citationMap?.[num.toString()] || citationMap?.[`[${num}]`];
 
-              // Key includes contextHash to prevent two citations of the same document (e.g. Method cell vs Finding cell) from conflicting
-              const citeUniqueKey = `cite-${num}-${contextHash}-${matchIndex}-${i}`;
+              // Key includes unique matchIndex to ensure ONLY the clicked citation turns amber/active
+              const citeUniqueKey = `cite-${num}-${matchIndex}-${i}`;
               const isSelected = activeCitationKey === citeUniqueKey;
               return (
                 <button
