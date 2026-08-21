@@ -23,9 +23,9 @@ export function parseCitationsInReactNode(
     // Determine the full text available (use parent/container text if node is a partial string)
     const effectiveFullText = parentFullText || node;
     // Support standard bracket citations: [1], [2], [1, 2], [1]-[3], [Dokumen 1], [Document 1]
-    // Also support fallback prefixes like [M-01], [T-01], [M-1], [T-1], [ref-1], [P-01]
+    // Also support fallback prefixes like [M-01], [T-01], [M-1], [T-1], [ref-1], [P-01], Dokumen [1], Paper [1], and isolated numbers in parenthesis like (1), (2)
     // Citation numbers correspond to document indices (1 to 500)
-    const regex = /\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\]/gi;
+    const regex = /(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\]|(?:Dokumen|Document|Paper|Source)\s*\[?(\d{1,3})\]?|\((\d{1,3})\))/gi;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
@@ -48,7 +48,7 @@ export function parseCitationsInReactNode(
           .map(c => c.trim())
           .filter(c => c.length > 0 && !/^\d+$/.test(c))
           .join(" . ")
-          .replace(/\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]/gi, "")
+          .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?|\(\d{1,3}\))/gi, "")
           .trim();
       } else {
         // In natural text/paragraphs: find sentence boundaries
@@ -77,12 +77,12 @@ export function parseCitationsInReactNode(
         
         contextSentence = node
           .substring(sentenceStart, sentenceEnd)
-          .replace(/\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]/gi, "")
+          .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?|\(\d{1,3}\))/gi, "")
           .replace(/^[|\s*#_-]+|[|\s*#_-]+$/g, "")
           .trim();
       }
 
-      const rawNumbers = match[1];
+      const rawNumbers = match[1] || match[2] || match[3] || "";
       const nums: number[] = [];
       if (rawNumbers.includes("-")) {
         const [startStr, endStr] = rawNumbers.split("-");

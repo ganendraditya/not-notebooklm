@@ -214,7 +214,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ul>,
             ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ol>,
             li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</li>,
-            strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
+            strong: ({ children }) => <strong className="font-semibold text-white">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</strong>,
             a: ({ href, children }) => (
               <a 
                 href={href} 
@@ -235,7 +235,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             thead: ({ children }) => <thead className="bg-[#24262b] text-gray-200 border-b border-white/10 font-semibold">{children}</thead>,
             tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
             tr: ({ children }) => <tr className="hover:bg-white/[0.02] transition-colors">{children}</tr>,
-            th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{children}</th>,
+            th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</th>,
             td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap)}</td>,
             blockquote: ({ children }) => (
               <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-gray-300 bg-blue-500/5 rounded-r-lg italic">
