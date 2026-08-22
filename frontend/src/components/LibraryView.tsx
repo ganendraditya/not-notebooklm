@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { 
-  X, Search, Trash2, ArrowLeft, Image as ImageIcon, 
+  X, Search, Trash2, Image as ImageIcon, 
   FileText, LayoutGrid, List as ListIcon, Download, Box,
-  MessageSquare
+  Sidebar, MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface LibraryItem {
+export interface LibraryItem {
   id: string;
   type: "file" | "image" | "document" | "other";
   name: string;
@@ -20,21 +20,21 @@ interface LibraryItem {
   chat_title?: string | null;
 }
 
-interface StorageLibraryModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  category: "all" | "documents" | "images";
+interface LibraryViewProps {
+  initialCategory?: "all" | "documents" | "images";
   backendUrl: string;
+  isSidebarOpen: boolean;
+  onOpenSidebar: () => void;
   onSelectChat?: (chatId: string) => void;
 }
 
-export default function StorageLibraryModal({
-  isOpen,
-  onClose,
-  category: initialCategory,
+export default function LibraryView({
+  initialCategory = "all",
   backendUrl,
+  isSidebarOpen,
+  onOpenSidebar,
   onSelectChat
-}: StorageLibraryModalProps) {
+}: LibraryViewProps) {
   const [category, setCategory] = useState<"all" | "documents" | "images">(initialCategory);
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,17 +57,12 @@ export default function StorageLibraryModal({
   }, [isIndeterminate]);
 
   useEffect(() => {
-    if (isOpen) {
-      setCategory(initialCategory);
-      fetchItems(initialCategory, search, sort, sortOrder);
-    }
-  }, [isOpen, initialCategory]);
+    setCategory(initialCategory);
+  }, [initialCategory]);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchItems(category, search, sort, sortOrder);
-    }
-  }, [category, search, sort, sortOrder, isOpen]);
+    fetchItems(category, search, sort, sortOrder);
+  }, [category, search, sort, sortOrder]);
 
   const fetchItems = async (
     cat: string, 
@@ -183,8 +178,6 @@ export default function StorageLibraryModal({
       setIsDownloading(false);
     }
   };
-
-  if (!isOpen) return null;
 
   const formatBytes = (bytes: number) => {
     if (!bytes || bytes === 0) return "0 B";
@@ -308,17 +301,21 @@ export default function StorageLibraryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-[#18181b] text-white animate-in fade-in duration-200">
+    <div className="flex-1 flex flex-col h-full bg-[#212121] text-white relative overflow-hidden">
       {/* Top Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#141416]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#1e1e1e]">
         <div className="flex items-center gap-3">
-          <button 
-            onClick={onClose} 
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Back"
-          >
-            <ArrowLeft size={18} />
-          </button>
+          {!isSidebarOpen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 cursor-pointer mr-1"
+              onClick={onOpenSidebar}
+              title="Open sidebar"
+            >
+              <Sidebar size={18} />
+            </Button>
+          )}
           <h1 className="text-xl font-bold text-white tracking-tight">Library</h1>
         </div>
 
@@ -331,46 +328,38 @@ export default function StorageLibraryModal({
               placeholder="Search files or chats..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-[#212124] border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-xs text-white w-56 sm:w-72 focus:border-white/20 outline-none transition-all placeholder:text-gray-500"
+              className="bg-[#282828] border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-xs text-white w-56 sm:w-72 focus:border-white/20 outline-none transition-all placeholder:text-gray-500"
             />
           </div>
-
-          <button 
-            onClick={onClose} 
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Close"
-          >
-            <X size={18} />
-          </button>
         </div>
       </div>
 
       {/* Filter Tabs & Selection Actions Toolbar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#18181b]">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#1c1c1c]">
         {/* Left Side: Category Tabs & Inline Selection Action Bar */}
         <div className="flex items-center gap-3">
           {/* Pill Category Tabs */}
-          <div className="flex items-center gap-1.5 bg-[#212124] p-1 rounded-full border border-white/10">
+          <div className="flex items-center gap-1.5 bg-[#262626] p-1 rounded-full border border-white/10">
             <button 
               onClick={() => setCategory("all")}
-              className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                category === "all" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                category === "all" ? "bg-[#383838] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
               }`}
             >
               All
             </button>
             <button 
               onClick={() => setCategory("images")}
-              className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                category === "images" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                category === "images" ? "bg-[#383838] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
               }`}
             >
               Images
             </button>
             <button 
               onClick={() => setCategory("documents")}
-              className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                category === "documents" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
+              className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
+                category === "documents" ? "bg-[#383838] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
               }`}
             >
               Documents
@@ -414,7 +403,7 @@ export default function StorageLibraryModal({
 
         {/* Right Side: View Mode Toggle */}
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center bg-[#212124] border border-white/10 rounded-lg p-0.5">
+          <div className="flex items-center bg-[#262626] border border-white/10 rounded-lg p-0.5">
             <button 
               onClick={() => setViewMode("list")}
               className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "list" ? "bg-white/10 text-white" : "text-gray-400 hover:text-gray-200"}`}
@@ -459,7 +448,7 @@ export default function StorageLibraryModal({
                   className="rounded border-white/20 bg-black/40 cursor-pointer"
                 />
               </div>
-
+              
               {/* Name Column */}
               <div 
                 onClick={() => {
@@ -475,7 +464,7 @@ export default function StorageLibraryModal({
                 Name {sort === "name" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
 
-              {/* Conversation Column */}
+              {/* Conversation / Chat Column */}
               <div 
                 onClick={() => {
                   if (sort === "chat") {
@@ -490,7 +479,7 @@ export default function StorageLibraryModal({
                 Conversation {sort === "chat" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
 
-              {/* Modified Column */}
+              {/* Modified Date Column */}
               <div 
                 onClick={() => {
                   if (sort === "date") {
@@ -555,12 +544,11 @@ export default function StorageLibraryModal({
                       onClick={(e) => {
                         if (onSelectChat && item.chat_id) {
                           e.stopPropagation();
-                          onClose();
                           onSelectChat(item.chat_id);
                         }
                       }}
                       title={`Go to conversation: ${item.chat_title}`}
-                      className="text-gray-400 group-hover:text-gray-200 hover:!text-blue-400 transition-colors inline-flex items-center gap-1.5 truncate max-w-full cursor-pointer"
+                      className="text-gray-400 group-hover:text-gray-200 hover:!text-blue-400 transition-colors inline-flex items-center gap-1.5 truncate max-w-full"
                     >
                       <MessageSquare size={13} className="shrink-0 opacity-70" />
                       <span className="truncate">{item.chat_title}</span>

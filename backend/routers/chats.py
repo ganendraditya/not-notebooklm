@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 import shutil
 from sqlalchemy.orm import Session
 
@@ -75,11 +76,29 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
                 attachments = json.loads(msg.attachments_json)
             except:
                 pass
+        variants = None
+        if hasattr(msg, 'variants_json') and msg.variants_json:
+            try:
+                variants = json.loads(msg.variants_json)
+            except:
+                pass
+        if not variants and msg.content:
+            variants = [msg.content]
+            
+        active_var_idx = getattr(msg, 'active_variant_index', 0) or 0
+        if active_var_idx < 0 or active_var_idx >= len(variants):
+            active_var_idx = len(variants) - 1
+            
+        # Display current active variant content
+        curr_content = variants[active_var_idx] if variants else msg.content
+
         msg_responses.append(models.ChatMessageResponse(
             role=msg.role,
-            content=msg.content,
+            content=curr_content,
             created_at=msg.created_at,
-            attachments=attachments
+            attachments=attachments,
+            variants=variants,
+            active_variant_index=active_var_idx
         ))
         
     return models.ChatSessionDetailResponse(
@@ -189,7 +208,19 @@ def bulk_delete_chats(payload: models.BulkDeleteChatsRequest, db: Session = Depe
 @router.post("/chats/{chat_id}/upload_chat_media")
 async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
     """Uploads an image/media attachment for a chat session."""
-    # Ensure chat exists
+    # Check current storage usage against 10GB limit
+    total_bytes_limit = 10 * 1024 * 1024 * 1024
+    used_bytes = 0
+    if os.path.exists(UPLOAD_DIR):
+        for root, _, files in os.walk(UPLOAD_DIR):
+            for f in files:
+                try:
+                    used_bytes += os.path.getsize(os.path.join(root, f))
+                except Exception:
+                    pass
+                    
+    is_storage_full = used_bytes >= total_bytes_limit
+
     # Save file
     file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ".jpg"
     safe_filename = f"{chat_id}_{uuid.uuid4().hex[:8]}{file_ext}"
@@ -198,13 +229,18 @@ async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
         
-    # Return attachment metadata
+    file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+
+    # Return attachment metadata with storage limit awareness
     return {
         "status": "success",
+        "storage_full": is_storage_full,
         "attachment": {
             "type": "image" if file_ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"] else "file",
             "filename": file.filename,
-            "url": f"/uploads/chat_media/{safe_filename}"
+            "size": file_size,
+            "url": f"/uploads/chat_media/{safe_filename}",
+            "chat_only": is_storage_full
         }
     }
 async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depends(get_db)):
@@ -331,7 +367,13 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                 from database import SessionLocal
                 bg_db = SessionLocal()
                 try:
-                    asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=resp_text)
+                    asst_msg = ChatMessage(
+                        chat_id=chat_id, 
+                        role="assistant", 
+                        content=resp_text,
+                        variants_json=json.dumps([resp_text]),
+                        active_variant_index=0
+                    )
                     bg_db.add(asst_msg)
                     bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
                     if bg_chat:
@@ -345,7 +387,9 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                     "message": {
                         "role": "assistant",
                         "content": resp_text,
-                        "created_at": datetime.utcnow().isoformat()
+                        "created_at": datetime.utcnow().isoformat(),
+                        "variants": [resp_text],
+                        "active_variant_index": 0
                     }
                 })
             except Exception as e:
@@ -444,7 +488,13 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
                 from database import SessionLocal
                 bg_db = SessionLocal()
                 try:
-                    asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=resp_text)
+                    asst_msg = ChatMessage(
+                        chat_id=chat_id, 
+                        role="assistant", 
+                        content=resp_text,
+                        variants_json=json.dumps([resp_text]),
+                        active_variant_index=0
+                    )
                     bg_db.add(asst_msg)
                     bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
                     if bg_chat:
@@ -458,7 +508,9 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
                     "message": {
                         "role": "assistant",
                         "content": resp_text,
-                        "created_at": datetime.utcnow().isoformat()
+                        "created_at": datetime.utcnow().isoformat(),
+                        "variants": [resp_text],
+                        "active_variant_index": 0
                     }
                 })
             except Exception as e:
@@ -476,3 +528,135 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
             yield f"data: {json.dumps(item)}\n\n"
             
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@router.post("/chats/{chat_id}/regenerate_stream")
+async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageRequest, db: Session = Depends(get_db)):
+    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+        
+    all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
+    if req.message_index < 0 or req.message_index >= len(all_msgs):
+        raise HTTPException(status_code=400, detail="Invalid message index")
+        
+    target_msg = all_msgs[req.message_index]
+    if target_msg.role != "assistant":
+        raise HTTPException(status_code=400, detail="Only assistant messages can be regenerated")
+        
+    # Find the preceding user message
+    user_prompt = ""
+    for m in reversed(all_msgs[:req.message_index]):
+        if m.role == "user":
+            user_prompt = m.content
+            break
+            
+    if not user_prompt:
+        raise HTTPException(status_code=400, detail="No preceding user message found")
+        
+    # History up to the user message
+    truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index]]
+    target_msg_id = target_msg.id
+    
+    async def event_generator():
+        import asyncio
+        queue = asyncio.Queue()
+        
+        async def status_callback(status_text: str):
+            await queue.put({"type": "status", "text": status_text, "data": status_text})
+            
+        async def worker():
+            try:
+                resp_text = await rag.query_chat(
+                    chat_id, 
+                    user_prompt, 
+                    chat_history=truncated_history, 
+                    status_callback=status_callback
+                )
+                from database import SessionLocal
+                bg_db = SessionLocal()
+                try:
+                    db_msg = bg_db.query(ChatMessage).filter(ChatMessage.id == target_msg_id).first()
+                    if db_msg:
+                        existing_variants = []
+                        if db_msg.variants_json:
+                            try:
+                                existing_variants = json.loads(db_msg.variants_json)
+                            except:
+                                pass
+                        if not existing_variants and db_msg.content:
+                            existing_variants = [db_msg.content]
+                            
+                        existing_variants.append(resp_text)
+                        new_active_idx = len(existing_variants) - 1
+                        
+                        db_msg.content = resp_text
+                        db_msg.variants_json = json.dumps(existing_variants)
+                        db_msg.active_variant_index = new_active_idx
+                        
+                        bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+                        if bg_chat:
+                            bg_chat.updated_at = datetime.utcnow()
+                        bg_db.commit()
+                        
+                        await queue.put({
+                            "type": "done",
+                            "data": resp_text,
+                            "message_index": req.message_index,
+                            "variants": existing_variants,
+                            "active_variant_index": new_active_idx,
+                            "message": {
+                                "role": "assistant",
+                                "content": resp_text,
+                                "created_at": db_msg.created_at.isoformat() if hasattr(db_msg, 'created_at') else datetime.utcnow().isoformat(),
+                                "variants": existing_variants,
+                                "active_variant_index": new_active_idx
+                            }
+                        })
+                finally:
+                    bg_db.close()
+            except Exception as e:
+                logger.error(f"[Chat Regenerate Stream Worker Error]: {e}")
+                await queue.put({"type": "error", "data": str(e)})
+            finally:
+                await queue.put(None)
+                
+        asyncio.create_task(worker())
+        
+        while True:
+            item = await queue.get()
+            if item is None:
+                break
+            yield f"data: {json.dumps(item)}\n\n"
+            
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@router.put("/chats/{chat_id}/select_variant")
+def select_message_variant(chat_id: str, req: models.SelectVariantRequest, db: Session = Depends(get_db)):
+    all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
+    if req.message_index < 0 or req.message_index >= len(all_msgs):
+        raise HTTPException(status_code=400, detail="Invalid message index")
+        
+    target_msg = all_msgs[req.message_index]
+    if target_msg.role != "assistant":
+        raise HTTPException(status_code=400, detail="Only assistant messages have variants")
+        
+    variants = []
+    if target_msg.variants_json:
+        try:
+            variants = json.loads(target_msg.variants_json)
+        except:
+            pass
+    if not variants and target_msg.content:
+        variants = [target_msg.content]
+        
+    if req.variant_index < 0 or req.variant_index >= len(variants):
+        raise HTTPException(status_code=400, detail="Invalid variant index")
+        
+    target_msg.active_variant_index = req.variant_index
+    target_msg.content = variants[req.variant_index]
+    db.commit()
+    return {
+        "status": "success", 
+        "active_variant_index": req.variant_index, 
+        "content": target_msg.content
+    }

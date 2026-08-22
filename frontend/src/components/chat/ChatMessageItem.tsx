@@ -215,36 +215,39 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       >
         {isUser && msg.attachments && msg.attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2 pb-2 border-b border-white/10">
-            {msg.attachments.map((att, idx) => (
-              <a 
-                key={idx} 
-                href={att.url || "#"} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 p-1.5 pr-3 rounded-lg bg-black/40 border border-white/5 hover:border-white/20 transition-colors"
-              >
-                {att.type === "image" ? (
-                  <div className="w-10 h-10 rounded shrink-0 overflow-hidden bg-black/60">
-                    <img src={att.url} alt={att.filename} className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="w-10 h-10 rounded shrink-0 bg-white/5 flex items-center justify-center">
-                    <FileText size={18} className="text-gray-400" />
-                  </div>
-                )}
-                <span className="text-[11px] text-gray-300 font-medium truncate max-w-[150px]">{att.filename}</span>
-              </a>
-            ))}
+            {msg.attachments.map((att, idx) => {
+              const fileHref = att.url?.startsWith("http") ? att.url : `${backendUrl}${att.url || ""}`;
+              return (
+                <a 
+                  key={idx} 
+                  href={fileHref} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 p-1.5 pr-3 rounded-lg bg-black/40 border border-white/5 hover:border-white/20 transition-colors"
+                >
+                  {att.type === "image" ? (
+                    <div className="w-10 h-10 rounded shrink-0 overflow-hidden bg-black/60">
+                      <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-10 h-10 rounded shrink-0 bg-white/5 flex items-center justify-center">
+                      <FileText size={18} className="text-gray-400" />
+                    </div>
+                  )}
+                  <span className="text-[11px] text-gray-300 font-medium truncate max-w-[150px]">{att.filename}</span>
+                </a>
+              );
+            })}
           </div>
         )}
 
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-2">
       {/* 1. Main Markdown Text Content */}
-      <div className="prose prose-invert max-w-none text-[16px] leading-[1.65] space-y-3">
+      <div className="prose prose-invert max-w-none text-[16px] leading-[1.65]">
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
-            p: ({ children }) => <p className="mb-2.5 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "p")}</p>,
+            p: ({ children }) => <p className="mb-2 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "p")}</p>,
             h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h1")}</h1>,
             h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h2")}</h2>,
             h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h3")}</h3>,

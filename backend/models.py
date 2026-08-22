@@ -43,6 +43,8 @@ class ChatMessageResponse(BaseModel):
     content: str
     created_at: datetime
     attachments: Optional[List[AttachmentModel]] = None
+    variants: Optional[List[str]] = None
+    active_variant_index: Optional[int] = 0
     
     class Config:
         from_attributes = True
@@ -80,6 +82,13 @@ class ImportSourcesRequest(BaseModel):
 class EditMessageRequest(BaseModel):
     message_index: int
     message: str
+
+class RegenerateMessageRequest(BaseModel):
+    message_index: int # index of the assistant message to regenerate
+
+class SelectVariantRequest(BaseModel):
+    message_index: int
+    variant_index: int
 
 class BulkDeleteRequest(BaseModel):
     doc_ids: List[int]

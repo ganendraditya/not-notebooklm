@@ -4,19 +4,18 @@ import { useState, useEffect } from "react";
 import { 
   X, 
   HardDrive, 
-  Cpu, 
   Trash2, 
   Sparkles, 
   AlertTriangle, 
   Check, 
-  RefreshCw,
-  Database,
-  Layers,
-  FileText,
-  Sliders,
-  Settings,
-  Bell,
-  Palette
+  RefreshCw, 
+  Database, 
+  Layers, 
+  FileText, 
+  Settings, 
+  Bell, 
+  Palette,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatSession } from "@/app/ChatClient";
@@ -30,6 +29,7 @@ interface SettingsModalProps {
   sessions: ChatSession[];
   onChatsDeleted: (deletedIds: string[]) => void;
   onAllDataReset: () => void;
+  onNavigateToLibrary?: (category: "documents" | "images") => void;
 }
 
 interface StorageSummary {
@@ -45,15 +45,11 @@ interface StorageSummary {
     documents: number;
     others: number;
   };
-}
-
-interface ModelItem {
-  id: string;
-  name: string;
-  provider: string;
-  model_name: string;
-  description: string;
-  active: boolean;
+  category_counts?: {
+    images: number;
+    documents: number;
+    others: number;
+  };
 }
 
 export default function SettingsModal({
@@ -63,9 +59,10 @@ export default function SettingsModal({
   sessions,
   onChatsDeleted,
   onAllDataReset,
+  onNavigateToLibrary,
 }: SettingsModalProps) {
   const { t, language, setLanguage } = useTranslation();
-  const [activeTab, setActiveTab] = useState<"general" | "storage" | "notifications" | "models" | "rag">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "storage" | "notifications">("general");
   
   // Storage State
   const [storageSummary, setStorageSummary] = useState<StorageSummary | null>(null);
@@ -80,15 +77,9 @@ export default function SettingsModal({
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [isResetting, setIsResetting] = useState(false);
 
-  // Models State
-  const [modelsList, setModelsList] = useState<ModelItem[]>([]);
-  const [currentProvider, setCurrentProvider] = useState<string>("");
-  const [isSwitchingModel, setIsSwitchingModel] = useState(false);
-  const [modelToast, setModelToast] = useState<string | null>(null);
-
   // Library View State
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryCategory, setLibraryCategory] = useState<"all" | "files" | "images">("all");
+  const [libraryCategory, setLibraryCategory] = useState<"all" | "documents" | "images">("all");
 
   const fetchStorage = async () => {
     setIsLoadingStorage(true);
@@ -105,23 +96,9 @@ export default function SettingsModal({
     }
   };
 
-  const fetchModels = async () => {
-    try {
-      const res = await fetch(`${backendUrl}/llm/models`);
-      if (res.ok) {
-        const data = await res.json();
-        setModelsList(data.models || []);
-        setCurrentProvider(data.current_provider || "");
-      }
-    } catch (e) {
-      console.error("Failed to fetch models:", e);
-    }
-  };
-
   useEffect(() => {
     if (isOpen) {
       fetchStorage();
-      fetchModels();
     }
   }, [isOpen]);
 
@@ -195,28 +172,6 @@ export default function SettingsModal({
     }
   };
 
-  const handleSelectProvider = async (provider: string, modelName?: string) => {
-    if (isSwitchingModel) return;
-    setIsSwitchingModel(true);
-    try {
-      const res = await fetch(`${backendUrl}/llm/select`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, model_name: modelName })
-      });
-      if (res.ok) {
-        setCurrentProvider(provider);
-        setModelToast(`Switched active provider to ${provider}`);
-        setTimeout(() => setModelToast(null), 2500);
-        fetchModels();
-      }
-    } catch (e) {
-      console.error("Failed to select provider:", e);
-    } finally {
-      setIsSwitchingModel(false);
-    }
-  };
-
   const toggleSelectAllChats = () => {
     if (selectedChatIds.length === sessions.length) {
       setSelectedChatIds([]);
@@ -238,17 +193,12 @@ export default function SettingsModal({
     >
       <div 
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#212124] border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
+        className="bg-[#212124] border border-white/10 rounded-2xl w-full max-w-2xl h-[580px] max-h-[85vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#1b1c1e]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#1b1c1e] shrink-0">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-white">{t('settings.title')}</h2>
-            {modelToast && (
-              <span className="text-xs text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full animate-in fade-in">
-                {modelToast}
-              </span>
-            )}
           </div>
           <button 
             onClick={onClose}
@@ -259,9 +209,9 @@ export default function SettingsModal({
         </div>
 
         {/* Modal Body: Two-column layout with sidebar tabs */}
-        <div className="flex flex-1 min-h-[420px] overflow-hidden">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Settings Left Tab Menu */}
-          <div className="w-48 bg-[#18181b] border-r border-white/5 p-2 space-y-1 shrink-0">
+          <div className="w-48 bg-[#18181b] border-r border-white/5 p-2 space-y-1 shrink-0 overflow-y-auto custom-scrollbar">
             <button
               onClick={() => setActiveTab("general")}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
@@ -297,34 +247,10 @@ export default function SettingsModal({
               <Bell size={15} className={activeTab === "notifications" ? "text-blue-400" : "text-gray-400"} />
               <span>{t('settings.notifications')}</span>
             </button>
-
-            <button
-              onClick={() => setActiveTab("models")}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
-                activeTab === "models" 
-                  ? "bg-white/10 text-white shadow-sm" 
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-              }`}
-            >
-              <Cpu size={15} className={activeTab === "models" ? "text-blue-400" : "text-gray-400"} />
-              <span>{t('settings.models')}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("rag")}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
-                activeTab === "rag" 
-                  ? "bg-white/10 text-white shadow-sm" 
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-              }`}
-            >
-              <Sliders size={15} className={activeTab === "rag" ? "text-blue-400" : "text-gray-400"} />
-              <span>{t('settings.rag')}</span>
-            </button>
           </div>
 
           {/* Settings Tab Content */}
-          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-6">
+          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-6 min-h-0">
             {/* TAB: GENERAL */}
             {activeTab === "general" && (
               <div className="space-y-6">
@@ -334,9 +260,9 @@ export default function SettingsModal({
 
                 <div className="space-y-4">
                   {/* Appearance */}
-                  <div className="flex items-center justify-between py-2 border-b border-white/5">
-                    <span className="text-sm text-gray-200">{t('settings.appearance')}</span>
-                    <select className="bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
+                  <div className="flex items-center justify-between gap-6 py-2.5 border-b border-white/5">
+                    <span className="min-w-0 flex-1 text-sm text-gray-200 truncate">{t('settings.appearance')}</span>
+                    <select className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
                       <option value="system">{t('settings.appearance.system')}</option>
                       <option value="dark">{t('settings.appearance.dark')}</option>
                       <option value="light">{t('settings.appearance.light')}</option>
@@ -344,9 +270,9 @@ export default function SettingsModal({
                   </div>
 
                   {/* Contrast */}
-                  <div className="flex items-center justify-between py-2 border-b border-white/5">
-                    <span className="text-sm text-gray-200">{t('settings.contrast')}</span>
-                    <select className="bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
+                  <div className="flex items-center justify-between gap-6 py-2.5 border-b border-white/5">
+                    <span className="min-w-0 flex-1 text-sm text-gray-200 truncate">{t('settings.contrast')}</span>
+                    <select className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
                       <option value="system">{t('settings.contrast.system')}</option>
                       <option value="default">{t('settings.contrast.default')}</option>
                       <option value="high">{t('settings.contrast.high')}</option>
@@ -354,13 +280,11 @@ export default function SettingsModal({
                   </div>
 
                   {/* Accent Color */}
-                  <div className="flex items-center justify-between py-2 border-b border-white/5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-200">{t('settings.accent')}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                      <select className="bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
+                  <div className="flex items-center justify-between gap-6 py-2.5 border-b border-white/5">
+                    <span className="min-w-0 flex-1 text-sm text-gray-200 truncate">{t('settings.accent')}</span>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></div>
+                      <select className="w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
                         <option value="default">{t('settings.accent.default')}</option>
                         <option value="blue">{t('settings.accent.blue')}</option>
                         <option value="violet">{t('settings.accent.violet')}</option>
@@ -373,12 +297,12 @@ export default function SettingsModal({
                   </div>
 
                   {/* Language */}
-                  <div className="flex items-center justify-between py-2 border-b border-white/5">
-                    <span className="text-sm text-gray-200">{t('settings.language')}</span>
+                  <div className="flex items-center justify-between gap-6 py-2.5 border-b border-white/5">
+                    <span className="min-w-0 flex-1 text-sm text-gray-200 truncate">{t('settings.language')}</span>
                     <select 
                       value={language}
                       onChange={(e) => setLanguage(e.target.value)}
-                      className="bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer max-w-[200px]"
+                      className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer truncate"
                     >
                       <option value="auto">{t('language.auto')}</option>
                       {languages.map(lang => (
@@ -401,36 +325,36 @@ export default function SettingsModal({
 
                 <div className="space-y-4">
                   {/* Responses */}
-                  <div className="flex items-start justify-between py-3 border-b border-white/5">
-                    <div className="space-y-1 max-w-[70%]">
-                      <h4 className="text-sm font-medium text-gray-200">{t('settings.notifications.responses')}</h4>
-                      <p className="text-xs text-gray-400">{t('settings.notifications.responses.desc')}</p>
+                  <div className="flex items-center justify-between gap-6 py-3 border-b border-white/5">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <h4 className="text-sm font-medium text-gray-200 truncate">{t('settings.notifications.responses')}</h4>
+                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed break-words">{t('settings.notifications.responses.desc')}</p>
                     </div>
-                    <select className="bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
+                    <select className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
                       <option value="push">{t('settings.notifications.push')}</option>
                       <option value="off">{t('settings.notifications.off')}</option>
                     </select>
                   </div>
 
                   {/* Tasks & Queue */}
-                  <div className="flex items-start justify-between py-3 border-b border-white/5">
-                    <div className="space-y-1 max-w-[70%]">
-                      <h4 className="text-sm font-medium text-gray-200">{t('settings.notifications.tasks')}</h4>
-                      <p className="text-xs text-gray-400">{t('settings.notifications.tasks.desc')}</p>
+                  <div className="flex items-center justify-between gap-6 py-3 border-b border-white/5">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <h4 className="text-sm font-medium text-gray-200 truncate">{t('settings.notifications.tasks')}</h4>
+                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed break-words">{t('settings.notifications.tasks.desc')}</p>
                     </div>
-                    <select className="bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
+                    <select className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
                       <option value="push">{t('settings.notifications.push')}</option>
                       <option value="off">{t('settings.notifications.off')}</option>
                     </select>
                   </div>
 
                   {/* Downloads & Exports */}
-                  <div className="flex items-start justify-between py-3 border-b border-white/5">
-                    <div className="space-y-1 max-w-[70%]">
-                      <h4 className="text-sm font-medium text-gray-200">{t('settings.notifications.downloads')}</h4>
-                      <p className="text-xs text-gray-400">{t('settings.notifications.downloads.desc')}</p>
+                  <div className="flex items-center justify-between gap-6 py-3 border-b border-white/5">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <h4 className="text-sm font-medium text-gray-200 truncate">{t('settings.notifications.downloads')}</h4>
+                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed break-words">{t('settings.notifications.downloads.desc')}</p>
                     </div>
-                    <select className="bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
+                    <select className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer">
                       <option value="push">{t('settings.notifications.push')}</option>
                       <option value="off">{t('settings.notifications.off')}</option>
                     </select>
@@ -444,90 +368,89 @@ export default function SettingsModal({
               <div className="space-y-6">
                 <div>
                   <h3 className="text-sm font-semibold text-white">{t('settings.storageOverview')}</h3>
-                  <div className="mt-2 w-full bg-[#18181b] rounded-full h-4 overflow-hidden flex border border-white/10">
+                  <div className="mt-1.5 text-xs text-gray-300 font-medium">
+                    <span className="font-semibold text-white">
+                      {storageSummary ? formatBytes(storageSummary.used_bytes || 0) : "0 B"}
+                    </span>{" "}
+                    of {storageSummary ? formatBytes(storageSummary.total_bytes) : "10.0 GB"} {t('settings.used')}
+                  </div>
+                  <div className="mt-2 w-full bg-[#18181b] rounded-full h-2.5 overflow-hidden flex border border-white/10">
                     {storageSummary && (
                       <>
                         <div 
-                          className="bg-blue-500 h-full" 
-                          style={{ width: `${Math.max(1, ((storageSummary.used_bytes || 0) / (10240 * 1024 * 1024)) * 100)}%` }} 
+                          className="bg-blue-500 h-full transition-all" 
+                          style={{ width: `${Math.max(1, ((storageSummary.used_bytes || 0) / (storageSummary.total_bytes || 10240 * 1024 * 1024)) * 100)}%` }} 
                           title={t('settings.filesAndDocuments')}
-                        ></div>
-                        <div 
-                          className="bg-indigo-500 h-full" 
-                          style={{ width: `${Math.max(1, ((storageSummary.qdrant_bytes || 0) / (10240 * 1024 * 1024)) * 100)}%` }}
-                          title="Vector DB"
-                        ></div>
-                        <div 
-                          className="bg-purple-500 h-full" 
-                          style={{ width: `${Math.max(1, ((storageSummary.database_bytes || 0) / (10240 * 1024 * 1024)) * 100)}%` }}
-                          title="Database"
                         ></div>
                       </>
                     )}
                   </div>
-                  <div className="flex justify-between text-[11px] text-gray-400 mt-1.5 px-1">
-                    <span>
-                      {storageSummary ? formatBytes(storageSummary.total_bytes) : "0 B"} {t('settings.used')}
-                    </span>
-                    <span>10.0 GB {t('settings.limit')} (SQLite)</span>
+                </div>
+
+                {/* Manage Storage Section (ChatGPT style) */}
+                <div className="space-y-2">
+                  <div>
+                    <div className="text-sm font-semibold text-white">Manage storage</div>
+                    <div className="text-xs text-gray-400">Manage your library to free up storage</div>
+                  </div>
+
+                  <div className="divide-y divide-white/5 border-y border-white/5">
+                    {/* Files Row */}
+                    <button
+                      onClick={() => {
+                        if (onNavigateToLibrary) {
+                          onClose();
+                          onNavigateToLibrary("documents");
+                        } else {
+                          setLibraryCategory("documents");
+                          setLibraryOpen(true);
+                        }
+                      }}
+                      className="w-full flex items-center justify-between py-3 px-1 hover:bg-white/5 rounded-lg transition-colors text-left group cursor-pointer"
+                    >
+                      <div>
+                        <div className="text-sm text-gray-200 group-hover:text-white font-medium">
+                          {t('settings.filesAndDocuments')}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          {storageSummary ? formatBytes(storageSummary.categories?.documents || 0) : "0 B"} • {storageSummary?.category_counts?.documents ?? 0} files
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-500 group-hover:text-gray-300 transition-colors" />
+                    </button>
+
+                    {/* Images Row */}
+                    <button
+                      onClick={() => {
+                        if (onNavigateToLibrary) {
+                          onClose();
+                          onNavigateToLibrary("images");
+                        } else {
+                          setLibraryCategory("images");
+                          setLibraryOpen(true);
+                        }
+                      }}
+                      className="w-full flex items-center justify-between py-3 px-1 hover:bg-white/5 rounded-lg transition-colors text-left group cursor-pointer"
+                    >
+                      <div>
+                        <div className="text-sm text-gray-200 group-hover:text-white font-medium">
+                          {t('settings.imagesAndMedia')}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          {storageSummary ? formatBytes(storageSummary.categories?.images || 0) : "0 B"} • {storageSummary?.category_counts?.images ?? 0} images
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-gray-500 group-hover:text-gray-300 transition-colors" />
+                    </button>
                   </div>
                 </div>
 
-                {/* Storage Cards */}
-                {storageSummary ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      onClick={() => {
-                        setLibraryCategory("files");
-                        setLibraryOpen(true);
-                      }}
-                      className="bg-[#18181b] border border-white/5 hover:border-white/20 hover:bg-white/5 transition-all rounded-xl p-4 text-left group flex flex-col justify-between min-h-[90px]"
-                    >
-                      <div className="flex items-center justify-between text-gray-400 text-xs">
-                        <span className="group-hover:text-gray-200 transition-colors">{t('settings.filesAndDocuments')}</span>
-                        <FileText size={14} className="text-blue-400" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold text-white mt-2">
-                          {formatBytes(storageSummary.categories?.documents || 0)}
-                        </div>
-                        <div className="text-[11px] text-gray-500 mt-1">
-                          {t('settings.clickToView')}
-                        </div>
-                      </div>
-                    </button>
-
-                    <button 
-                      onClick={() => {
-                        setLibraryCategory("images");
-                        setLibraryOpen(true);
-                      }}
-                      className="bg-[#18181b] border border-white/5 hover:border-white/20 hover:bg-white/5 transition-all rounded-xl p-4 text-left group flex flex-col justify-between min-h-[90px]"
-                    >
-                      <div className="flex items-center justify-between text-gray-400 text-xs">
-                        <span className="group-hover:text-gray-200 transition-colors">{t('settings.imagesAndMedia')}</span>
-                        <Layers size={14} className="text-indigo-400" />
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold text-white mt-2">
-                          {formatBytes(storageSummary.categories?.images || 0)}
-                        </div>
-                        <div className="text-[11px] text-gray-500 mt-1">
-                          {t('settings.clickToView')}
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-xs text-gray-400 py-4 text-center">{t('settings.loadingStorage')}</div>
-                )}
-
                 {/* Maintenance Actions */}
                 <div className="space-y-3 pt-2 border-t border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
                       <div className="text-xs font-semibold text-white">{t('settings.orphanCleanup')}</div>
-                      <div className="text-[11px] text-gray-400">
+                      <div className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
                         {t('settings.orphanCleanupDesc')}
                       </div>
                     </div>
@@ -536,7 +459,7 @@ export default function SettingsModal({
                       variant="outline"
                       onClick={handleCleanOrphans}
                       disabled={isCleaningOrphans}
-                      className="text-xs border-white/10 text-gray-200 hover:bg-white/10 hover:text-white cursor-pointer h-8"
+                      className="text-xs border-white/10 text-gray-200 hover:bg-white/10 hover:text-white cursor-pointer h-8 shrink-0 whitespace-nowrap px-3"
                     >
                       {isCleaningOrphans ? t('settings.cleaning') : t('settings.cleanOrphans')}
                     </Button>
@@ -550,10 +473,10 @@ export default function SettingsModal({
 
                 {/* Bulk Delete Chats */}
                 <div className="space-y-3 pt-4 border-t border-white/10">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
                       <div className="text-xs font-semibold text-white">{t('settings.batchDelete')}</div>
-                      <div className="text-[11px] text-gray-400">
+                      <div className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
                         {t('settings.batchDeleteDesc')}
                       </div>
                     </div>
@@ -562,7 +485,7 @@ export default function SettingsModal({
                         size="sm"
                         onClick={handleBulkDeleteChats}
                         disabled={isDeletingChats}
-                        className="text-xs bg-red-600 hover:bg-red-500 text-white cursor-pointer h-8"
+                        className="text-xs bg-red-600 hover:bg-red-500 text-white cursor-pointer h-8 shrink-0 whitespace-nowrap px-3"
                       >
                         {isDeletingChats ? t('settings.deleting') : `${t('settings.deleteSelected')} (${selectedChatIds.length})`}
                       </Button>
@@ -602,10 +525,10 @@ export default function SettingsModal({
 
                 {/* Danger Zone: Factory Reset */}
                 <div className="pt-4 border-t border-red-500/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="min-w-0 flex-1 pr-2">
                       <div className="text-xs font-semibold text-red-400">{t('settings.factoryReset')}</div>
-                      <div className="text-[11px] text-gray-400">
+                      <div className="text-[11px] text-gray-400 mt-0.5 leading-relaxed break-words">
                         {t('settings.factoryResetDesc')}
                       </div>
                     </div>
@@ -613,7 +536,7 @@ export default function SettingsModal({
                       size="sm"
                       variant="destructive"
                       onClick={() => setIsResetConfirmOpen(true)}
-                      className="text-xs bg-red-950/60 text-red-400 border border-red-500/30 hover:bg-red-900 hover:text-white cursor-pointer h-8"
+                      className="text-xs bg-red-950/60 text-red-400 border border-red-500/30 hover:bg-red-900 hover:text-white cursor-pointer h-8 shrink-0 whitespace-nowrap px-3.5"
                     >
                       {t('settings.factoryReset')}
                     </Button>
@@ -654,102 +577,7 @@ export default function SettingsModal({
                 </div>
               </div>
             )}
-
-            {/* TAB 2: MODELS & AI */}
-            {activeTab === "models" && (
-              <div className="space-y-5">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">{t('settings.activeLlm')}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {t('settings.activeLlmDesc')}
-                  </p>
-                </div>
-
-                <div className="space-y-2.5">
-                  {modelsList.map((m) => {
-                    const isActive = currentProvider.toLowerCase() === m.id.toLowerCase();
-                    return (
-                      <div
-                        key={m.id}
-                        onClick={() => handleSelectProvider(m.id, m.model_name)}
-                        className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-3 ${
-                          isActive 
-                            ? "bg-[#27282d] border-blue-500 shadow-md" 
-                            : "bg-[#18181b] border-white/5 hover:border-white/15"
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-white">{m.name}</span>
-                            {isActive && (
-                              <span className="text-[10px] bg-blue-500/20 text-blue-400 font-medium px-2 py-0.5 rounded-full border border-blue-500/30 flex items-center gap-1">
-                                <Check size={10} /> Active
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-gray-400 leading-relaxed">
-                            {m.description}
-                          </p>
-                        </div>
-                        <input
-                          type="radio"
-                          name="llm_provider"
-                          checked={isActive}
-                          onChange={() => handleSelectProvider(m.id, m.model_name)}
-                          className="mt-1 cursor-pointer"
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: RAG PARAMETERS */}
-            {activeTab === "rag" && (
-              <div className="space-y-5">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">{t('settings.retrievalGrounding')}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {t('settings.retrievalGroundingDesc')}
-                  </p>
-                </div>
-
-                <div className="space-y-4 bg-[#18181b] border border-white/5 rounded-xl p-4">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-gray-200">{t('settings.citationThreshold')}</span>
-                      <span className="text-gray-400">20% {t('settings.fuzzyMatch')}</span>
-                    </div>
-                    <p className="text-[11px] text-gray-400">
-                      {t('settings.citationThresholdDesc')}
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5 pt-3 border-t border-white/5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-gray-200">{t('settings.localEmbeddings')}</span>
-                      <span className="text-emerald-400 font-mono">BAAI/bge-small-en-v1.5</span>
-                    </div>
-                    <p className="text-[11px] text-gray-400">
-                      {t('settings.localEmbeddingsDesc')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-
-        {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-white/10 bg-[#1b1c1e] flex justify-end">
-          <Button
-            size="sm"
-            onClick={onClose}
-            className="text-xs bg-white/10 hover:bg-white/15 text-white cursor-pointer px-4 h-8"
-          >
-            {t('settings.close')}
-          </Button>
         </div>
       </div>
 

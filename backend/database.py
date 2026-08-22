@@ -75,7 +75,9 @@ class ChatMessage(Base):
     chat_id = Column(String, ForeignKey("chat_sessions.id"))
     role = Column(String) # 'user' or 'assistant'
     content = Column(Text)
-    attachments_json = Column(Text, nullable=True) # NEW: store attachments JSON
+    attachments_json = Column(Text, nullable=True) # store attachments JSON
+    variants_json = Column(Text, nullable=True) # JSON list of string variants [v1, v2, ...]
+    active_variant_index = Column(Integer, default=0, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     chat_session = relationship("ChatSession", back_populates="messages")
@@ -125,6 +127,12 @@ try:
         msg_cols = [r[1] for r in res_msgs]
         if "attachments_json" not in msg_cols:
             conn.execute(text("ALTER TABLE chat_messages ADD COLUMN attachments_json TEXT"))
+            conn.commit()
+        if "variants_json" not in msg_cols:
+            conn.execute(text("ALTER TABLE chat_messages ADD COLUMN variants_json TEXT"))
+            conn.commit()
+        if "active_variant_index" not in msg_cols:
+            conn.execute(text("ALTER TABLE chat_messages ADD COLUMN active_variant_index INTEGER DEFAULT 0"))
             conn.commit()
 
 except Exception as e:

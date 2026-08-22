@@ -10,7 +10,9 @@ import {
   X,
   Trash2,
   SlidersHorizontal,
-  Plus
+  Plus,
+  FileArchive,
+  FileSpreadsheet
 } from "lucide-react";
 import { TargetedSource } from "@/app/ChatClient";
 import ModelSelector from "@/components/ModelSelector";
@@ -21,6 +23,7 @@ export interface Attachment {
   type: "image" | "file";
   filename: string;
   url?: string;
+  size?: number;
   file?: File;
   previewUrl?: string;
 }
@@ -37,8 +40,10 @@ export interface ChatInputBoxProps {
   onPromoteQueuedPrompt?: (index: number) => void;
   backendUrl: string;
   chatId: string | null;
+  onEnsureChatSession?: () => Promise<string>;
   targetedSource?: TargetedSource | null;
   onClearTargetedSource?: () => void;
+  onOpenStorage?: () => void;
 }
 
 export const ChatInputBox = memo(function ChatInputBox({
@@ -53,8 +58,10 @@ export const ChatInputBox = memo(function ChatInputBox({
   onPromoteQueuedPrompt,
   backendUrl,
   chatId,
+  onEnsureChatSession,
   targetedSource,
-  onClearTargetedSource
+  onClearTargetedSource,
+  onOpenStorage
 }: ChatInputBoxProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState("");
@@ -62,6 +69,7 @@ export const ChatInputBox = memo(function ChatInputBox({
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [storageWarningFile, setStorageWarningFile] = useState<{ filename: string; size: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,7 +102,18 @@ export const ChatInputBox = memo(function ChatInputBox({
   };
 
   const handleFileUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0 || !chatId) return;
+    if (!files || files.length === 0) return;
+    
+    let targetChatId = chatId;
+    if (!targetChatId && onEnsureChatSession) {
+      try {
+        targetChatId = await onEnsureChatSession();
+      } catch (err) {
+        console.error("Failed to ensure chat session for attachment:", err);
+      }
+    }
+    
+    if (!targetChatId) return;
     
     setIsUploading(true);
     const newAttachments = [...attachments];
@@ -105,7 +124,7 @@ export const ChatInputBox = memo(function ChatInputBox({
       formData.append("file", file);
       
       try {
-        const res = await fetch(`${backendUrl}/chats/${chatId}/upload_chat_media`, {
+        const res = await fetch(`${backendUrl}/chats/${targetChatId}/upload_chat_media`, {
           method: "POST",
           body: formData
         });
@@ -116,8 +135,16 @@ export const ChatInputBox = memo(function ChatInputBox({
             type: data.attachment.type,
             filename: data.attachment.filename,
             url: data.attachment.url,
+            size: data.attachment.size || file.size,
             previewUrl: URL.createObjectURL(file)
           });
+          
+          if (data.storage_full || data.attachment?.chat_only) {
+            setStorageWarningFile({
+              filename: data.attachment.filename,
+              size: data.attachment.size || file.size
+            });
+          }
         }
       } catch (e) {
         console.error("Failed to upload file:", e);
@@ -209,36 +236,65 @@ export const ChatInputBox = memo(function ChatInputBox({
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes || bytes <= 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
   return (
     <div className={`w-full ${isCentered ? "max-w-2xl mx-auto my-4" : ""}`}>
-      {/* Attachments Preview Area */}
-      {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-2 px-1">
-          {attachments.map((att, idx) => (
-            <div key={idx} className="relative group rounded-xl border border-white/10 bg-[#1e1f22] overflow-hidden flex items-center p-1.5 pr-8 min-w-[120px] max-w-[200px]">
-              {att.type === "image" && att.previewUrl ? (
-                <div className="w-8 h-8 rounded shrink-0 bg-black/40 overflow-hidden mr-2">
-                  <img src={att.previewUrl} alt="preview" className="w-full h-full object-cover" />
-                </div>
-              ) : (
-                <div className="w-8 h-8 rounded shrink-0 bg-white/5 flex items-center justify-center mr-2">
-                  <FileText size={16} className="text-gray-400" />
-                </div>
-              )}
-              <span className="text-[11px] text-gray-300 truncate">{att.filename}</span>
-              <button 
-                onClick={() => removeAttachment(idx)}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-full bg-black/40 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+      {/* Storage Limit Exceeded Modal / Card */}
+      {storageWarningFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#1e1f20] border border-white/10 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 relative text-left"
+          >
+            <div className="flex items-start justify-between">
+              <h3 className="text-base font-semibold text-white">File added to chat only</h3>
+              <button
+                type="button"
+                onClick={() => setStorageWarningFile(null)}
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
               >
-                <X size={12} />
+                <X size={18} />
               </button>
             </div>
-          ))}
-          {isUploading && (
-            <div className="h-11 px-3 rounded-xl border border-white/5 bg-[#1e1f22]/50 flex items-center justify-center text-[11px] text-gray-400 animate-pulse">
-              Uploading...
+
+            <p className="text-sm text-gray-300 leading-relaxed">
+              You don&apos;t have enough storage space left to save this file. Remove files to create space.
+            </p>
+
+            <div className="flex items-center justify-between p-3 rounded-xl bg-[#141415] border border-white/10">
+              <div className="flex items-center gap-3 min-w-0 pr-3">
+                <div className="p-2 rounded-lg bg-white/5 border border-white/10 shrink-0">
+                  <FileText size={18} className="text-gray-300" />
+                </div>
+                <span className="text-sm font-medium text-white truncate">
+                  {storageWarningFile.filename}
+                </span>
+              </div>
+              <span className="text-xs text-gray-400 font-mono shrink-0">
+                {formatFileSize(storageWarningFile.size)}
+              </span>
             </div>
-          )}
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setStorageWarningFile(null);
+                  onOpenStorage?.();
+                }}
+                className="px-4 py-2 text-xs font-medium text-white bg-[#2a2b2e] hover:bg-[#35373b] border border-white/10 rounded-full transition-colors cursor-pointer shadow-sm"
+              >
+                Manage storage
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -329,27 +385,58 @@ export const ChatInputBox = memo(function ChatInputBox({
       >
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2 px-1">
-            {attachments.map((att, i) => (
-              <div key={i} className="relative group flex items-center bg-black/40 rounded-lg p-1.5 pr-3 border border-white/10 max-w-[200px]">
-                {att.type === 'image' && att.previewUrl ? (
-                  <img src={att.previewUrl} alt={att.filename} className="w-8 h-8 object-cover rounded mr-2" />
-                ) : (
-                  <FileText size={20} className="text-gray-400 mx-1 mr-2 shrink-0" />
-                )}
-                <span className="text-xs text-gray-300 truncate">{att.filename}</span>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    const newAtts = [...attachments];
-                    newAtts.splice(i, 1);
-                    setAttachments(newAtts);
-                  }}
-                  className="absolute -top-1.5 -right-1.5 p-0.5 bg-gray-800 text-gray-400 hover:text-white hover:bg-red-500/80 rounded-full border border-white/20 opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
+            {attachments.map((att, i) => {
+              const ext = att.filename.split('.').pop()?.toLowerCase() || '';
+              const isWord = ['docx', 'doc'].includes(ext);
+              const isPdf = ext === 'pdf';
+              const isZip = ['zip', 'rar', '7z', 'tar', 'gz'].includes(ext);
+              const isSheet = ['xlsx', 'xls', 'csv', 'tsv'].includes(ext);
+
+              return (
+                <div key={i} className="relative group flex items-center bg-[#25262b] rounded-2xl p-2 pr-3.5 border border-white/10 max-w-[260px] shadow-sm">
+                  {att.type === 'image' && att.previewUrl ? (
+                    <img src={att.previewUrl} alt={att.filename} className="w-8 h-8 object-cover rounded-xl mr-2.5 shrink-0" />
+                  ) : isWord ? (
+                    <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-xs mr-2.5 shrink-0">
+                      W
+                    </div>
+                  ) : isPdf ? (
+                    <div className="w-8 h-8 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-[10px] mr-2.5 shrink-0">
+                      PDF
+                    </div>
+                  ) : isZip ? (
+                    <div className="w-8 h-8 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mr-2.5 shrink-0">
+                      <FileArchive size={16} />
+                    </div>
+                  ) : isSheet ? (
+                    <div className="w-8 h-8 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mr-2.5 shrink-0">
+                      <FileSpreadsheet size={16} />
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-300 mr-2.5 shrink-0">
+                      <FileText size={16} />
+                    </div>
+                  )}
+                  <div className="flex flex-col min-w-0 pr-1">
+                    <span className="text-xs text-gray-200 font-medium truncate">{att.filename}</span>
+                    {att.size && att.size > 0 ? (
+                      <span className="text-[10px] text-gray-400 font-mono">{formatFileSize(att.size)}</span>
+                    ) : null}
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const newAtts = [...attachments];
+                      newAtts.splice(i, 1);
+                      setAttachments(newAtts);
+                    }}
+                    className="absolute -top-1.5 -right-1.5 p-1 bg-[#1e1f20] text-gray-400 hover:text-white hover:bg-red-500/80 rounded-full border border-white/20 opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
         <textarea

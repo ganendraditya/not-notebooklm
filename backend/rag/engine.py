@@ -385,15 +385,36 @@ async def query_chat(
     final_user_msg = chat_history[-1] if chat_history else {}
     attachments = final_user_msg.get("attachments", [])
     
-    # Simple integration: append image descriptions to query if vision is supported
-    # Real implementations pass base64 to multimodal models, but for text-only fallback:
     if attachments:
+        from helpers import UPLOAD_DIR
+        chat_media_dir = os.path.join(UPLOAD_DIR, "chat_media")
         query += "\n\n[Attachments Provided by User:]"
         for att in attachments:
-            if att.get('type') == 'image':
-                query += f"\n- Image attached: {att.get('filename')}"
+            fname = att.get('filename', '')
+            att_type = att.get('type', '')
+            url = att.get('url', '')
+            
+            # If doc/docx/pdf/txt/csv file attachment, extract text content so LLM can read draft
+            extracted_text = ""
+            if url:
+                base_media_name = os.path.basename(url)
+                media_path = os.path.join(chat_media_dir, base_media_name)
+                if os.path.exists(media_path):
+                    try:
+                        from rag.parsers import parse_document_to_markdown
+                        extracted_text = parse_document_to_markdown(media_path)
+                    except Exception as pe:
+                        logger.debug(f"[Parse Attachment Warning]: {pe}")
+            
+            if att_type == 'image':
+                query += f"\n- Image attached: {fname}"
             else:
-                query += f"\n- Document attached: {att.get('filename')}"
+                query += f"\n- Document attached: {fname}"
+                if extracted_text:
+                    truncated_content = extracted_text[:12000]
+                    if len(extracted_text) > 12000:
+                        truncated_content += "\n...[Content truncated for length]..."
+                    query += f"\n\n--- Content of Attached File ({fname}) ---\n{truncated_content}\n--- End of Attached File Content ---\n"
     
     async def report_status(text: str):
         if status_callback:

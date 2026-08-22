@@ -5,6 +5,8 @@ import LeftSidebar from "@/components/LeftSidebar";
 import ChatArea from "@/components/ChatArea";
 import RightSidebar from "@/components/RightSidebar";
 import SettingsModal from "@/components/SettingsModal";
+import LibraryView from "@/components/LibraryView";
+import SearchChatsView from "@/components/SearchChatsView";
 
 // Types
 export interface ChatSession {
@@ -53,6 +55,8 @@ export interface ChatMessage {
   content: string;
   created_at: string;
   attachments?: Attachment[];
+  variants?: string[];
+  active_variant_index?: number;
 }
 
 export interface PendingSourceItem {
@@ -76,6 +80,8 @@ export default function ChatClient() {
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   const [groundingHighlight, setGroundingHighlight] = useState<CitationGroundingHighlight | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [currentView, setCurrentView] = useState<"chat" | "library" | "search">("chat");
+  const [libraryInitialCategory, setLibraryInitialCategory] = useState<"all" | "documents" | "images">("all");
   
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -563,6 +569,162 @@ export default function ChatClient() {
     }
   };
 
+  const handleRegenerateMessage = async (messageIndex: number) => {
+    const currentChatId = activeChatId;
+    if (!currentChatId || isLoading) return;
+
+    const job = getChatJob(currentChatId);
+    if (job.isProcessing) return;
+
+    job.isProcessing = true;
+    job.status = "Regenerating response...";
+    if (activeChatIdRef.current === currentChatId) {
+      setIsLoading(true);
+      setActiveStatus(job.status);
+    }
+
+    const controller = new AbortController();
+    job.controller = controller;
+
+    bumpSessionToTop(currentChatId);
+
+    try {
+      const res = await fetch(`${backendUrl}/chats/${currentChatId}/regenerate_stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message_index: messageIndex
+        }),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) {
+        throw new Error("No readable stream received from server");
+      }
+
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        while (buffer.includes("\n\n")) {
+          const splitIdx = buffer.indexOf("\n\n");
+          const eventBlock = buffer.slice(0, splitIdx);
+          buffer = buffer.slice(splitIdx + 2);
+
+          const lines = eventBlock.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "status") {
+                  const statusText = data.text || data.data;
+                  if (statusText) {
+                    job.status = statusText;
+                    if (activeChatIdRef.current === currentChatId) {
+                      setActiveStatus(statusText);
+                    }
+                  }
+                } else if (data.type === "done") {
+                  const asstMsg = data.message || {
+                    role: "assistant",
+                    content: data.data || "",
+                    variants: data.variants,
+                    active_variant_index: data.active_variant_index,
+                    created_at: new Date().toISOString()
+                  };
+                  if (activeChatIdRef.current === currentChatId) {
+                    setMessages(prev => {
+                      const next = [...prev];
+                      if (next[messageIndex]) {
+                        next[messageIndex] = asstMsg;
+                      } else {
+                        next.push(asstMsg);
+                      }
+                      return next;
+                    });
+                  }
+
+                  const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
+                  if (actionMatch) {
+                    try {
+                      const actionObj = JSON.parse(actionMatch[1]);
+                      if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
+                        const idSet = new Set(actionObj.deleted_doc_ids);
+                        if (activeChatIdRef.current === currentChatId) {
+                          setDocuments(prev => {
+                            const remaining = prev.filter(d => !idSet.has(d.id));
+                            return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                          });
+                        }
+                      }
+                    } catch (e) {
+                      console.error("Failed to parse SOURCES_ACTION in regenerated response:", e);
+                    }
+                  }
+                }
+              } catch (parseErr) {
+                console.error("Error parsing regenerate SSE data:", parseErr);
+              }
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        console.log(`Regenerate request aborted for chat ${currentChatId}`);
+      } else {
+        console.error("Failed to regenerate message:", err);
+      }
+    } finally {
+      if (job.controller === controller) {
+        job.controller = null;
+      }
+      job.isProcessing = false;
+      job.status = null;
+      if (activeChatIdRef.current === currentChatId) {
+        setActiveStatus(null);
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleSelectVariant = async (messageIndex: number, variantIndex: number) => {
+    const currentChatId = activeChatId;
+    if (!currentChatId) return;
+
+    setMessages(prev => {
+      const next = [...prev];
+      const msg = { ...next[messageIndex] };
+      if (msg.variants && msg.variants[variantIndex] !== undefined) {
+        msg.active_variant_index = variantIndex;
+        msg.content = msg.variants[variantIndex];
+        next[messageIndex] = msg;
+      }
+      return next;
+    });
+
+    try {
+      await fetch(`${backendUrl}/chats/${currentChatId}/select_variant`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message_index: messageIndex,
+          variant_index: variantIndex
+        })
+      });
+    } catch (e) {
+      console.error("Failed to persist selected variant:", e);
+    }
+  };
+
   const handleCreateChat = () => {
     setActiveChatId(null);
     setDocuments([]);
@@ -573,9 +735,11 @@ export default function ChatClient() {
     setQueuedPrompts([]);
     setIsLoading(false);
     setActiveStatus(null);
+    setCurrentView("chat");
   };
 
   const handleSelectChat = (id: string) => {
+    setCurrentView("chat");
     if (activeChatId === id) return;
 
     setActiveChatId(id);
@@ -725,8 +889,14 @@ export default function ChatClient() {
         <LeftSidebar 
           sessions={sessions} 
           activeChatId={activeChatId} 
+          currentView={currentView}
           onSelectChat={handleSelectChat}
           onCreateChat={handleCreateChat}
+          onOpenLibrary={(cat) => {
+            setLibraryInitialCategory(cat || "all");
+            setCurrentView("library");
+          }}
+          onOpenSearch={() => setCurrentView("search")}
           onDeleteChat={handleDeleteChat}
           onRenameChat={handleRenameChat}
           onTogglePinChat={handleTogglePinChat}
@@ -735,84 +905,112 @@ export default function ChatClient() {
         />
       )}
       
-      {/* Center: Main Chat Area */}
-      <ChatArea 
-        activeChatId={activeChatId} 
-        messages={messages} 
-        isLoading={isLoading}
-        onSendMessage={handleSendMessage} 
-        onEditMessage={handleEditMessage}
-        onStopGeneration={handleStopGeneration}
-        queuedPrompts={queuedPrompts}
-        onRemoveQueuedPrompt={handleRemoveQueuedPrompt}
-        onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
-        documents={documents}
-        onDocumentAdded={handleDocumentAdded}
-        onAddPendingSources={handleAddPendingSources}
-        onResolvePendingSource={handleResolvePendingSource}
-        onOpenDocument={(doc, citationContext) => {
-          setViewingDoc(doc);
-          if (citationContext) {
-            setGroundingHighlight({
-              docId: doc.id,
-              sentence: citationContext.sentence,
-              num: citationContext.num,
-              citationKey: citationContext.citationKey,
-              aiQuotes: citationContext.aiQuotes,
-              clickId: Date.now()
-            });
-          } else {
-            setGroundingHighlight(null);
-          }
-          setIsRightSidebarOpen(true);
-        }}
-        onEnsureChatSession={handleEnsureChatSession}
-        backendUrl={backendUrl}
-        isSidebarOpen={isSidebarOpen}
-        onOpenSidebar={() => setIsSidebarOpen(true)}
-        isRightSidebarOpen={isRightSidebarOpen}
-        onToggleRightSidebar={() => setIsRightSidebarOpen(prev => !prev)}
-        targetedSource={targetedSource}
-        onClearTargetedSource={() => setTargetedSource(null)}
-        activeStatus={activeStatus}
-        activeCitationKey={groundingHighlight?.citationKey}
-      />
-
-      {/* Right Sidebar: Sources Panel (NotebookLM Style) */}
-      {isRightSidebarOpen && (
-        <RightSidebar 
-          activeChatId={activeChatId} 
-          documents={documents} 
-          pendingSources={pendingSources}
-          onDocumentAdded={handleDocumentAdded} 
-          onDocumentUpdated={handleDocumentUpdated}
-          onDocumentDeleted={(id) => {
-            setDocuments(prev => prev.filter(d => d.id !== id));
-            if (targetedSource?.id === id) setTargetedSource(null);
-            if (viewingDoc?.id === id) setViewingDoc(null);
-          }}
-          onBulkDocumentsDeleted={(ids) => {
-            handleBulkDocumentsDeleted(ids);
-            if (targetedSource && ids.includes(targetedSource.id)) setTargetedSource(null);
-            if (viewingDoc && ids.includes(viewingDoc.id)) setViewingDoc(null);
-          }}
-          onEnsureChatSession={handleEnsureChatSession}
-          onAskAboutDocument={(doc, paperTitle) => {
-            setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
-          }}
-          externalViewingDoc={viewingDoc}
-          groundingHighlight={groundingHighlight}
-          onClearGroundingHighlight={() => setGroundingHighlight(null)}
-          onClearViewingDoc={() => {
-            setViewingDoc(null);
-            setGroundingHighlight(null);
-          }}
+      {/* Center View: Main Chat Area, Library View, or Search View */}
+      {currentView === "library" ? (
+        <LibraryView
+          initialCategory={libraryInitialCategory}
           backendUrl={backendUrl}
-          onClose={() => {
-            setIsRightSidebarOpen(false);
-            setGroundingHighlight(null);
-          }}
+          isSidebarOpen={isSidebarOpen}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+          onSelectChat={handleSelectChat}
         />
+      ) : currentView === "search" ? (
+        <SearchChatsView
+          sessions={sessions}
+          backendUrl={backendUrl}
+          isSidebarOpen={isSidebarOpen}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+          onSelectChat={handleSelectChat}
+        />
+      ) : (
+        <>
+          <ChatArea 
+            activeChatId={activeChatId} 
+            messages={messages} 
+            isLoading={isLoading}
+            onSendMessage={handleSendMessage} 
+            onEditMessage={handleEditMessage}
+            onStopGeneration={handleStopGeneration}
+            queuedPrompts={queuedPrompts}
+            onRemoveQueuedPrompt={handleRemoveQueuedPrompt}
+            onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
+            documents={documents}
+            onDocumentAdded={handleDocumentAdded}
+            onAddPendingSources={handleAddPendingSources}
+            onResolvePendingSource={handleResolvePendingSource}
+            onOpenDocument={(doc, citationContext) => {
+              setViewingDoc(doc);
+              if (citationContext) {
+                setGroundingHighlight({
+                  docId: doc.id,
+                  sentence: citationContext.sentence,
+                  num: citationContext.num,
+                  citationKey: citationContext.citationKey,
+                  aiQuotes: citationContext.aiQuotes,
+                  clickId: Date.now()
+                });
+              } else {
+                setGroundingHighlight(null);
+              }
+              setIsRightSidebarOpen(true);
+            }}
+            onEnsureChatSession={handleEnsureChatSession}
+            backendUrl={backendUrl}
+            isSidebarOpen={isSidebarOpen}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            isRightSidebarOpen={isRightSidebarOpen}
+            onToggleRightSidebar={() => setIsRightSidebarOpen(prev => !prev)}
+            targetedSource={targetedSource}
+            onClearTargetedSource={() => setTargetedSource(null)}
+            activeStatus={activeStatus}
+            activeCitationKey={groundingHighlight?.citationKey}
+            onRenameChat={handleRenameChat}
+            onDeleteChat={handleDeleteChat}
+            onTogglePinChat={handleTogglePinChat}
+            isPinned={sessions.find(s => s.id === activeChatId)?.is_pinned}
+            chatTitle={sessions.find(s => s.id === activeChatId)?.title}
+            onRegenerateMessage={handleRegenerateMessage}
+            onSelectVariant={handleSelectVariant}
+            onOpenStorage={() => setIsSettingsOpen(true)}
+          />
+
+          {/* Right Sidebar: Sources Panel (NotebookLM Style) */}
+          {isRightSidebarOpen && (
+            <RightSidebar 
+              activeChatId={activeChatId} 
+              documents={documents} 
+              pendingSources={pendingSources}
+              onDocumentAdded={handleDocumentAdded} 
+              onDocumentUpdated={handleDocumentUpdated}
+              onDocumentDeleted={(id) => {
+                setDocuments(prev => prev.filter(d => d.id !== id));
+                if (targetedSource?.id === id) setTargetedSource(null);
+                if (viewingDoc?.id === id) setViewingDoc(null);
+              }}
+              onBulkDocumentsDeleted={(ids) => {
+                handleBulkDocumentsDeleted(ids);
+                if (targetedSource && ids.includes(targetedSource.id)) setTargetedSource(null);
+                if (viewingDoc && ids.includes(viewingDoc.id)) setViewingDoc(null);
+              }}
+              onEnsureChatSession={handleEnsureChatSession}
+              onAskAboutDocument={(doc, paperTitle) => {
+                setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
+              }}
+              externalViewingDoc={viewingDoc}
+              groundingHighlight={groundingHighlight}
+              onClearGroundingHighlight={() => setGroundingHighlight(null)}
+              onClearViewingDoc={() => {
+                setViewingDoc(null);
+                setGroundingHighlight(null);
+              }}
+              backendUrl={backendUrl}
+              onClose={() => {
+                setIsRightSidebarOpen(false);
+                setGroundingHighlight(null);
+              }}
+            />
+          )}
+        </>
       )}
 
       {/* Global Settings & Storage Modal */}
@@ -821,6 +1019,10 @@ export default function ChatClient() {
         onClose={() => setIsSettingsOpen(false)}
         backendUrl={backendUrl}
         sessions={sessions}
+        onNavigateToLibrary={(cat) => {
+          setLibraryInitialCategory(cat);
+          setCurrentView("library");
+        }}
         onChatsDeleted={(deletedIds) => {
           setSessions(prev => prev.filter(s => !deletedIds.includes(s.id)));
           if (activeChatId && deletedIds.includes(activeChatId)) {

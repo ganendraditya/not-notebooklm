@@ -14,7 +14,9 @@ import {
   SquarePen,
   Search,
   Sparkles,
-  Settings
+  Settings,
+  FolderArchive,
+  Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatSession } from "@/app/ChatClient";
@@ -23,8 +25,11 @@ import { useTranslation } from "@/lib/i18n";
 interface LeftSidebarProps {
   sessions: ChatSession[];
   activeChatId: string | null;
+  currentView?: "chat" | "library" | "search";
   onSelectChat: (id: string) => void;
   onCreateChat: () => void;
+  onOpenLibrary?: (category?: "all" | "documents" | "images") => void;
+  onOpenSearch?: () => void;
   onDeleteChat: (id: string) => void;
   onRenameChat: (id: string, newTitle: string) => void;
   onTogglePinChat?: (id: string) => void;
@@ -35,8 +40,11 @@ interface LeftSidebarProps {
 export default function LeftSidebar({ 
   sessions, 
   activeChatId, 
+  currentView = "chat",
   onSelectChat, 
   onCreateChat,
+  onOpenLibrary,
+  onOpenSearch,
   onDeleteChat,
   onTogglePinChat,
   onRenameChat,
@@ -142,7 +150,6 @@ export default function LeftSidebar({
         <div 
           onClick={onCreateChat}
           className="flex items-center gap-2 font-bold text-white tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
-          title={t('ui.newChat')}
         >
           <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm flex items-center justify-center">
             <Sparkles size={14} />
@@ -162,11 +169,15 @@ export default function LeftSidebar({
         </Button>
       </div>
 
-      {/* Top Action Items: New chat & Search chat */}
+      {/* Top Action Items: New chat, Search, & Library */}
       <div className="px-3 py-1 space-y-1">
         <Button 
           variant="ghost" 
-          className="w-full justify-start text-gray-300 hover:text-white hover:bg-white/10 h-9 text-xs font-medium cursor-pointer"
+          className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
+            currentView === "chat" && !activeChatId
+              ? "bg-white/10 text-white font-semibold"
+              : "text-gray-300 hover:text-white hover:bg-white/10"
+          }`}
           onClick={() => {
             setSearchQuery("");
             onCreateChat();
@@ -178,38 +189,26 @@ export default function LeftSidebar({
         <Button 
           variant="ghost" 
           className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
-            isSearching 
-              ? "bg-white/10 text-white" 
+            currentView === "library"
+              ? "bg-white/10 text-white font-semibold"
               : "text-gray-300 hover:text-white hover:bg-white/10"
           }`}
-          onClick={() => setIsSearching(prev => !prev)}
+          onClick={() => onOpenLibrary?.("all")}
+        >
+          <FolderArchive className="mr-2.5 text-gray-400" size={16} /> Library
+        </Button>
+
+        <Button 
+          variant="ghost" 
+          className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
+            currentView === "search" 
+              ? "bg-white/10 text-white font-semibold" 
+              : "text-gray-300 hover:text-white hover:bg-white/10"
+          }`}
+          onClick={() => onOpenSearch?.()}
         >
           <Search className="mr-2.5 text-gray-400" size={16} /> {t('ui.searchChat')}
         </Button>
-
-        {/* Inline Search Input */}
-        {isSearching && (
-          <div className="pt-1">
-            <div className="relative flex items-center">
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('left.searchConversations')}
-                className="flex-1 bg-transparent text-white outline-none text-xs placeholder:text-gray-500"
-              />
-              {searchQuery && (
-                <button 
-                  onClick={() => setSearchQuery("")}
-                  className="text-gray-400 hover:text-white cursor-pointer"
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* History List */}
@@ -224,7 +223,7 @@ export default function LeftSidebar({
             const recentList = filteredSessions.filter(s => !s.is_pinned);
 
             const renderSessionItem = (session: ChatSession) => {
-              const isActive = activeChatId === session.id;
+              const isActive = currentView === "chat" && activeChatId === session.id;
               const isMenuOpen = openMenuId === session.id;
 
               return (
@@ -346,11 +345,10 @@ export default function LeftSidebar({
         <span className="text-[11px] text-gray-500 font-medium pl-1">NotbookLM v0.1</span>
         <button
           onClick={onOpenSettings}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer text-xs"
+          className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           title={t('ui.settings')}
         >
-          <Settings size={14} />
-          <span>{t('ui.settings')}</span>
+          <Settings size={15} />
         </button>
       </div>
 

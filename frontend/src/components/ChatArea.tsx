@@ -8,8 +8,17 @@ import {
   Loader2, 
   Copy, 
   Pencil, 
-  Clock 
+  Clock,
+  MoreHorizontal,
+  Pin,
+  PinOff,
+  Trash2,
+  X,
+  RotateCw,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ChatMessage, Document as DocType, TargetedSource } from "@/app/ChatClient";
 import { InChatMessageComponent } from "./chat/ChatMessageItem";
 import { ChatInputBox, Attachment } from "./chat/ChatInput";
@@ -41,6 +50,14 @@ interface ChatAreaProps {
   onClearTargetedSource?: () => void;
   activeStatus?: string | null;
   activeCitationKey?: string | null;
+  onRenameChat?: (id: string, newTitle: string) => void;
+  onDeleteChat?: (id: string) => void;
+  onTogglePinChat?: (id: string) => void;
+  isPinned?: boolean;
+  chatTitle?: string;
+  onRegenerateMessage?: (messageIndex: number) => void;
+  onSelectVariant?: (messageIndex: number, variantIndex: number) => void;
+  onOpenStorage?: () => void;
 }
 
 export default function ChatArea({ 
@@ -67,16 +84,52 @@ export default function ChatArea({
   targetedSource,
   onClearTargetedSource,
   activeStatus,
-  activeCitationKey
+  activeCitationKey,
+  onRenameChat,
+  onDeleteChat,
+  onTogglePinChat,
+  isPinned = false,
+  chatTitle = "",
+  onRegenerateMessage,
+  onSelectVariant,
+  onOpenStorage
 }: ChatAreaProps) {
   const { t } = useTranslation();
   const [copiedMessageIdx, setCopiedMessageIdx] = useState<number | null>(null);
   const [editingMessageIdx, setEditingMessageIdx] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
+  const [isTopMenuOpen, setIsTopMenuOpen] = useState(false);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameInput, setRenameInput] = useState("");
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  const topMenuRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const isChatEmpty = messages.length === 0;
+
+  // Close top menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (topMenuRef.current && !topMenuRef.current.contains(e.target as Node)) {
+        setIsTopMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Focus rename input
+  useEffect(() => {
+    if (isRenameOpen) {
+      setTimeout(() => {
+        renameInputRef.current?.focus();
+        renameInputRef.current?.select();
+      }, 50);
+    }
+  }, [isRenameOpen]);
 
   useEffect(() => {
     if (!isChatEmpty) {
@@ -133,8 +186,10 @@ export default function ChatArea({
         </div>
       )}
 
-      {!isRightSidebarOpen && onToggleRightSidebar && (
-        <div className="absolute top-3.5 right-3.5 z-20">
+      {/* Top Right Header Controls */}
+      <div className="absolute top-3.5 right-3.5 z-20 flex items-center gap-2">
+        {/* Open Sources Toggle (when right sidebar is closed) */}
+        {!isRightSidebarOpen && onToggleRightSidebar && (
           <button 
             type="button"
             onClick={onToggleRightSidebar}
@@ -149,8 +204,78 @@ export default function ChatArea({
               </span>
             )}
           </button>
-        </div>
-      )}
+        )}
+
+        {/* Three Dots Context Menu (Only when chat is not empty & activeChatId exists) */}
+        {!isChatEmpty && activeChatId && (
+          <div className="relative" ref={topMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsTopMenuOpen(prev => !prev)}
+              className="h-8 w-8 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-gray-300 hover:text-white flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+              title={t('left.options')}
+            >
+              <MoreHorizontal size={16} />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isTopMenuOpen && (
+              <div 
+                className="absolute right-0 top-9 z-50 w-44 rounded-xl bg-[#222222] border border-white/10 shadow-2xl p-1 text-xs text-gray-200 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Pin / Unpin */}
+                <button
+                  onClick={() => {
+                    setIsTopMenuOpen(false);
+                    if (onTogglePinChat && activeChatId) {
+                      onTogglePinChat(activeChatId);
+                    }
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/10 text-left transition-colors cursor-pointer"
+                >
+                  {isPinned ? (
+                    <>
+                      <PinOff size={13} className="text-amber-400" />
+                      <span>{t('left.unpin')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Pin size={13} className="text-gray-400" />
+                      <span>{t('left.pin')}</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Rename */}
+                <button
+                  onClick={() => {
+                    setIsTopMenuOpen(false);
+                    setRenameInput(chatTitle || "");
+                    setIsRenameOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/10 text-left transition-colors cursor-pointer"
+                >
+                  <Pencil size={13} className="text-gray-400" />
+                  <span>{t('left.rename')}</span>
+                </button>
+
+                {/* Delete */}
+                <button
+                  onClick={() => {
+                    setIsTopMenuOpen(false);
+                    setIsDeleteConfirmOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 text-left transition-colors cursor-pointer"
+                >
+                  <Trash2 size={13} />
+                  <span>{t('left.delete')}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
         <div 
           ref={scrollContainerRef}
@@ -176,8 +301,10 @@ export default function ChatArea({
                 onPromoteQueuedPrompt={onPromoteQueuedPrompt}
                 backendUrl={backendUrl}
                 chatId={activeChatId}
+                onEnsureChatSession={onEnsureChatSession}
                 targetedSource={targetedSource}
                 onClearTargetedSource={onClearTargetedSource}
+                onOpenStorage={onOpenStorage}
               />
             </div>
           ) : (
@@ -213,27 +340,68 @@ export default function ChatArea({
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 max-w-[85%] -mr-1 sm:-mr-1.5">
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                        <div className="flex flex-col items-end max-w-[85%] -mr-1 sm:-mr-1.5">
+                          {msg.attachments && msg.attachments.length > 0 && (
+                            <div className="flex flex-wrap justify-end gap-2 mb-2">
+                              {msg.attachments.map((att, attIdx) => {
+                                const fileHref = att.url?.startsWith("http") ? att.url : `${backendUrl}${att.url || ""}`;
+                                const isWord = att.filename.endsWith(".docx") || att.filename.endsWith(".doc");
+                                const isPdf = att.filename.endsWith(".pdf");
+                                return (
+                                  <a
+                                    key={attIdx}
+                                    href={fileHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex flex-col p-3 rounded-2xl bg-[#1e1f20] border border-white/10 hover:border-white/20 transition-all text-left w-36 shadow-md group/att"
+                                  >
+                                    <div className="flex items-center justify-between mb-2">
+                                      {att.type === "image" ? (
+                                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/40">
+                                          <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
+                                        </div>
+                                      ) : isWord ? (
+                                        <div className="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-[11px]">
+                                          W
+                                        </div>
+                                      ) : isPdf ? (
+                                        <div className="w-7 h-7 rounded bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-[10px]">
+                                          PDF
+                                        </div>
+                                      ) : (
+                                        <div className="w-7 h-7 rounded bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
+                                          <FileText size={15} />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="text-xs font-medium text-gray-200 line-clamp-2 leading-tight group-hover/att:text-white">
+                                      {att.filename}
+                                    </span>
+                                  </a>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <div className="bg-[#2f2f2f] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm">
+                            {msg.content}
+                          </div>
+                          <div className="flex items-center gap-1 mt-1 mr-0.5">
                             <button
                               type="button"
                               onClick={() => handleStartEdit(msg.content, idx)}
-                              className="p-1 text-gray-400 hover:text-white rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+                              className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
                               title={t('chat.editMessage')}
                             >
-                              <Pencil size={13} />
+                              <Pencil size={15} />
                             </button>
                             <button
                               type="button"
                               onClick={() => handleCopy(msg.content, idx)}
-                              className="p-1 text-gray-400 hover:text-white rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+                              className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
                               title={t('chat.copyPrompt')}
                             >
-                              {copiedMessageIdx === idx ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                              {copiedMessageIdx === idx ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
                             </button>
-                          </div>
-                          <div className="bg-[#2f2f2f] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm">
-                            {msg.content}
                           </div>
                         </div>
                       )}
@@ -253,24 +421,57 @@ export default function ChatArea({
                           onEnsureChatSession={onEnsureChatSession}
                           activeCitationKey={activeCitationKey}
                         />
-                        <div className="mt-2 flex items-center gap-2">
+                        <div className="mt-1 flex items-center gap-1.5">
+                          {/* Pagination for response variants (e.g. 1/2, 2/2) */}
+                          {msg.variants && msg.variants.length > 1 && (
+                            <div className="flex items-center gap-0.5 text-xs text-gray-400 font-mono select-none bg-white/5 px-2 py-0.5 rounded-lg border border-white/5 mr-1">
+                              <button
+                                type="button"
+                                onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) - 1)}
+                                disabled={(msg.active_variant_index || 0) <= 0 || isLoading}
+                                className="p-0.5 hover:text-white disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                title="Previous response"
+                              >
+                                <ChevronLeft size={14} />
+                              </button>
+                              <span className="px-1 text-gray-300 text-xs">
+                                {(msg.active_variant_index || 0) + 1}/{msg.variants.length}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) + 1)}
+                                disabled={(msg.active_variant_index || 0) >= msg.variants.length - 1 || isLoading}
+                                className="p-0.5 hover:text-white disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                title="Next response"
+                              >
+                                <ChevronRight size={14} />
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Copy Button */}
                           <button
                             type="button"
                             onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "").trim(), idx)}
-                            className="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs"
+                            className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
                             title={t('chat.copyResponse')}
                           >
                             {copiedMessageIdx === idx ? (
-                              <>
-                                <Check size={13} className="text-emerald-400" />
-                                <span className="text-emerald-400 text-[11px]">{t('chat.copied')}</span>
-                              </>
+                              <Check size={15} className="text-emerald-400" />
                             ) : (
-                              <>
-                                <Copy size={13} />
-                                <span className="text-[11px]">{t('action.copy')}</span>
-                              </>
+                              <Copy size={15} />
                             )}
+                          </button>
+
+                          {/* Retry / Regenerate Button */}
+                          <button
+                            type="button"
+                            onClick={() => onRegenerateMessage?.(idx)}
+                            disabled={isLoading}
+                            className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+                            title="Regenerate response"
+                          >
+                            <RotateCw size={15} className={isLoading ? "animate-spin text-blue-400" : ""} />
                           </button>
                         </div>
                       </div>
@@ -293,7 +494,7 @@ export default function ChatArea({
       </div>
 
       {!isChatEmpty && (
-        <div className="absolute bottom-0 left-0 right-0 pl-4 sm:pl-6 pr-[22px] sm:pr-[30px] pb-3 pt-0 pointer-events-none z-20 w-full flex justify-center">
+        <div className="absolute bottom-0 left-0 right-0 pl-4 sm:pl-6 pr-[22px] sm:pr-[30px] pb-3 pt-6 bg-gradient-to-t from-[#212121] via-[#212121]/90 to-transparent pointer-events-none z-20 w-full flex justify-center">
           <div className="w-full max-w-3xl pointer-events-auto">
             <ChatInputBox 
               isLoading={isLoading}
@@ -306,7 +507,121 @@ export default function ChatArea({
               onPromoteQueuedPrompt={onPromoteQueuedPrompt}
               backendUrl={backendUrl}
               chatId={activeChatId}
+              onEnsureChatSession={onEnsureChatSession}
+              targetedSource={targetedSource}
+              onClearTargetedSource={onClearTargetedSource}
+              onOpenStorage={onOpenStorage}
             />
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Rename Chat */}
+      {isRenameOpen && activeChatId && (
+        <div 
+          onClick={() => setIsRenameOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+          >
+            <div className="space-y-1.5">
+              <h3 className="text-base font-semibold text-white">{t('left.renameConversation')}</h3>
+              <p className="text-xs text-gray-400">
+                {t('left.renameDesc')}
+              </p>
+            </div>
+
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (renameInput.trim() && onRenameChat && activeChatId) {
+                  onRenameChat(activeChatId, renameInput.trim());
+                }
+                setIsRenameOpen(false);
+              }} 
+              className="space-y-4"
+            >
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={renameInput}
+                onChange={(e) => setRenameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setIsRenameOpen(false);
+                }}
+                placeholder={t('left.renamePlaceholder')}
+                className="w-full bg-[#1b1c1e] border border-white/15 focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-white outline-none transition-colors"
+              />
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsRenameOpen(false)}
+                  className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+                >
+                  {t('action.cancel')}
+                </Button>
+
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={!renameInput.trim()}
+                  className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow"
+                >
+                  {t('action.save')}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Delete Chat */}
+      {isDeleteConfirmOpen && activeChatId && (
+        <div 
+          onClick={() => setIsDeleteConfirmOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+          >
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-white">{t('left.deleteConversation')}</h3>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                {t('left.deleteConfirm')}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+              >
+                {t('action.cancel')}
+              </Button>
+
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  if (onDeleteChat && activeChatId) {
+                    onDeleteChat(activeChatId);
+                  }
+                  setIsDeleteConfirmOpen(false);
+                }}
+                className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow"
+              >
+                {t('action.delete')}
+              </Button>
+            </div>
           </div>
         </div>
       )}
