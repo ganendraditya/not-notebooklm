@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "@/lib/i18n";
 import { 
   X, 
   SlidersHorizontal, 
@@ -120,6 +121,7 @@ export default function SearchFilterPopover({
   onClose,
   onToggle,
 }: SearchFilterPopoverProps) {
+  const { t } = useTranslation();
   const [localFilter, setLocalFilter] = useState<SearchFilterState>(() => sanitizeFilter(filter));
   const [domainSearch, setDomainSearch] = useState<string>("");
   const [languageSearch, setLanguageSearch] = useState<string>("");
@@ -321,10 +323,10 @@ export default function SearchFilterPopover({
             ? "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-300 font-medium shadow-sm" 
             : "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-white/5 hover:bg-white/10 border-white/5 text-gray-300 hover:text-white font-medium"
         }
-        title="Filter search & research papers"
+        title={t('filter.button')}
       >
         <SlidersHorizontal size={12} className={appliedCount > 0 ? "text-blue-400" : "text-gray-400"} />
-        <span>Filter</span>
+        <span>{t('filter.button')}</span>
         {appliedCount > 0 && (
           <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-mono font-semibold">
             {appliedCount}
@@ -344,10 +346,10 @@ export default function SearchFilterPopover({
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white leading-tight">
-                  Search & Paper Filters
+                  {t('filter.title')}
                 </h3>
                 <span className="text-[11px] text-gray-400">
-                  OpenAlex & Crossref Academic Engine
+                  {t('filter.desc')}
                 </span>
               </div>
             </div>
@@ -369,7 +371,7 @@ export default function SearchFilterPopover({
             <div className="space-y-2">
               <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
                 <Calendar size={13} className="text-blue-400" />
-                Year Range
+                {t('filter.year')}
               </span>
 
               <div className="grid grid-cols-3 gap-1.5 text-[11px]">
@@ -382,7 +384,7 @@ export default function SearchFilterPopover({
                       : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
                   }
                 >
-                  Past 3 years
+                  {t('filter.past3years')}
                 </button>
                 <button
                   type="button"
@@ -393,7 +395,7 @@ export default function SearchFilterPopover({
                       : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
                   }
                 >
-                  Past 5 years
+                  {t('filter.past5years')}
                 </button>
                 <button
                   type="button"
@@ -404,14 +406,14 @@ export default function SearchFilterPopover({
                       : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
                   }
                 >
-                  Past 10 years
+                  {t('filter.past10years')}
                 </button>
               </div>
 
               <div className="flex items-center gap-2 pt-1">
                 <input
                   type="number"
-                  placeholder="From"
+                  placeholder={t('filter.from')}
                   value={localFilter.yearFrom}
                   onChange={(e) => setLocalFilter(prev => ({ ...prev, yearFrom: e.target.value }))}
                   className="w-full bg-[#131417] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
@@ -419,7 +421,7 @@ export default function SearchFilterPopover({
                 <span className="text-gray-400 text-xs">-</span>
                 <input
                   type="number"
-                  placeholder="To"
+                  placeholder={t('filter.to')}
                   value={localFilter.yearTo}
                   onChange={(e) => setLocalFilter(prev => ({ ...prev, yearTo: e.target.value }))}
                   className="w-full bg-[#131417] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
@@ -431,7 +433,7 @@ export default function SearchFilterPopover({
             <div className="space-y-2 pt-2 border-t border-white/10">
               <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
                 <Award size={13} className="text-blue-400" />
-                Minimum Citations
+                {t('filter.minCitations')}
               </span>
 
               {/* Preset citation chips */}
@@ -465,7 +467,7 @@ export default function SearchFilterPopover({
 
               {/* Custom numeric input */}
               <div className="flex items-center gap-2 pt-0.5">
-                <span className="text-[11px] text-gray-400 shrink-0">Custom min:</span>
+                <span className="text-[11px] text-gray-400 shrink-0">{t('filter.customMin')}</span>
                 <input
                   type="number"
                   min="0"
@@ -481,12 +483,12 @@ export default function SearchFilterPopover({
             <div className="space-y-2.5 pt-2 border-t border-white/10">
               <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
                 <Award size={13} className="text-blue-400" />
-                Journal Indexing & Reputation
+                {t('filter.journalReputation')}
               </span>
 
               {/* Scopus Quartiles Chips */}
               <div className="space-y-1">
-                <div className="text-[11px] text-gray-400 font-medium">Scopus Quartile:</div>
+                <div className="text-[11px] text-gray-400 font-medium">{t('filter.scopusQuartile')}</div>
                 <div className="grid grid-cols-4 gap-1.5">
                   {SCOPUS_QUARTILES.map((sc) => {
                     const isChecked = localFilter.scopusQuartiles.includes(sc.id);
@@ -538,7 +540,7 @@ export default function SearchFilterPopover({
             <div className="space-y-2 pt-2 border-t border-white/10">
               <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
                 <BookOpen size={13} className="text-blue-400" />
-                Manuscript & Access Preferences
+                {t('filter.manuscriptAccess')}
               </span>
 
               <div className="space-y-1.5">
@@ -549,10 +551,10 @@ export default function SearchFilterPopover({
                 >
                   <div>
                     <div className="text-xs font-medium text-white flex items-center gap-1.5">
-                      <span>Exclude Preprints</span>
+                      <span>{t('filter.excludePreprints')}</span>
                     </div>
                     <div className="text-[10px] text-gray-400">
-                      Exclude unreviewed drafts (arXiv, bioRxiv, SSRN)
+                      {t('filter.excludePreprintsDesc')}
                     </div>
                   </div>
 
@@ -581,10 +583,10 @@ export default function SearchFilterPopover({
                 >
                   <div>
                     <div className="text-xs font-medium text-white flex items-center gap-1.5">
-                      <span>Open Access Only</span>
+                      <span>{t('filter.openAccessOnly')}</span>
                     </div>
                     <div className="text-[10px] text-gray-400">
-                      Only find papers with free & legal full-text PDF
+                      {t('filter.openAccessOnlyDesc')}
                     </div>
                   </div>
 
@@ -613,7 +615,7 @@ export default function SearchFilterPopover({
                 <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5 truncate">
                   <Globe size={13} className="text-blue-400 shrink-0" />
                   <span className="truncate">
-                    Languages & Countries ({localFilter.languages.length ? `${localFilter.languages.length} selected` : "All Languages"})
+                    {localFilter.languages.length ? t('filter.languagesCount').replace('{count}', localFilter.languages.length.toString()) : t('filter.languagesAll')}
                   </span>
                 </span>
               </div>
@@ -623,7 +625,7 @@ export default function SearchFilterPopover({
                 <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Search language or country (e.g. Indonesian, Japan, Germany)..."
+                  placeholder={t('filter.searchLangPlaceholder')}
                   value={languageSearch}
                   onChange={(e) => setLanguageSearch(e.target.value)}
                   className="w-full bg-[#131417] border border-white/10 rounded-lg pl-7 pr-2.5 py-1.5 text-[11.5px] text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
@@ -634,7 +636,7 @@ export default function SearchFilterPopover({
               <div className="grid grid-cols-2 gap-1.5 max-h-[160px] overflow-y-auto pr-0.5 custom-scrollbar">
                 {filteredLanguages.filter(l => l.id !== "all").length === 0 ? (
                   <div className="col-span-2 text-center text-xs text-gray-500 py-3">
-                    No languages or countries found
+                    {t('filter.noLangFound')}
                   </div>
                 ) : (
                   filteredLanguages
@@ -681,7 +683,7 @@ export default function SearchFilterPopover({
             <div className="space-y-2 pt-2 border-t border-white/10">
               <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
                 <GraduationCap size={13} className="text-blue-400" />
-                Fields of Study ({localFilter.fieldsOfStudy.length ? `${localFilter.fieldsOfStudy.length} selected` : "All Domains"})
+                {localFilter.fieldsOfStudy.length ? t('filter.fieldsCount').replace('{count}', localFilter.fieldsOfStudy.length.toString()) : t('filter.fieldsAll')}
               </span>
 
               {/* Search Domain Input */}
@@ -689,7 +691,7 @@ export default function SearchFilterPopover({
                 <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Search fields (e.g. AI, Medicine, Physics)..."
+                  placeholder={t('filter.searchFieldPlaceholder')}
                   value={domainSearch}
                   onChange={(e) => setDomainSearch(e.target.value)}
                   className="w-full bg-[#131417] border border-white/10 rounded-lg pl-7 pr-2.5 py-1.5 text-[11.5px] text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
@@ -699,7 +701,7 @@ export default function SearchFilterPopover({
               <div className="grid grid-cols-2 gap-1.5 max-h-[160px] overflow-y-auto pr-0.5 custom-scrollbar">
                 {filteredDomains.length === 0 ? (
                   <div className="col-span-2 text-center text-xs text-gray-500 py-3">
-                    No fields found
+                    {t('filter.noFieldFound')}
                   </div>
                 ) : (
                   filteredDomains.map((f) => {
@@ -717,7 +719,7 @@ export default function SearchFilterPopover({
                       >
                         <div className="flex items-center gap-1.5 truncate">
                           <span className="text-xs">{f.icon}</span>
-                          <span className="truncate">{f.label}</span>
+                          <span className="truncate">{t(`filter.field.${f.id}`) || f.label}</span>
                         </div>
                         <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
                           isChecked ? "bg-blue-600 border-blue-500 text-white" : "border-gray-500 bg-transparent"
@@ -741,7 +743,7 @@ export default function SearchFilterPopover({
               className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/10 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <RotateCcw size={12} />
-              <span>Reset</span>
+              <span>{t('filter.clear')}</span>
             </button>
 
             <div className="flex items-center gap-2">
@@ -750,14 +752,14 @@ export default function SearchFilterPopover({
                 onClick={onClose}
                 className="px-3 py-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
-                Cancel
+                {t('action.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleApply}
                 className="px-4 py-1.5 rounded-lg text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors cursor-pointer shadow flex items-center gap-1.5"
               >
-                <span>Apply</span>
+                <span>{t('filter.apply')}</span>
                 {activeLocalCount > 0 && (
                   <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white text-[10px] font-mono">
                     {activeLocalCount}

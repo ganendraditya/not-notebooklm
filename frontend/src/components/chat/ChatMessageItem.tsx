@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { ChatMessage, Document as DocType } from "@/app/ChatClient";
 import { parseCitationsInReactNode, CitationContext } from "./CitationParser";
+import { FileText, Image as ImageIcon } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export interface InChatMessageProps {
   msg: ChatMessage;
@@ -36,13 +38,15 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   activeChatId, 
   backendUrl, 
   documents = [],
-  onDocumentAdded, 
+  onDocumentAdded,
   onAddPendingSources,
   onResolvePendingSource,
-  onOpenDocument, 
+  onOpenDocument,
   onEnsureChatSession,
   activeCitationKey
 }: InChatMessageProps) {
+  const { t } = useTranslation();
+  const isUser = msg.role === "user";
   const { cleanContent, sources, citationMap } = useMemo(() => {
     const sourcesMatch = msg.content.match(/<!-- SOURCES_DATA:\s*([\s\S]*?)\s*-->/);
     const citationMapMatch = msg.content.match(/<!-- CITATION_MAP:\s*([\s\S]*?)\s*-->/);
@@ -201,6 +205,39 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   }, [sources, isDuplicateSource, isSourceChecked]);
 
   return (
+    <div className={`mb-5 flex ${isUser ? "justify-end" : "justify-start"} font-sans group`}>
+      <div 
+        className={`relative inline-block max-w-[95%] sm:max-w-[85%] leading-relaxed tracking-wide ${
+          isUser 
+            ? "bg-[#18181b] border border-white/5 text-gray-200 px-5 py-3.5 rounded-[1.5rem] rounded-tr-sm shadow-md"
+            : "text-gray-300 w-full"
+        }`}
+      >
+        {isUser && msg.attachments && msg.attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2 pb-2 border-b border-white/10">
+            {msg.attachments.map((att, idx) => (
+              <a 
+                key={idx} 
+                href={att.url || "#"} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 p-1.5 pr-3 rounded-lg bg-black/40 border border-white/5 hover:border-white/20 transition-colors"
+              >
+                {att.type === "image" ? (
+                  <div className="w-10 h-10 rounded shrink-0 overflow-hidden bg-black/60">
+                    <img src={att.url} alt={att.filename} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 rounded shrink-0 bg-white/5 flex items-center justify-center">
+                    <FileText size={18} className="text-gray-400" />
+                  </div>
+                )}
+                <span className="text-[11px] text-gray-300 font-medium truncate max-w-[150px]">{att.filename}</span>
+              </a>
+            ))}
+          </div>
+        )}
+
     <div className="w-full space-y-3">
       {/* 1. Main Markdown Text Content */}
       <div className="prose prose-invert max-w-none text-[16px] leading-[1.65] space-y-3">
@@ -290,7 +327,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           {!isCollapsed && (
             <>
               <div className="px-4 py-2 bg-[#222325] border-b border-white/5 flex items-center justify-between text-xs text-gray-300">
-                <span className="text-gray-400">Research papers and articles found</span>
+                <span className="text-gray-400">{t('chat.researchFound')}</span>
                 {novelSourcesCount > 0 && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
@@ -404,7 +441,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                   ) : (
                     <>
                       <Plus size={13} />
-                      <span>Add {selectedCount > 0 ? `${selectedCount} ` : ""}to sources</span>
+                      <span>{t('chat.addToSources').replace('{count}', selectedCount > 0 ? `${selectedCount} ` : "")}</span>
                     </>
                   )}
                 </button>
@@ -413,6 +450,8 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           )}
         </div>
       )}
+    </div>
+    </div>
     </div>
   );
 });

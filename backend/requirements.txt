@@ -8,11 +8,11 @@ llama-index-vector-stores-qdrant
 llama-index-llms-gemini
 llama-index-embeddings-gemini
 llama-index-embeddings-huggingface
+llama-index-llms-openai-like
 sentence-transformers
 llama-index-llms-groq
 python-dotenv
 requests
-beautifulsoup4
 ddgs
 pymupdf4llm
 python-docx

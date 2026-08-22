@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight } from "@/app/ChatClient";
+import { useTranslation } from "@/lib/i18n";
 import { DownloadManager, DownloadTask } from "./DownloadManager";
 
 interface RightSidebarProps {
@@ -693,6 +694,7 @@ export default function RightSidebar({
   backendUrl, 
   onClose 
 }: RightSidebarProps) {
+  const { t } = useTranslation();
   const [isUploading, setIsUploading] = useState(false);
   const [selectedDocs, setSelectedDocs] = useState<Record<number, boolean>>({});
   
@@ -897,7 +899,7 @@ export default function RightSidebar({
     });
 
     if (validFiles.length === 0) {
-      alert("Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv");
+      alert(t('alert.unsupportedFormat') || "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv");
       return;
     }
 
@@ -909,13 +911,15 @@ export default function RightSidebar({
     // Check capacity limit of 300
     const availableSlots = Math.max(0, 300 - (documents.length + pendingSources.length));
     if (availableSlots <= 0) {
-      alert("Source limit reached! Maximum capacity is 300 sources per notebook.");
+      alert(t('alert.limitReached') || "Source limit reached! Maximum capacity is 300 sources per notebook.");
       return;
     }
 
     const filesToUpload = validFiles.slice(0, availableSlots);
     if (validFiles.length > availableSlots) {
-      alert(`Capacity limit warning: Only uploading ${availableSlots} out of ${validFiles.length} valid files to respect the 300 source cap.`);
+      alert((t('alert.capacityWarning') || `Capacity limit warning: Only uploading {n} out of {m} valid files to respect the 300 source cap.`)
+        .replace('{n}', availableSlots.toString())
+        .replace('{m}', validFiles.length.toString()));
     }
 
     const newPendingItems: { item: PendingSourceItem; file: File }[] = filesToUpload.map((f) => ({
@@ -1003,7 +1007,7 @@ export default function RightSidebar({
 
     // Check capacity
     if (documents.length + pendingSources.length >= 300) {
-      alert("Source limit reached! Maximum capacity is 300 sources per notebook.");
+      alert(t('alert.limitReached') || "Source limit reached! Maximum capacity is 300 sources per notebook.");
       return;
     }
 
@@ -1183,7 +1187,7 @@ export default function RightSidebar({
       total: docIds.length,
       current: 0,
       percent: 0,
-      currentFile: "Connecting to server..."
+      currentFile: t('download.connecting')
     });
 
     try {
@@ -1224,7 +1228,7 @@ export default function RightSidebar({
                   total: data.total || docIds.length,
                   current: 0,
                   percent: 0,
-                  currentFile: "Starting parallel archive build..."
+                  currentFile: t('download.startingParallel')
                 });
               } else if (data.type === "progress") {
                 const calculatedPercent = typeof data.percent === "number" 
@@ -1246,7 +1250,7 @@ export default function RightSidebar({
                   current: 0,
                   percent: 0,
                   currentFile: "",
-                  errorMsg: data.message || "Failed to download ZIP archive"
+                  errorMsg: data.message || t('download.failedZip')
                 });
               } else if (data.type === "complete") {
                 setDownloadTask({
@@ -1256,7 +1260,7 @@ export default function RightSidebar({
                   percent: 100,
                   downloadedCount: data.downloaded_count,
                   skippedCount: data.skipped_count,
-                  currentFile: "Download complete!",
+                  currentFile: t('download.downloadComplete'),
                   totalSizeMb: data.total_size_mb
                 });
 
@@ -1282,7 +1286,7 @@ export default function RightSidebar({
         current: 0,
         percent: 0,
         currentFile: "",
-        errorMsg: err?.message || "Failed to download ZIP archive"
+        errorMsg: err?.message || t('download.failedZip')
       });
     } finally {
       setIsBulkDownloading(false);
@@ -1362,12 +1366,12 @@ export default function RightSidebar({
     }
     const authorsStr = paperDetails?.authors && paperDetails.authors.length > 0 
       ? paperDetails.authors.join(", ") 
-      : "Academic Researchers";
+      : t('right.academicResearchers');
     const pubDateStr = formatReadableDate(paperDetails?.publication_date, paperDetails?.year);
-    const journalName = paperDetails?.journal || "Scholarly Publication";
+    const journalName = paperDetails?.journal || t('right.scholarlyPublication');
     const citationsCount = paperDetails?.citations !== undefined ? paperDetails.citations : 0;
     const doiStr = paperDetails?.doi || "";
-    const cleanAbstract = cleanHtmlAbstract(paperDetails?.abstract) || (isLoadingDetails ? "" : "Abstract not provided in public indexing metadata.");
+    const cleanAbstract = cleanHtmlAbstract(paperDetails?.abstract) || (isLoadingDetails ? "" : t('right.noAbstractProvided'));
     const landingUrl = paperDetails?.url || (doiStr ? `https://doi.org/${doiStr}` : "");
 
     const citations = generateCitations(
@@ -1397,7 +1401,7 @@ export default function RightSidebar({
           <button 
             onClick={onClose}
             className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            title="Close"
+            title={t('right.close')}
           >
             <X size={14} />
           </button>
@@ -1411,7 +1415,7 @@ export default function RightSidebar({
               activeTab === "overview" ? "text-white border-white" : "text-gray-400 hover:text-gray-200 border-transparent"
             }`}
           >
-            Overview
+            {t('right.overviewTab')}
           </button>
           <button
             onClick={() => setActiveTab("preview")}
@@ -1419,7 +1423,7 @@ export default function RightSidebar({
               activeTab === "preview" ? "text-white border-white font-semibold" : "text-gray-400 hover:text-gray-200 border-transparent"
             }`}
           >
-            <span>Full Paper</span>
+            <span>{t('right.fullPaper')}</span>
           </button>
         </div>
 
@@ -1473,14 +1477,14 @@ export default function RightSidebar({
                 <div>
                   <p className="font-semibold text-gray-200 text-[12px]">{journalName}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[11px] text-gray-400 font-medium">{paperDetails?.journal_metric || "Peer-Reviewed"}</span>
+                    <span className="text-[11px] text-gray-400 font-medium">{paperDetails?.journal_metric || t('right.peerReviewed')}</span>
                   </div>
                 </div>
 
                 {/* Citations Count */}
                 <div className="text-right">
                   <span className="text-xs font-semibold text-gray-300">{citationsCount}</span>
-                  <p className="text-[10.5px] text-gray-400">Citations</p>
+                  <p className="text-[10.5px] text-gray-400">{t('right.citations')}</p>
                 </div>
               </div>
             )}
@@ -1512,12 +1516,12 @@ export default function RightSidebar({
               ) : paperDetails?.is_oa || paperDetails?.pdf_url ? (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  <span>Open Access (PDF Available)</span>
+                  <span>{t('right.openAccess')}</span>
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-400 text-xs font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
-                  <span>Publisher Source</span>
+                  <span>{t('right.publisherSource')}</span>
                 </div>
               )}
             </div>
@@ -1546,10 +1550,10 @@ export default function RightSidebar({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
                     <Sparkles size={13} className="text-purple-400" />
-                    <span>AI Synthesis Overview</span>
+                    <span>{t('right.aiOverview')}</span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-950/60 border border-purple-800/60 text-purple-300">
-                    Publisher Metadata
+                    {t('right.publisherMetadata')}
                   </span>
                 </div>
 
@@ -1557,7 +1561,7 @@ export default function RightSidebar({
                 <div className="p-2.5 rounded-lg bg-purple-950/30 border border-purple-800/40 text-[11px] text-purple-200/90 leading-relaxed flex items-start gap-2">
                   <Info size={13} className="text-purple-400 shrink-0 mt-0.5" />
                   <p>
-                    <span className="font-semibold text-purple-200">AI Overview Note:</span> Executive overview synthesized from verified indexing metadata.
+                    <span className="font-semibold text-purple-200">{t('right.aiNote')}</span> {t('right.executiveDesc')}
                   </p>
                 </div>
 
@@ -1571,11 +1575,11 @@ export default function RightSidebar({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-gray-200 tracking-wider uppercase">
                     <FileText size={13} className="text-blue-400" />
-                    <span>Abstract</span>
+                    <span>{t('right.abstract')}</span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 flex items-center gap-1">
                     <Check size={10} />
-                    <span>Official Abstract</span>
+                    <span>{t('right.officialAbstract')}</span>
                   </span>
                 </div>
 
@@ -1612,7 +1616,7 @@ export default function RightSidebar({
                           setActiveMatchIndex(prev);
                         }}
                         className="p-0.5 hover:bg-amber-400/20 text-amber-300 hover:text-white rounded transition-colors"
-                        title="Previous evidence section"
+                        title={t('right.prevEvidence')}
                       >
                         <ChevronUp size={13} />
                       </button>
@@ -1623,7 +1627,7 @@ export default function RightSidebar({
                           setActiveMatchIndex(next);
                         }}
                         className="p-0.5 hover:bg-amber-400/20 text-amber-300 hover:text-white rounded transition-colors"
-                        title="Next evidence section"
+                        title={t('right.nextEvidence')}
                       >
                         <ChevronDown size={13} />
                       </button>
@@ -1636,10 +1640,10 @@ export default function RightSidebar({
                     href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
                     download={viewingDoc.filename}
                     className="px-2 py-1 rounded bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
-                    title="Download document file"
+                    title={t('right.downloadFile')}
                   >
                     <Download size={12} />
-                    <span>Download</span>
+                    <span>{t('right.download')}</span>
                   </a>
                 )}
               </div>
@@ -1650,7 +1654,7 @@ export default function RightSidebar({
               {isLoadingDetails ? (
                 <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
                   <Loader2 size={24} className="animate-spin text-blue-400" />
-                  <p className="text-xs text-gray-400">Loading document content...</p>
+                  <p className="text-xs text-gray-400">{t('right.loading')}</p>
                 </div>
               ) : (paperDetails?.has_full_pdf === false || paperDetails?.is_abstract_only || (paperDetails?.content && (paperDetails.content.length < 3500 || paperDetails.content.includes("NOTBOOKLM SCHOLARLY ARCHIVE") || paperDetails.content.includes("OFFICIAL PUBLICATION ARCHIVE RECORD")))) ? (
                 <div className="p-4 sm:p-5 rounded-xl bg-[#1b1c1e] border border-white/10 shadow-lg space-y-4">
@@ -1660,14 +1664,14 @@ export default function RightSidebar({
                       <Info size={16} className="text-amber-400 shrink-0" />
                       <span>
                         {paperDetails?.is_oa
-                          ? "Full Manuscript Restricted (HTTP 403 / Bot Challenge)"
-                          : "Full Manuscript Restricted (Publisher Paywalled)"}
+                          ? t('right.restrictedOA')
+                          : t('right.restrictedPaywall')}
                       </span>
                     </div>
                     <p className="text-[11.5px] text-amber-300/80 leading-relaxed">
                       {paperDetails?.is_oa
-                        ? "This publication is Open Access, but automatic PDF retrieval was restricted by the publisher repository (HTTP 403 / Bot Challenge). Verified metadata and official author abstract are indexed for AI synthesis."
-                        : "The full manuscript is protected behind a publisher paywall. Verified academic metadata and official author abstract are indexed for scholarly synthesis and citations."}
+                        ? t('right.restrictedOADesc')
+                        : t('right.restrictedPaywallDesc')}
                     </p>
                     {landingUrl && (
                       <div className="pt-1">
@@ -1678,7 +1682,7 @@ export default function RightSidebar({
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-amber-100 font-medium text-xs border border-amber-500/30 transition-colors"
                         >
                           <ExternalLink size={13} />
-                          <span>Open Official Publisher Portal (DOI) ↗</span>
+                          <span>{t('right.openOfficial')}</span>
                         </a>
                       </div>
                     )}
@@ -1688,7 +1692,7 @@ export default function RightSidebar({
                   <div className="pb-3 border-b border-white/10 space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase bg-amber-950/70 border border-amber-800/80 text-amber-400">
-                        METADATA & ABSTRACT
+                        {t('right.metadataAndAbstract')}
                       </span>
                       {paperDetails?.year && (
                         <span className="text-[11px] text-gray-400">
@@ -1703,7 +1707,7 @@ export default function RightSidebar({
 
                     {authorsStr && (
                       <p className="text-xs text-gray-400">
-                        By {authorsStr}
+                        {t('right.by')}{authorsStr}
                       </p>
                     )}
                   </div>
@@ -1711,7 +1715,7 @@ export default function RightSidebar({
                   {/* Official Abstract Content */}
                   <div className="space-y-2">
                     <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                      Official Author Abstract
+                      {t('right.officialAbstract')}
                     </h3>
                     <div className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans whitespace-pre-wrap select-text break-words bg-black/20 p-3.5 rounded-lg border border-white/5">
                       {(() => {
@@ -1736,7 +1740,7 @@ export default function RightSidebar({
                   {/* Status Banner for Full Manuscript */}
                   <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 flex items-center gap-2 text-xs text-emerald-300">
                     <Check size={14} className="text-emerald-400 shrink-0" />
-                    <span className="font-medium">Full Manuscript Verified</span>
+                    <span className="font-medium">{t('right.fullManuscriptVerified')}</span>
                   </div>
 
                   {/* Paper Sheet Header */}
@@ -1758,7 +1762,7 @@ export default function RightSidebar({
 
                     {authorsStr && (
                       <p className="text-xs text-gray-400">
-                        By {authorsStr}
+                        {t('right.by')}{authorsStr}
                       </p>
                     )}
                   </div>
@@ -1793,9 +1797,9 @@ export default function RightSidebar({
               ) : (
                 <div className="p-4 rounded-xl bg-[#1b1c1e] border border-white/10 text-center py-10 space-y-2">
                   <FileText size={28} className="text-gray-500 mx-auto stroke-[1.5]" />
-                  <p className="text-xs text-gray-300 font-medium">Document content is indexed</p>
+                  <p className="text-xs text-gray-300 font-medium">{t('right.docIndexed')}</p>
                   <p className="text-[11px] text-gray-500 max-w-[240px] mx-auto">
-                    Full text is registered in the AI source context for answering questions.
+                    {t('right.docIndexedDesc')}
                   </p>
                 </div>
               )}
@@ -1821,10 +1825,10 @@ export default function RightSidebar({
                 }
               }}
               className="h-8 px-3 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:cursor-not-allowed"
-              title="Ask AI questions specifically about this paper"
+              title={t('right.askAI')}
             >
               <MessageSquare size={13} />
-              <span>Ask</span>
+              <span>{t('right.ask')}</span>
             </button>
 
             {/* Multi-Format Cite Button (Opens Interactive Citation Modal) */}
@@ -1832,10 +1836,10 @@ export default function RightSidebar({
               disabled={isLoadingDetails}
               onClick={() => setIsCiteModalOpen(true)}
               className="h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/10 disabled:opacity-50 border border-white/10 text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed"
-              title="Cite paper (APA, IEEE, Harvard, MLA, Chicago, BibTeX, RIS)"
+              title={t('right.citePaper')}
             >
               <Quote size={13} />
-              <span>Cite</span>
+              <span>{t('action.cite') || 'Cite'}</span>
             </button>
 
             {/* Copy Link Icon Button */}
@@ -1843,7 +1847,7 @@ export default function RightSidebar({
               disabled={isLoadingDetails || !landingUrl}
               onClick={() => copyToClipboard(landingUrl, "link")}
               className="w-8 h-8 rounded-full hover:bg-white/10 disabled:opacity-50 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed"
-              title={copiedLink ? "Link Copied!" : "Copy Paper Link"}
+              title={copiedLink ? t('right.copiedLink') : t('right.copyLink')}
             >
               {copiedLink ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}
             </button>
@@ -1856,7 +1860,7 @@ export default function RightSidebar({
                   <button
                     disabled
                     className="w-8 h-8 rounded-full text-gray-600 opacity-30 flex items-center justify-center cursor-not-allowed"
-                    title="Full manuscript PDF is not available for download (metadata & abstract only)"
+                    title={t('right.downloadNotAvail')}
                   >
                     <Download size={14} />
                   </button>
@@ -2003,13 +2007,13 @@ export default function RightSidebar({
     <aside className="w-80 h-full bg-[#1e1f20] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
       {/* 1. Header: Sources Title & Collapse Button */}
       <div className="p-4 flex items-center justify-between border-b border-white/5">
-        <h2 className="text-base font-semibold text-white tracking-tight">Sources</h2>
+        <h2 className="text-base font-semibold text-white tracking-tight">{t('ui.sources')}</h2>
         <Button 
           variant="ghost" 
           size="icon" 
           className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer"
           onClick={onClose}
-          title="Close Sources"
+          title={t('right.closeSources')}
         >
           <Sidebar size={16} className="rotate-180" />
         </Button>
@@ -2040,7 +2044,7 @@ export default function RightSidebar({
             onClick={() => setIsAddSourcesModalOpen(true)}
           >
             <Plus size={18} className="text-gray-300" />
-            <span>Add sources</span>
+            <span>{t('ui.addSources')}</span>
           </Button>
         </div>
 
@@ -2069,7 +2073,7 @@ export default function RightSidebar({
                     ? "text-gray-400 hover:text-gray-200 hover:bg-white/5 cursor-pointer"
                     : "text-gray-600 opacity-30 cursor-not-allowed"
                 }`}
-                title={documents.length > 1 ? "Sort sources" : "Add more sources to enable sorting"}
+                title={documents.length > 1 ? t('right.sortSources') : t('right.addMoreSort')}
               >
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" className="opacity-90">
                   <rect x="2" y="3" width="12" height="1.6" rx="0.8" />
@@ -2134,7 +2138,7 @@ export default function RightSidebar({
                     ? "text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
                     : "text-gray-600 opacity-30 cursor-not-allowed"
                 }`}
-                title="Clean duplicate sources automatically"
+                title={t('right.cleanDup')}
               >
                 {isCleaningDuplicates ? (
                   <Loader2 size={14} className="animate-spin text-emerald-400" />
@@ -2156,10 +2160,10 @@ export default function RightSidebar({
                 }`}
                 title={
                   selectedCount === 1
-                    ? "Rename selected source"
+                    ? t('right.renameSelected')
                     : selectedCount > 1
-                    ? `Can only rename 1 source at a time (${selectedCount} selected)`
-                    : "Select 1 source to rename"
+                    ? t('right.renameMultiError').replace('{n}', selectedCount.toString())
+                    : t('right.renameSelectOne')
                 }
               >
                 <Pencil size={14} />
@@ -2170,14 +2174,14 @@ export default function RightSidebar({
                 const downloadableSelectedCount = selectedDocList.filter(d => d.has_full_pdf !== false).length;
                 const canDownload = selectedCount > 0 && downloadableSelectedCount > 0 && !isBulkDownloading;
                 const tooltipText = selectedCount === 0 
-                  ? "Select sources to download"
+                  ? t('right.selectToDownload')
                   : downloadableSelectedCount === 0
-                  ? "Full manuscript PDF is not available for download (metadata & abstract only)"
+                  ? t('right.downloadNotAvail')
                   : selectedCount === 1
-                  ? "Download full manuscript PDF"
+                  ? t('right.downloadPdf')
                   : downloadableSelectedCount === selectedCount
-                  ? `Download ${selectedCount} selected file(s)`
-                  : `Download ${downloadableSelectedCount} manuscript PDF(s) (${selectedCount - downloadableSelectedCount} skipped)`;
+                  ? t('right.downloadSelected').replace('{n}', selectedCount.toString())
+                  : t('right.downloadSelectedSkip').replace('{n}', downloadableSelectedCount.toString()).replace('{m}', (selectedCount - downloadableSelectedCount).toString());
 
                 return (
                   <button
@@ -2208,7 +2212,7 @@ export default function RightSidebar({
                     ? "text-gray-400 hover:text-red-400 hover:bg-white/5 cursor-pointer"
                     : "text-gray-600 opacity-30 cursor-not-allowed"
                 }`}
-                title={selectedCount > 0 ? `Delete ${selectedCount} selected file(s)` : "Select sources to delete"}
+                title={selectedCount > 0 ? t('right.deleteSelected').replace('{n}', selectedCount.toString()) : t('right.selectToDelete')}
               >
                 <Trash2 size={15} />
               </button>
@@ -2219,7 +2223,7 @@ export default function RightSidebar({
           <div className={`flex items-center gap-2 pr-0.5 whitespace-nowrap select-none ${
             documents.length === 0 ? "opacity-30 pointer-events-none" : ""
           }`}>
-            <span className="text-[11px] font-medium text-gray-400 select-none">Select all</span>
+            <span className="text-[11px] font-medium text-gray-400 select-none">{t('right.selectAll')}</span>
             <button
               type="button"
               onClick={handleToggleSelectAll}
@@ -2231,7 +2235,7 @@ export default function RightSidebar({
                   ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:border-gray-300" 
                   : "border-gray-500 bg-transparent cursor-pointer hover:border-gray-300"
               }`}
-              title={documents.length === 0 ? "No sources available" : isAllSelected ? "Unselect all" : "Select all"}
+              title={documents.length === 0 ? t('right.noSourcesAvail') : isAllSelected ? t('right.unselectAll') : t('right.selectAll')}
             >
               {isAllSelected && documents.length > 0 ? (
                 <Check size={10} strokeWidth={3} />
@@ -2247,9 +2251,9 @@ export default function RightSidebar({
           {sortedDocuments.length === 0 && pendingSources.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center text-gray-400 px-3">
               <FileText size={30} className="text-gray-600 mb-2 stroke-[1.5]" />
-              <h4 className="text-xs font-semibold text-gray-300">Saved sources will appear here</h4>
+              <h4 className="text-xs font-semibold text-gray-300">{t('ui.noSources')}</h4>
               <p className="text-[11px] text-gray-500 mt-1 max-w-[220px] leading-relaxed">
-                Add files, websites, or more. Then ask questions or create things based on these sources.
+                {t('ui.noSourcesDesc')}
               </p>
             </div>
           ) : (
@@ -2347,7 +2351,7 @@ export default function RightSidebar({
                     {/* Right: Circular Spinner (NotebookLM Ring Loader) or Error Icon */}
                     <div className="flex items-center shrink-0 pr-0.5">
                       {item.status === "uploading" ? (
-                        <div className="w-3.5 h-3.5 flex items-center justify-center" title="Uploading and indexing...">
+                        <div className="w-3.5 h-3.5 flex items-center justify-center" title={t('right.uploading')}>
                           <svg className="animate-spin w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                             <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -2355,14 +2359,14 @@ export default function RightSidebar({
                         </div>
                       ) : (
                         <div className="flex items-center gap-1">
-                          <span title={item.error || "Upload failed"} className="text-red-400 cursor-help">
+                          <span title={item.error || t('right.uploadFailed')} className="text-red-400 cursor-help">
                             <AlertCircle size={13} />
                           </span>
                           <button
                             type="button"
                             onClick={() => setInternalPendingSources(prev => prev.filter(p => p.id !== item.id))}
                             className="text-gray-500 hover:text-gray-300 p-0.5 rounded cursor-pointer"
-                            title="Dismiss"
+                            title={t('right.dismiss')}
                           >
                             <X size={12} />
                           </button>
@@ -2397,7 +2401,7 @@ export default function RightSidebar({
                 setDoiInput("");
               }}
               className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-              title="Close"
+              title={t('right.close')}
             >
               <X size={18} />
             </button>
@@ -2405,10 +2409,10 @@ export default function RightSidebar({
             {/* Modal Header */}
             <div className="space-y-1.5 pr-8">
               <h2 className="text-xl font-bold text-white tracking-tight leading-snug">
-                Add sources to your notebook
+                {t('ui.addSources')}
               </h2>
               <p className="text-xs text-gray-400">
-                Import research papers by DOI or upload local documents for AI synthesis.
+                {t('right.addSourcesModalDesc')}
               </p>
             </div>
 
@@ -2423,7 +2427,7 @@ export default function RightSidebar({
                     type="text"
                     value={doiInput}
                     onChange={(e) => setDoiInput(e.target.value)}
-                    placeholder="Enter DOI"
+                    placeholder={t('right.enterDoi')}
                     className="w-full h-11 pl-10 pr-24 rounded-full bg-[#131416] border border-white/15 focus:border-blue-500 text-xs text-white placeholder-gray-500 focus:outline-none transition-all"
                   />
                 </div>
@@ -2432,7 +2436,7 @@ export default function RightSidebar({
                   disabled={!doiInput.trim()}
                   className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 px-3.5 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
                 >
-                  <span>Import</span>
+                  <span>{t('right.import')}</span>
                 </button>
               </form>
             </div>
@@ -2471,10 +2475,10 @@ export default function RightSidebar({
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-gray-200">
-                  or drop your files here
+                  {t('right.dropFiles')}
                 </p>
                 <p className="text-xs text-gray-400">
-                  .pdf, .docx, .txt, .md, and more
+                  {t('right.supportedFormats')}
                 </p>
               </div>
             </div>
@@ -2482,7 +2486,7 @@ export default function RightSidebar({
             {/* Section 3: Capacity Progress Bar (300 Sources Max) */}
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between text-xs text-gray-400">
-                <span>Sources capacity</span>
+                <span>{t('right.sourcesCapacity')}</span>
                 <span className="font-medium text-gray-300 font-mono">
                   {documents.length + pendingSources.length} / 300
                 </span>
@@ -2572,7 +2576,7 @@ export default function RightSidebar({
                     if (renameError) setRenameError(null);
                   }}
                   autoFocus
-                  placeholder="Enter source title..."
+                  placeholder={t('right.enterSourceTitle')}
                   className="w-full h-10 px-3.5 rounded-xl bg-[#1a1b1d] border border-white/15 focus:border-blue-500 text-xs text-white placeholder-gray-500 focus:outline-none transition-all"
                   disabled={isSavingRename}
                 />

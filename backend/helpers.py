@@ -2,13 +2,14 @@ import os
 import re
 import urllib.parse
 from typing import List, Optional
-import rag
 import pdf_exporter
 
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
 TEMP_ZIPS_DIR = os.path.join(UPLOAD_DIR, "temp_zips")
+CHAT_MEDIA_DIR = os.path.join(UPLOAD_DIR, "chat_media")
 os.makedirs(TEMP_ZIPS_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
 
 MAX_SOURCES_PER_CHAT = 300
 
@@ -36,26 +37,30 @@ def sanitize_paper_filename(title: str, max_length: int = 200) -> str:
 
 def get_doc_file_path(chat_id: str, filename: str) -> str:
     """Returns absolute file path for a chat document across working directories and legacy fallbacks."""
+    # Sanitize inputs to prevent directory traversal
+    clean_chat_id = os.path.basename((chat_id or "").strip().replace("..", ""))
+    clean_fname = os.path.basename((filename or "").strip().replace("..", ""))
+
     # 1. Standard per-chat upload path
-    if chat_id:
-        p1 = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
+    if clean_chat_id:
+        p1 = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
         if os.path.exists(p1):
             return p1
-        p1_cwd = os.path.abspath(os.path.join(os.getcwd(), "uploads", f"{chat_id}_{filename}"))
+        p1_cwd = os.path.abspath(os.path.join(os.getcwd(), "uploads", f"{clean_chat_id}_{clean_fname}"))
         if os.path.exists(p1_cwd):
             return p1_cwd
             
     # 2. Legacy fallback with None_ prefix
-    p_none = os.path.join(UPLOAD_DIR, f"None_{filename}")
+    p_none = os.path.join(UPLOAD_DIR, f"None_{clean_fname}")
     if os.path.exists(p_none):
         return p_none
 
     # 3. Direct filename fallback
-    p_direct = os.path.join(UPLOAD_DIR, filename)
+    p_direct = os.path.join(UPLOAD_DIR, clean_fname)
     if os.path.exists(p_direct):
         return p_direct
 
-    return os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
+    return os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
 
 def get_authentic_document_pdf(chat_id: str, doc_filename: str) -> tuple:
     """

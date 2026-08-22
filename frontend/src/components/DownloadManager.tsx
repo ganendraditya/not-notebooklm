@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp, X, CheckCircle2, AlertCircle, FileArchive, ArrowDownToLine, Loader2 } from "lucide-react";
 
+import { useTranslation } from "@/lib/i18n";
+
 export interface DownloadTask {
   status: "idle" | "preparing" | "zipping" | "complete" | "error";
   total: number;
@@ -21,6 +23,7 @@ interface DownloadManagerProps {
 }
 
 export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose }) => {
+  const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Auto-dismiss on complete after 8 seconds
@@ -54,10 +57,10 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
             )}
             <span className="text-xs font-semibold text-gray-200">
               {task.status === "complete"
-                ? "Download ready"
+                ? t('download.complete')
                 : task.status === "error"
-                ? "Download failed"
-                : "Preparing download"}
+                ? t('download.failed')
+                : t('download.preparing')}
             </span>
           </div>
 
@@ -65,14 +68,14 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="p-1 text-gray-400 hover:text-gray-200 hover:bg-white/10 rounded transition-colors cursor-pointer"
-              title={isCollapsed ? "Expand" : "Collapse"}
+              title={isCollapsed ? t('download.expand') : t('download.collapse')}
             >
               {isCollapsed ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
             <button
               onClick={onClose}
               className="p-1 text-gray-400 hover:text-gray-200 hover:bg-white/10 rounded transition-colors cursor-pointer"
-              title="Close"
+              title={t('download.close')}
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -127,8 +130,8 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
                   <span className="text-emerald-400 flex items-center gap-1.5 truncate">
                     <ArrowDownToLine className="w-3 h-3 shrink-0" />
                     {task.skippedCount && task.skippedCount > 0
-                      ? `${task.downloadedCount} full manuscript PDF(s) zipped (${task.skippedCount} skipped)`
-                      : "ZIP archive is downloading automatically"}
+                      ? t('download.zippedWithSkip').replace('{downloaded}', (task.downloadedCount ?? task.total).toString()).replace('{total}', task.total.toString()).replace('{skipped}', task.skippedCount.toString())
+                      : `${t('download.zippedCount').replace('{total}', task.total.toString())} (${task.totalSizeMb ? `${task.totalSizeMb} MB` : t('download.ready')})`}
                   </span>
                   {task.totalSizeMb && (
                     <span className="text-gray-400 font-mono text-[10px] shrink-0 ml-2">

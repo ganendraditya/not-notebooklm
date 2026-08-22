@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ChevronRight, ChevronUp, Check, Info, Sparkles } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 export interface ModelTier {
   id: string;
@@ -84,6 +85,7 @@ interface ModelSelectorProps {
 }
 
 export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
+  const { t } = useTranslation();
   const [currentModelId, setCurrentModelId] = useState<string>("ag/gemini-3.7-flash-high");
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [activeSubmenuId, setActiveSubmenuId] = useState<string | null>(null);
@@ -181,7 +183,7 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
           });
         }}
         className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer group focus:outline-none"
-        title="Select AI Model"
+        title={t('model.select')}
       >
         {(() => {
           const { groupName, tierName } = getDisplayInfo();
@@ -208,7 +210,7 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
           {/* Header */}
           <div className="px-2.5 py-1 mb-1">
             <span className="text-[11px] font-medium text-gray-400">
-              Model
+              {t('model.select')}
             </span>
           </div>
 

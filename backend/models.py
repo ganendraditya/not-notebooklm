@@ -11,11 +11,15 @@ class ChatSessionUpdate(BaseModel):
 class ChatSessionResponse(BaseModel):
     id: str
     title: str
+    is_pinned: Optional[bool] = False
     created_at: datetime
     updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
+
+class PinChatRequest(BaseModel):
+    is_pinned: bool
 
 class DocumentResponse(BaseModel):
     id: int
@@ -29,16 +33,23 @@ class DocumentResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class AttachmentModel(BaseModel):
+    type: str
+    filename: str
+    url: str
+
 class ChatMessageResponse(BaseModel):
     role: str
     content: str
     created_at: datetime
+    attachments: Optional[List[AttachmentModel]] = None
     
     class Config:
         from_attributes = True
 
 class ChatQuery(BaseModel):
     message: str
+    attachments: Optional[List[AttachmentModel]] = None
 
 class ChatSessionDetailResponse(ChatSessionResponse):
     documents: List[DocumentResponse] = []
@@ -72,6 +83,16 @@ class EditMessageRequest(BaseModel):
 
 class BulkDeleteRequest(BaseModel):
     doc_ids: List[int]
+
+class BulkDeleteChatsRequest(BaseModel):
+    chat_ids: List[str]
+
+class StorageSummaryResponse(BaseModel):
+    uploads_bytes: int
+    uploads_count: int
+    qdrant_bytes: int
+    database_bytes: int
+    total_bytes: int
 
 class RenameDocumentRequest(BaseModel):
     title: str

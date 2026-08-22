@@ -23,6 +23,7 @@ from helpers import (
     sanitize_paper_filename,
     get_doc_file_path,
     get_or_generate_document_pdf,
+    get_authentic_document_pdf,
 )
 
 router = APIRouter(tags=["documents"])
@@ -168,6 +169,10 @@ def delete_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
             os.remove(file_path)
         except Exception:
             pass
+    try:
+        rag.delete_qdrant_vectors(chat_id, doc.filename)
+    except Exception:
+        pass
     db.delete(doc)
     db.commit()
     return {"status": "success"}
@@ -418,17 +423,6 @@ async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db))
 
             if needs_db_update:
                 db.add(keeper)
-
-    if cleaned_doc_ids:
-        db.commit()
-
-    remaining = db.query(Document).filter(Document.chat_id == chat_id).count()
-    return {
-        "status": "success",
-        "cleaned_count": len(cleaned_doc_ids),
-        "remaining_count": remaining,
-        "cleaned_doc_ids": cleaned_doc_ids
-    }
 
     if cleaned_doc_ids:
         db.commit()

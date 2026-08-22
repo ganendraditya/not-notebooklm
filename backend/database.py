@@ -33,6 +33,7 @@ class ChatSession(Base):
     
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())) # UUID string
     title = Column(String, default="New Chat")
+    is_pinned = Column(Boolean, default=False, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -74,6 +75,7 @@ class ChatMessage(Base):
     chat_id = Column(String, ForeignKey("chat_sessions.id"))
     role = Column(String) # 'user' or 'assistant'
     content = Column(Text)
+    attachments_json = Column(Text, nullable=True) # NEW: store attachments JSON
     created_at = Column(DateTime, default=datetime.utcnow)
     
     chat_session = relationship("ChatSession", back_populates="messages")
@@ -89,6 +91,9 @@ try:
         if "updated_at" not in cols:
             conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN updated_at DATETIME"))
             conn.execute(text("UPDATE chat_sessions SET updated_at = created_at WHERE updated_at IS NULL"))
+            conn.commit()
+        if "is_pinned" not in cols:
+            conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN is_pinned BOOLEAN DEFAULT 0"))
             conn.commit()
 
         # Auto-migrate Document metadata columns
@@ -116,6 +121,12 @@ try:
             if col_name not in doc_cols:
                 conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col_name} {col_type}"))
         conn.commit()
+        res_msgs = conn.execute(text("PRAGMA table_info(chat_messages)")).fetchall()
+        msg_cols = [r[1] for r in res_msgs]
+        if "attachments_json" not in msg_cols:
+            conn.execute(text("ALTER TABLE chat_messages ADD COLUMN attachments_json TEXT"))
+            conn.commit()
+
 except Exception as e:
     print(f"[DB Migration Warning]: {e}")
 

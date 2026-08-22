@@ -4,16 +4,20 @@ import json
 import logging
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+import shutil
 from sqlalchemy.orm import Session
 
 from database import get_db, ChatSession, Document, ChatMessage
+from helpers import UPLOAD_DIR
 import models
 import rag
 
 router = APIRouter(tags=["chats"])
 logger = logging.getLogger("uvicorn.error")
+
+CHAT_MEDIA_DIR = os.path.join(UPLOAD_DIR, "chat_media")
+os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
 
 @router.post("/chats", response_model=models.ChatSessionResponse)
 def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
@@ -62,22 +66,50 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
             is_oa=d.is_oa if d.is_oa is not None else True
         ))
         
+    sorted_msgs = sorted(chat.messages, key=lambda m: m.created_at)
+    msg_responses = []
+    for msg in sorted_msgs:
+        attachments = None
+        if hasattr(msg, 'attachments_json') and msg.attachments_json:
+            try:
+                attachments = json.loads(msg.attachments_json)
+            except:
+                pass
+        msg_responses.append(models.ChatMessageResponse(
+            role=msg.role,
+            content=msg.content,
+            created_at=msg.created_at,
+            attachments=attachments
+        ))
+        
     return models.ChatSessionDetailResponse(
         id=chat.id,
         title=chat.title,
         created_at=chat.created_at,
         updated_at=chat.updated_at,
+        is_pinned=chat.is_pinned,
         documents=doc_responses,
-        messages=chat.messages
+        messages=msg_responses
     )
 
 @router.put("/chats/{chat_id}", response_model=models.ChatSessionResponse)
+@router.patch("/chats/{chat_id}", response_model=models.ChatSessionResponse)
 def update_chat(chat_id: str, update: models.ChatSessionUpdate, db: Session = Depends(get_db)):
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     chat.title = update.title
     chat.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(chat)
+    return chat
+
+@router.patch("/chats/{chat_id}/pin", response_model=models.ChatSessionResponse)
+def toggle_pin_chat(chat_id: str, payload: models.PinChatRequest, db: Session = Depends(get_db)):
+    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+    chat.is_pinned = payload.is_pinned
     db.commit()
     db.refresh(chat)
     return chat
@@ -103,27 +135,108 @@ def delete_chat(chat_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         logger.warning(f"[Delete Chat File Cleanup Warning]: {e}")
 
-    # 2. Delete all related documents and chat messages explicitly
+    # 2. Clean vectors from Qdrant
+    try:
+        rag.delete_qdrant_vectors(chat_id)
+    except Exception as e:
+        logger.debug(f"[Qdrant Vector Clean Warning]: {e}")
+
+    # 3. Delete all related documents and chat messages explicitly
     db.query(Document).filter(Document.chat_id == chat_id).delete(synchronize_session=False)
     db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).delete(synchronize_session=False)
     
-    # 3. Delete chat session record
+    # 4. Delete chat session record
     db.delete(chat)
     db.commit()
     return {"status": "success", "message": "Chat deleted"}
 
-@router.post("/chats/{chat_id}/message", response_model=models.ChatMessageResponse)
+@router.post("/chats/bulk-delete")
+def bulk_delete_chats(payload: models.BulkDeleteChatsRequest, db: Session = Depends(get_db)):
+    deleted_count = 0
+    from helpers import UPLOAD_DIR
+    
+    for chat_id in payload.chat_ids:
+        chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+        if not chat:
+            continue
+            
+        # Clean physical files
+        try:
+            if os.path.exists(UPLOAD_DIR):
+                for fname in os.listdir(UPLOAD_DIR):
+                    if fname.startswith(f"{chat_id}_"):
+                        fp = os.path.join(UPLOAD_DIR, fname)
+                        if os.path.isfile(fp):
+                            os.remove(fp)
+        except Exception:
+            pass
+
+        # Clean vectors
+        try:
+            rag.delete_qdrant_vectors(chat_id)
+        except Exception:
+            pass
+
+        # Delete database records
+        db.query(Document).filter(Document.chat_id == chat_id).delete(synchronize_session=False)
+        db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).delete(synchronize_session=False)
+        db.delete(chat)
+        deleted_count += 1
+
+    db.commit()
+    return {"status": "success", "deleted_count": deleted_count}
+
+@router.post("/chats/{chat_id}/upload_chat_media")
+async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
+    """Uploads an image/media attachment for a chat session."""
+    # Ensure chat exists
+    # Save file
+    file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ".jpg"
+    safe_filename = f"{chat_id}_{uuid.uuid4().hex[:8]}{file_ext}"
+    file_path = os.path.join(CHAT_MEDIA_DIR, safe_filename)
+    
+    with open(file_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+        
+    # Return attachment metadata
+    return {
+        "status": "success",
+        "attachment": {
+            "type": "image" if file_ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"] else "file",
+            "filename": file.filename,
+            "url": f"/uploads/chat_media/{safe_filename}"
+        }
+    }
 async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depends(get_db)):
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
         
-    user_msg = ChatMessage(chat_id=chat_id, role="user", content=query.message)
+    attachments_str = None
+    if query.attachments:
+        attachments_str = json.dumps([a.dict() for a in query.attachments])
+
+    user_msg = ChatMessage(
+        chat_id=chat_id, 
+        role="user", 
+        content=query.message,
+        attachments_json=attachments_str
+    )
     db.add(user_msg)
     chat.updated_at = datetime.utcnow()
     db.commit()
     
-    chat_history = [{"role": msg.role, "content": msg.content} for msg in chat.messages]
+    chat_history = []
+    for msg in chat.messages:
+        item = {"role": msg.role, "content": msg.content}
+        if hasattr(msg, 'attachments_json') and msg.attachments_json:
+            try:
+                atts = json.loads(msg.attachments_json)
+                if atts:
+                    item["attachments"] = atts
+            except:
+                pass
+        chat_history.append(item)
     
     try:
         response_text = await rag.query_chat(chat_id, query.message, chat_history=chat_history)
@@ -137,7 +250,12 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
     db.commit()
     db.refresh(asst_msg)
     
-    return asst_msg
+    return models.ChatMessageResponse(
+        role=asst_msg.role,
+        content=asst_msg.content,
+        created_at=asst_msg.created_at,
+        attachments=None
+    )
 
 @router.post("/chats/{chat_id}/message/stream")
 @router.post("/chats/{chat_id}/message_stream")
@@ -146,13 +264,32 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
         
-    user_msg = ChatMessage(chat_id=chat_id, role="user", content=query.message)
+    attachments_str = None
+    if query.attachments:
+        attachments_str = json.dumps([a.dict() for a in query.attachments])
+
+    user_msg = ChatMessage(
+        chat_id=chat_id, 
+        role="user", 
+        content=query.message,
+        attachments_json=attachments_str
+    )
     db.add(user_msg)
     chat.updated_at = datetime.utcnow()
     db.commit()
     
     all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
-    chat_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs]
+    chat_history = []
+    for msg in all_msgs:
+        item = {"role": msg.role, "content": msg.content}
+        if hasattr(msg, 'attachments_json') and msg.attachments_json:
+            try:
+                atts = json.loads(msg.attachments_json)
+                if atts:
+                    item["attachments"] = atts
+            except:
+                pass
+        chat_history.append(item)
     
     # Check if chat is still using default/raw initial title and needs smart AI naming
     is_initial_chat_state = len(all_msgs) <= 1 or chat.title in ("New Chat", "New Research", "") or (chat.title and chat.title.endswith("..."))

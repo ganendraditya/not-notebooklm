@@ -32,6 +32,7 @@ from .search import (
 from .engine import (
     vector_store,
     qdrant_client,
+    delete_qdrant_vectors,
     create_llm_instances,
     ingest_document_text,
     ingest_documents_batch,
@@ -72,6 +73,7 @@ __all__ = [
     # Engine & Agent
     "vector_store",
     "qdrant_client",
+    "delete_qdrant_vectors",
     "create_llm_instances",
     "ingest_document_text",
     "ingest_document",

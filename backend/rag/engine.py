@@ -29,6 +29,7 @@ from llama_index.core.agent import ReActAgent
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
 from .parsers import parse_document_to_markdown
+from helpers import get_doc_file_path
 from .search import (
     search_academic_papers,
     plan_academic_search,
@@ -90,6 +91,32 @@ def init_embedding_and_vector_store():
     embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
     vstore = QdrantVectorStore(client=qdrant_client, collection_name="not_notebooklm", path=None, url=None, api_key=None)
     return embed_model, vstore
+
+def delete_qdrant_vectors(chat_id: str, doc_filename: Optional[str] = None):
+    """Purges points from Qdrant vector store by chat_id and optionally by doc_filename."""
+    try:
+        from qdrant_client.http import models as qmodels
+        conditions = [
+            qmodels.FieldCondition(key="chat_id", match=qmodels.MatchValue(value=chat_id))
+        ]
+        if doc_filename:
+            conditions.append(
+                qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=doc_filename))
+            )
+            
+        colls_to_clean = ["not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
+        for cname in colls_to_clean:
+            try:
+                qdrant_client.delete(
+                    collection_name=cname,
+                    points_selector=qmodels.FilterSelector(
+                        filter=qmodels.Filter(must=conditions)
+                    )
+                )
+            except Exception:
+                pass
+    except Exception as e:
+        logger.debug(f"[Qdrant Vector Purge Error]: {e}")
 
 Settings.embed_model, vector_store = init_embedding_and_vector_store()
 
@@ -354,6 +381,20 @@ async def query_chat(
     """
     from database import SessionLocal, Document as DBDocument
     
+    # Process attachments on the latest user query if present
+    final_user_msg = chat_history[-1] if chat_history else {}
+    attachments = final_user_msg.get("attachments", [])
+    
+    # Simple integration: append image descriptions to query if vision is supported
+    # Real implementations pass base64 to multimodal models, but for text-only fallback:
+    if attachments:
+        query += "\n\n[Attachments Provided by User:]"
+        for att in attachments:
+            if att.get('type') == 'image':
+                query += f"\n- Image attached: {att.get('filename')}"
+            else:
+                query += f"\n- Document attached: {att.get('filename')}"
+    
     async def report_status(text: str):
         if status_callback:
             try:
@@ -367,9 +408,11 @@ async def query_chat(
     
     db = SessionLocal()
     local_docs = []
+    db_docs_by_filename = {}
     try:
         db_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all()
         local_docs = [d.filename for d in db_docs]
+        db_docs_by_filename = {d.filename: d for d in db_docs}
     finally:
         db.close()
         

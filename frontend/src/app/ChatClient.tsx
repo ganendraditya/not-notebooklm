@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import LeftSidebar from "@/components/LeftSidebar";
 import ChatArea from "@/components/ChatArea";
 import RightSidebar from "@/components/RightSidebar";
+import SettingsModal from "@/components/SettingsModal";
 
 // Types
 export interface ChatSession {
@@ -41,10 +42,17 @@ export interface CitationGroundingHighlight {
   clickId?: number;
 }
 
+export interface Attachment {
+  type: "image" | "file";
+  filename: string;
+  url?: string;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
   created_at: string;
+  attachments?: Attachment[];
 }
 
 export interface PendingSourceItem {
@@ -67,6 +75,7 @@ export default function ChatClient() {
   const [activeStatus, setActiveStatus] = useState<string | null>(null);
   const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
   const [groundingHighlight, setGroundingHighlight] = useState<CitationGroundingHighlight | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -85,11 +94,9 @@ export default function ChatClient() {
     fetch(`${backendUrl}/chats`)
       .then(res => res.json())
       .then(data => {
-        const pinnedStorage = JSON.parse(localStorage.getItem("pinned_chats") || "[]") as string[];
-        const pinnedSet = new Set(pinnedStorage);
         const hydrated = (data || []).map((s: ChatSession) => ({
           ...s,
-          is_pinned: pinnedSet.has(s.id)
+          is_pinned: Boolean(s.is_pinned)
         }));
         setSessions(hydrated);
         if (hydrated.length > 0 && !activeChatId) {
@@ -147,10 +154,16 @@ export default function ChatClient() {
     activeChatIdRef.current = activeChatId;
   }, [activeChatId]);
 
+  // Queue now needs to store attachments too
+  interface QueuedMessage {
+    text: string;
+    attachments?: Attachment[];
+  }
+
   // Per-chat background generation tracker
   interface ChatJobState {
     controller: AbortController | null;
-    queue: string[];
+    queue: QueuedMessage[];
     isProcessing: boolean;
     status: string | null;
   }
@@ -193,7 +206,7 @@ export default function ChatClient() {
     if (!currentChatId) return;
     const job = getChatJob(currentChatId);
     job.queue = job.queue.filter((_, i) => i !== index);
-    setQueuedPrompts([...job.queue]);
+    setQueuedPrompts(job.queue.map(q => q.text));
   };
 
   const handlePromoteQueuedPrompt = async (index: number) => {
@@ -205,7 +218,7 @@ export default function ChatClient() {
 
     // 1. Remove this item from the queue list
     job.queue = job.queue.filter((_, i) => i !== index);
-    setQueuedPrompts([...job.queue]);
+    setQueuedPrompts(job.queue.map(q => q.text));
 
     // 2. Abort current ongoing generation for this chat
     if (job.controller) {
@@ -239,10 +252,15 @@ export default function ChatClient() {
     job.status = "Analyzing query & reasoning...";
 
     if (activeChatIdRef.current === targetChatId) {
-      setQueuedPrompts([...job.queue]);
+      setQueuedPrompts(job.queue.map(q => q.text));
       setIsLoading(true);
       setActiveStatus(job.status);
-      const newMsg: ChatMessage = { role: "user", content: nextMessage, created_at: new Date().toISOString() };
+      const newMsg: ChatMessage = { 
+        role: "user", 
+        content: nextMessage.text, 
+        created_at: new Date().toISOString(),
+        attachments: nextMessage.attachments
+      };
       setMessages(prev => [...prev, newMsg]);
     }
 
@@ -255,7 +273,10 @@ export default function ChatClient() {
       const res = await fetch(`${backendUrl}/chats/${targetChatId}/message_stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: nextMessage }),
+        body: JSON.stringify({ 
+          message: nextMessage.text,
+          attachments: nextMessage.attachments
+        }),
         signal: controller.signal
       });
 
@@ -375,10 +396,10 @@ export default function ChatClient() {
     }
   };
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (text: string, attachments?: Attachment[]) => {
     let currentChatId = activeChatIdRef.current;
     if (!currentChatId) {
-      currentChatId = await handleEnsureChatSession(message);
+      currentChatId = await handleEnsureChatSession(text);
     }
     if (!currentChatId) return;
 
@@ -386,14 +407,18 @@ export default function ChatClient() {
 
     if (job.isProcessing) {
       // If AI is currently generating for this chat, add to queue
-      job.queue.push(message);
+      job.queue.push({ text, attachments });
       if (activeChatIdRef.current === currentChatId) {
-        setQueuedPrompts([...job.queue]);
+        setQueuedPrompts(job.queue.map(q => q.text));
       }
       return;
     }
 
-    job.queue.push(message);
+    job.queue.push({ text, attachments });
+    if (activeChatIdRef.current === currentChatId) {
+      setQueuedPrompts(job.queue.map(q => q.text));
+    }
+
     await processNextInQueue(currentChatId);
   };
 
@@ -561,7 +586,7 @@ export default function ChatClient() {
     const job = getChatJob(id);
     setIsLoading(job.isProcessing);
     setActiveStatus(job.status);
-    setQueuedPrompts([...job.queue]);
+    setQueuedPrompts(job.queue.map(q => q.text));
 
     fetch(`${backendUrl}/chats/${id}`)
         .then(res => res.json())
@@ -623,33 +648,27 @@ export default function ChatClient() {
     }
   };
 
-  const handleTogglePinChat = (id: string) => {
-    setSessions(prev => {
-      let pinnedStorage: string[] = [];
-      try {
-        pinnedStorage = JSON.parse(localStorage.getItem("pinned_chats") || "[]") as string[];
-      } catch (e) {
-        pinnedStorage = [];
+  const handleTogglePinChat = async (id: string) => {
+    const targetSession = sessions.find(s => s.id === id);
+    const nextPinnedState = targetSession ? !targetSession.is_pinned : true;
+
+    // Optimistic UI update
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, is_pinned: nextPinnedState } : s));
+
+    try {
+      const res = await fetch(`${backendUrl}/chats/${id}/pin`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_pinned: nextPinnedState })
+      });
+      if (!res.ok) {
+        // Revert on failure
+        setSessions(prev => prev.map(s => s.id === id ? { ...s, is_pinned: !nextPinnedState } : s));
       }
-
-      const targetSession = prev.find(s => s.id === id);
-      const willPin = targetSession ? !targetSession.is_pinned : true;
-
-      let updatedPinned: string[];
-      if (willPin) {
-        updatedPinned = Array.from(new Set([...pinnedStorage, id]));
-      } else {
-        updatedPinned = pinnedStorage.filter(pId => pId !== id);
-      }
-
-      try {
-        localStorage.setItem("pinned_chats", JSON.stringify(updatedPinned));
-      } catch (e) {
-        console.error("Failed to save pinned chats to localStorage:", e);
-      }
-
-      return prev.map(s => s.id === id ? { ...s, is_pinned: willPin } : s);
-    });
+    } catch (e) {
+      console.error("Failed to sync pinned chat state to backend:", e);
+      setSessions(prev => prev.map(s => s.id === id ? { ...s, is_pinned: !nextPinnedState } : s));
+    }
   };
 
   const handleBulkDocumentsDeleted = (docIds: number[]) => {
@@ -712,6 +731,7 @@ export default function ChatClient() {
           onRenameChat={handleRenameChat}
           onTogglePinChat={handleTogglePinChat}
           onToggleSidebar={() => setIsSidebarOpen(false)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       )}
       
@@ -794,6 +814,34 @@ export default function ChatClient() {
           }}
         />
       )}
+
+      {/* Global Settings & Storage Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        backendUrl={backendUrl}
+        sessions={sessions}
+        onChatsDeleted={(deletedIds) => {
+          setSessions(prev => prev.filter(s => !deletedIds.includes(s.id)));
+          if (activeChatId && deletedIds.includes(activeChatId)) {
+            const remaining = sessions.filter(s => !deletedIds.includes(s.id));
+            if (remaining.length > 0) {
+              handleSelectChat(remaining[0].id);
+            } else {
+              handleCreateChat();
+            }
+          }
+        }}
+        onAllDataReset={() => {
+          setSessions([]);
+          setDocuments([]);
+          setMessages([]);
+          setActiveChatId(null);
+          setViewingDoc(null);
+          setGroundingHighlight(null);
+          handleCreateChat();
+        }}
+      />
     </div>
   );
 }

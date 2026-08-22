@@ -12,14 +12,15 @@ import {
 } from "lucide-react";
 import { ChatMessage, Document as DocType, TargetedSource } from "@/app/ChatClient";
 import { InChatMessageComponent } from "./chat/ChatMessageItem";
-import { ChatInputBox } from "./chat/ChatInput";
+import { ChatInputBox, Attachment } from "./chat/ChatInput";
 import { CitationContext } from "./chat/CitationParser";
+import { useTranslation } from "@/lib/i18n";
 
 interface ChatAreaProps {
   activeChatId: string | null;
   messages: ChatMessage[];
   isLoading?: boolean;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, attachments?: Attachment[]) => void;
   onEditMessage?: (messageIndex: number, newContent: string) => void;
   onStopGeneration?: () => void;
   queuedPrompts?: string[];
@@ -68,6 +69,7 @@ export default function ChatArea({
   activeStatus,
   activeCitationKey
 }: ChatAreaProps) {
+  const { t } = useTranslation();
   const [copiedMessageIdx, setCopiedMessageIdx] = useState<number | null>(null);
   const [editingMessageIdx, setEditingMessageIdx] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -84,8 +86,8 @@ export default function ChatArea({
     }
   }, [messages, isLoading, isChatEmpty]);
 
-  const handleSendMessage = useCallback((text: string) => {
-    onSendMessage(text);
+  const handleSendMessage = useCallback((text: string, attachments?: Attachment[]) => {
+    onSendMessage(text, attachments);
   }, [onSendMessage]);
 
   const handleCopy = useCallback((text: string, idx: number) => {
@@ -124,7 +126,7 @@ export default function ChatArea({
             type="button"
             onClick={onOpenSidebar}
             className="h-8 w-8 text-gray-400 hover:text-white bg-[#282828] hover:bg-[#333333] border border-white/10 rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
-            title="Open sidebar"
+            title={t('chat.openSidebar')}
           >
             <Sparkles size={16} />
           </button>
@@ -137,10 +139,10 @@ export default function ChatArea({
             type="button"
             onClick={onToggleRightSidebar}
             className="h-8 px-2.5 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-xs text-gray-300 hover:text-white flex items-center gap-1.5 cursor-pointer shadow-md backdrop-blur transition-colors"
-            title="Open sources"
+            title={t('chat.openSources')}
           >
             <FileText size={13} className="text-blue-400" />
-            <span>Sources</span>
+            <span>{t('ui.sources')}</span>
             {documents.length > 0 && (
               <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-600/30 text-blue-300 text-[10px] font-mono">
                 {documents.length}
@@ -150,11 +152,11 @@ export default function ChatArea({
         </div>
       )}
 
-      <div 
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 sm:px-6 pt-10 sm:pt-12 pb-6 w-full min-h-0 scroll-smooth"
-      >
-        <div className={`max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto px-4 sm:px-6 pt-8 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
+        >
+          <div className={`w-full max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
           {isChatEmpty ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4 w-full max-w-2xl mx-auto my-auto">
               <div className="p-3.5 rounded-full bg-white/5 border border-white/10 mb-4 shadow-sm">
@@ -173,6 +175,7 @@ export default function ChatArea({
                 onRemoveQueuedPrompt={onRemoveQueuedPrompt}
                 onPromoteQueuedPrompt={onPromoteQueuedPrompt}
                 backendUrl={backendUrl}
+                chatId={activeChatId}
                 targetedSource={targetedSource}
                 onClearTargetedSource={onClearTargetedSource}
               />
@@ -210,13 +213,13 @@ export default function ChatArea({
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 max-w-[85%]">
+                        <div className="flex items-center gap-2 max-w-[85%] -mr-1 sm:-mr-1.5">
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                             <button
                               type="button"
                               onClick={() => handleStartEdit(msg.content, idx)}
                               className="p-1 text-gray-400 hover:text-white rounded-md hover:bg-white/10 transition-colors cursor-pointer"
-                              title="Edit message"
+                              title={t('chat.editMessage')}
                             >
                               <Pencil size={13} />
                             </button>
@@ -224,7 +227,7 @@ export default function ChatArea({
                               type="button"
                               onClick={() => handleCopy(msg.content, idx)}
                               className="p-1 text-gray-400 hover:text-white rounded-md hover:bg-white/10 transition-colors cursor-pointer"
-                              title="Copy prompt"
+                              title={t('chat.copyPrompt')}
                             >
                               {copiedMessageIdx === idx ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                             </button>
@@ -236,7 +239,7 @@ export default function ChatArea({
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-start">
+                    <div className="flex items-start pl-1 sm:pl-1.5">
                       <div className="flex-1 min-w-0">
                         <InChatMessageComponent 
                           msg={msg}
@@ -253,19 +256,19 @@ export default function ChatArea({
                         <div className="mt-2 flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/, "").trim(), idx)}
+                            onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "").trim(), idx)}
                             className="p-1.5 text-gray-400 hover:text-white rounded-md hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-1 text-xs"
-                            title="Copy response"
+                            title={t('chat.copyResponse')}
                           >
                             {copiedMessageIdx === idx ? (
                               <>
                                 <Check size={13} className="text-emerald-400" />
-                                <span className="text-emerald-400 text-[11px]">Copied</span>
+                                <span className="text-emerald-400 text-[11px]">{t('chat.copied')}</span>
                               </>
                             ) : (
                               <>
                                 <Copy size={13} />
-                                <span className="text-[11px]">Copy</span>
+                                <span className="text-[11px]">{t('action.copy')}</span>
                               </>
                             )}
                           </button>
@@ -290,20 +293,21 @@ export default function ChatArea({
       </div>
 
       {!isChatEmpty && (
-        <div className="p-4 bg-gradient-to-t from-[#212121] via-[#212121] to-transparent shrink-0">
-          <ChatInputBox 
-            isLoading={isLoading}
-            documentsCount={documents.length}
-            onToggleRightSidebar={onToggleRightSidebar}
-            onSubmit={handleSendMessage}
-            onStopGeneration={onStopGeneration}
-            queuedPrompts={queuedPrompts}
-            onRemoveQueuedPrompt={onRemoveQueuedPrompt}
-            onPromoteQueuedPrompt={onPromoteQueuedPrompt}
-            backendUrl={backendUrl}
-            targetedSource={targetedSource}
-            onClearTargetedSource={onClearTargetedSource}
-          />
+        <div className="absolute bottom-0 left-0 right-0 pl-4 sm:pl-6 pr-[22px] sm:pr-[30px] pb-3 pt-0 pointer-events-none z-20 w-full flex justify-center">
+          <div className="w-full max-w-3xl pointer-events-auto">
+            <ChatInputBox 
+              isLoading={isLoading}
+              documentsCount={documents.length}
+              onToggleRightSidebar={onToggleRightSidebar}
+              onSubmit={handleSendMessage}
+              onStopGeneration={onStopGeneration}
+              queuedPrompts={queuedPrompts}
+              onRemoveQueuedPrompt={onRemoveQueuedPrompt}
+              onPromoteQueuedPrompt={onPromoteQueuedPrompt}
+              backendUrl={backendUrl}
+              chatId={activeChatId}
+            />
+          </div>
         </div>
       )}
     </div>
