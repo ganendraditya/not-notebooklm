@@ -18,9 +18,9 @@ export const metadata: Metadata = {
   title: "NotbookLM",
   description: "AI Research Assistant",
   icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
-    apple: "/icon.svg",
+    icon: "/icon?v=7",
+    shortcut: "/icon?v=7",
+    apple: "/icon?v=7",
   },
 };
 

@@ -86,11 +86,13 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
             variants = [msg.content]
             
         active_var_idx = getattr(msg, 'active_variant_index', 0) or 0
-        if active_var_idx < 0 or active_var_idx >= len(variants):
-            active_var_idx = len(variants) - 1
-            
-        # Display current active variant content
-        curr_content = variants[active_var_idx] if variants else msg.content
+        if variants:
+            if active_var_idx < 0 or active_var_idx >= len(variants):
+                active_var_idx = len(variants) - 1
+            curr_content = variants[active_var_idx]
+        else:
+            active_var_idx = 0
+            curr_content = msg.content or ""
 
         msg_responses.append(models.ChatMessageResponse(
             role=msg.role,
@@ -205,9 +207,21 @@ def bulk_delete_chats(payload: models.BulkDeleteChatsRequest, db: Session = Depe
     db.commit()
     return {"status": "success", "deleted_count": deleted_count}
 
+ALLOWED_ATTACHMENT_EXTENSIONS = {
+    ".pdf", ".docx", ".doc", ".txt", ".md", ".csv", ".tsv", ".bib", ".bibtex", ".ris",
+    ".jpg", ".jpeg", ".png", ".webp", ".gif"
+}
+
 @router.post("/chats/{chat_id}/upload_chat_media")
 async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
     """Uploads an image/media attachment for a chat session."""
+    file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ".jpg"
+    if file_ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file format '{file_ext}'. Allowed formats: {', '.join(sorted(ALLOWED_ATTACHMENT_EXTENSIONS))}"
+        )
+
     # Check current storage usage against 10GB limit
     total_bytes_limit = 10 * 1024 * 1024 * 1024
     used_bytes = 0
@@ -543,18 +557,33 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
     if target_msg.role != "assistant":
         raise HTTPException(status_code=400, detail="Only assistant messages can be regenerated")
         
-    # Find the preceding user message
+    # Find the preceding user message (or attachments)
     user_prompt = ""
+    user_attachments = []
     for m in reversed(all_msgs[:req.message_index]):
         if m.role == "user":
-            user_prompt = m.content
+            user_prompt = m.content or ""
+            if m.attachments_json:
+                try:
+                    user_attachments = json.loads(m.attachments_json)
+                except:
+                    pass
             break
             
-    if not user_prompt:
-        raise HTTPException(status_code=400, detail="No preceding user message found")
-        
     # History up to the user message
-    truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index]]
+    truncated_history = []
+    for msg in all_msgs[:req.message_index]:
+        atts = []
+        if msg.attachments_json:
+            try:
+                atts = json.loads(msg.attachments_json)
+            except:
+                pass
+        truncated_history.append({
+            "role": msg.role, 
+            "content": msg.content or "",
+            "attachments": atts
+        })
     target_msg_id = target_msg.id
     
     async def event_generator():

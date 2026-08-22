@@ -19,6 +19,11 @@ import ModelSelector from "@/components/ModelSelector";
 import SearchFilterPopover, { SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/components/SearchFilterPopover";
 import { useTranslation } from "@/lib/i18n";
 
+const ALLOWED_ATTACHMENT_EXTS = new Set([
+  "pdf", "docx", "doc", "txt", "md", "csv", "tsv", "bib", "bibtex", "ris",
+  "jpg", "jpeg", "png", "webp", "gif"
+]);
+
 export interface Attachment {
   type: "image" | "file";
   filename: string;
@@ -83,9 +88,54 @@ export const ChatInputBox = memo(function ChatInputBox({
     }
   }, [input]);
 
+  const checkHasValidFiles = (e: React.DragEvent) => {
+    if (!e.dataTransfer || !e.dataTransfer.items) return false;
+    for (let i = 0; i < e.dataTransfer.items.length; i++) {
+      const item = e.dataTransfer.items[i];
+      if (item.kind !== "file") continue;
+      
+      // If item type is available (e.g. image/png, application/pdf)
+      const mime = (item.type || "").toLowerCase();
+      if (
+        mime.startsWith("image/") ||
+        mime.includes("pdf") ||
+        mime.includes("word") ||
+        mime.includes("text") ||
+        mime.includes("csv")
+      ) {
+        return true;
+      }
+
+      // Check file name extension from item if available as a File (some browsers)
+      const file = item.getAsFile?.();
+      if (file) {
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        if (ALLOWED_ATTACHMENT_EXTS.has(ext)) {
+          return true;
+        }
+      }
+    }
+    // Fallback: if browser hides item details during dragover, check files if present
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        const ext = e.dataTransfer.files[i].name.split('.').pop()?.toLowerCase() || '';
+        if (ALLOWED_ATTACHMENT_EXTS.has(ext)) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return false;
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragActive(true);
+    const isValid = checkHasValidFiles(e);
+    if (isValid) {
+      setIsDragActive(true);
+    } else {
+      setIsDragActive(false);
+    }
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -104,6 +154,18 @@ export const ChatInputBox = memo(function ChatInputBox({
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
+    // Filter only supported formats
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      if (ALLOWED_ATTACHMENT_EXTS.has(ext)) {
+        validFiles.push(file);
+      }
+    }
+
+    if (validFiles.length === 0) return;
+
     let targetChatId = chatId;
     if (!targetChatId && onEnsureChatSession) {
       try {
@@ -118,8 +180,8 @@ export const ChatInputBox = memo(function ChatInputBox({
     setIsUploading(true);
     const newAttachments = [...attachments];
     
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
       const formData = new FormData();
       formData.append("file", file);
       
@@ -472,7 +534,7 @@ export const ChatInputBox = memo(function ChatInputBox({
               ref={fileInputRef} 
               className="hidden" 
               multiple 
-              accept="image/*,.pdf,.txt,.docx" 
+              accept=".pdf,.docx,.doc,.txt,.md,.csv,.tsv,.bib,.bibtex,.ris,image/jpeg,image/png,image/webp,image/gif" 
               onChange={(e) => handleFileUpload(e.target.files)}
             />
             <ModelSelector backendUrl={backendUrl} />

@@ -187,7 +187,7 @@ export default function ChatArea({
       )}
 
       {/* Top Right Header Controls */}
-      <div className="absolute top-3.5 right-3.5 z-20 flex items-center gap-2">
+      <div className="absolute top-3.5 right-7 z-20 flex items-center gap-2">
         {/* Open Sources Toggle (when right sidebar is closed) */}
         {!isRightSidebarOpen && onToggleRightSidebar && (
           <button 
@@ -224,6 +224,19 @@ export default function ChatArea({
                 className="absolute right-0 top-9 z-50 w-44 rounded-xl bg-[#222222] border border-white/10 shadow-2xl p-1 text-xs text-gray-200 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                 onClick={(e) => e.stopPropagation()}
               >
+                {/* Rename */}
+                <button
+                  onClick={() => {
+                    setIsTopMenuOpen(false);
+                    setRenameInput(chatTitle || "");
+                    setIsRenameOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                >
+                  <Pencil size={13} className="text-gray-400" />
+                  <span>{t('action.rename')}</span>
+                </button>
+
                 {/* Pin / Unpin */}
                 <button
                   onClick={() => {
@@ -232,32 +245,19 @@ export default function ChatArea({
                       onTogglePinChat(activeChatId);
                     }
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/10 text-left transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
                 >
                   {isPinned ? (
                     <>
                       <PinOff size={13} className="text-amber-400" />
-                      <span>{t('left.unpin')}</span>
+                      <span>{t('action.unpin')}</span>
                     </>
                   ) : (
                     <>
                       <Pin size={13} className="text-gray-400" />
-                      <span>{t('left.pin')}</span>
+                      <span>{t('action.pin')}</span>
                     </>
                   )}
-                </button>
-
-                {/* Rename */}
-                <button
-                  onClick={() => {
-                    setIsTopMenuOpen(false);
-                    setRenameInput(chatTitle || "");
-                    setIsRenameOpen(true);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/10 text-left transition-colors cursor-pointer"
-                >
-                  <Pencil size={13} className="text-gray-400" />
-                  <span>{t('left.rename')}</span>
                 </button>
 
                 {/* Delete */}
@@ -266,10 +266,10 @@ export default function ChatArea({
                     setIsTopMenuOpen(false);
                     setIsDeleteConfirmOpen(true);
                   }}
-                  className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 text-left transition-colors cursor-pointer"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
                 >
                   <Trash2 size={13} />
-                  <span>{t('left.delete')}</span>
+                  <span>{t('action.deleteChat')}</span>
                 </button>
               </div>
             )}
@@ -313,98 +313,106 @@ export default function ChatArea({
                 <div key={idx} className="space-y-2 group">
                   {msg.role === "user" ? (
                     <div className="flex flex-col items-end">
-                      {editingMessageIdx === idx ? (
-                        <div className="w-full max-w-xl bg-[#2a2a2a] p-3 rounded-2xl border border-white/10 space-y-2 shadow-xl">
-                          <textarea
-                            value={editContent}
-                            onChange={(e) => setEditContent(e.target.value)}
-                            className="w-full bg-[#1e1e1e] text-white p-3 rounded-xl border border-white/10 focus:outline-none focus:border-blue-500 text-sm resize-none"
-                            rows={3}
-                            autoFocus
-                          />
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setEditingMessageIdx(null)}
-                              className="px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleSaveEdit(idx)}
-                              className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors cursor-pointer shadow-sm"
-                            >
-                              Save &amp; Submit
-                            </button>
+                      <div className="flex flex-col items-end w-full max-w-[85%] -mr-1 sm:-mr-1.5">
+                        {/* Always display attachments above, even during edit */}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="flex flex-wrap justify-end gap-2 mb-2">
+                            {msg.attachments.map((att, attIdx) => {
+                              const fileHref = att.url?.startsWith("http") ? att.url : `${backendUrl}${att.url || ""}`;
+                              const isWord = att.filename.endsWith(".docx") || att.filename.endsWith(".doc");
+                              const isPdf = att.filename.endsWith(".pdf");
+                              return (
+                                <a
+                                  key={attIdx}
+                                  href={fileHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex flex-col p-3 rounded-2xl bg-[#1e1f20] border border-white/10 hover:border-white/20 transition-all text-left w-36 shadow-md group/att"
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    {att.type === "image" ? (
+                                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/40">
+                                        <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
+                                      </div>
+                                    ) : isWord ? (
+                                      <div className="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-[11px]">
+                                        W
+                                      </div>
+                                    ) : isPdf ? (
+                                      <div className="w-7 h-7 rounded bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-[10px]">
+                                        PDF
+                                      </div>
+                                    ) : (
+                                      <div className="w-7 h-7 rounded bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
+                                        <FileText size={15} />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-medium text-gray-200 line-clamp-2 leading-tight group-hover/att:text-white">
+                                    {att.filename}
+                                  </span>
+                                </a>
+                              );
+                            })}
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-end max-w-[85%] -mr-1 sm:-mr-1.5">
-                          {msg.attachments && msg.attachments.length > 0 && (
-                            <div className="flex flex-wrap justify-end gap-2 mb-2">
-                              {msg.attachments.map((att, attIdx) => {
-                                const fileHref = att.url?.startsWith("http") ? att.url : `${backendUrl}${att.url || ""}`;
-                                const isWord = att.filename.endsWith(".docx") || att.filename.endsWith(".doc");
-                                const isPdf = att.filename.endsWith(".pdf");
-                                return (
-                                  <a
-                                    key={attIdx}
-                                    href={fileHref}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex flex-col p-3 rounded-2xl bg-[#1e1f20] border border-white/10 hover:border-white/20 transition-all text-left w-36 shadow-md group/att"
-                                  >
-                                    <div className="flex items-center justify-between mb-2">
-                                      {att.type === "image" ? (
-                                        <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/40">
-                                          <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
-                                        </div>
-                                      ) : isWord ? (
-                                        <div className="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-[11px]">
-                                          W
-                                        </div>
-                                      ) : isPdf ? (
-                                        <div className="w-7 h-7 rounded bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-[10px]">
-                                          PDF
-                                        </div>
-                                      ) : (
-                                        <div className="w-7 h-7 rounded bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
-                                          <FileText size={15} />
-                                        </div>
-                                      )}
-                                    </div>
-                                    <span className="text-xs font-medium text-gray-200 line-clamp-2 leading-tight group-hover/att:text-white">
-                                      {att.filename}
-                                    </span>
-                                  </a>
-                                );
-                              })}
+                        )}
+
+                        {editingMessageIdx === idx ? (
+                          <div className="w-full max-w-xl bg-[#2a2a2a] p-3 rounded-2xl border border-white/10 space-y-2 shadow-xl">
+                            <textarea
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              className="w-full bg-[#1e1e1e] text-white p-3 rounded-xl border border-white/10 focus:outline-none focus:border-blue-500 text-sm resize-none"
+                              rows={3}
+                              autoFocus
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingMessageIdx(null)}
+                                className="px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEdit(idx)}
+                                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors cursor-pointer shadow-sm"
+                              >
+                                Save &amp; Submit
+                              </button>
                             </div>
-                          )}
-                          <div className="bg-[#2f2f2f] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm">
-                            {msg.content}
                           </div>
-                          <div className="flex items-center gap-1 mt-1 mr-0.5">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEdit(msg.content, idx)}
-                              className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
-                              title={t('chat.editMessage')}
-                            >
-                              <Pencil size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(msg.content, idx)}
-                              className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
-                              title={t('chat.copyPrompt')}
-                            >
-                              {copiedMessageIdx === idx ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                        ) : (
+                          <>
+                            {msg.content?.trim() && (
+                              <div className="bg-[#2f2f2f] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm">
+                                {msg.content}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1 mt-1 mr-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(msg.content || "", idx)}
+                                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+                                title={t('chat.editMessage')}
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              {msg.content?.trim() && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopy(msg.content, idx)}
+                                  className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+                                  title={t('chat.copyPrompt')}
+                                >
+                                  {copiedMessageIdx === idx ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="flex items-start pl-1 sm:pl-1.5">
@@ -494,7 +502,7 @@ export default function ChatArea({
       </div>
 
       {!isChatEmpty && (
-        <div className="absolute bottom-0 left-0 right-0 pl-4 sm:pl-6 pr-[22px] sm:pr-[30px] pb-3 pt-6 bg-gradient-to-t from-[#212121] via-[#212121]/90 to-transparent pointer-events-none z-20 w-full flex justify-center">
+        <div className="absolute bottom-0 left-0 right-3 pl-4 sm:pl-6 pr-4 sm:pr-6 pb-3 pt-6 bg-gradient-to-t from-[#212121] via-[#212121]/90 to-transparent pointer-events-none z-20 flex justify-center">
           <div className="w-full max-w-3xl pointer-events-auto">
             <ChatInputBox 
               isLoading={isLoading}
@@ -590,10 +598,10 @@ export default function ChatArea({
             onClick={(e) => e.stopPropagation()}
             className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
           >
-            <div className="space-y-2">
-              <h3 className="text-base font-semibold text-white">{t('left.deleteConversation')}</h3>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-semibold text-white">{t('ui.deleteConfirmTitle')}</h3>
               <p className="text-xs text-gray-400 leading-relaxed">
-                {t('left.deleteConfirm')}
+                {t('ui.deleteConfirmDesc').replace('{title}', chatTitle || "conversation")}
               </p>
             </div>
 

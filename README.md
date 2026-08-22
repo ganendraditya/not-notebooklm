@@ -1,6 +1,6 @@
-# Not-NotebookLM
+# NotbookLM
 
-An open-source, customizable AI research and document workspace inspired by NotebookLM. Powered by FastAPI, Next.js, LlamaIndex, and Qdrant vector database.
+An open-source, customizable AI research and document workspace inspired by **NotebookLM** and **Consensus AI**. The name *NotbookLM* is a pun on Google's NotebookLM. Powered by FastAPI, Next.js, LlamaIndex, and Qdrant vector database.
 
 ---
 
