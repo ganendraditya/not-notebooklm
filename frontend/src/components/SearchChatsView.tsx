@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, MessageSquare, Sidebar, X, ArrowUpDown, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ChatSession } from "@/app/ChatClient";
+import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
 
 interface SearchChatsViewProps {
@@ -68,11 +68,11 @@ export default function SearchChatsView({
             size="icon"
             className={`h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 cursor-pointer mr-1 ${isSidebarOpen ? "hidden" : "flex"}`}
             onClick={onOpenSidebar}
-            title="Open sidebar"
+            title={t('ui.openSidebar')}
           >
             <Sidebar size={18} />
           </Button>
-          <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">Search</h1>
+          <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">{t('searchView.title')}</h1>
         </div>
       </div>
 
@@ -85,7 +85,7 @@ export default function SearchChatsView({
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search chats..."
+              placeholder={t('searchView.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-[#282828] border border-white/10 rounded-full pl-12 pr-10 py-3.5 text-sm text-white placeholder:text-gray-500 outline-none focus:border-white/25 transition-all shadow-lg"
@@ -103,15 +103,15 @@ export default function SearchChatsView({
           {/* Section Header */}
           <div className="space-y-2">
             <div className="text-xs font-semibold text-gray-400 tracking-wider select-none px-2">
-              {searchQuery ? "Search Results" : "Recent"}
+              {searchQuery ? t('searchView.searchResults') : t('searchView.recent')}
             </div>
 
             {/* Conversations List */}
             {filteredSessions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-gray-500 space-y-2">
                 <MessageSquare size={36} className="opacity-20" />
-                <p className="text-sm font-medium">No conversations found</p>
-                <p className="text-xs text-gray-600">Try searching for a different title or keyword.</p>
+                <p className="text-sm font-medium">{t('searchView.noResults')}</p>
+                <p className="text-xs text-gray-600">{t('searchView.noResultsDesc')}</p>
               </div>
             ) : (
               <div className="divide-y divide-white/5 border-t border-b border-white/5">

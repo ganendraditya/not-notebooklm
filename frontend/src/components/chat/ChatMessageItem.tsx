@@ -15,7 +15,8 @@ import {
   Clock, 
   Trash2 
 } from "lucide-react";
-import { ChatMessage, Document as DocType } from "@/app/ChatClient";
+import { ChatMessage } from "@/stores/chatStore";
+import { Document as DocType } from "@/stores/documentStore";
 import { parseCitationsInReactNode, CitationContext } from "./CitationParser";
 import { FileText, Image as ImageIcon } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
@@ -205,7 +206,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   }, [sources, isDuplicateSource, isSourceChecked]);
 
   return (
-    <div className={`mb-5 flex ${isUser ? "justify-end" : "justify-start"} font-sans group`}>
+    <div className={`mb-3 flex ${isUser ? "justify-end" : "justify-start"} font-sans group`}>
       <div 
         className={`relative inline-block max-w-[95%] sm:max-w-[85%] leading-relaxed tracking-wide ${
           isUser 

@@ -19,7 +19,7 @@ import {
   Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ChatSession } from "@/app/ChatClient";
+import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
 
 interface LeftSidebarProps {
@@ -195,7 +195,7 @@ export default function LeftSidebar({
           }`}
           onClick={() => onOpenLibrary?.("all")}
         >
-          <FolderArchive className="mr-2.5 text-gray-400" size={16} /> Library
+          <FolderArchive className="mr-2.5 text-gray-400" size={16} /> {t('ui.library')}
         </Button>
 
         <Button 
@@ -338,6 +338,21 @@ export default function LeftSidebar({
             );
           })()
         )}
+      </div>
+
+      {/* Desktop-only Footer: App Version & Settings Gear Button */}
+      <div className="hidden lg:flex items-center justify-between px-4 py-3 border-t border-white/10 text-xs text-gray-400 shrink-0">
+        <span className="font-medium tracking-wide text-gray-400 select-none">
+          NotbookLM <span className="text-[11px] text-gray-500 font-mono">v0.1</span>
+        </span>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          title={t('ui.settings') || "Settings"}
+          className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+        >
+          <Settings size={15} />
+        </button>
       </div>
 
       {/* Centered Modal for Rename Chat */}

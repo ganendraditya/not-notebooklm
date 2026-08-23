@@ -55,12 +55,21 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
     clean_text = re.sub(r'\d+', ' ', clean_text)
     clean_text = ' '.join(clean_text.split()).strip()
 
+    # Determine default language preference from prompt
+    # If English words dominate prompt -> "en", if Indonesian words dominate -> "id"
+    id_indicators = [
+        "cari", "cariin", "carikan", "tolong", "tentang", "jurnal", "makalah", "terbaru", 
+        "tahun", "terakhir", "dong", "deh", "nih", "gw", "gua", "gue", "bisa", "buat", "kalo", "yg", "yang"
+    ]
+    is_mostly_id = any(re.search(rf'\b{re.escape(w)}\b', query, re.I) for w in id_indicators)
+    default_lang = "id" if is_mostly_id else "en"
+
     # 1. Default heuristic fallback (adaptive 15 by default)
     default_plan = {
         "en_query": clean_text if len(clean_text) >= 3 else query.strip(),
         "id_query": clean_text if len(clean_text) >= 3 else query.strip(),
         "target_count": 15,
-        "language_preference": "mixed",
+        "language_preference": default_lang,
         "open_access_only": False,
         "scopus_quartiles": [],
         "sinta_tiers": [],
@@ -160,7 +169,10 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
             "9. 'user_requested_count': The exact integer if the user specified a number (e.g. 30, 50, 100), otherwise null.\n"
             "10. 'min_year': Integer representing minimum publication year (e.g. 2020 if user mentioned '5 tahun terakhir' or 'terbaru', otherwise null).\n"
             "11. 'min_citations': Integer representing minimum citations count threshold (e.g. 10 if user specified 'min 10 sitasi', otherwise 0).\n"
-            "12. 'language_preference': 'mixed' (if user wants both/either/mix/unspecified), 'en' (if user strictly asked for English/international), 'id' (if user strictly asked for Indonesian).\n"
+            "12. 'language_preference' (CRITICAL):\n"
+            "   - 'en': By default, if the user writes in English, asks in English, or requests international literature, choose 'en'.\n"
+            "   - 'id': If the user writes in Indonesian and specifically asks for Indonesian journals/research, choose 'id'.\n"
+            "   - 'mixed': ONLY if the user explicitly asks for mixed languages (e.g. 'campur inggris dan indo', 'keduanya', 'both indonesian and english').\n"
             "13. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\n"
             "Example Output:\n"
             "{\n"
@@ -174,7 +186,7 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
             "  \"user_requested_count\": 100,\n"
             "  \"min_year\": 2021,\n"
             "  \"min_citations\": 0,\n"
-            "  \"language_preference\": \"mixed\"\n"
+            "  \"language_preference\": \"en\"\n"
             "}"
         )
         
@@ -214,9 +226,9 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
             else:
                 m_cit = default_min_citations
                     
-            lang = str(parsed.get("language_preference", "mixed")).lower()
+            lang = str(parsed.get("language_preference", default_plan["language_preference"])).lower()
             if lang not in ["mixed", "en", "id"]:
-                lang = "mixed"
+                lang = default_plan["language_preference"]
 
             oa_only = bool(parsed.get("open_access_only", default_plan["open_access_only"])) or default_plan["open_access_only"]
             scopus_q = parsed.get("scopus_quartiles") or default_plan["scopus_quartiles"]

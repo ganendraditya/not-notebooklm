@@ -29,10 +29,35 @@ from .search import (
     search_academic_papers,
 )
 
-from .engine import (
+from .prompts import (
+    get_general_chat_system_prompt,
+    get_source_deletion_prompt,
+    get_search_synthesis_prompt,
+    get_workspace_analysis_system_prompt,
+    get_agentic_system_prompt
+)
+
+from .intent import (
+    is_simple_conversational,
+    is_technical_discussion,
+    is_sources_meta_query,
+    classify_user_intent
+)
+
+from .vector_store import (
+    embed_model,
     vector_store,
     qdrant_client,
     delete_qdrant_vectors,
+)
+
+from .streamer import (
+    parse_sse_stream,
+    llm_stream_generator,
+    create_streaming_response
+)
+
+from .engine import (
     create_llm_instances,
     ingest_document_text,
     ingest_documents_batch,
@@ -70,10 +95,27 @@ __all__ = [
     "resolve_paper_metadata_by_doi",
     "fetch_full_abstract_by_doi",
     "search_academic_papers",
-    # Engine & Agent
+    # Prompts
+    "get_general_chat_system_prompt",
+    "get_source_deletion_prompt",
+    "get_search_synthesis_prompt",
+    "get_workspace_analysis_system_prompt",
+    "get_agentic_system_prompt",
+    # Intent
+    "is_simple_conversational",
+    "is_technical_discussion",
+    "is_sources_meta_query",
+    "classify_user_intent",
+    # Vector Store
+    "embed_model",
     "vector_store",
     "qdrant_client",
     "delete_qdrant_vectors",
+    # Streamer
+    "parse_sse_stream",
+    "llm_stream_generator",
+    "create_streaming_response",
+    # Engine & Agent
     "create_llm_instances",
     "ingest_document_text",
     "ingest_document",

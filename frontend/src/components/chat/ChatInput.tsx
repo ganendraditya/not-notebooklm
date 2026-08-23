@@ -14,7 +14,7 @@ import {
   FileArchive,
   FileSpreadsheet
 } from "lucide-react";
-import { TargetedSource } from "@/app/ChatClient";
+import { TargetedSource } from "@/stores/documentStore";
 import ModelSelector from "@/components/ModelSelector";
 import SearchFilterPopover, { SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/components/SearchFilterPopover";
 import { useTranslation } from "@/lib/i18n";

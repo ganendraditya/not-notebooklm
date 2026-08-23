@@ -28,7 +28,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Document, CitationGroundingHighlight } from "@/app/ChatClient";
+import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
 import { DownloadManager, DownloadTask } from "./DownloadManager";
 
@@ -50,14 +50,14 @@ interface RightSidebarProps {
   onClose: () => void;
 }
 
-export interface PendingSourceItem {
-  id: string;
-  filename: string;
-  type: "file" | "doi";
-  doi?: string;
-  status: "uploading" | "error";
-  error?: string;
-}
+// export interface PendingSourceItem {
+//   id: string;
+//   filename: string;
+//   type: "file" | "doi";
+//   doi?: string;
+//   status: "uploading" | "error";
+//   error?: string;
+// }
 
 interface PaperDetailData {
   id: number;
@@ -2005,6 +2005,25 @@ export default function RightSidebar({
   // ==========================================
   return (
     <aside className="w-full lg:w-80 h-full bg-[#1e1f20] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
+      {/* Top Header Bar with Close/Hide Button */}
+      <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm text-white tracking-tight">{t('ui.sources') || "Sources"}</span>
+          {documents.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-300 text-[11px] font-mono">
+              {documents.length}
+            </span>
+          )}
+        </div>
+        <button 
+          onClick={onClose}
+          className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          title={t('right.close') || "Hide sidebar"}
+        >
+          <X size={15} />
+        </button>
+      </div>
+
       {/* Hidden File Input for Multi-format Document Upload */}
       <input
         ref={fileInputRef}
@@ -2499,9 +2518,11 @@ export default function RightSidebar({
             className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
           >
             <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-white">Delete {selectedCount} selected source(s)?</h3>
+              <h3 className="text-base font-semibold text-white">
+                {t('right.deleteConfirmTitle', { count: selectedCount.toString() })}
+              </h3>
               <p className="text-xs text-gray-400 leading-relaxed">
-                Deleted documents will no longer be used by the AI to answer questions in this chat session.
+                {t('right.deleteConfirmDesc')}
               </p>
             </div>
 
@@ -2513,7 +2534,7 @@ export default function RightSidebar({
                 disabled={isBulkDeleting}
                 className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
               >
-                Cancel
+                {t('action.cancel')}
               </Button>
 
               <Button
@@ -2525,10 +2546,10 @@ export default function RightSidebar({
                 {isBulkDeleting ? (
                   <>
                     <Loader2 size={12} className="animate-spin" />
-                    <span>Deleting...</span>
+                    <span>{t('right.deleting')}</span>
                   </>
                 ) : (
-                  <span>Delete ({selectedCount})</span>
+                  <span>{t('right.deleteButton', { count: selectedCount.toString() })}</span>
                 )}
               </Button>
             </div>
@@ -2546,9 +2567,9 @@ export default function RightSidebar({
             className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-gray-200"
           >
             <div className="space-y-1">
-              <h3 className="text-base font-semibold text-white">Rename source</h3>
+              <h3 className="text-base font-semibold text-white">{t('right.renameSource')}</h3>
               <p className="text-xs text-gray-400 truncate" title={renamingDoc.filename}>
-                File: {renamingDoc.filename}
+                {t('right.filePrefix')}{renamingDoc.filename}
               </p>
             </div>
 
@@ -2584,7 +2605,7 @@ export default function RightSidebar({
                   disabled={isSavingRename}
                   className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
                 >
-                  Cancel
+                  {t('action.cancel')}
                 </Button>
 
                 <Button
@@ -2596,10 +2617,10 @@ export default function RightSidebar({
                   {isSavingRename ? (
                     <>
                       <Loader2 size={12} className="animate-spin" />
-                      <span>Saving...</span>
+                      <span>{t('right.saving')}</span>
                     </>
                   ) : (
-                    <span>Save</span>
+                    <span>{t('action.save')}</span>
                   )}
                 </Button>
               </div>

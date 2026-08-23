@@ -18,7 +18,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ChatSession } from "@/app/ChatClient";
+import { ChatSession } from "@/stores/chatStore";
 import { useTranslation, languages } from "@/lib/i18n";
 import StorageLibraryModal from "./StorageLibraryModal";
 
@@ -494,8 +494,8 @@ export default function SettingsModal({
                   {/* Manage Storage Section */}
                   <div>
                     <div className="mb-2">
-                      <div className="text-sm font-semibold text-white">Manage storage</div>
-                      <div className="text-xs text-gray-400 mt-0.5">Manage your library to free up storage</div>
+                      <div className="text-sm font-semibold text-white">{t('settings.manageStorage')}</div>
+                      <div className="text-xs text-gray-400 mt-0.5">{t('settings.manageStorageDesc')}</div>
                     </div>
 
                     <div className="divide-y divide-white/5">
@@ -517,7 +517,7 @@ export default function SettingsModal({
                             {t('settings.filesAndDocuments')}
                           </div>
                           <div className="text-xs text-gray-400 mt-0.5">
-                            {storageSummary ? formatBytes(storageSummary.categories?.documents || 0) : "0 B"} • {storageSummary?.category_counts?.documents ?? 0} files
+                            {storageSummary ? formatBytes(storageSummary.categories?.documents || 0) : "0 B"} • {t('settings.filesCount', { count: (storageSummary?.category_counts?.documents ?? 0).toString() })}
                           </div>
                         </div>
                         <ChevronRight size={16} className="text-gray-500 group-hover:text-gray-300 transition-colors shrink-0 ml-2" />
@@ -541,7 +541,7 @@ export default function SettingsModal({
                             {t('settings.imagesAndMedia')}
                           </div>
                           <div className="text-xs text-gray-400 mt-0.5">
-                            {storageSummary ? formatBytes(storageSummary.categories?.images || 0) : "0 B"} • {storageSummary?.category_counts?.images ?? 0} images
+                            {storageSummary ? formatBytes(storageSummary.categories?.images || 0) : "0 B"} • {t('settings.imagesCount', { count: (storageSummary?.category_counts?.images ?? 0).toString() })}
                           </div>
                         </div>
                         <ChevronRight size={16} className="text-gray-500 group-hover:text-gray-300 transition-colors shrink-0 ml-2" />
@@ -553,22 +553,24 @@ export default function SettingsModal({
                   <div className="space-y-6 pt-1">
                     {/* Maintenance: Orphan Cleanup */}
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-6">
+                        <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-gray-200">{t('settings.orphanCleanup')}</div>
                           <div className="text-xs text-gray-400 mt-0.5 leading-relaxed">
                             {t('settings.orphanCleanupDesc')}
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCleanOrphans}
-                          disabled={isCleaningOrphans}
-                          className="text-xs border-white/10 text-gray-200 hover:bg-white/10 hover:text-white cursor-pointer h-8 shrink-0 whitespace-nowrap px-3"
-                        >
-                          {isCleaningOrphans ? t('settings.cleaning') : t('settings.cleanOrphans')}
-                        </Button>
+                        <div className="w-36 shrink-0 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCleanOrphans}
+                            disabled={isCleaningOrphans}
+                            className="w-full text-xs border-white/10 text-gray-200 hover:bg-white/10 hover:text-white cursor-pointer h-8 whitespace-nowrap px-3"
+                          >
+                            {isCleaningOrphans ? t('settings.cleaning') : t('settings.cleanOrphans')}
+                          </Button>
+                        </div>
                       </div>
                       {cleanReport && (
                         <div className="text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
@@ -579,29 +581,31 @@ export default function SettingsModal({
 
                     {/* Bulk Delete Chats */}
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-6">
+                        <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-gray-200">{t('settings.batchDelete')}</div>
                           <div className="text-xs text-gray-400 mt-0.5 leading-relaxed">
                             {t('settings.batchDeleteDesc')}
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={handleBulkDeleteChats}
-                          disabled={selectedChatIds.length === 0 || isDeletingChats}
-                          className={`text-xs h-8 min-w-[130px] shrink-0 justify-center whitespace-nowrap px-3.5 transition-colors ${
-                            selectedChatIds.length > 0
-                              ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm"
-                              : "bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed opacity-50"
-                          }`}
-                        >
-                          {isDeletingChats
-                            ? t('settings.deleting')
-                            : selectedChatIds.length > 0
-                            ? `${t('settings.deleteSelected')} (${selectedChatIds.length})`
-                            : t('settings.deleteSelected')}
-                        </Button>
+                        <div className="w-36 shrink-0 flex justify-end">
+                          <Button
+                            size="sm"
+                            onClick={handleBulkDeleteChats}
+                            disabled={selectedChatIds.length === 0 || isDeletingChats}
+                            className={`w-full text-xs h-8 justify-center whitespace-nowrap px-3 transition-colors ${
+                              selectedChatIds.length > 0
+                                ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm"
+                                : "bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed opacity-50"
+                            }`}
+                          >
+                            {isDeletingChats
+                              ? t('settings.deleting')
+                              : selectedChatIds.length > 0
+                              ? `${t('settings.deleteSelected')} (${selectedChatIds.length})`
+                              : t('settings.deleteSelected')}
+                          </Button>
+                        </div>
                       </div>
 
                       {sessions.length > 0 ? (
@@ -642,20 +646,22 @@ export default function SettingsModal({
                     {/* Danger Zone: Factory Reset */}
                     <div className="space-y-2 pt-4">
                       <div className="flex items-center justify-between gap-6">
-                        <div className="min-w-0 flex-1 pr-2">
+                        <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-red-400">{t('settings.factoryReset')}</div>
-                          <div className="text-xs text-gray-400 mt-0.5 leading-relaxed break-words">
+                          <div className="text-xs text-gray-400 mt-0.5 leading-relaxed">
                             {t('settings.factoryResetDesc')}
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => setIsResetConfirmOpen(true)}
-                          className="text-xs bg-red-950/60 text-red-400 border border-red-500/30 hover:bg-red-900 hover:text-white cursor-pointer h-8 shrink-0 whitespace-nowrap px-3.5"
-                        >
-                          {t('settings.factoryReset')}
-                        </Button>
+                        <div className="w-36 shrink-0 flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setIsResetConfirmOpen(true)}
+                            className="w-full text-xs bg-red-950/60 text-red-400 border border-red-500/30 hover:bg-red-900 hover:text-white cursor-pointer h-8 whitespace-nowrap px-3"
+                          >
+                            {t('settings.factoryReset')}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Document as DocType } from "@/app/ChatClient";
+import { Document as DocType } from "@/stores/documentStore";
 
 export interface CitationContext {
   sentence: string;

@@ -8,93 +8,36 @@ import RightSidebar from "@/components/RightSidebar";
 import SettingsModal from "@/components/SettingsModal";
 import LibraryView from "@/components/LibraryView";
 import SearchChatsView from "@/components/SearchChatsView";
-
-// Types
-export interface ChatSession {
-  id: string;
-  title: string;
-  created_at: string;
-  updated_at?: string;
-  is_pinned?: boolean;
-}
-
-export interface Document {
-  id: number;
-  filename: string;
-  title?: string;
-  doi?: string;
-  created_at: string;
-  index?: number;
-  has_full_pdf?: boolean;
-  is_oa?: boolean;
-}
-
-export interface TargetedSource {
-  id: number;
-  filename: string;
-  title?: string;
-}
-
-export interface CitationGroundingHighlight {
-  docId: number;
-  sentence: string;
-  num?: number;
-  citationKey?: string;
-  aiQuotes?: string[];
-  /** Monotonic click ID — ensures re-click on the same citation resets highlight state */
-  clickId?: number;
-}
-
-export interface Attachment {
-  type: "image" | "file";
-  filename: string;
-  url?: string;
-}
-
-export interface ChatMessage {
-  role: string;
-  content: string;
-  created_at: string;
-  attachments?: Attachment[];
-  variants?: string[];
-  active_variant_index?: number;
-}
-
-export interface PendingSourceItem {
-  id: string;
-  filename: string;
-  type: "file" | "doi";
-  doi?: string;
-  status: "uploading" | "error";
-  error?: string;
-}
+import { useTranslation } from "@/lib/i18n";
+import { useChatStore, type ChatSession, type ChatMessage } from "@/stores/chatStore";
+import { useDocumentStore, type Document, type PendingSourceItem } from "@/stores/documentStore";
+import { useUIStore } from "@/stores/uiStore";
+import type { Attachment } from "@/stores/chatStore";
 
 export default function ChatClient() {
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [pendingSources, setPendingSources] = useState<PendingSourceItem[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [targetedSource, setTargetedSource] = useState<TargetedSource | null>(null);
-  const [activeStatus, setActiveStatus] = useState<string | null>(null);
-  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
-  const [groundingHighlight, setGroundingHighlight] = useState<CitationGroundingHighlight | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [currentView, setCurrentView] = useState<"chat" | "library" | "search">("chat");
-  const [libraryInitialCategory, setLibraryInitialCategory] = useState<"all" | "documents" | "images">("all");
+  const { t } = useTranslation();
+  
+  // Zustand Stores
+  const { 
+    sessions, setSessions, activeChatId, setActiveChatId, 
+    messages, setMessages, isLoading, setIsLoading,
+    activeStatus, setActiveStatus, queuedPrompts, setQueuedPrompts,
+    bumpSessionToTop, updateMessagesList, updateSessionsList
+  } = useChatStore();
+
+  const {
+    documents, setDocuments, pendingSources, setPendingSources,
+    targetedSource, setTargetedSource, viewingDoc, setViewingDoc,
+    groundingHighlight, setGroundingHighlight, addDocument,
+    updateDocumentsList, updatePendingSourcesList
+  } = useDocumentStore();
+
+  const {
+    isSettingsOpen, setIsSettingsOpen, currentView, setCurrentView,
+    libraryInitialCategory, setLibraryInitialCategory
+  } = useUIStore();
   
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-  const bumpSessionToTop = (chatId: string) => {
-    setSessions(prev => {
-      const idx = prev.findIndex(s => s.id === chatId);
-      if (idx <= 0) return prev; // Already at top or not found
-      const target = { ...prev[idx], updated_at: new Date().toISOString() };
-      const rest = prev.filter((_, i) => i !== idx);
-      return [target, ...rest];
-    });
-  };
 
   // Fetch all sessions on mount & auto-select the latest active chat if none selected
   useEffect(() => {
@@ -147,7 +90,7 @@ export default function ChatClient() {
       });
       const newChat = await res.json();
       activeChatIdRef.current = newChat.id;
-      setSessions(prev => [newChat, ...prev]);
+      setSessions([newChat, ...sessions]);
       setActiveChatId(newChat.id);
       return newChat.id;
     } catch (err) {
@@ -187,8 +130,6 @@ export default function ChatClient() {
     }
     return chatJobsRef.current.get(chatId)!;
   };
-
-  const [queuedPrompts, setQueuedPrompts] = useState<string[]>([]);
 
   const handleStopGeneration = () => {
     const currentChatId = activeChatIdRef.current;
@@ -268,7 +209,7 @@ export default function ChatClient() {
         created_at: new Date().toISOString(),
         attachments: nextMessage.attachments
       };
-      setMessages(prev => [...prev, newMsg]);
+      setMessages([...messages, newMsg]);
     }
 
     const controller = new AbortController();
@@ -315,7 +256,7 @@ export default function ChatClient() {
                 const data = JSON.parse(line.slice(6));
                 if (data.type === "title_update" && data.title) {
                   const updatedTitle = data.title;
-                  setSessions(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
+                  updateSessionsList(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
                   if (activeChatIdRef.current === targetChatId) {
                     document.title = `${updatedTitle} - NotbookLM`;
                   }
@@ -330,7 +271,7 @@ export default function ChatClient() {
                 } else if (data.type === "done") {
                   const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
                   if (activeChatIdRef.current === targetChatId) {
-                    setMessages(prev => [...prev, asstMsg]);
+                    updateMessagesList(prev => [...prev, asstMsg]);
                   }
 
                   // Check if response contains an action payload like deleting documents
@@ -341,7 +282,7 @@ export default function ChatClient() {
                       if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
                         const idSet = new Set(actionObj.deleted_doc_ids);
                         if (activeChatIdRef.current === targetChatId) {
-                          setDocuments(prev => {
+                          updateDocumentsList(prev => {
                             const remaining = prev.filter(d => !idSet.has(d.id));
                             return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
                           });
@@ -354,7 +295,7 @@ export default function ChatClient() {
                 } else if (data.type === "error") {
                   const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
                   if (activeChatIdRef.current === targetChatId) {
-                    setMessages(prev => [...prev, errorMsg]);
+                    updateMessagesList(prev => [...prev, errorMsg]);
                   }
                 }
               } catch (e) {
@@ -368,7 +309,7 @@ export default function ChatClient() {
       if (err?.name === "AbortError") {
         console.log(`Generation stopped by user for chat ${targetChatId}`);
         if (activeChatIdRef.current === targetChatId) {
-          setMessages(prev => [
+          updateMessagesList(prev => [
             ...prev,
             { role: "assistant", content: "*(Response generation stopped by user)*", created_at: new Date().toISOString() }
           ]);
@@ -377,7 +318,7 @@ export default function ChatClient() {
       } else {
         console.error("Failed to send queued message:", err);
         if (activeChatIdRef.current === targetChatId) {
-          setMessages(prev => [
+          updateMessagesList(prev => [
             ...prev,
             { role: "assistant", content: "⚠️ Sorry, an error occurred while connecting to the AI server.", created_at: new Date().toISOString() }
           ]);
@@ -461,7 +402,7 @@ export default function ChatClient() {
     // Optimistically update message list: keep messages up to messageIndex, replace at messageIndex, remove subsequent responses
     const updatedUserMsg: ChatMessage = { role: "user", content: newContent, created_at: new Date().toISOString() };
     if (activeChatIdRef.current === currentChatId) {
-      setMessages(prev => [...prev.slice(0, messageIndex), updatedUserMsg]);
+      updateMessagesList(prev => [...prev.slice(0, messageIndex), updatedUserMsg]);
     }
 
     try {
@@ -512,7 +453,7 @@ export default function ChatClient() {
                 } else if (data.type === "done") {
                   const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
                   if (activeChatIdRef.current === currentChatId) {
-                    setMessages(prev => [...prev, asstMsg]);
+                    updateMessagesList(prev => [...prev, asstMsg]);
                   }
 
                   const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
@@ -522,7 +463,7 @@ export default function ChatClient() {
                       if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
                         const idSet = new Set(actionObj.deleted_doc_ids);
                         if (activeChatIdRef.current === currentChatId) {
-                          setDocuments(prev => {
+                          updateDocumentsList(prev => {
                             const remaining = prev.filter(d => !idSet.has(d.id));
                             return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
                           });
@@ -535,7 +476,7 @@ export default function ChatClient() {
                 } else if (data.type === "error") {
                   const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
                   if (activeChatIdRef.current === currentChatId) {
-                    setMessages(prev => [...prev, errorMsg]);
+                    updateMessagesList(prev => [...prev, errorMsg]);
                   }
                 }
               } catch (e) {
@@ -551,7 +492,7 @@ export default function ChatClient() {
       } else {
         console.error("Failed to edit message:", err);
         if (activeChatIdRef.current === currentChatId) {
-          setMessages(prev => [
+          updateMessagesList(prev => [
             ...prev,
             { role: "assistant", content: "⚠️ Sorry, an error occurred while editing the message.", created_at: new Date().toISOString() }
           ]);
@@ -642,7 +583,7 @@ export default function ChatClient() {
                     created_at: new Date().toISOString()
                   };
                   if (activeChatIdRef.current === currentChatId) {
-                    setMessages(prev => {
+                    updateMessagesList(prev => {
                       const next = [...prev];
                       if (next[messageIndex]) {
                         next[messageIndex] = asstMsg;
@@ -660,7 +601,7 @@ export default function ChatClient() {
                       if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
                         const idSet = new Set(actionObj.deleted_doc_ids);
                         if (activeChatIdRef.current === currentChatId) {
-                          setDocuments(prev => {
+                          updateDocumentsList(prev => {
                             const remaining = prev.filter(d => !idSet.has(d.id));
                             return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
                           });
@@ -701,7 +642,7 @@ export default function ChatClient() {
     const currentChatId = activeChatId;
     if (!currentChatId) return;
 
-    setMessages(prev => {
+    updateMessagesList(prev => {
       const next = [...prev];
       const msg = { ...next[messageIndex] };
       if (msg.variants && msg.variants[variantIndex] !== undefined) {
@@ -788,7 +729,7 @@ export default function ChatClient() {
   const handleDeleteChat = async (id: string) => {
     try {
       await fetch(`${backendUrl}/chats/${id}`, { method: "DELETE" });
-      setSessions(prev => prev.filter(s => s.id !== id));
+      updateSessionsList(prev => prev.filter(s => s.id !== id));
       if (activeChatId === id) {
         handleCreateChat();
       }
@@ -806,7 +747,7 @@ export default function ChatClient() {
       });
       if (res.ok) {
         const updated = await res.json();
-        setSessions(prev => prev.map(s => s.id === id ? { ...s, title: updated.title } : s));
+        updateSessionsList(prev => prev.map(s => s.id === id ? { ...s, title: updated.title } : s));
       }
     } catch (err) {
       console.error("Failed to rename chat:", err);
@@ -818,7 +759,7 @@ export default function ChatClient() {
     const nextPinnedState = targetSession ? !targetSession.is_pinned : true;
 
     // Optimistic UI update
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, is_pinned: nextPinnedState } : s));
+    updateSessionsList(prev => prev.map(s => s.id === id ? { ...s, is_pinned: nextPinnedState } : s));
 
     try {
       const res = await fetch(`${backendUrl}/chats/${id}/pin`, {
@@ -828,17 +769,17 @@ export default function ChatClient() {
       });
       if (!res.ok) {
         // Revert on failure
-        setSessions(prev => prev.map(s => s.id === id ? { ...s, is_pinned: !nextPinnedState } : s));
+        updateSessionsList(prev => prev.map(s => s.id === id ? { ...s, is_pinned: !nextPinnedState } : s));
       }
     } catch (e) {
       console.error("Failed to sync pinned chat state to backend:", e);
-      setSessions(prev => prev.map(s => s.id === id ? { ...s, is_pinned: !nextPinnedState } : s));
+      updateSessionsList(prev => prev.map(s => s.id === id ? { ...s, is_pinned: !nextPinnedState } : s));
     }
   };
 
   const handleBulkDocumentsDeleted = (docIds: number[]) => {
     const idSet = new Set(docIds);
-    setDocuments(prev => {
+    updateDocumentsList(prev => {
       const remaining = prev.filter(d => !idSet.has(d.id));
       return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
     });
@@ -847,12 +788,12 @@ export default function ChatClient() {
   const handleDocumentAdded = (doc: Document, targetChatId?: string) => {
     // Only append to the visible documents list if the user is currently viewing the target chat
     if (!targetChatId || targetChatId === activeChatIdRef.current) {
-      setDocuments(prev => {
+      updateDocumentsList(prev => {
         if (prev.some(d => d.id === doc.id)) return prev;
         return [...prev, doc];
       });
       // Remove matching pending item by doi or filename matching
-      setPendingSources(prev => prev.filter(p => {
+      updatePendingSourcesList(prev => prev.filter(p => {
         if (p.doi && doc.doi && p.doi.toLowerCase().trim() === doc.doi.toLowerCase().trim()) return false;
         const normP = (p.filename || "").toLowerCase().replace(/\.pdf$/i, "").replace(/[^a-z0-9]/g, "");
         const normDocFn = (doc.filename || "").toLowerCase().replace(/\.pdf$/i, "").replace(/[^a-z0-9]/g, "");
@@ -866,17 +807,17 @@ export default function ChatClient() {
   };
 
   const handleAddPendingSources = (items: PendingSourceItem[]) => {
-    setPendingSources(prev => [...prev, ...items]);
+    updatePendingSourcesList(prev => [...prev, ...items]);
   };
 
   const handleResolvePendingSource = (pendingId: string) => {
-    setPendingSources(prev => prev.filter(p => p.id !== pendingId));
+    updatePendingSourcesList(prev => prev.filter(p => p.id !== pendingId));
   };
 
   const handleDocumentUpdated = (updatedDoc: Document) => {
-    setDocuments(prev => prev.map(d => d.id === updatedDoc.id ? { ...d, title: updatedDoc.title } : d));
+    updateDocumentsList(prev => prev.map(d => d.id === updatedDoc.id ? { ...d, title: updatedDoc.title } : d));
     if (viewingDoc && viewingDoc.id === updatedDoc.id) {
-      setViewingDoc(prev => prev ? { ...prev, title: updatedDoc.title } : null);
+      setViewingDoc({ ...viewingDoc, title: updatedDoc.title });
     }
   };
 
@@ -926,7 +867,7 @@ export default function ChatClient() {
               mobileTab === "menu" ? "text-white font-semibold" : "text-gray-400 hover:text-gray-200"
             }`}
           >
-            <span>Menu</span>
+            <span>{t('nav.menu')}</span>
             {mobileTab === "menu" && (
               <div className="absolute bottom-0 inset-x-4 h-0.5 bg-blue-500 rounded-full"></div>
             )}
@@ -942,7 +883,7 @@ export default function ChatClient() {
             }`}
           >
             <span>
-              {currentView === "library" ? "Library" : currentView === "search" ? "Search" : "Chat"}
+              {currentView === "library" ? t('nav.library') : currentView === "search" ? t('nav.search') : t('nav.chat')}
             </span>
             {mobileTab === "chat" && (
               <div className="absolute bottom-0 inset-x-4 h-0.5 bg-blue-500 rounded-full"></div>
@@ -960,7 +901,7 @@ export default function ChatClient() {
                 mobileTab === "sources" ? "text-white font-semibold" : "text-gray-400 hover:text-gray-200"
               }`}
             >
-              <span>Sources</span>
+              <span>{t('nav.sources')}</span>
               {mobileTab === "sources" && (
                 <div className="absolute bottom-0 inset-x-4 h-0.5 bg-blue-500 rounded-full"></div>
               )}
@@ -968,9 +909,9 @@ export default function ChatClient() {
           ) : (
             <div
               className="flex-1 py-2.5 text-center relative text-gray-600 cursor-not-allowed select-none opacity-40"
-              title="Sources panel is only available in chat view"
+              title={t('nav.sourcesDisabledTooltip')}
             >
-              <span>Sources</span>
+              <span>{t('nav.sources')}</span>
             </div>
           )}
         </div>
@@ -1104,7 +1045,7 @@ export default function ChatClient() {
                   onDocumentAdded={handleDocumentAdded} 
                   onDocumentUpdated={handleDocumentUpdated}
                   onDocumentDeleted={(id) => {
-                    setDocuments(prev => prev.filter(d => d.id !== id));
+                    updateDocumentsList(prev => prev.filter(d => d.id !== id));
                     if (targetedSource?.id === id) setTargetedSource(null);
                     if (viewingDoc?.id === id) setViewingDoc(null);
                   }}
@@ -1149,7 +1090,7 @@ export default function ChatClient() {
           setCurrentView("library");
         }}
         onChatsDeleted={(deletedIds) => {
-          setSessions(prev => prev.filter(s => !deletedIds.includes(s.id)));
+          updateSessionsList(prev => prev.filter(s => !deletedIds.includes(s.id)));
           if (activeChatId && deletedIds.includes(activeChatId)) {
             const remaining = sessions.filter(s => !deletedIds.includes(s.id));
             if (remaining.length > 0) {

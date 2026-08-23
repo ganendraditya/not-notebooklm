@@ -13,15 +13,8 @@ from dotenv import load_dotenv
 logger = logging.getLogger("uvicorn.error")
 
 from llama_index.core import VectorStoreIndex, Document, Settings
-from llama_index.vector_stores.qdrant import QdrantVectorStore
-from qdrant_client import QdrantClient
 from llama_index.core.vector_stores.types import MetadataFilter, MetadataFilters, FilterOperator
 from llama_index.llms.gemini import Gemini
-from llama_index.embeddings.gemini import GeminiEmbedding
-try:
-    from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-except Exception:
-    HuggingFaceEmbedding = None
 from llama_index.llms.groq import Groq
 from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.tools import FunctionTool
@@ -36,97 +29,36 @@ from .search import (
     search_academic_papers_planned,
     get_existing_notebook_sources_signatures,
 )
+from .intent import (
+    is_simple_conversational,
+    is_technical_discussion,
+    is_sources_meta_query,
+    classify_user_intent
+)
+from .prompts import (
+    get_general_chat_system_prompt,
+    get_source_deletion_prompt,
+    get_search_synthesis_prompt,
+    get_workspace_analysis_system_prompt,
+    get_agentic_system_prompt
+)
+from .vector_store import embed_model, vector_store, qdrant_client, delete_qdrant_vectors
 
 load_dotenv()
 
-# Setup Qdrant Client (Supports Remote Server / Docker or Local Disk fallback)
-QDRANT_URL = os.getenv("QDRANT_URL")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+# Setup variables
+Settings.embed_model = embed_model
 
-if QDRANT_URL:
-    try:
-        qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
-        logger.info(f"[Qdrant] Connected to remote server at {QDRANT_URL}")
-    except Exception as e:
-        logger.warning(f"[Qdrant] Failed connecting to remote URL {QDRANT_URL}: {e}. Falling back to disk.")
-        QDRANT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "qdrant_data"))
-        os.makedirs(QDRANT_PATH, exist_ok=True)
-        qdrant_client = QdrantClient(path=QDRANT_PATH, force_disable_check_same_thread=True)
-else:
-    QDRANT_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "qdrant_data"))
-    os.makedirs(QDRANT_PATH, exist_ok=True)
-    try:
-        qdrant_client = QdrantClient(path=QDRANT_PATH, force_disable_check_same_thread=True)
-    except Exception:
-        try:
-            qdrant_client = QdrantClient(path=QDRANT_PATH)
-        except Exception:
-            qdrant_client = QdrantClient(location=":memory:")
-
-def init_embedding_and_vector_store():
-    """Initializes high-performance embeddings (Local BGE or Gemini) and associates with Qdrant collection."""
-    env_provider = os.getenv("EMBEDDING_PROVIDER", "local").lower()
-    gemini_key = os.getenv("GEMINI_API_KEY")
-
-    if env_provider == "gemini" and gemini_key and not gemini_key.startswith("your_"):
-        try:
-            embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
-            coll_name = "not_notebooklm_gemini"
-            vstore = QdrantVectorStore(client=qdrant_client, collection_name=coll_name, path=None, url=None, api_key=None)
-            return embed_model, vstore
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Gemini Embedding initialization failed ({e}), falling back to local BGE embeddings.")
-
-    # Default Local Offline Embeddings (Zero API Quota limit, zero rate limit)
-    if HuggingFaceEmbedding is not None:
-        try:
-            embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
-            coll_name = "not_notebooklm_bge"
-            vstore = QdrantVectorStore(client=qdrant_client, collection_name=coll_name, path=None, url=None, api_key=None)
-            return embed_model, vstore
-        except Exception as e:
-            logger.warning(f"[RAG Engine] HuggingFace Embedding loading failed: {e}")
-
-    # Ultimate fallback to Gemini
-    embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
-    vstore = QdrantVectorStore(client=qdrant_client, collection_name="not_notebooklm", path=None, url=None, api_key=None)
-    return embed_model, vstore
-
-def delete_qdrant_vectors(chat_id: str, doc_filename: Optional[str] = None):
-    """Purges points from Qdrant vector store by chat_id and optionally by doc_filename."""
-    try:
-        from qdrant_client.http import models as qmodels
-        conditions = [
-            qmodels.FieldCondition(key="chat_id", match=qmodels.MatchValue(value=chat_id))
-        ]
-        if doc_filename:
-            conditions.append(
-                qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=doc_filename))
-            )
-            
-        colls_to_clean = ["not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
-        for cname in colls_to_clean:
-            try:
-                qdrant_client.delete(
-                    collection_name=cname,
-                    points_selector=qmodels.FilterSelector(
-                        filter=qmodels.Filter(must=conditions)
-                    )
-                )
-            except Exception:
-                pass
-    except Exception as e:
-        logger.debug(f"[Qdrant Vector Purge Error]: {e}")
-
-Settings.embed_model, vector_store = init_embedding_and_vector_store()
+ninerouter_llm = None
+freellm_llm = None
+gemini_llm = None
+groq_llm = None
 
 def create_llm_instances():
-    """Initializes LLM instances for 9Router, FreeLLMAPI, Gemini, and Groq."""
-    env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
-    load_dotenv(dotenv_path=env_path, override=True)
-    load_dotenv(override=True)
+    """Initializes LLM instances dynamically."""
+    global ninerouter_llm, freellm_llm, gemini_llm, groq_llm
     
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:20128/v1")
+    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:3000/v1")
     ninerouter_key = os.getenv("NINEROUTER_API_KEY")
     ninerouter_model = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
     
@@ -599,120 +531,22 @@ async def query_chat(
         return text.strip()
 
     def is_simple_conversational(text: str) -> bool:
-        # Strip punctuation and collapse spaces
-        t = re.sub(r'[^\w\s]', '', text.lower()).strip()
-        tokens = t.split()
-        if len(tokens) == 0 or len(tokens) > 6:
-            return False
-            
-        greetings_exact = {
-            "halo", "hai", "hi", "hello", "hey", "hei", "pagi", "siang", "sore", "malam",
-            "good morning", "good afternoon", "good evening", "good night",
-            "terima kasih", "makasih", "thanks", "thank you", "siapa kamu", "who are you",
-            "bisa apa", "kamu siapa", "what can you do", "tes", "test", "ping", "bisa bantu apa",
-            "woi", "oy", "p", "bro", "bos", "min", "apa kabar", "how are you", "how are you doing",
-            "hows it going", "how is it going", "sup", "whats up",
-            "gimana kabarnya", "kabar apa", "sehat", "apa kabarmu", "apa kabarmu bro",
-            "piye kabare", "piye kabare mas", "piye kabare mbak", "sugeng enjang", "sugeng siang", "sugeng sonten", "sugeng dalu", "matur nuwun",
-            "hola", "buenos dias", "buenas tardes", "buenas noches", "como estas", "que tal", "hola como estas", "gracias",
-            "안녕하세요", "안녕", "어떻게 지내세요", "어떻게 지내", "반갑습니다", "고마워", "감사합니다", "테스트",
-            "konnichiwa", "arigato", "ohayo", "ohayou", "ohayou gozaimasu", "kombanwa"
-        }
-        
-        # Strip Spanish accents/marks for normalization
-        t_clean = t.replace("¿", "").replace("?", "").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u").strip()
-        
-        if t in greetings_exact or t_clean in greetings_exact:
-            return True
-            
-        # Check prefix/suffix combinations
-        clean_prefix = re.sub(r'^(halo|hai|hi|hello|hey|hei|woi|oy|p|bro|bos|min|assalamualaikum|mas|mbak|pak|bu|hola)\s+', '', t_clean).strip()
-        clean_suffix = re.sub(r'\s+(mas|mbak|pak|bu|bro|bos|min|ya|dong|gan|rek)$', '', t_clean).strip()
-        clean_both = re.sub(r'\s+(mas|mbak|pak|bu|bro|bos|min|ya|dong|gan|rek)$', '', clean_prefix).strip()
-        
-        return clean_prefix in greetings_exact or clean_suffix in greetings_exact or clean_both in greetings_exact
+        pass
 
     def is_technical_discussion(text: str) -> bool:
-        """Identifies queries asking about NotbookLM system internals, RAG, databases, embeddings, or conceptual discussion."""
-        t = text.lower().strip()
-        tech_triggers = [
-            "pake rag", "pakai rag", "sistem rag", "cara kerja", "arsitektur",
-            "database apa", "vector database", "database vektor", "gimana sistemnya",
-            "gimana cara kerja", "masuk ke database", "disimpan di mana", "data disimpan",
-            "bisa fetch apa", "bisa akses apa", "paywall", "open access kah", "cara lo dapet",
-            "dapetin papernya gimana", "punya database sendiri", "apakah ada database",
-            "gimana lu", "gimana lo", "bagaimana kamu", "apakah kamu", "kenapa kamu"
-        ]
-        return any(tr in t for tr in tech_triggers)
+        pass
 
     def is_sources_meta_query(text: str) -> bool:
-        t = text.lower().strip()
-        # Do not capture if user explicitly asks to delete / remove
-        if any(dt in t for dt in ["hapus", "hapusin", "remove", "delete", "bersihkan", "buang", "drop"]):
-            return False
-        meta_phrases = [
-            "berapa dokumen", "berapa file", "berapa banyak dokumen", "berapa jumlah dokumen",
-            "berapa total dokumen", "jumlah dokumen", "daftar dokumen", "ada berapa dokumen",
-            "ada dokumen apa", "dokumen apa saja", "list dokumen", "sebutkan dokumen",
-            "dokumen yang diupload", "dokumen yang diimpor", "berapa source", "jumlah source",
-            "berapa referensi", "daftar referensi", "ada referensi apa", "berapa doang", "berapa yang",
-            "yang mana saja", "relevan berapa", "yang cocok berapa"
-        ]
-        return any(p in t for p in meta_phrases)
+        pass
 
     async def execute_agent(target_llm, timeout_sec=60.0):
-        # 1. First, let the LLM semantically classify what the user wants
-        async def classify_user_intent(user_query: str, has_docs: bool) -> str:
-            system_intent_prompt = f"""You are the Master Intent Classifier for NotbookLM research workspace.
-Current Workspace Status: {'Contains ' + str(len(local_docs)) + ' imported documents' if has_docs else 'No documents imported yet'}.
-
-Analyze the user's latest prompt carefully and determine their true intention. Choose strictly ONE of the following 4 categories:
-
-1. 'REMOVE_SOURCES':
-   - ONLY when the user is giving an EXPLICIT, DIRECT COMMAND to delete or remove documents from their sources (e.g. 'tolong hapus 12 paper tadi', 'hapusin paper yang ga relevan', 'delete paper A, B, C', 'buang dokumen yang tidak cocok').
-   - DO NOT choose this if the user is merely asking a question or seeking evaluation (e.g. 'apakah ada yang ga relevan?', 'ada berapa paper yang tidak cocok?').
-
-2. 'SEARCH_NEW':
-   - When the user is asking to find, discover, search, fetch, or recommend NEW academic papers or literature from the internet (e.g. 'cariin 50 paper tentang rainfall', 'find papers about machine learning', 'tambah 20 paper lagi', 'rekomendasiin paper terkini').
-   - DO NOT choose this if the user is asking about the documents already inside their workspace (e.g. 'ada berapa paper di sources?', 'apakah di dokumen saya ada paper Indo?').
-
-3. 'ANALYZE_WORKSPACE':
-   - When the user is asking questions about, crosschecking, synthesizing, summarizing, comparing, or listing the documents ALREADY inside their workspace (e.g. 'ada berapa paper indo di sources?', 'analisis perbandingan metode dari dokumen ini', 'buat ringkasan bab 1', 'apakah ada dokumen yang tidak relevan di sources saya?').
-
-4. 'GENERAL_CHAT':
-   - For greetings, casual questions, thanking, testing, system explanations, or general knowledge questions.
-
-User Prompt: "{user_query}"
-
-Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_WORKSPACE, or GENERAL_CHAT) without quotes or explanations."""
-            try:
-                resp = await target_llm.acomplete(system_intent_prompt)
-                raw_intent = resp.text.strip().upper().replace("'", "").replace('"', "").replace("`", "")
-                for valid in ["REMOVE_SOURCES", "SEARCH_NEW", "ANALYZE_WORKSPACE", "GENERAL_CHAT"]:
-                    if valid in raw_intent:
-                        return valid
-            except Exception as e:
-                logger.debug(f"[Intent Classifier Error]: {e}")
-
-            if has_docs:
-                return "ANALYZE_WORKSPACE"
-            return "GENERAL_CHAT"
-
-        intent = await classify_user_intent(query, has_local_docs)
+        intent = await classify_user_intent(query, has_local_docs, len(local_docs), target_llm)
         print(f"[RAG Engine] LLM Semantic Intent: {intent}")
 
         # 1. Handle General Conversational & Technical Discussion
         if intent == "GENERAL_CHAT":
             chat_msgs = [
-                LlamaChatMessage(
-                    role=MessageRole.SYSTEM,
-                    content=(
-                        "You are NotbookLM, an intelligent, transparent, and friendly AI research assistant (like Google NotebookLM).\n"
-                        "LANGUAGE RULE (CRITICAL):\n"
-                        "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese -> Basa Jawa, Spanish -> Spanish).\n"
-                        "- If asked about capabilities or system workings, explain clearly that you are connected to verified academic APIs (OpenAlex, Europe PMC, Crossref) and Qdrant RAG vector database."
-                    )
-                ),
+                LlamaChatMessage(role=MessageRole.SYSTEM, content=get_general_chat_system_prompt()),
                 *(formatted_history if formatted_history else []),
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
@@ -737,18 +571,7 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                 snippet = (d.abstract or d.snippet or "")[:200]
                 doc_summaries.append(f"- ID: {d.id} | Filename: {d.filename} | Title: {t} | Abstract: {snippet}")
 
-            eval_prompt = (
-                "You are an AI Document Management Assistant.\n"
-                f"User Deletion Request: \"{query}\"\n\n"
-                "List of loaded documents in this workspace:\n" + "\n".join(doc_summaries) + "\n\n"
-                "Task: Identify STRICTLY the specific document IDs that match the user's explicit deletion instruction.\n"
-                "If the user named specific papers (e.g. 'hapus paper a, b, c' or 'hapus yang tidak relevan'), identify ONLY those matching IDs.\n"
-                "Return ONLY a valid JSON object matching:\n"
-                "{\n"
-                "  \"remove_doc_ids\": [1, 2, 3],\n"
-                "  \"reason\": \"Summary reason for removal\"\n"
-                "}"
-            )
+            eval_prompt = get_source_deletion_prompt(query, doc_summaries)
             try:
                 eval_resp = await target_llm.acomplete(eval_prompt)
                 clean_json_text = eval_resp.text.strip()
@@ -814,23 +637,7 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
                 )
             papers_context = "\n\n".join(paper_bullet_list)
 
-            synthesis_prompt = (
-                "You are NotbookLM, an intelligent, proactive, and structured research curator & academic synthesis assistant (Google NotebookLM style).\n\n"
-                "LANGUAGE RULE (CRITICAL):\n"
-                "- Match the exact language of the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n\n"
-                f"User Request: \"{query}\"\n\n"
-                f"Verified Academic Search Results: Successfully retrieved and filtered {len(papers)} verified and reputable Open Access papers.\n\n"
-                f"Core Paper Samples:\n{papers_context}\n\n"
-                "RESPONSE STRUCTURE TO FOLLOW:\n"
-                "1. Friendly Opening & Realistic Context:\n"
-                "   - If the user requested a massive quantity (e.g. 50-100 papers), politely explain that presenting dozens of raw papers all at once in text is counterproductive for in-depth analysis. State that the system has curated the top {len(papers)} most relevant, high-impact papers published in the last 5 years.\n"
-                "2. Research Trends & Thematic Clusters (3-4 Key Themes):\n"
-                "   - Provide insightful thematic clusters synthesizing the landscape (e.g. architecture evolution, multimodal sentiment, domain applications, low-resource languages).\n"
-                "   - Highlight key methodologies, models, and findings.\n"
-                "3. Call-to-Action & Sources Report:\n"
-                "   - Inform the user that all {len(papers)} papers with metadata, DOI links, and summaries are ready in the interactive Source Card below for one-click import into the workspace panel.\n"
-                "4. NEVER be passive or tell the user to manually search Google Scholar."
-            )
+            synthesis_prompt = get_search_synthesis_prompt(query, len(papers), papers_context)
 
             synth_msgs = [
                 LlamaChatMessage(role=MessageRole.SYSTEM, content=synthesis_prompt),
@@ -929,39 +736,7 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
             
             system_msg = LlamaChatMessage(
                 role=MessageRole.SYSTEM,
-                content=(
-                    "You are NotbookLM, an advanced AI research assistant and academic literature specialist.\n\n"
-                    "LANGUAGE RULE (CRITICAL):\n"
-                    "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n\n"
-                    f"This chat session has {len(local_docs)} imported reference documents in the workspace.\n"
-                    "Use ALL document data to answer the user's query comprehensively, accurately, and with clear structure.\n\n"
-                    "SOURCE INTEGRITY RULE (CRITICAL):\n"
-                    "- Every document in the workspace (whether full manuscript or publication brief/abstract) is a 100% valid, verified academic source.\n"
-                    "- NEVER make excuses such as 'naskah tidak lengkap', 'hanya abstrak', 'paywalled', 'HTTP 403', or 'fitur highlight nonaktif'. All sources are fully supported by the system's evidence highlighting engine.\n\n"
-                    "CITATION & TABLE RULES (CRITICAL - STRICT GROUNDING & MANDATORY CITATIONS):\n"
-                    "- Every reference document in workspace has a permanent Global Reference Number: [1], [2], [3], etc. as written in its header.\n"
-                    "- MANDATORY CITATIONS ON ALL CLAIMS, ESSAYS, DRAFTS, & TABLES:\n"
-                    "  Whenever discussing, comparing, listing, drafting papers/chapters (e.g. Bab 1 Pendahuluan), or synthesizing information from workspace documents, you MUST explicitly attach bracketed citations [1], [2], [3] directly to EVERY factual statement, method, algorithm, finding, and metric.\n"
-                    "- MASTER COMPARISON TABLE ARCHITECTURE (When requested/applicable):\n"
-                    "  1. When comparing documents or presenting synthesis tables, ALWAYS output strictly ONE single Master Table encompassing all documents (1 row = 1 document).\n"
-                    "  2. Standard columns: `Dokumen / Judul | Metode yang Dipakai | Temuan Utama | Limitasi | Rekomendasi`.\n"
-                    "  3. STRICTLY FORBIDDEN: NEVER create separate sub-tables per document.\n"
-                    "  4. IN EVERY TABLE CELL: Attach bracketed citations [1], [2], etc. directly beside EVERY claim and metric.\n"
-                    "- ZERO MANUAL QUOTE DUMP RULE:\n"
-                    "  1. DO NOT dump raw manual quotes or write static location text (e.g. NEVER write 'Halaman X, Paragraf Y' or 'Abstrak Baris Z' in the chat body).\n"
-                    "  2. Provide the synthesized answer/draft/table with [1], [2], [3] citations. The user clicks [X] to view highlighted proof in the sidebar.\n"
-                    "  3. Store the exact verbatim sentences in the hidden <!-- CITATION_MAP --> block for precision highlighting.\n\n"
-                    "AI CITATION GROUNDING MAP (CRITICAL REQUIREMENT - MANDATORY ON EVERY RESPONSE WITH CITATIONS):\n"
-                    "At the VERY END of your response, you MUST ALWAYS append a hidden JSON metadata block.\n"
-                    "For EACH cited document number [X] appearing in your response (in tables, essay paragraphs, draft chapters, or bullet points), extract the EXACT verbatim sentence(s) from that document that contain the specific claim, method, algorithm, or metric you cited.\n\n"
-                    "Format strictly as:\n"
-                    "<!-- CITATION_MAP: {\n"
-                    "  \"1\": [\"The authors use tweets from President Candidates of Indonesia (Jokowi and Prabowo), and tweets from relevant hashtags for sentiment analysis gathered from March to July 2018 to predict Indonesian Presidential election result.\"],\n"
-                    "  \"2\": [\"Selanjutnya akan melalui beberapa tahapan dalam melaukan analisis sentimen, antara lain adalah tahap pengumpulan data, data correction, preprocessing data, dan klasifikasi menggunakan Naïve Bayes Classifier serta dilakukan asosiasi teks.\"],\n"
-                    "  \"3\": [\"Analisis sentimen mengungkapkan persepsi publik yang dominan positif terhadap kebijakan MBG, meskipun bias model hadir karena ketidakseimbangan data.\"]\n"
-                    "} -->\n\n"
-                    "Ensure EVERY cited document number in your response has at least one verbatim excerpt in CITATION_MAP."
-                )
+                content=get_workspace_analysis_system_prompt(len(local_docs))
             )
             context_msg = LlamaChatMessage(
                 role=MessageRole.SYSTEM,
@@ -987,16 +762,7 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
             streaming=False,
             max_iterations=6,
             timeout=timeout_sec,
-            system_prompt=(
-                "You are NotbookLM, a powerful, proactive AI research assistant.\n"
-                "LANGUAGE RULE: Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English, Indonesian, Javanese, Spanish).\n"
-                "Always maintain conversation context from the chat history.\n"
-                f"{doc_context_info}\n"
-                "- If the user requests data, paper search, analysis, or summaries, perform it directly using tools.\n"
-                "- MANDATORY CITATION RULE: Whenever referring to local workspace documents, always cite using square brackets [1], [2], [3] directly on every factual claim, method, finding, and metric.\n"
-                "- ZERO QUOTE DUMP RULE: Never dump raw manual quotes into the chat text. The user inspects evidence by clicking [X] buttons which highlight text directly in the document.\n"
-                "- Never output internal thoughts or monologues. Output only the final response."
-            )
+            system_prompt=get_agentic_system_prompt(doc_context_info)
         )
         res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
         return clean_response(str(res))

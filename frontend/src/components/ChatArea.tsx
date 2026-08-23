@@ -19,7 +19,8 @@ import {
   ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ChatMessage, Document as DocType, TargetedSource } from "@/app/ChatClient";
+import { ChatMessage } from "@/stores/chatStore";
+import { Document as DocType, TargetedSource } from "@/stores/documentStore";
 import { InChatMessageComponent } from "./chat/ChatMessageItem";
 import { ChatInputBox, Attachment } from "./chat/ChatInput";
 import { CitationContext } from "./chat/CitationParser";
@@ -266,13 +267,12 @@ export default function ChatArea({
             <button 
               type="button"
               onClick={onToggleRightSidebar}
-              className="h-8 px-2.5 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-xs text-gray-300 hover:text-white flex items-center gap-1.5 cursor-pointer shadow-md backdrop-blur transition-colors"
-              title={t('chat.openSources')}
+              className="relative h-8 w-8 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-gray-300 hover:text-white flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+              title={t('chat.openSources') || "Open sources"}
             >
-              <FileText size={13} className="text-blue-400" />
-              <span>{t('ui.sources')}</span>
+              <FileText size={15} className="text-blue-400" />
               {documents.length > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-600/30 text-blue-300 text-[10px] font-mono">
+                <span className="absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-[#1e1f20] leading-none shadow">
                   {documents.length}
                 </span>
               )}
@@ -317,7 +317,7 @@ export default function ChatArea({
                 <div key={idx} className="space-y-2 group">
                   {msg.role === "user" ? (
                     <div className="flex flex-col items-end">
-                      <div className="flex flex-col items-end w-full max-w-[85%] -mr-1 sm:-mr-1.5">
+                      <div className="flex flex-col items-end w-full max-w-[85%] -mr-[7px]">
                         {/* Always display attachments above, even during edit */}
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div className="flex flex-wrap justify-end gap-2 mb-2">
@@ -419,7 +419,7 @@ export default function ChatArea({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-start pl-1 sm:pl-1.5">
+                    <div className="flex items-start">
                       <div className="flex-1 min-w-0">
                         <InChatMessageComponent 
                           msg={msg}
@@ -442,7 +442,7 @@ export default function ChatArea({
                                 onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) - 1)}
                                 disabled={(msg.active_variant_index || 0) <= 0 || isLoading}
                                 className="p-0.5 hover:text-white disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                                title="Previous response"
+                                title={t('chat.previousResponse')}
                               >
                                 <ChevronLeft size={14} />
                               </button>
@@ -454,7 +454,7 @@ export default function ChatArea({
                                 onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) + 1)}
                                 disabled={(msg.active_variant_index || 0) >= msg.variants.length - 1 || isLoading}
                                 className="p-0.5 hover:text-white disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                                title="Next response"
+                                title={t('chat.nextResponse')}
                               >
                                 <ChevronRight size={14} />
                               </button>
@@ -481,9 +481,9 @@ export default function ChatArea({
                             onClick={() => onRegenerateMessage?.(idx)}
                             disabled={isLoading}
                             className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
-                            title="Regenerate response"
+                            title={t('chat.regenerateResponse')}
                           >
-                            <RotateCw size={15} className={isLoading ? "animate-spin text-blue-400" : ""} />
+                            <RotateCw size={15} />
                           </button>
                         </div>
                       </div>
@@ -506,7 +506,7 @@ export default function ChatArea({
       </div>
 
       {!isChatEmpty && (
-        <div className="absolute bottom-0 inset-x-0 px-3 sm:px-6 pb-3 pt-6 bg-gradient-to-t from-[#212121] via-[#212121]/90 to-transparent pointer-events-none z-20 flex justify-center right-[6px]">
+        <div className="absolute bottom-0 inset-x-0 px-4 sm:px-6 md:px-8 pb-3 pt-6 bg-gradient-to-t from-[#212121] via-[#212121]/90 to-transparent pointer-events-none z-20 flex justify-center">
           <div className="w-full lg:max-w-3xl pointer-events-auto min-w-0">
             <ChatInputBox 
               isLoading={isLoading}

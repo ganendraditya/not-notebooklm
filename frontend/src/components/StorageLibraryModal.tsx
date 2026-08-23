@@ -7,6 +7,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/lib/i18n";
 
 interface LibraryItem {
   id: string;
@@ -35,6 +36,7 @@ export default function StorageLibraryModal({
   backendUrl,
   onSelectChat
 }: StorageLibraryModalProps) {
+  const { t } = useTranslation();
   const [category, setCategory] = useState<"all" | "documents" | "images">(initialCategory);
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -315,11 +317,11 @@ export default function StorageLibraryModal({
           <button 
             onClick={onClose} 
             className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Back"
+            title={t('ui.back')}
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="text-xl font-bold text-white tracking-tight">Library</h1>
+          <h1 className="text-xl font-bold text-white tracking-tight">{t('library.title')}</h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -328,7 +330,7 @@ export default function StorageLibraryModal({
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
             <input 
               type="text" 
-              placeholder="Search files or chats..." 
+              placeholder={t('library.searchPlaceholder')} 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="bg-[#212124] border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-xs text-white w-56 sm:w-72 focus:border-white/20 outline-none transition-all placeholder:text-gray-500"
@@ -338,7 +340,7 @@ export default function StorageLibraryModal({
           <button 
             onClick={onClose} 
             className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Close"
+            title={t('settings.close')}
           >
             <X size={18} />
           </button>
@@ -357,7 +359,7 @@ export default function StorageLibraryModal({
                 category === "all" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
               }`}
             >
-              All
+              {t('library.all')}
             </button>
             <button 
               onClick={() => setCategory("images")}
@@ -365,7 +367,7 @@ export default function StorageLibraryModal({
                 category === "images" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
               }`}
             >
-              Images
+              {t('library.images')}
             </button>
             <button 
               onClick={() => setCategory("documents")}
@@ -373,7 +375,7 @@ export default function StorageLibraryModal({
                 category === "documents" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
               }`}
             >
-              Documents
+              {t('library.documents')}
             </button>
           </div>
 
@@ -381,7 +383,7 @@ export default function StorageLibraryModal({
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2 bg-[#28292c] px-3 py-1 rounded-full border border-blue-500/30 animate-in fade-in slide-in-from-left-2 duration-150 shadow-sm">
               <span className="text-xs font-semibold text-blue-400 pl-1 select-none">
-                {selectedIds.size} selected
+                {t('library.selectedCount', { count: selectedIds.size.toString() })}
               </span>
               <div className="h-3.5 w-px bg-white/20"></div>
               
@@ -390,10 +392,10 @@ export default function StorageLibraryModal({
                 onClick={handleDownload}
                 disabled={isDownloading}
                 className="flex items-center gap-1.5 text-xs text-gray-300 hover:text-white font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
-                title="Download"
+                title={t('library.download')}
               >
                 <Download size={13} />
-                <span>{isDownloading ? "Downloading..." : "Download"}</span>
+                <span>{isDownloading ? t('download.preparing') : t('library.download')}</span>
               </button>
 
               <div className="h-3.5 w-px bg-white/20"></div>
@@ -403,10 +405,10 @@ export default function StorageLibraryModal({
                 onClick={handleDelete}
                 disabled={isDeleting}
                 className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
-                title="Delete"
+                title={t('library.delete')}
               >
                 <Trash2 size={13} />
-                <span>{isDeleting ? "Deleting..." : "Delete"}</span>
+                <span>{isDeleting ? t('library.deleting') : t('library.delete')}</span>
               </button>
             </div>
           )}
@@ -418,14 +420,14 @@ export default function StorageLibraryModal({
             <button 
               onClick={() => setViewMode("list")}
               className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "list" ? "bg-white/10 text-white" : "text-gray-400 hover:text-gray-200"}`}
-              title="List view"
+              title={t('library.listView')}
             >
               <ListIcon size={14} />
             </button>
             <button 
               onClick={() => setViewMode("grid")}
               className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "grid" ? "bg-white/10 text-white" : "text-gray-400 hover:text-gray-200"}`}
-              title="Grid view"
+              title={t('library.gridView')}
             >
               <LayoutGrid size={14} />
             </button>
@@ -438,13 +440,13 @@ export default function StorageLibraryModal({
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400 space-y-2">
             <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-            <p className="text-xs text-gray-500">Loading library items...</p>
+            <p className="text-xs text-gray-500">{t('settings.loadingStorage')}</p>
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-500 space-y-3">
             <LayoutGrid size={40} className="opacity-25" />
-            <p className="text-sm font-medium">No items found.</p>
-            <p className="text-xs text-gray-600">Uploaded documents and images will show up here.</p>
+            <p className="text-sm font-medium">{t('library.noItems')}</p>
+            <p className="text-xs text-gray-600">{t('library.noItemsDesc')}</p>
           </div>
         ) : viewMode === "list" ? (
           <div className="w-full space-y-1">
@@ -472,7 +474,7 @@ export default function StorageLibraryModal({
                 }}
                 className="flex-1 min-w-0 pr-4 pl-1 cursor-pointer hover:text-gray-300 transition-colors select-none truncate"
               >
-                Name {sort === "name" && (sortOrder === "desc" ? "↓" : "↑")}
+                {t('library.colName')} {sort === "name" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
 
               {/* Conversation Column */}
@@ -487,7 +489,7 @@ export default function StorageLibraryModal({
                 }}
                 className="w-44 sm:w-48 md:w-56 shrink-0 text-left pr-4 cursor-pointer hover:text-gray-300 transition-colors select-none truncate"
               >
-                Conversation {sort === "chat" && (sortOrder === "desc" ? "↓" : "↑")}
+                {t('library.colConversation')} {sort === "chat" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
 
               {/* Modified Column */}
@@ -502,7 +504,7 @@ export default function StorageLibraryModal({
                 }}
                 className="w-28 shrink-0 text-left cursor-pointer hover:text-gray-300 select-none"
               >
-                Modified {sort === "date" && (sortOrder === "desc" ? "↓" : "↑")}
+                {t('library.colModified')} {sort === "date" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
 
               {/* Size Column */}
@@ -517,7 +519,7 @@ export default function StorageLibraryModal({
                 }}
                 className="w-24 shrink-0 text-right cursor-pointer hover:text-gray-300 pr-2 select-none"
               >
-                Size {sort === "size" && (sortOrder === "desc" ? "↓" : "↑")}
+                {t('library.colSize')} {sort === "size" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
             </div>
 
@@ -559,7 +561,7 @@ export default function StorageLibraryModal({
                           onSelectChat(item.chat_id);
                         }
                       }}
-                      title={`Go to conversation: ${item.chat_title}`}
+                      title={t('library.goToConversation', { title: item.chat_title })}
                       className="text-gray-400 group-hover:text-gray-200 hover:!text-blue-400 transition-colors inline-flex items-center gap-1.5 truncate max-w-full cursor-pointer"
                     >
                       <MessageSquare size={13} className="shrink-0 opacity-70" />

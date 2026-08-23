@@ -1,9 +1,12 @@
 import os
 import uuid
+import logging
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text, Boolean, event
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 import sqlite3
+
+logger = logging.getLogger("uvicorn.error")
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "not_notebooklm.db"))
 DATABASE_URL = f"sqlite:///{DB_PATH}"
@@ -84,59 +87,60 @@ class ChatMessage(Base):
 
 Base.metadata.create_all(bind=engine)
 
-# Auto-migrate columns if missing in SQLite
-try:
-    with engine.connect() as conn:
-        from sqlalchemy import text
-        res = conn.execute(text("PRAGMA table_info(chat_sessions)")).fetchall()
-        cols = [r[1] for r in res]
-        if "updated_at" not in cols:
-            conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN updated_at DATETIME"))
-            conn.execute(text("UPDATE chat_sessions SET updated_at = created_at WHERE updated_at IS NULL"))
-            conn.commit()
-        if "is_pinned" not in cols:
-            conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN is_pinned BOOLEAN DEFAULT 0"))
-            conn.commit()
+def auto_migrate_schema():
+    """Lightweight schema migrator for SQLite columns."""
+    try:
+        with engine.begin() as conn:
+            from sqlalchemy import text
+            
+            # ChatSessions
+            res = conn.execute(text("PRAGMA table_info(chat_sessions)")).fetchall()
+            cols = [r[1] for r in res]
+            if "updated_at" not in cols:
+                conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN updated_at DATETIME"))
+                conn.execute(text("UPDATE chat_sessions SET updated_at = created_at WHERE updated_at IS NULL"))
+            if "is_pinned" not in cols:
+                conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN is_pinned BOOLEAN DEFAULT 0"))
 
-        # Auto-migrate Document metadata columns
-        res_docs = conn.execute(text("PRAGMA table_info(documents)")).fetchall()
-        doc_cols = [r[1] for r in res_docs]
-        new_doc_columns = {
-            "title": "TEXT",
-            "authors": "TEXT",
-            "year": "VARCHAR",
-            "journal": "VARCHAR",
-            "journal_metric": "VARCHAR",
-            "doi": "VARCHAR",
-            "url": "VARCHAR",
-            "pdf_url": "VARCHAR",
-            "abstract": "TEXT",
-            "abstract_type": "VARCHAR",
-            "is_oa": "BOOLEAN",
-            "access_status": "VARCHAR",
-            "snippet": "TEXT",
-            "venue": "VARCHAR",
-            "citations": "INTEGER DEFAULT 0",
-            "quality_tier": "INTEGER DEFAULT 4",
-        }
-        for col_name, col_type in new_doc_columns.items():
-            if col_name not in doc_cols:
-                conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col_name} {col_type}"))
-        conn.commit()
-        res_msgs = conn.execute(text("PRAGMA table_info(chat_messages)")).fetchall()
-        msg_cols = [r[1] for r in res_msgs]
-        if "attachments_json" not in msg_cols:
-            conn.execute(text("ALTER TABLE chat_messages ADD COLUMN attachments_json TEXT"))
-            conn.commit()
-        if "variants_json" not in msg_cols:
-            conn.execute(text("ALTER TABLE chat_messages ADD COLUMN variants_json TEXT"))
-            conn.commit()
-        if "active_variant_index" not in msg_cols:
-            conn.execute(text("ALTER TABLE chat_messages ADD COLUMN active_variant_index INTEGER DEFAULT 0"))
-            conn.commit()
+            # Documents
+            res_docs = conn.execute(text("PRAGMA table_info(documents)")).fetchall()
+            doc_cols = [r[1] for r in res_docs]
+            new_doc_columns = {
+                "title": "TEXT",
+                "authors": "TEXT",
+                "year": "VARCHAR",
+                "journal": "VARCHAR",
+                "journal_metric": "VARCHAR",
+                "doi": "VARCHAR",
+                "url": "VARCHAR",
+                "pdf_url": "VARCHAR",
+                "abstract": "TEXT",
+                "abstract_type": "VARCHAR",
+                "is_oa": "BOOLEAN",
+                "access_status": "VARCHAR",
+                "snippet": "TEXT",
+                "venue": "VARCHAR",
+                "citations": "INTEGER DEFAULT 0",
+                "quality_tier": "INTEGER DEFAULT 4",
+            }
+            for col_name, col_type in new_doc_columns.items():
+                if col_name not in doc_cols:
+                    conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col_name} {col_type}"))
+            
+            # ChatMessages
+            res_msgs = conn.execute(text("PRAGMA table_info(chat_messages)")).fetchall()
+            msg_cols = [r[1] for r in res_msgs]
+            if "attachments_json" not in msg_cols:
+                conn.execute(text("ALTER TABLE chat_messages ADD COLUMN attachments_json TEXT"))
+            if "variants_json" not in msg_cols:
+                conn.execute(text("ALTER TABLE chat_messages ADD COLUMN variants_json TEXT"))
+            if "active_variant_index" not in msg_cols:
+                conn.execute(text("ALTER TABLE chat_messages ADD COLUMN active_variant_index INTEGER DEFAULT 0"))
 
-except Exception as e:
-    print(f"[DB Migration Warning]: {e}")
+    except Exception as e:
+        logger.warning(f"[DB Migration Warning]: {e}")
+
+auto_migrate_schema()
 
 def get_db():
     db = SessionLocal()
