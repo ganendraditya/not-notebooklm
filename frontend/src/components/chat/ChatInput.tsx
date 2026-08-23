@@ -518,9 +518,9 @@ export const ChatInputBox = memo(function ChatInputBox({
         />
 
         {/* Bottom Actions Row */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 px-1">
+        <div className="flex items-center justify-between gap-1.5 pt-2 px-1 w-full min-w-0">
           {/* Left: + Button & ModelSelector */}
-          <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center gap-1 min-w-0 flex-1">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -537,11 +537,13 @@ export const ChatInputBox = memo(function ChatInputBox({
               accept=".pdf,.docx,.doc,.txt,.md,.csv,.tsv,.bib,.bibtex,.ris,image/jpeg,image/png,image/webp,image/gif" 
               onChange={(e) => handleFileUpload(e.target.files)}
             />
-            <ModelSelector backendUrl={backendUrl} />
+            <div className="min-w-0 flex-shrink">
+              <ModelSelector backendUrl={backendUrl} />
+            </div>
           </div>
 
           {/* Right: Filter, Sources Badge, and Send/Stop Button */}
-          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-1">
             <SearchFilterPopover
               isOpen={isFilterOpen}
               onClose={() => setIsFilterOpen(false)}
@@ -553,11 +555,16 @@ export const ChatInputBox = memo(function ChatInputBox({
             <button 
               type="button"
               onClick={onToggleRightSidebar}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium border border-white/5 transition-colors cursor-pointer"
+              className="relative p-2 min-[1100px]:px-3 min-[1100px]:py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium border border-white/5 transition-colors cursor-pointer shrink-0 flex items-center justify-center min-[1100px]:gap-1.5"
+              title={t('chat.sourcesCount').replace('{count}', documentsCount.toString())}
             >
               <FileText size={15} className="text-blue-400 fill-blue-400/20 shrink-0" />
-              <span className="hidden sm:inline">{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
-              <span className="sm:hidden">{documentsCount}</span>
+              <span className="hidden min-[1100px]:inline">{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
+              {documentsCount > 0 && (
+                <span className="min-[1100px]:hidden absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-[#1e1f20] leading-none shadow">
+                  {documentsCount}
+                </span>
+              )}
             </button>
 
             {isLoading && onStopGeneration ? (

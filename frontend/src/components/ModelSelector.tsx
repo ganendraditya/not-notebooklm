@@ -188,10 +188,10 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
         {(() => {
           const { groupName, tierName } = getDisplayInfo();
           return (
-            <span className="font-normal text-gray-200 group-hover:text-white truncate max-w-[220px] flex items-center gap-1.5">
-              <span>{groupName}</span>
+            <span className="font-normal text-gray-200 group-hover:text-white truncate max-w-[130px] min-[1100px]:max-w-[220px] flex items-center gap-1.5">
+              <span className="truncate">{groupName}</span>
               {tierName && (
-                <span className="text-gray-400 font-normal text-[11.5px] group-hover:text-gray-300 transition-colors">
+                <span className="text-gray-400 font-normal text-[11.5px] group-hover:text-gray-300 transition-colors shrink-0">
                   {tierName}
                 </span>
               )}

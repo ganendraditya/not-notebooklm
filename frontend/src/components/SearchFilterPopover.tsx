@@ -314,19 +314,19 @@ export default function SearchFilterPopover({
 
   return (
     <div className="relative inline-block text-left select-none" ref={containerRef}>
-      {/* Trigger Button (Pill in Chat Input Bar) */}
+      {/* Trigger Button (Responsive: Pill with Text on >=1100px, Compact Icon on <1100px) */}
       <button
         type="button"
         onClick={onToggle}
         className={
           appliedCount > 0 
-            ? "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-300 font-medium shadow-sm" 
-            : "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-white/5 hover:bg-white/10 border-white/5 text-gray-300 hover:text-white font-medium"
+            ? "flex items-center gap-1.5 px-2.5 min-[1100px]:px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-300 font-medium shadow-sm" 
+            : "flex items-center gap-1.5 px-2.5 min-[1100px]:px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-white/5 hover:bg-white/10 border-white/5 text-gray-300 hover:text-white font-medium"
         }
         title={t('filter.button')}
       >
-        <SlidersHorizontal size={12} className={appliedCount > 0 ? "text-blue-400" : "text-gray-400"} />
-        <span>{t('filter.button')}</span>
+        <SlidersHorizontal size={13} className={appliedCount > 0 ? "text-blue-400" : "text-gray-400"} />
+        <span className="hidden min-[1100px]:inline">{t('filter.button')}</span>
         {appliedCount > 0 && (
           <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-mono font-semibold">
             {appliedCount}
