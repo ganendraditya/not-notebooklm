@@ -174,10 +174,10 @@ export default function ChatArea({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#212121] overflow-hidden relative">
-      {/* Top Fixed Header Navigation Bar (Shown on desktop lg:flex, hidden on mobile/tablet because of top mobile tab header) */}
-      <div className="h-14 shrink-0 px-4 sm:px-6 hidden lg:flex items-center justify-between z-20 bg-[#212121]">
+      {/* Top Floating Action Controls (Transparent, no solid bar / height) */}
+      <div className="absolute top-3 inset-x-0 px-4 sm:px-6 md:px-8 hidden lg:flex items-center justify-between z-20 pointer-events-none">
         {/* Left: Open Sidebar Button */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pointer-events-auto">
           {!isSidebarOpen && onOpenSidebar && (
             <button 
               type="button"
@@ -191,7 +191,7 @@ export default function ChatArea({
         </div>
 
         {/* Right: Context Menu & Sources Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pointer-events-auto">
           {/* Three Dots Context Menu (Only when chat is not empty & activeChatId exists) */}
           {!isChatEmpty && activeChatId && (
             <div className="relative" ref={topMenuRef}>
@@ -283,7 +283,7 @@ export default function ChatArea({
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pt-4 lg:pt-2 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
+        className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pt-12 lg:pt-14 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
       >
           <div className={`w-full lg:max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
           {isChatEmpty ? (
@@ -505,9 +505,11 @@ export default function ChatArea({
         </div>
       </div>
 
+      {/* Floating Gradient Backdrop for Input (width capped to input box width only, zero side overflow) */}
       {!isChatEmpty && (
-        <div className="absolute bottom-0 inset-x-0 px-4 sm:px-6 md:px-8 pb-3 pt-6 bg-gradient-to-t from-[#212121] via-[#212121]/90 to-transparent pointer-events-none z-20 flex justify-center">
-          <div className="w-full lg:max-w-3xl pointer-events-auto min-w-0">
+        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-20 flex justify-center px-4 sm:px-6 md:px-8">
+          <div className="w-full lg:max-w-3xl pointer-events-auto min-w-0 relative">
+            <div className="absolute -inset-x-4 -top-6 -bottom-3 bg-gradient-to-t from-[#212121] via-[#212121]/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             <ChatInputBox 
               isLoading={isLoading}
               documentsCount={documents.length}

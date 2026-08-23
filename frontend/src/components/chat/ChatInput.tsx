@@ -584,9 +584,8 @@ export const ChatInputBox = memo(function ChatInputBox({
         </div>
       </div>
 
-      {/* Bottom Disclaimer / Caveat with Solid Backdrop */}
+      {/* Bottom Disclaimer / Caveat */}
       <div className="relative">
-        <div className="absolute -top-4 -bottom-6 -left-8 -right-8 bg-[#212121] -z-10 pointer-events-auto"></div>
         <p className="text-center text-[11px] text-gray-400 mt-2 px-2 select-none relative z-10">
           {t('chat.mistakeWarning')}
         </p>
