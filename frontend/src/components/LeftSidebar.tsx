@@ -143,9 +143,9 @@ export default function LeftSidebar({
   );
 
   return (
-    <div className="w-[260px] bg-[#171717] flex flex-col h-full text-sm border-r border-white/5 select-none shrink-0">
-      {/* Top Header with NotbookLM Logo and Sidebar Toggle */}
-      <div className="p-3.5 flex items-center justify-between">
+    <div className="w-full lg:w-[260px] bg-[#171717] flex flex-col h-full text-sm border-r border-white/5 select-none shrink-0">
+      {/* Top Header with NotbookLM Logo and Sidebar Toggle (Desktop Only) */}
+      <div className="w-full p-3.5 sm:p-4 items-center justify-between hidden lg:flex">
         {/* Logo NotbookLM (Clickable -> New Chat) */}
         <div 
           onClick={onCreateChat}
@@ -157,11 +157,11 @@ export default function LeftSidebar({
           <span className="text-sm font-bold text-white">NotbookLM</span>
         </div>
 
-        {/* Hide Sidebar Button (Moved to far right) */}
+        {/* Hide Sidebar Button (Only visible on desktop) */}
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 cursor-pointer"
+          className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 cursor-pointer hidden lg:flex"
           onClick={onToggleSidebar}
           title={t('left.closeSidebar')}
         >
@@ -170,7 +170,7 @@ export default function LeftSidebar({
       </div>
 
       {/* Top Action Items: New chat, Search, & Library */}
-      <div className="px-3 py-1 space-y-1">
+      <div className="w-full px-3 pt-3 lg:pt-1 pb-3 space-y-1 border-b border-white/5">
         <Button 
           variant="ghost" 
           className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
@@ -212,7 +212,7 @@ export default function LeftSidebar({
       </div>
 
       {/* History List */}
-      <div className="flex-1 overflow-y-auto px-2 mt-1.5 space-y-4 min-h-0 custom-scrollbar">
+      <div className="w-full flex-1 overflow-y-auto px-2 sm:px-3 pt-3 space-y-4 min-h-0 custom-scrollbar">
         {filteredSessions.length === 0 ? (
           <div className="text-center text-xs text-gray-500 py-8 px-4">
             {searchQuery ? t('ui.noConversationsFound') : t('ui.noChatHistory')}
@@ -338,18 +338,6 @@ export default function LeftSidebar({
             );
           })()
         )}
-      </div>
-
-      {/* User Footer / Info with Settings Button */}
-      <div className="p-2.5 border-t border-white/5 flex items-center justify-between text-xs text-gray-400">
-        <span className="text-[11px] text-gray-500 font-medium pl-1">NotbookLM v0.1</span>
-        <button
-          onClick={onOpenSettings}
-          className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-          title={t('ui.settings')}
-        >
-          <Settings size={15} />
-        </button>
       </div>
 
       {/* Centered Modal for Rename Chat */}

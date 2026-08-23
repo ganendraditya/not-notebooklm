@@ -1384,7 +1384,7 @@ export default function RightSidebar({
     );
 
     return (
-      <aside className="w-80 sm:w-[460px] h-full bg-[#18191b] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
+      <aside className="w-full lg:w-[460px] h-full bg-[#18191b] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
         {/* 1. Header Bar: ← Paper + Circular Close Button */}
         <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
           <button
@@ -1400,7 +1400,7 @@ export default function RightSidebar({
 
           <button 
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer hidden lg:flex"
             title={t('right.close')}
           >
             <X size={14} />
@@ -2004,21 +2004,7 @@ export default function RightSidebar({
   // VIEW MODE: STANDARD SOURCES LIST PANEL
   // ==========================================
   return (
-    <aside className="w-80 h-full bg-[#1e1f20] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
-      {/* 1. Header: Sources Title & Collapse Button */}
-      <div className="p-4 flex items-center justify-between border-b border-white/5">
-        <h2 className="text-base font-semibold text-white tracking-tight">{t('ui.sources')}</h2>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg cursor-pointer"
-          onClick={onClose}
-          title={t('right.closeSources')}
-        >
-          <Sidebar size={16} className="rotate-180" />
-        </Button>
-      </div>
-
+    <aside className="w-full lg:w-80 h-full bg-[#1e1f20] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
       {/* Hidden File Input for Multi-format Document Upload */}
       <input
         ref={fileInputRef}
@@ -2037,7 +2023,7 @@ export default function RightSidebar({
 
       <div className="p-3.5 space-y-2.5 flex-1 flex flex-col overflow-y-auto custom-scrollbar min-h-0">
         {/* 2. Prominent '+ Add sources' Button (NotebookLM Style) */}
-        <div>
+        <div className="w-full">
           <Button
             variant="outline"
             className="w-full h-11 rounded-full bg-[#262729] hover:bg-[#2e3033] border border-white/15 text-gray-100 hover:text-white font-medium text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-colors"
@@ -2050,14 +2036,14 @@ export default function RightSidebar({
 
         {/* Dynamic Clean Feedback Notification */}
         {cleanFeedback && (
-          <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+          <div className="w-full px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
             <Check size={13} className="text-emerald-400 shrink-0" />
             <span className="text-[12px]">{cleanFeedback}</span>
           </div>
         )}
 
         {/* 3. Controls Row: Sort (3 descending bars), Contextual Actions (Clean Dupes, Rename, Download, Delete), and Select All */}
-        <div className="flex items-center justify-between pt-1 px-0 text-xs text-gray-400 relative">
+        <div className="w-full flex items-center justify-between pt-1 px-0 text-xs text-gray-400 relative">
           <div className="flex items-center gap-1">
             {/* Sort Button & Dropdown (Disabled if <= 1 document) */}
             <div className="relative" ref={sortMenuRef}>
@@ -2247,7 +2233,7 @@ export default function RightSidebar({
         </div>
 
         {/* 4. Saved Documents / Sources List (Compact height per item, flush left & right align) */}
-        <div className="flex-1 space-y-0.5 pt-0.5">
+        <div className="w-full flex-1 space-y-0.5 pt-0.5">
           {sortedDocuments.length === 0 && pendingSources.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-center text-gray-400 px-3">
               <FileText size={30} className="text-gray-600 mb-2 stroke-[1.5]" />

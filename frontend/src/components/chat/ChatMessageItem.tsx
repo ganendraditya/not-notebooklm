@@ -241,9 +241,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           </div>
         )}
 
-    <div className="w-full space-y-2">
+    <div className="w-full space-y-2 min-w-0 overflow-hidden break-words">
       {/* 1. Main Markdown Text Content */}
-      <div className="prose prose-invert max-w-none text-[16px] leading-[1.65]">
+      <div className="prose prose-invert max-w-none text-[16px] leading-[1.65] break-words [word-break:break-word]">
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
@@ -293,7 +293,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             code: ({ inline, className, children, ...props }: any) => {
               if (inline) {
                 return (
-                  <code className="bg-white/10 text-blue-300 px-1.5 py-0.5 rounded text-xs font-mono" {...props}>
+                  <code className="bg-white/10 text-blue-300 px-1.5 py-0.5 rounded text-xs font-mono break-all" {...props}>
                     {children}
                   </code>
                 );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { Sparkles, Settings } from "lucide-react";
 import LeftSidebar from "@/components/LeftSidebar";
 import ChatArea from "@/components/ChatArea";
 import RightSidebar from "@/components/RightSidebar";
@@ -881,137 +882,261 @@ export default function ChatClient() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
+  const [mobileTab, setMobileTab] = useState<"menu" | "chat" | "sources">("chat");
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-[#212121]">
-      {/* Left Sidebar: Chat History */}
-      {isSidebarOpen && (
-        <LeftSidebar 
-          sessions={sessions} 
-          activeChatId={activeChatId} 
-          currentView={currentView}
-          onSelectChat={handleSelectChat}
-          onCreateChat={handleCreateChat}
-          onOpenLibrary={(cat) => {
-            setLibraryInitialCategory(cat || "all");
-            setCurrentView("library");
-          }}
-          onOpenSearch={() => setCurrentView("search")}
-          onDeleteChat={handleDeleteChat}
-          onRenameChat={handleRenameChat}
-          onTogglePinChat={handleTogglePinChat}
-          onToggleSidebar={() => setIsSidebarOpen(false)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
-      )}
-      
-      {/* Center View: Main Chat Area, Library View, or Search View */}
-      {currentView === "library" ? (
-        <LibraryView
-          initialCategory={libraryInitialCategory}
-          backendUrl={backendUrl}
-          isSidebarOpen={isSidebarOpen}
-          onOpenSidebar={() => setIsSidebarOpen(true)}
-          onSelectChat={handleSelectChat}
-        />
-      ) : currentView === "search" ? (
-        <SearchChatsView
-          sessions={sessions}
-          backendUrl={backendUrl}
-          isSidebarOpen={isSidebarOpen}
-          onOpenSidebar={() => setIsSidebarOpen(true)}
-          onSelectChat={handleSelectChat}
-        />
-      ) : (
-        <>
-          <ChatArea 
-            activeChatId={activeChatId} 
-            messages={messages} 
-            isLoading={isLoading}
-            onSendMessage={handleSendMessage} 
-            onEditMessage={handleEditMessage}
-            onStopGeneration={handleStopGeneration}
-            queuedPrompts={queuedPrompts}
-            onRemoveQueuedPrompt={handleRemoveQueuedPrompt}
-            onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
-            documents={documents}
-            onDocumentAdded={handleDocumentAdded}
-            onAddPendingSources={handleAddPendingSources}
-            onResolvePendingSource={handleResolvePendingSource}
-            onOpenDocument={(doc, citationContext) => {
-              setViewingDoc(doc);
-              if (citationContext) {
-                setGroundingHighlight({
-                  docId: doc.id,
-                  sentence: citationContext.sentence,
-                  num: citationContext.num,
-                  citationKey: citationContext.citationKey,
-                  aiQuotes: citationContext.aiQuotes,
-                  clickId: Date.now()
-                });
-              } else {
-                setGroundingHighlight(null);
-              }
-              setIsRightSidebarOpen(true);
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-[#212121]">
+      {/* Mobile/Tablet NotebookLM Top Header Bar (< lg) */}
+      <div className="lg:hidden shrink-0 bg-[#1b1c1e] border-b border-white/10 z-50 flex flex-col">
+        {/* Row 1: Brand / Active Chat Title + Settings Gear Icon */}
+        <div className="px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0 pr-2">
+            <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm flex items-center justify-center shrink-0">
+              <Sparkles size={14} />
+            </div>
+            <span className="text-sm font-semibold text-white truncate">
+              {currentView === "library" 
+                ? "Library" 
+                : currentView === "search" 
+                ? "Search" 
+                : (activeChatId ? (sessions.find(s => s.id === activeChatId)?.title || "NotbookLM") : "NotbookLM")}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title="Settings"
+            >
+              <Settings size={17} />
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2: 3 Tabs (Menu | Chat | Sources) */}
+        <div className="flex items-center justify-around text-xs font-medium border-t border-white/5">
+          {/* 1. Left Tab: Menu */}
+          <button
+            onClick={() => {
+              setMobileTab("menu");
+              setIsSidebarOpen(true);
             }}
-            onEnsureChatSession={handleEnsureChatSession}
+            className={`flex-1 py-2.5 text-center relative transition-colors cursor-pointer ${
+              mobileTab === "menu" ? "text-white font-semibold" : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <span>Menu</span>
+            {mobileTab === "menu" && (
+              <div className="absolute bottom-0 inset-x-4 h-0.5 bg-blue-500 rounded-full"></div>
+            )}
+          </button>
+
+          {/* 2. Middle Tab: Dynamic Label (Chat | Library | Search) */}
+          <button
+            onClick={() => {
+              setMobileTab("chat");
+            }}
+            className={`flex-1 py-2.5 text-center relative transition-colors cursor-pointer ${
+              mobileTab === "chat" ? "text-white font-semibold" : "text-gray-400 hover:text-gray-200"
+            }`}
+          >
+            <span>
+              {currentView === "library" ? "Library" : currentView === "search" ? "Search" : "Chat"}
+            </span>
+            {mobileTab === "chat" && (
+              <div className="absolute bottom-0 inset-x-4 h-0.5 bg-blue-500 rounded-full"></div>
+            )}
+          </button>
+
+          {/* 3. Right Tab: Sources (Disabled & Dimmed when on Library / Search view) */}
+          {currentView === "chat" ? (
+            <button
+              onClick={() => {
+                setMobileTab("sources");
+                setIsRightSidebarOpen(true);
+              }}
+              className={`flex-1 py-2.5 text-center relative transition-colors cursor-pointer ${
+                mobileTab === "sources" ? "text-white font-semibold" : "text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              <span>Sources</span>
+              {mobileTab === "sources" && (
+                <div className="absolute bottom-0 inset-x-4 h-0.5 bg-blue-500 rounded-full"></div>
+              )}
+            </button>
+          ) : (
+            <div
+              className="flex-1 py-2.5 text-center relative text-gray-600 cursor-not-allowed select-none opacity-40"
+              title="Sources panel is only available in chat view"
+            >
+              <span>Sources</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Workspace Layout */}
+      <div className="flex-1 flex min-w-0 h-full overflow-hidden relative">
+        {/* Left Sidebar: Chat Sessions (Shown on desktop if open, or when mobileTab is 'menu' on smaller screens) */}
+        {(isSidebarOpen || mobileTab === "menu") && (
+          <div className={`h-full min-w-0 ${mobileTab === "menu" ? "w-full z-40 lg:w-auto" : "hidden lg:block"}`}>
+            <LeftSidebar 
+              sessions={sessions} 
+              activeChatId={activeChatId} 
+              currentView={currentView}
+              onSelectChat={(id) => {
+                handleSelectChat(id);
+                setCurrentView("chat");
+                setMobileTab("chat");
+              }}
+              onCreateChat={() => {
+                handleCreateChat();
+                setCurrentView("chat");
+                setMobileTab("chat");
+              }}
+              onOpenLibrary={(cat) => {
+                setLibraryInitialCategory(cat || "all");
+                setCurrentView("library");
+                setMobileTab("chat");
+              }}
+              onOpenSearch={() => {
+                setCurrentView("search");
+                setMobileTab("chat");
+              }}
+              onDeleteChat={handleDeleteChat}
+              onRenameChat={handleRenameChat}
+              onTogglePinChat={handleTogglePinChat}
+              onToggleSidebar={() => {
+                setIsSidebarOpen(false);
+                setMobileTab("chat");
+              }}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
+          </div>
+        )}
+        
+        {/* Center View: Main Chat Area, Library View, or Search View */}
+        {currentView === "library" ? (
+          <LibraryView
+            initialCategory={libraryInitialCategory}
             backendUrl={backendUrl}
             isSidebarOpen={isSidebarOpen}
             onOpenSidebar={() => setIsSidebarOpen(true)}
-            isRightSidebarOpen={isRightSidebarOpen}
-            onToggleRightSidebar={() => setIsRightSidebarOpen(prev => !prev)}
-            targetedSource={targetedSource}
-            onClearTargetedSource={() => setTargetedSource(null)}
-            activeStatus={activeStatus}
-            activeCitationKey={groundingHighlight?.citationKey}
-            onRenameChat={handleRenameChat}
-            onDeleteChat={handleDeleteChat}
-            onTogglePinChat={handleTogglePinChat}
-            isPinned={sessions.find(s => s.id === activeChatId)?.is_pinned}
-            chatTitle={sessions.find(s => s.id === activeChatId)?.title}
-            onRegenerateMessage={handleRegenerateMessage}
-            onSelectVariant={handleSelectVariant}
-            onOpenStorage={() => setIsSettingsOpen(true)}
+            onSelectChat={handleSelectChat}
           />
+        ) : currentView === "search" ? (
+          <SearchChatsView
+            sessions={sessions}
+            backendUrl={backendUrl}
+            isSidebarOpen={isSidebarOpen}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            onSelectChat={handleSelectChat}
+          />
+        ) : (
+          <div className={`flex-1 flex min-w-0 h-full overflow-hidden ${mobileTab === "menu" ? "hidden lg:flex" : "flex"}`}>
+            <div className={`flex-1 h-full min-w-0 ${mobileTab === "sources" ? "hidden lg:flex" : "flex"}`}>
+              <ChatArea 
+                activeChatId={activeChatId} 
+                messages={messages} 
+                isLoading={isLoading}
+                onSendMessage={handleSendMessage} 
+                onEditMessage={handleEditMessage}
+                onStopGeneration={handleStopGeneration}
+                queuedPrompts={queuedPrompts}
+                onRemoveQueuedPrompt={handleRemoveQueuedPrompt}
+                onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
+                documents={documents}
+                onDocumentAdded={handleDocumentAdded}
+                onAddPendingSources={handleAddPendingSources}
+                onResolvePendingSource={handleResolvePendingSource}
+                onOpenDocument={(doc, citationContext) => {
+                  setViewingDoc(doc);
+                  if (citationContext) {
+                    setGroundingHighlight({
+                      docId: doc.id,
+                      sentence: citationContext.sentence,
+                      num: citationContext.num,
+                      citationKey: citationContext.citationKey,
+                      aiQuotes: citationContext.aiQuotes,
+                      clickId: Date.now()
+                    });
+                  } else {
+                    setGroundingHighlight(null);
+                  }
+                  setIsRightSidebarOpen(true);
+                  setMobileTab("sources");
+                }}
+                onEnsureChatSession={handleEnsureChatSession}
+                backendUrl={backendUrl}
+                isSidebarOpen={isSidebarOpen}
+                onOpenSidebar={() => {
+                  setIsSidebarOpen(true);
+                  setMobileTab("menu");
+                }}
+                isRightSidebarOpen={isRightSidebarOpen}
+                onToggleRightSidebar={() => {
+                  setIsRightSidebarOpen(prev => !prev);
+                  setMobileTab(prev => (prev === "sources" ? "chat" : "sources"));
+                }}
+                targetedSource={targetedSource}
+                onClearTargetedSource={() => setTargetedSource(null)}
+                activeStatus={activeStatus}
+                activeCitationKey={groundingHighlight?.citationKey}
+                onRenameChat={handleRenameChat}
+                onDeleteChat={handleDeleteChat}
+                onTogglePinChat={handleTogglePinChat}
+                isPinned={sessions.find(s => s.id === activeChatId)?.is_pinned}
+                chatTitle={sessions.find(s => s.id === activeChatId)?.title}
+                onRegenerateMessage={handleRegenerateMessage}
+                onSelectVariant={handleSelectVariant}
+                onOpenStorage={() => setIsSettingsOpen(true)}
+              />
+            </div>
 
-          {/* Right Sidebar: Sources Panel (NotebookLM Style) */}
-          {isRightSidebarOpen && (
-            <RightSidebar 
-              activeChatId={activeChatId} 
-              documents={documents} 
-              pendingSources={pendingSources}
-              onDocumentAdded={handleDocumentAdded} 
-              onDocumentUpdated={handleDocumentUpdated}
-              onDocumentDeleted={(id) => {
-                setDocuments(prev => prev.filter(d => d.id !== id));
-                if (targetedSource?.id === id) setTargetedSource(null);
-                if (viewingDoc?.id === id) setViewingDoc(null);
-              }}
-              onBulkDocumentsDeleted={(ids) => {
-                handleBulkDocumentsDeleted(ids);
-                if (targetedSource && ids.includes(targetedSource.id)) setTargetedSource(null);
-                if (viewingDoc && ids.includes(viewingDoc.id)) setViewingDoc(null);
-              }}
-              onEnsureChatSession={handleEnsureChatSession}
-              onAskAboutDocument={(doc, paperTitle) => {
-                setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
-              }}
-              externalViewingDoc={viewingDoc}
-              groundingHighlight={groundingHighlight}
-              onClearGroundingHighlight={() => setGroundingHighlight(null)}
-              onClearViewingDoc={() => {
-                setViewingDoc(null);
-                setGroundingHighlight(null);
-              }}
-              backendUrl={backendUrl}
-              onClose={() => {
-                setIsRightSidebarOpen(false);
-                setGroundingHighlight(null);
-              }}
-            />
-          )}
-        </>
-      )}
+            {/* Right Sidebar: Sources Panel (NotebookLM Style) */}
+            {(isRightSidebarOpen || mobileTab === "sources") && (
+              <div className={`h-full min-w-0 ${mobileTab === "chat" ? "hidden lg:block" : "w-full lg:w-auto"}`}>
+                <RightSidebar 
+                  activeChatId={activeChatId} 
+                  documents={documents} 
+                  pendingSources={pendingSources}
+                  onDocumentAdded={handleDocumentAdded} 
+                  onDocumentUpdated={handleDocumentUpdated}
+                  onDocumentDeleted={(id) => {
+                    setDocuments(prev => prev.filter(d => d.id !== id));
+                    if (targetedSource?.id === id) setTargetedSource(null);
+                    if (viewingDoc?.id === id) setViewingDoc(null);
+                  }}
+                  onBulkDocumentsDeleted={(ids) => {
+                    handleBulkDocumentsDeleted(ids);
+                    if (targetedSource && ids.includes(targetedSource.id)) setTargetedSource(null);
+                    if (viewingDoc && ids.includes(viewingDoc.id)) setViewingDoc(null);
+                  }}
+                  onEnsureChatSession={handleEnsureChatSession}
+                  onAskAboutDocument={(doc, paperTitle) => {
+                    setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
+                    setMobileTab("chat");
+                  }}
+                  externalViewingDoc={viewingDoc}
+                  groundingHighlight={groundingHighlight}
+                  onClearGroundingHighlight={() => setGroundingHighlight(null)}
+                  onClearViewingDoc={() => {
+                    setViewingDoc(null);
+                    setGroundingHighlight(null);
+                  }}
+                  backendUrl={backendUrl}
+                  onClose={() => {
+                    setIsRightSidebarOpen(false);
+                    setGroundingHighlight(null);
+                    setMobileTab("chat");
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Global Settings & Storage Modal */}
       <SettingsModal

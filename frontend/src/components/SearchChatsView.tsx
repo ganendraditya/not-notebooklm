@@ -61,20 +61,18 @@ export default function SearchChatsView({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#212121] text-white relative overflow-hidden">
       {/* Top Bar for Sidebar toggle if closed */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#1e1e1e]">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5 bg-[#1e1e1e]">
         <div className="flex items-center gap-3">
-          {!isSidebarOpen && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 cursor-pointer mr-1"
-              onClick={onOpenSidebar}
-              title="Open sidebar"
-            >
-              <Sidebar size={18} />
-            </Button>
-          )}
-          <h1 className="text-xl font-bold text-white tracking-tight">Search</h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 cursor-pointer mr-1 ${isSidebarOpen ? "hidden" : "flex"}`}
+            onClick={onOpenSidebar}
+            title="Open sidebar"
+          >
+            <Sidebar size={18} />
+          </Button>
+          <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">Search</h1>
         </div>
       </div>
 

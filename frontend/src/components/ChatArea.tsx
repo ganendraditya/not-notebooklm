@@ -173,115 +173,119 @@ export default function ChatArea({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#212121] overflow-hidden relative">
-      {!isSidebarOpen && onOpenSidebar && (
-        <div className="absolute top-3.5 left-3.5 z-20">
-          <button 
-            type="button"
-            onClick={onOpenSidebar}
-            className="h-8 w-8 text-gray-400 hover:text-white bg-[#282828] hover:bg-[#333333] border border-white/10 rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
-            title={t('chat.openSidebar')}
-          >
-            <Sparkles size={16} />
-          </button>
-        </div>
-      )}
-
-      {/* Top Right Header Controls */}
-      <div className="absolute top-3.5 right-7 z-20 flex items-center gap-2">
-        {/* Open Sources Toggle (when right sidebar is closed) */}
-        {!isRightSidebarOpen && onToggleRightSidebar && (
-          <button 
-            type="button"
-            onClick={onToggleRightSidebar}
-            className="h-8 px-2.5 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-xs text-gray-300 hover:text-white flex items-center gap-1.5 cursor-pointer shadow-md backdrop-blur transition-colors"
-            title={t('chat.openSources')}
-          >
-            <FileText size={13} className="text-blue-400" />
-            <span>{t('ui.sources')}</span>
-            {documents.length > 0 && (
-              <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-600/30 text-blue-300 text-[10px] font-mono">
-                {documents.length}
-              </span>
-            )}
-          </button>
-        )}
-
-        {/* Three Dots Context Menu (Only when chat is not empty & activeChatId exists) */}
-        {!isChatEmpty && activeChatId && (
-          <div className="relative" ref={topMenuRef}>
-            <button
+      {/* Top Fixed Header Navigation Bar (Shown on desktop lg:flex, hidden on mobile/tablet because of top mobile tab header) */}
+      <div className="h-14 shrink-0 px-4 sm:px-6 hidden lg:flex items-center justify-between z-20 bg-[#212121]">
+        {/* Left: Open Sidebar Button */}
+        <div className="flex items-center gap-2">
+          {!isSidebarOpen && onOpenSidebar && (
+            <button 
               type="button"
-              onClick={() => setIsTopMenuOpen(prev => !prev)}
-              className="h-8 w-8 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-gray-300 hover:text-white flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
-              title={t('left.options')}
+              onClick={onOpenSidebar}
+              className="h-8 w-8 text-gray-400 hover:text-white bg-[#282828] hover:bg-[#333333] border border-white/10 rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
+              title={t('chat.openSidebar')}
             >
-              <MoreHorizontal size={16} />
+              <Sparkles size={16} />
             </button>
+          )}
+        </div>
 
-            {/* Dropdown Menu */}
-            {isTopMenuOpen && (
-              <div 
-                className="absolute right-0 top-9 z-50 w-44 rounded-xl bg-[#222222] border border-white/10 shadow-2xl p-1 text-xs text-gray-200 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
-                onClick={(e) => e.stopPropagation()}
+        {/* Right: Context Menu & Sources Controls */}
+        <div className="flex items-center gap-2">
+          {/* Three Dots Context Menu (Only when chat is not empty & activeChatId exists) */}
+          {!isChatEmpty && activeChatId && (
+            <div className="relative" ref={topMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsTopMenuOpen(prev => !prev)}
+                className="h-8 w-8 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-gray-300 hover:text-white flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+                title={t('left.options')}
               >
-                {/* Rename */}
-                <button
-                  onClick={() => {
-                    setIsTopMenuOpen(false);
-                    setRenameInput(chatTitle || "");
-                    setIsRenameOpen(true);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                >
-                  <Pencil size={13} className="text-gray-400" />
-                  <span>{t('action.rename')}</span>
-                </button>
+                <MoreHorizontal size={16} />
+              </button>
 
-                {/* Pin / Unpin */}
-                <button
-                  onClick={() => {
-                    setIsTopMenuOpen(false);
-                    if (onTogglePinChat && activeChatId) {
-                      onTogglePinChat(activeChatId);
-                    }
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              {/* Dropdown Menu */}
+              {isTopMenuOpen && (
+                <div 
+                  className="absolute right-0 top-9 z-50 w-44 rounded-xl bg-[#222222] border border-white/10 shadow-2xl p-1 text-xs text-gray-200 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {isPinned ? (
-                    <>
-                      <PinOff size={13} className="text-amber-400" />
-                      <span>{t('action.unpin')}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Pin size={13} className="text-gray-400" />
-                      <span>{t('action.pin')}</span>
-                    </>
-                  )}
-                </button>
+                  {/* Rename */}
+                  <button
+                    onClick={() => {
+                      setIsTopMenuOpen(false);
+                      setRenameInput(chatTitle || "");
+                      setIsRenameOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Pencil size={13} className="text-gray-400" />
+                    <span>{t('action.rename')}</span>
+                  </button>
 
-                {/* Delete */}
-                <button
-                  onClick={() => {
-                    setIsTopMenuOpen(false);
-                    setIsDeleteConfirmOpen(true);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
-                >
-                  <Trash2 size={13} />
-                  <span>{t('action.deleteChat')}</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+                  {/* Pin / Unpin */}
+                  <button
+                    onClick={() => {
+                      setIsTopMenuOpen(false);
+                      if (onTogglePinChat && activeChatId) {
+                        onTogglePinChat(activeChatId);
+                      }
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                  >
+                    {isPinned ? (
+                      <>
+                        <PinOff size={13} className="text-amber-400" />
+                        <span>{t('action.unpin')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Pin size={13} className="text-gray-400" />
+                        <span>{t('action.pin')}</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Delete */}
+                  <button
+                    onClick={() => {
+                      setIsTopMenuOpen(false);
+                      setIsDeleteConfirmOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
+                  >
+                    <Trash2 size={13} />
+                    <span>{t('action.delete')}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Open Sources Toggle (when right sidebar is closed) */}
+          {!isRightSidebarOpen && onToggleRightSidebar && (
+            <button 
+              type="button"
+              onClick={onToggleRightSidebar}
+              className="h-8 px-2.5 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-xs text-gray-300 hover:text-white flex items-center gap-1.5 cursor-pointer shadow-md backdrop-blur transition-colors"
+              title={t('chat.openSources')}
+            >
+              <FileText size={13} className="text-blue-400" />
+              <span>{t('ui.sources')}</span>
+              {documents.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-600/30 text-blue-300 text-[10px] font-mono">
+                  {documents.length}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
-        <div 
-          ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto px-4 sm:px-6 pt-8 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
-        >
-          <div className={`w-full max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pt-4 lg:pt-2 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
+      >
+          <div className={`w-full lg:max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
           {isChatEmpty ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4 w-full max-w-2xl mx-auto my-auto">
               <div className="p-3.5 rounded-full bg-white/5 border border-white/10 mb-4 shadow-sm">
@@ -502,8 +506,8 @@ export default function ChatArea({
       </div>
 
       {!isChatEmpty && (
-        <div className="absolute bottom-0 left-0 right-3 pl-4 sm:pl-6 pr-4 sm:pr-6 pb-3 pt-6 bg-gradient-to-t from-[#212121] via-[#212121]/90 to-transparent pointer-events-none z-20 flex justify-center">
-          <div className="w-full max-w-3xl pointer-events-auto">
+        <div className="absolute bottom-0 inset-x-0 px-3 sm:px-6 pb-3 pt-6 bg-gradient-to-t from-[#212121] via-[#212121]/90 to-transparent pointer-events-none z-20 flex justify-center right-[6px]">
+          <div className="w-full lg:max-w-3xl pointer-events-auto min-w-0">
             <ChatInputBox 
               isLoading={isLoading}
               documentsCount={documents.length}

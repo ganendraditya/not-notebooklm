@@ -518,13 +518,13 @@ export const ChatInputBox = memo(function ChatInputBox({
         />
 
         {/* Bottom Actions Row */}
-        <div className="flex items-center justify-between pt-2 px-1">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 px-1">
           {/* Left: + Button & ModelSelector */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 min-w-0">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
               title={t('chat.attachTitle')}
             >
               <Plus size={20} />
@@ -541,7 +541,7 @@ export const ChatInputBox = memo(function ChatInputBox({
           </div>
 
           {/* Right: Filter, Sources Badge, and Send/Stop Button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
             <SearchFilterPopover
               isOpen={isFilterOpen}
               onClose={() => setIsFilterOpen(false)}
@@ -553,17 +553,18 @@ export const ChatInputBox = memo(function ChatInputBox({
             <button 
               type="button"
               onClick={onToggleRightSidebar}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium border border-white/5 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium border border-white/5 transition-colors cursor-pointer"
             >
-              <FileText size={16} className="text-blue-400 fill-blue-400/20" />
-              <span>{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
+              <FileText size={15} className="text-blue-400 fill-blue-400/20 shrink-0" />
+              <span className="hidden sm:inline">{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
+              <span className="sm:hidden">{documentsCount}</span>
             </button>
 
             {isLoading && onStopGeneration ? (
               <button
                 type="button"
                 onClick={onStopGeneration}
-                className="p-2 rounded-full bg-white text-black hover:bg-gray-200 transition-all cursor-pointer shadow-md flex items-center justify-center"
+                className="p-2 rounded-full bg-white text-black hover:bg-gray-200 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
                 title={t('chat.stopTitle')}
               >
                 <Square size={16} className="fill-current" />
@@ -573,7 +574,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                 type="button"
                 onClick={handleSend}
                 disabled={(!input.trim() && attachments.length === 0) || isUploading}
-                className="p-2 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-white transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center"
+                className="p-2 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-white transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0"
                 title={t('chat.sendTitle')}
               >
                 <ArrowUp size={18} strokeWidth={2.5} />
