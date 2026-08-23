@@ -173,7 +173,7 @@ export default function ChatArea({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#212121] overflow-hidden relative">
+    <div className="flex-1 flex flex-col h-full bg-app-bg text-app-text overflow-hidden relative">
       {/* Top Floating Action Controls (Transparent, no solid bar / height) */}
       <div className="absolute top-3 inset-x-0 px-4 sm:px-6 md:px-8 hidden lg:flex items-center justify-between z-20 pointer-events-none">
         {/* Left: Open Sidebar Button */}
@@ -182,7 +182,7 @@ export default function ChatArea({
             <button 
               type="button"
               onClick={onOpenSidebar}
-              className="h-8 w-8 text-gray-400 hover:text-white bg-[#282828] hover:bg-[#333333] border border-white/10 rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
+              className="h-8 w-8 text-app-text-muted hover:text-app-text bg-app-card hover:bg-app-card-hover border border-app-border rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
               title={t('chat.openSidebar')}
             >
               <Sparkles size={16} />
@@ -198,7 +198,7 @@ export default function ChatArea({
               <button
                 type="button"
                 onClick={() => setIsTopMenuOpen(prev => !prev)}
-                className="h-8 w-8 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-gray-300 hover:text-white flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+                className="h-8 w-8 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
                 title={t('left.options')}
               >
                 <MoreHorizontal size={16} />
@@ -207,7 +207,7 @@ export default function ChatArea({
               {/* Dropdown Menu */}
               {isTopMenuOpen && (
                 <div 
-                  className="absolute right-0 top-9 z-50 w-44 rounded-xl bg-[#222222] border border-white/10 shadow-2xl p-1 text-xs text-gray-200 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                  className="absolute right-0 top-9 z-50 w-44 rounded-xl bg-app-dropdown border border-app-border-strong shadow-2xl p-1 text-xs text-app-text animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Rename */}
@@ -217,9 +217,9 @@ export default function ChatArea({
                       setRenameInput(chatTitle || "");
                       setIsRenameOpen(true);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-app-item-hover hover:text-app-text transition-colors cursor-pointer"
                   >
-                    <Pencil size={13} className="text-gray-400" />
+                    <Pencil size={13} className="text-app-text-dim" />
                     <span>{t('action.rename')}</span>
                   </button>
 
@@ -231,16 +231,16 @@ export default function ChatArea({
                         onTogglePinChat(activeChatId);
                       }
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-app-item-hover hover:text-app-text transition-colors cursor-pointer"
                   >
                     {isPinned ? (
                       <>
-                        <PinOff size={13} className="text-amber-400" />
+                        <PinOff size={13} className="text-amber-500" />
                         <span>{t('action.unpin')}</span>
                       </>
                     ) : (
                       <>
-                        <Pin size={13} className="text-gray-400" />
+                        <Pin size={13} className="text-app-text-dim" />
                         <span>{t('action.pin')}</span>
                       </>
                     )}
@@ -252,7 +252,7 @@ export default function ChatArea({
                       setIsTopMenuOpen(false);
                       setIsDeleteConfirmOpen(true);
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-500 hover:bg-red-500/10 hover:text-red-600 transition-colors cursor-pointer"
                   >
                     <Trash2 size={13} />
                     <span>{t('action.delete')}</span>
@@ -267,12 +267,12 @@ export default function ChatArea({
             <button 
               type="button"
               onClick={onToggleRightSidebar}
-              className="relative h-8 w-8 rounded-lg bg-[#28292c]/90 hover:bg-[#333] border border-white/10 text-gray-300 hover:text-white flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+              className="relative h-8 w-8 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
               title={t('chat.openSources') || "Open sources"}
             >
-              <FileText size={15} className="text-blue-400" />
+              <FileText size={15} className="text-blue-500" />
               {documents.length > 0 && (
-                <span className="absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-[#1e1f20] leading-none shadow">
+                <span className="absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-app-card leading-none shadow">
                   {documents.length}
                 </span>
               )}
@@ -288,10 +288,10 @@ export default function ChatArea({
           <div className={`w-full lg:max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
           {isChatEmpty ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4 w-full max-w-2xl mx-auto my-auto">
-              <div className="p-3.5 rounded-full bg-white/5 border border-white/10 mb-4 shadow-sm">
-                <Sparkles size={28} className="text-white" />
+              <div className="p-3.5 rounded-full bg-app-surface border border-app-border mb-4 shadow-sm">
+                <Sparkles size={28} className="text-blue-500" />
               </div>
-              <h2 className="text-3xl font-bold tracking-tight text-white mb-6">NotbookLM</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-app-text mb-6">NotbookLM</h2>
 
               <ChatInputBox 
                 isCentered={true}
@@ -331,28 +331,28 @@ export default function ChatArea({
                                   href={fileHref}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex flex-col p-3 rounded-2xl bg-[#1e1f20] border border-white/10 hover:border-white/20 transition-all text-left w-36 shadow-md group/att"
+                                  className="flex flex-col p-3 rounded-2xl bg-app-card border border-app-border hover:border-app-border-strong transition-all text-left w-36 shadow-md group/att"
                                 >
                                   <div className="flex items-center justify-between mb-2">
                                     {att.type === "image" ? (
-                                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/40">
+                                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/10 dark:bg-black/40">
                                         <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
                                       </div>
                                     ) : isWord ? (
-                                      <div className="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-[11px]">
+                                      <div className="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 font-bold text-[11px]">
                                         W
                                       </div>
                                     ) : isPdf ? (
-                                      <div className="w-7 h-7 rounded bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-[10px]">
+                                      <div className="w-7 h-7 rounded bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 font-bold text-[10px]">
                                         PDF
                                       </div>
                                     ) : (
-                                      <div className="w-7 h-7 rounded bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
+                                      <div className="w-7 h-7 rounded bg-app-item-hover border border-app-border flex items-center justify-center text-app-text-muted">
                                         <FileText size={15} />
                                       </div>
                                     )}
                                   </div>
-                                  <span className="text-xs font-medium text-gray-200 line-clamp-2 leading-tight group-hover/att:text-white">
+                                  <span className="text-xs font-medium text-app-text line-clamp-2 leading-tight">
                                     {att.filename}
                                   </span>
                                 </a>
@@ -362,11 +362,11 @@ export default function ChatArea({
                         )}
 
                         {editingMessageIdx === idx ? (
-                          <div className="w-full max-w-xl bg-[#2a2a2a] p-3 rounded-2xl border border-white/10 space-y-2 shadow-xl">
+                          <div className="w-full max-w-xl bg-app-card p-3 rounded-2xl border border-app-border-strong space-y-2 shadow-xl">
                             <textarea
                               value={editContent}
                               onChange={(e) => setEditContent(e.target.value)}
-                              className="w-full bg-[#1e1e1e] text-white p-3 rounded-xl border border-white/10 focus:outline-none focus:border-blue-500 text-sm resize-none"
+                              className="w-full bg-app-input-surface text-app-text p-3 rounded-xl border border-app-border focus:outline-none focus:border-blue-500 text-sm resize-none"
                               rows={3}
                               autoFocus
                             />
@@ -374,7 +374,7 @@ export default function ChatArea({
                               <button
                                 type="button"
                                 onClick={() => setEditingMessageIdx(null)}
-                                className="px-3 py-1.5 text-xs text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                                className="px-3 py-1.5 text-xs text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer"
                               >
                                 Cancel
                               </button>
@@ -390,7 +390,7 @@ export default function ChatArea({
                         ) : (
                           <>
                             {msg.content?.trim() && (
-                              <div className="bg-[#2f2f2f] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm">
+                              <div className="bg-app-user-bubble text-app-text px-4 py-2.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm border border-app-border">
                                 {msg.content}
                               </div>
                             )}
@@ -398,7 +398,7 @@ export default function ChatArea({
                               <button
                                 type="button"
                                 onClick={() => handleStartEdit(msg.content || "", idx)}
-                                className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+                                className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
                                 title={t('chat.editMessage')}
                               >
                                 <Pencil size={15} />
@@ -407,10 +407,10 @@ export default function ChatArea({
                                 <button
                                   type="button"
                                   onClick={() => handleCopy(msg.content, idx)}
-                                  className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+                                  className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
                                   title={t('chat.copyPrompt')}
                                 >
-                                  {copiedMessageIdx === idx ? <Check size={15} className="text-emerald-400" /> : <Copy size={15} />}
+                                  {copiedMessageIdx === idx ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
                                 </button>
                               )}
                             </div>
@@ -441,19 +441,19 @@ export default function ChatArea({
                                 type="button"
                                 onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) - 1)}
                                 disabled={(msg.active_variant_index || 0) <= 0 || isLoading}
-                                className="p-0.5 hover:text-white disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
                                 title={t('chat.previousResponse')}
                               >
                                 <ChevronLeft size={14} />
                               </button>
-                              <span className="px-1 text-gray-300 text-xs">
+                              <span className="px-1 text-app-text text-xs">
                                 {(msg.active_variant_index || 0) + 1}/{msg.variants.length}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) + 1)}
                                 disabled={(msg.active_variant_index || 0) >= msg.variants.length - 1 || isLoading}
-                                className="p-0.5 hover:text-white disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
                                 title={t('chat.nextResponse')}
                               >
                                 <ChevronRight size={14} />
@@ -465,11 +465,11 @@ export default function ChatArea({
                           <button
                             type="button"
                             onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "").trim(), idx)}
-                            className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+                            className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
                             title={t('chat.copyResponse')}
                           >
                             {copiedMessageIdx === idx ? (
-                              <Check size={15} className="text-emerald-400" />
+                              <Check size={15} className="text-emerald-500" />
                             ) : (
                               <Copy size={15} />
                             )}
@@ -480,7 +480,7 @@ export default function ChatArea({
                             type="button"
                             onClick={() => onRegenerateMessage?.(idx)}
                             disabled={isLoading}
-                            className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+                            className="p-1.5 text-app-text-muted hover:text-app-text disabled:opacity-30 rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
                             title={t('chat.regenerateResponse')}
                           >
                             <RotateCw size={15} />
@@ -493,8 +493,8 @@ export default function ChatArea({
               ))}
 
               {isLoading && (
-                <div className="flex items-center gap-2.5 text-gray-400 text-sm py-1.5 animate-in fade-in duration-200">
-                  <Loader2 size={16} className="text-blue-400 animate-spin shrink-0" />
+                <div className="flex items-center gap-2.5 text-app-text-muted text-sm py-1.5 animate-in fade-in duration-200">
+                  <Loader2 size={16} className="text-blue-500 animate-spin shrink-0" />
                   <span>{activeStatus || "Analyzing and generating response..."}</span>
                 </div>
               )}
@@ -509,7 +509,7 @@ export default function ChatArea({
       {!isChatEmpty && (
         <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-20 flex justify-center px-4 sm:px-6 md:px-8">
           <div className="w-full lg:max-w-3xl pointer-events-auto min-w-0 relative">
-            <div className="absolute -inset-x-4 -top-6 -bottom-3 bg-gradient-to-t from-[#212121] via-[#212121]/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
+            <div className="absolute -inset-x-4 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             <ChatInputBox 
               isLoading={isLoading}
               documentsCount={documents.length}
@@ -538,11 +538,11 @@ export default function ChatArea({
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
           >
             <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-white">{t('left.renameConversation')}</h3>
-              <p className="text-xs text-gray-400">
+              <h3 className="text-base font-semibold text-app-text">{t('left.renameConversation')}</h3>
+              <p className="text-xs text-app-text-muted">
                 {t('left.renameDesc')}
               </p>
             </div>
@@ -566,16 +566,16 @@ export default function ChatArea({
                   if (e.key === "Escape") setIsRenameOpen(false);
                 }}
                 placeholder={t('left.renamePlaceholder')}
-                className="w-full bg-[#1b1c1e] border border-white/15 focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-white outline-none transition-colors"
+                className="w-full bg-app-input-surface border border-app-border focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-app-text outline-none transition-colors"
               />
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsRenameOpen(false)}
-                  className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+                  className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
                 >
                   {t('action.cancel')}
                 </Button>
@@ -602,22 +602,22 @@ export default function ChatArea({
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
           >
             <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-white">{t('ui.deleteConfirmTitle')}</h3>
-              <p className="text-xs text-gray-400 leading-relaxed">
+              <h3 className="text-base font-semibold text-app-text">{t('ui.deleteConfirmTitle')}</h3>
+              <p className="text-xs text-app-text-muted leading-relaxed">
                 {t('ui.deleteConfirmDesc').replace('{title}', chatTitle || "conversation")}
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsDeleteConfirmOpen(false)}
-                className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+                className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
               >
                 {t('action.cancel')}
               </Button>

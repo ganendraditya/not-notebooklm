@@ -1073,23 +1073,23 @@ export default function RightSidebar({
 
   const getFileBadgeInfo = (filename: string) => {
     if (filename.startsWith("10.") || filename.startsWith("DOI:") || filename.includes("doi.org")) {
-      return { label: "DOI", bg: "bg-blue-950/70 border-blue-800/80 text-blue-400" };
+      return { label: "DOI", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
     }
     const ext = filename.split(".").pop()?.toLowerCase() || "doc";
     if (ext === "pdf") {
-      return { label: "PDF", bg: "bg-red-950/70 border-red-800/80 text-red-400" };
+      return { label: "PDF", bg: "bg-red-600/15 border-red-500/40 text-red-500" };
     } else if (ext === "docx" || ext === "doc") {
-      return { label: "DOC", bg: "bg-blue-950/70 border-blue-800/80 text-blue-400" };
+      return { label: "DOC", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
     } else if (ext === "bib" || ext === "bibtex") {
-      return { label: "BIB", bg: "bg-amber-950/70 border-amber-800/80 text-amber-400" };
+      return { label: "BIB", bg: "bg-amber-600/15 border-amber-500/40 text-amber-500" };
     } else if (ext === "ris") {
-      return { label: "RIS", bg: "bg-orange-950/70 border-orange-800/80 text-orange-400" };
+      return { label: "RIS", bg: "bg-orange-600/15 border-orange-500/40 text-orange-500" };
     } else if (ext === "csv" || ext === "tsv") {
-      return { label: "CSV", bg: "bg-emerald-950/70 border-emerald-800/80 text-emerald-400" };
+      return { label: "CSV", bg: "bg-emerald-600/15 border-emerald-500/40 text-emerald-500" };
     } else if (ext === "md") {
-      return { label: "MD", bg: "bg-purple-950/70 border-purple-800/80 text-purple-400" };
+      return { label: "MD", bg: "bg-purple-600/15 border-purple-500/40 text-purple-500" };
     } else {
-      return { label: "TXT", bg: "bg-gray-800/80 border-gray-700 text-gray-300" };
+      return { label: "TXT", bg: "bg-app-item-hover border-app-border text-app-text-muted" };
     }
   };
 
@@ -1384,23 +1384,23 @@ export default function RightSidebar({
     );
 
     return (
-      <aside className="w-full lg:w-[460px] h-full bg-[#18191b] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
+      <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 select-none z-10 transition-all relative text-app-text">
         {/* 1. Header Bar: ← Paper + Circular Close Button */}
-        <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-app-divider">
           <button
             onClick={() => {
               setViewingDoc(null);
               onClearViewingDoc?.();
             }}
-            className="flex items-center gap-2 text-xs font-semibold text-gray-200 hover:text-white transition-colors cursor-pointer group"
+            className="flex items-center gap-2 text-xs font-semibold text-app-text hover:opacity-80 transition-colors cursor-pointer group"
           >
-            <ArrowLeft size={16} className="text-gray-400 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
+            <ArrowLeft size={16} className="text-app-text-muted group-hover:text-app-text transition-transform group-hover:-translate-x-0.5" />
             <span className="text-sm tracking-tight font-medium">Paper</span>
           </button>
 
           <button 
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer hidden lg:flex"
+            className="w-7 h-7 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer hidden lg:flex"
             title={t('right.close')}
           >
             <X size={14} />
@@ -1408,11 +1408,11 @@ export default function RightSidebar({
         </div>
 
         {/* 2. Simplified 2 Navigation Tabs: Overview & Full Paper */}
-        <div className="flex items-center px-4 border-b border-white/10 text-xs font-medium text-gray-400 gap-6 shrink-0">
+        <div className="flex items-center px-4 border-b border-app-divider text-xs font-medium text-app-text-muted gap-6 shrink-0">
           <button
             onClick={() => setActiveTab("overview")}
             className={`py-2.5 transition-colors cursor-pointer border-b-2 font-semibold ${
-              activeTab === "overview" ? "text-white border-white" : "text-gray-400 hover:text-gray-200 border-transparent"
+              activeTab === "overview" ? "text-app-text border-blue-500" : "text-app-text-muted hover:text-app-text border-transparent"
             }`}
           >
             {t('right.overviewTab')}
@@ -1420,7 +1420,7 @@ export default function RightSidebar({
           <button
             onClick={() => setActiveTab("preview")}
             className={`py-2.5 transition-colors cursor-pointer border-b-2 font-medium flex items-center gap-1.5 ${
-              activeTab === "preview" ? "text-white border-white font-semibold" : "text-gray-400 hover:text-gray-200 border-transparent"
+              activeTab === "preview" ? "text-app-text border-blue-500 font-semibold" : "text-app-text-muted hover:text-app-text border-transparent"
             }`}
           >
             <span>{t('right.fullPaper')}</span>
@@ -1433,10 +1433,10 @@ export default function RightSidebar({
             {/* Paper Title with Global Reference Badge */}
             <div className="space-y-1.5">
               <div className="flex items-start gap-2">
-                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-blue-500/15 text-blue-300 border border-blue-500/30 shrink-0 mt-0.5 select-none" title="Permanent Global Reference Index">
+                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-blue-500/15 text-blue-500 border border-blue-500/30 shrink-0 mt-0.5 select-none" title="Permanent Global Reference Index">
                   [{viewingDoc.index || (documents.findIndex(d => d.id === viewingDoc.id) + 1)}]
                 </span>
-                <h1 className="text-[15px] sm:text-[16px] font-bold text-white leading-snug tracking-tight">
+                <h1 className="text-[15px] sm:text-[16px] font-bold text-app-text leading-snug tracking-tight">
                   {title}
                 </h1>
               </div>
@@ -1444,16 +1444,16 @@ export default function RightSidebar({
               {/* Authors & Publication Date (Textual format e.g. Oct 9, 2024) */}
               {isLoadingDetails ? (
                 <div className="flex items-center gap-2 pt-0.5 animate-pulse">
-                  <div className="h-3 w-24 bg-white/10 rounded" />
-                  <div className="h-3 w-40 bg-white/5 rounded" />
+                  <div className="h-3 w-24 bg-app-item-hover rounded" />
+                  <div className="h-3 w-40 bg-app-item-hover rounded" />
                 </div>
               ) : (
-                <p className="text-xs text-gray-400 font-normal">
+                <p className="text-xs text-app-text-dim font-normal">
                   <span>{pubDateStr}</span>
                   {authorsStr && (
                     <>
-                      <span className="mx-1.5 text-gray-600">·</span>
-                      <span className="text-gray-300">{authorsStr}</span>
+                      <span className="mx-1.5 text-app-text-dim">·</span>
+                      <span className="text-app-text-muted">{authorsStr}</span>
                     </>
                   )}
                 </p>
@@ -1475,16 +1475,16 @@ export default function RightSidebar({
             ) : (
               <div className="flex items-center justify-between pt-1 text-xs">
                 <div>
-                  <p className="font-semibold text-gray-200 text-[12px]">{journalName}</p>
+                  <p className="font-semibold text-app-text text-[12px]">{journalName}</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[11px] text-gray-400 font-medium">{paperDetails?.journal_metric || t('right.peerReviewed')}</span>
+                    <span className="text-[11px] text-app-text-muted font-medium">{paperDetails?.journal_metric || t('right.peerReviewed')}</span>
                   </div>
                 </div>
 
                 {/* Citations Count */}
                 <div className="text-right">
-                  <span className="text-xs font-semibold text-gray-300">{citationsCount}</span>
-                  <p className="text-[10.5px] text-gray-400">{t('right.citations')}</p>
+                  <span className="text-xs font-semibold text-app-text">{citationsCount}</span>
+                  <p className="text-[10.5px] text-app-text-dim">{t('right.citations')}</p>
                 </div>
               </div>
             )}
@@ -1492,19 +1492,19 @@ export default function RightSidebar({
             {/* DOI Row with Copy Button */}
             {isLoadingDetails ? (
               <div className="flex items-center gap-2 pt-0.5 animate-pulse">
-                <div className="h-3 w-7 bg-white/5 rounded" />
-                <div className="h-3 w-36 bg-white/10 rounded" />
+                <div className="h-3 w-7 bg-app-item-hover rounded" />
+                <div className="h-3 w-36 bg-app-item-active rounded" />
               </div>
             ) : doiStr ? (
-              <div className="flex items-center gap-1.5 text-[11px] text-gray-400 pt-0.5">
-                <span className="font-medium text-gray-500">DOI</span>
-                <span className="font-mono text-gray-300 truncate">{doiStr}</span>
+              <div className="flex items-center gap-1.5 text-[11px] text-app-text-dim pt-0.5">
+                <span className="font-medium text-app-text-dim">DOI</span>
+                <span className="font-mono text-app-text-muted truncate">{doiStr}</span>
                 <button
                   onClick={() => copyToClipboard(doiStr, "doi")}
-                  className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                  className="p-1 rounded hover:bg-app-item-hover text-app-text-dim hover:text-app-text transition-colors cursor-pointer shrink-0"
                   title="Copy DOI"
                 >
-                  {copiedDoi ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  {copiedDoi ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                 </button>
               </div>
             ) : null}
@@ -1512,22 +1512,22 @@ export default function RightSidebar({
             {/* Access & Discovery Badge (Positive-Neutral Model) */}
             <div className="pt-1">
               {isLoadingDetails ? (
-                <div className="h-6 w-28 rounded-lg bg-white/10 animate-pulse" />
+                <div className="h-6 w-28 rounded-lg bg-app-item-hover animate-pulse" />
               ) : paperDetails?.is_oa || paperDetails?.pdf_url ? (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                   <span>{t('right.openAccess')}</span>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-400 text-xs font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0" />
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-app-card border border-app-border text-app-text-muted text-xs font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-app-text-dim shrink-0" />
                   <span>{t('right.publisherSource')}</span>
                 </div>
               )}
             </div>
 
             {/* Divider */}
-            <div className="border-t border-white/10 pt-2" />
+            <div className="border-t border-app-divider pt-2" />
 
             {/* Abstract / Overview Section */}
             {isLoadingDetails ? (
@@ -1548,24 +1548,24 @@ export default function RightSidebar({
               /* AI Synthesis / Executive Summary Card with Disclaimer */
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300">
-                    <Sparkles size={13} className="text-purple-400" />
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-300">
+                    <Sparkles size={13} className="text-purple-500" />
                     <span>{t('right.aiOverview')}</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-950/60 border border-purple-800/60 text-purple-300">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/10 border border-purple-500/30 text-purple-600 dark:text-purple-300">
                     {t('right.publisherMetadata')}
                   </span>
                 </div>
 
                 {/* Clarification Alert Box */}
-                <div className="p-2.5 rounded-lg bg-purple-950/30 border border-purple-800/40 text-[11px] text-purple-200/90 leading-relaxed flex items-start gap-2">
-                  <Info size={13} className="text-purple-400 shrink-0 mt-0.5" />
+                <div className="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-900 dark:text-purple-200 leading-relaxed flex items-start gap-2">
+                  <Info size={13} className="text-purple-500 shrink-0 mt-0.5" />
                   <p>
-                    <span className="font-semibold text-purple-200">{t('right.aiNote')}</span> {t('right.executiveDesc')}
+                    <span className="font-semibold text-purple-800 dark:text-purple-200">{t('right.aiNote')}</span> {t('right.executiveDesc')}
                   </p>
                 </div>
 
-                <p className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
+                <p className="text-[12.5px] sm:text-[13px] text-app-text leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
                   {cleanAbstract}
                 </p>
               </div>
@@ -1573,17 +1573,17 @@ export default function RightSidebar({
               /* Official Authentic Abstract */
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-200 tracking-wider uppercase">
-                    <FileText size={13} className="text-blue-400" />
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-app-text tracking-wider uppercase">
+                    <FileText size={13} className="text-blue-500" />
                     <span>{t('right.abstract')}</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 flex items-center gap-1">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-300 flex items-center gap-1">
                     <Check size={10} />
                     <span>{t('right.officialAbstract')}</span>
                   </span>
                 </div>
 
-                <p className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
+                <p className="text-[12.5px] sm:text-[13px] text-app-text leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
                   {cleanAbstract}
                 </p>
               </div>
@@ -1591,12 +1591,12 @@ export default function RightSidebar({
           </div>
         ) : (
           /* TAB 2: FULL PAPER / IN-APP NATIVE SCROLLABLE DOCUMENT READER */
-          <div className="flex-1 flex flex-col min-h-0 bg-[#121315] relative overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 bg-app-bg relative overflow-hidden">
             {/* Top Preview Controls Bar */}
-            <div className="px-3.5 py-2 bg-[#1e1f22] border-b border-white/10 flex items-center justify-between text-xs text-gray-300 shrink-0">
+            <div className="px-3.5 py-2 bg-app-sidebar border-b border-app-divider flex items-center justify-between text-xs text-app-text-muted shrink-0">
               <div className="flex items-center gap-2 min-w-0">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${paperDetails?.has_full_pdf ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-                <span className="truncate max-w-[170px] font-mono text-[11px] text-gray-300">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${paperDetails?.has_full_pdf ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                <span className="truncate max-w-[170px] font-mono text-[11px] text-app-text-muted">
                   {viewingDoc.filename}
                 </span>
               </div>
@@ -1604,8 +1604,8 @@ export default function RightSidebar({
               <div className="flex items-center gap-1.5">
                 {/* Evidence Passage Navigator (Chevron Up / Down for multiple disjoint matches) */}
                 {totalMatches > 1 && (
-                  <div className="flex items-center gap-1 bg-amber-400/10 border border-amber-400/30 rounded-lg px-2 py-0.5 mr-1">
-                    <span className="text-[10px] font-mono font-semibold text-amber-300">
+                  <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-0.5 mr-1">
+                    <span className="text-[10px] font-mono font-semibold text-amber-500">
                       {activeMatchIndex + 1}/{totalMatches}
                     </span>
                     <div className="flex items-center">
@@ -1615,7 +1615,7 @@ export default function RightSidebar({
                           const prev = activeMatchIndex > 0 ? activeMatchIndex - 1 : totalMatches - 1;
                           setActiveMatchIndex(prev);
                         }}
-                        className="p-0.5 hover:bg-amber-400/20 text-amber-300 hover:text-white rounded transition-colors"
+                        className="p-0.5 hover:bg-amber-500/20 text-amber-500 hover:text-amber-600 rounded transition-colors"
                         title={t('right.prevEvidence')}
                       >
                         <ChevronUp size={13} />
@@ -1626,7 +1626,7 @@ export default function RightSidebar({
                           const next = activeMatchIndex < totalMatches - 1 ? activeMatchIndex + 1 : 0;
                           setActiveMatchIndex(next);
                         }}
-                        className="p-0.5 hover:bg-amber-400/20 text-amber-300 hover:text-white rounded transition-colors"
+                        className="p-0.5 hover:bg-amber-500/20 text-amber-500 hover:text-amber-600 rounded transition-colors"
                         title={t('right.nextEvidence')}
                       >
                         <ChevronDown size={13} />
@@ -1639,7 +1639,7 @@ export default function RightSidebar({
                   <a
                     href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
                     download={viewingDoc.filename}
-                    className="px-2 py-1 rounded bg-white/5 hover:bg-white/15 text-gray-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1 text-[11px]"
+                    className="px-2 py-1 rounded bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text transition-colors cursor-pointer flex items-center gap-1 text-[11px] shadow-sm"
                     title={t('right.downloadFile')}
                   >
                     <Download size={12} />
@@ -1653,22 +1653,22 @@ export default function RightSidebar({
             <div className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-4 select-text">
               {isLoadingDetails ? (
                 <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
-                  <Loader2 size={24} className="animate-spin text-blue-400" />
-                  <p className="text-xs text-gray-400">{t('right.loading')}</p>
+                  <Loader2 size={24} className="animate-spin text-blue-500" />
+                  <p className="text-xs text-app-text-dim">{t('right.loading')}</p>
                 </div>
               ) : (paperDetails?.has_full_pdf === false || paperDetails?.is_abstract_only || (paperDetails?.content && (paperDetails.content.length < 3500 || paperDetails.content.includes("NOTBOOKLM SCHOLARLY ARCHIVE") || paperDetails.content.includes("OFFICIAL PUBLICATION ARCHIVE RECORD")))) ? (
-                <div className="p-4 sm:p-5 rounded-xl bg-[#1b1c1e] border border-white/10 shadow-lg space-y-4">
+                <div className="p-4 sm:p-5 rounded-xl bg-app-card border border-app-border shadow-lg space-y-4">
                   {/* Status Banner for Abstract Only */}
-                  <div className="p-3.5 rounded-lg bg-amber-950/30 border border-amber-800/40 space-y-2 text-xs text-amber-200">
-                    <div className="flex items-center gap-2 font-semibold text-amber-100">
-                      <Info size={16} className="text-amber-400 shrink-0" />
+                  <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2 text-xs text-amber-900 dark:text-amber-200">
+                    <div className="flex items-center gap-2 font-semibold text-amber-800 dark:text-amber-100">
+                      <Info size={16} className="text-amber-500 shrink-0" />
                       <span>
                         {paperDetails?.is_oa
                           ? t('right.restrictedOA')
                           : t('right.restrictedPaywall')}
                       </span>
                     </div>
-                    <p className="text-[11.5px] text-amber-300/80 leading-relaxed">
+                    <p className="text-[11.5px] text-amber-700 dark:text-amber-300/80 leading-relaxed">
                       {paperDetails?.is_oa
                         ? t('right.restrictedOADesc')
                         : t('right.restrictedPaywallDesc')}
@@ -1679,7 +1679,7 @@ export default function RightSidebar({
                           href={landingUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-amber-100 font-medium text-xs border border-amber-500/30 transition-colors"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-100 font-medium text-xs border border-amber-500/30 transition-colors"
                         >
                           <ExternalLink size={13} />
                           <span>{t('right.openOfficial')}</span>
@@ -1689,24 +1689,24 @@ export default function RightSidebar({
                   </div>
 
                   {/* Paper Title & Authors */}
-                  <div className="pb-3 border-b border-white/10 space-y-2">
+                  <div className="pb-3 border-b border-app-divider space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase bg-amber-950/70 border border-amber-800/80 text-amber-400">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400">
                         {t('right.metadataAndAbstract')}
                       </span>
                       {paperDetails?.year && (
-                        <span className="text-[11px] text-gray-400">
+                        <span className="text-[11px] text-app-text-dim">
                           {paperDetails.year}
                         </span>
                       )}
                     </div>
 
-                    <h2 className="text-sm sm:text-[15px] font-bold text-white leading-snug">
+                    <h2 className="text-sm sm:text-[15px] font-bold text-app-text leading-snug">
                       {title}
                     </h2>
 
                     {authorsStr && (
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-app-text-muted">
                         {t('right.by')}{authorsStr}
                       </p>
                     )}
@@ -1714,10 +1714,10 @@ export default function RightSidebar({
 
                   {/* Official Abstract Content */}
                   <div className="space-y-2">
-                    <h3 className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    <h3 className="text-xs font-semibold text-app-text uppercase tracking-wider">
                       {t('right.officialAbstract')}
                     </h3>
-                    <div className="text-[12.5px] sm:text-[13px] text-gray-300 leading-relaxed font-sans whitespace-pre-wrap select-text break-words bg-black/20 p-3.5 rounded-lg border border-white/5">
+                    <div className="text-[12.5px] sm:text-[13px] text-app-text leading-relaxed font-sans whitespace-pre-wrap select-text break-words bg-app-input-surface p-3.5 rounded-lg border border-app-border">
                       {(() => {
                         const targetAbstract = cleanAbstract || paperDetails?.abstract || "No additional abstract text provided.";
                         const res = getHighlightedContent(
@@ -1736,39 +1736,39 @@ export default function RightSidebar({
                   </div>
                 </div>
               ) : paperDetails?.content ? (
-                <div className="p-4 sm:p-5 rounded-xl bg-[#1b1c1e] border border-white/10 shadow-lg space-y-4">
+                <div className="p-4 sm:p-5 rounded-xl bg-app-card border border-app-border shadow-lg space-y-4">
                   {/* Status Banner for Full Manuscript */}
-                  <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-800/50 flex items-center gap-2 text-xs text-emerald-300">
-                    <Check size={14} className="text-emerald-400 shrink-0" />
+                  <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-300">
+                    <Check size={14} className="text-emerald-500 shrink-0" />
                     <span className="font-medium">{t('right.fullManuscriptVerified')}</span>
                   </div>
 
                   {/* Paper Sheet Header */}
-                  <div className="pb-3 border-b border-white/10 space-y-2">
+                  <div className="pb-3 border-b border-app-divider space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase bg-blue-950/70 border border-blue-800/80 text-blue-400">
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold font-mono uppercase bg-blue-500/15 border border-blue-500/30 text-blue-500">
                         {paperDetails.type?.toUpperCase() || "PDF"}
                       </span>
                       {paperDetails.year && (
-                        <span className="text-[11px] text-gray-400">
+                        <span className="text-[11px] text-app-text-dim">
                           {paperDetails.year}
                         </span>
                       )}
                     </div>
 
-                    <h2 className="text-sm sm:text-[15px] font-bold text-white leading-snug">
+                    <h2 className="text-sm sm:text-[15px] font-bold text-app-text leading-snug">
                       {title}
                     </h2>
 
                     {authorsStr && (
-                      <p className="text-xs text-gray-400">
+                      <p className="text-xs text-app-text-muted">
                         {t('right.by')}{authorsStr}
                       </p>
                     )}
                   </div>
 
                   {/* Clean Formatted Document Body (Scrolls through the entire file) */}
-                  <div className="text-[12.5px] sm:text-[13px] text-gray-200 leading-relaxed font-sans whitespace-pre-wrap select-text break-words">
+                  <div className="text-[12.5px] sm:text-[13px] text-app-text leading-relaxed font-sans whitespace-pre-wrap select-text break-words">
                     {(() => {
                       // Strip repeated journal header/footer lines injected by PyMuPDF on every page
                       let cleanedContent = paperDetails.content
@@ -1795,10 +1795,10 @@ export default function RightSidebar({
                   </div>
                 </div>
               ) : (
-                <div className="p-4 rounded-xl bg-[#1b1c1e] border border-white/10 text-center py-10 space-y-2">
-                  <FileText size={28} className="text-gray-500 mx-auto stroke-[1.5]" />
-                  <p className="text-xs text-gray-300 font-medium">{t('right.docIndexed')}</p>
-                  <p className="text-[11px] text-gray-500 max-w-[240px] mx-auto">
+                <div className="p-4 rounded-xl bg-app-card border border-app-border text-center py-10 space-y-2">
+                  <FileText size={28} className="text-app-text-dim mx-auto stroke-[1.5]" />
+                  <p className="text-xs text-app-text font-medium">{t('right.docIndexed')}</p>
+                  <p className="text-[11px] text-app-text-dim max-w-[240px] mx-auto">
                     {t('right.docIndexedDesc')}
                   </p>
                 </div>
@@ -1808,7 +1808,7 @@ export default function RightSidebar({
         )}
 
         {/* 4. Consensus-style Bottom Floating Action Toolbar */}
-        <div className={`p-3 border-t border-white/10 bg-[#161719] flex items-center justify-between gap-1.5 shrink-0 select-none transition-opacity ${
+        <div className={`p-3 border-t border-app-divider bg-app-sidebar flex items-center justify-between gap-1.5 shrink-0 select-none transition-opacity ${
           isLoadingDetails ? "opacity-40 pointer-events-none" : "opacity-100"
         }`}>
           <div className="flex items-center gap-1.5">
@@ -1835,7 +1835,7 @@ export default function RightSidebar({
             <button
               disabled={isLoadingDetails}
               onClick={() => setIsCiteModalOpen(true)}
-              className="h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/10 disabled:opacity-50 border border-white/10 text-gray-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              className="h-8 px-2.5 rounded-full bg-app-card hover:bg-app-card-hover disabled:opacity-50 border border-app-border text-app-text text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
               title={t('right.citePaper')}
             >
               <Quote size={13} />
@@ -1846,10 +1846,10 @@ export default function RightSidebar({
             <button
               disabled={isLoadingDetails || !landingUrl}
               onClick={() => copyToClipboard(landingUrl, "link")}
-              className="w-8 h-8 rounded-full hover:bg-white/10 disabled:opacity-50 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed"
+              className="w-8 h-8 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border disabled:opacity-50 text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
               title={copiedLink ? t('right.copiedLink') : t('right.copyLink')}
             >
-              {copiedLink ? <Check size={14} className="text-emerald-400" /> : <LinkIcon size={14} />}
+              {copiedLink ? <Check size={14} className="text-emerald-500" /> : <LinkIcon size={14} />}
             </button>
 
             {/* Download Icon Button */}
@@ -1859,7 +1859,7 @@ export default function RightSidebar({
                 return (
                   <button
                     disabled
-                    className="w-8 h-8 rounded-full text-gray-600 opacity-30 flex items-center justify-center cursor-not-allowed"
+                    className="w-8 h-8 rounded-full bg-app-card border border-app-border text-app-text-dim opacity-30 flex items-center justify-center cursor-not-allowed"
                     title={t('right.downloadNotAvail')}
                   >
                     <Download size={14} />
@@ -1870,7 +1870,7 @@ export default function RightSidebar({
                 <a
                   href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
                   download={viewingDoc.filename}
-                  className="w-8 h-8 rounded-full hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer shadow-sm"
                   title="Download original manuscript PDF"
                 >
                   <Download size={14} />
@@ -1887,7 +1887,7 @@ export default function RightSidebar({
                 href={isLoadingDetails ? undefined : pdfLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`h-8 px-2.5 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 text-gray-200 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 ${
+                className={`h-8 px-2.5 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 shadow-sm ${
                   isLoadingDetails ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"
                 }`}
                 title={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"}
@@ -1901,17 +1901,17 @@ export default function RightSidebar({
 
         {/* 5. Interactive Multi-Format Citation Modal */}
         {isCiteModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-            <div className="bg-[#222326] border border-white/15 rounded-2xl w-full max-w-[530px] p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-150 text-gray-200">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+            <div className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-[530px] p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-150 text-app-text">
               {/* Modal Header */}
-              <div className="flex items-center justify-between pb-2.5 border-b border-white/10">
+              <div className="flex items-center justify-between pb-2.5 border-b border-app-divider">
                 <div className="flex items-center gap-2">
-                  <Quote size={16} className="text-blue-400" />
-                  <h3 className="text-sm font-semibold text-white">Cite this Paper</h3>
+                  <Quote size={16} className="text-blue-500" />
+                  <h3 className="text-sm font-semibold text-app-text">Cite this Paper</h3>
                 </div>
                 <button
                   onClick={() => setIsCiteModalOpen(false)}
-                  className="w-7 h-7 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-7 h-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <X size={14} />
                 </button>
@@ -1934,7 +1934,7 @@ export default function RightSidebar({
                     className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer text-xs ${
                       selectedCitationStyle === st.id
                         ? "bg-blue-600 text-white font-semibold shadow-sm"
-                        : "bg-white/5 hover:bg-white/10 text-gray-400 hover:text-gray-200"
+                        : "bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text"
                     }`}
                   >
                     {st.label}
@@ -1943,17 +1943,17 @@ export default function RightSidebar({
               </div>
 
               {/* Fixed-Height Scrollable Citation Content Box */}
-              <div className="h-[140px] p-3.5 rounded-xl bg-[#141517] border border-white/10 font-sans text-xs leading-relaxed select-text text-gray-200 break-words whitespace-pre-wrap overflow-y-auto custom-scrollbar">
+              <div className="h-[140px] p-3.5 rounded-xl bg-app-input-surface border border-app-border font-sans text-xs leading-relaxed select-text text-app-text break-words whitespace-pre-wrap overflow-y-auto custom-scrollbar">
                 {citations[selectedCitationStyle]}
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-1 border-t border-white/5">
+              <div className="flex items-center justify-between pt-1 border-t border-app-divider">
                 <div className="flex items-center gap-2">
                   {selectedCitationStyle === "bibtex" && (
                     <button
                       onClick={() => downloadFileText(citations.bibtex, `${doiStr ? doiStr.replace(/[^a-z0-9]/gi, "_") : "paper"}.bib`)}
-                      className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-gray-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                      className="px-2.5 py-1.5 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-xs text-app-text-muted hover:text-app-text transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                     >
                       <Download size={13} />
                       <span>Download .bib</span>
@@ -1962,7 +1962,7 @@ export default function RightSidebar({
                   {selectedCitationStyle === "ris" && (
                     <button
                       onClick={() => downloadFileText(citations.ris, `${doiStr ? doiStr.replace(/[^a-z0-9]/gi, "_") : "paper"}.ris`)}
-                      className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-gray-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                      className="px-2.5 py-1.5 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-xs text-app-text-muted hover:text-app-text transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
                     >
                       <Download size={13} />
                       <span>Download .ris</span>
@@ -1978,7 +1978,7 @@ export default function RightSidebar({
                     setCopiedCitationKey(selectedCitationStyle);
                     setTimeout(() => setCopiedCitationKey(null), 2000);
                   }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg px-4 h-8 cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  className="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg px-4 h-8 cursor-pointer flex items-center gap-1.5 shadow-sm transition-colors"
                 >
                   {copiedCitationKey === selectedCitationStyle ? (
                     <>
@@ -2004,20 +2004,15 @@ export default function RightSidebar({
   // VIEW MODE: STANDARD SOURCES LIST PANEL
   // ==========================================
   return (
-    <aside className="w-full lg:w-80 h-full bg-[#1e1f20] border-l border-white/10 flex flex-col shrink-0 select-none z-10 transition-all relative">
+    <aside className="w-full lg:w-80 h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 select-none z-10 transition-all relative text-app-text">
       {/* Top Header Bar with Close/Hide Button */}
-      <div className="px-4 py-3 flex items-center justify-between border-b border-white/5">
+      <div className="px-4 py-3 flex items-center justify-between border-b border-app-divider">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm text-white tracking-tight">{t('ui.sources') || "Sources"}</span>
-          {documents.length > 0 && (
-            <span className="px-2 py-0.5 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-300 text-[11px] font-mono">
-              {documents.length}
-            </span>
-          )}
+          <span className="font-semibold text-sm text-app-text tracking-tight">{t('ui.sources') || "Sources"}</span>
         </div>
         <button 
           onClick={onClose}
-          className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="w-7 h-7 rounded-lg bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer"
           title={t('right.close') || "Hide sidebar"}
         >
           <X size={15} />
@@ -2045,10 +2040,10 @@ export default function RightSidebar({
         <div className="w-full">
           <Button
             variant="outline"
-            className="w-full h-11 rounded-full bg-[#262729] hover:bg-[#2e3033] border border-white/15 text-gray-100 hover:text-white font-medium text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-colors"
+            className="w-full h-11 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text font-medium text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm transition-colors"
             onClick={() => setIsAddSourcesModalOpen(true)}
           >
-            <Plus size={18} className="text-gray-300" />
+            <Plus size={18} className="text-app-text-muted" />
             <span>{t('ui.addSources')}</span>
           </Button>
         </div>
@@ -2062,7 +2057,8 @@ export default function RightSidebar({
         )}
 
         {/* 3. Controls Row: Sort (3 descending bars), Contextual Actions (Clean Dupes, Rename, Download, Delete), and Select All */}
-        <div className="w-full flex items-center justify-between pt-1 px-0 text-xs text-gray-400 relative">
+        {/* 3. Action Toolbar (Always-rendered icons with dynamic disabled states) */}
+        <div className="w-full flex items-center justify-between pt-1 px-0 text-xs text-app-text-muted relative">
           <div className="flex items-center gap-1">
             {/* Sort Button & Dropdown (Disabled if <= 1 document) */}
             <div className="relative" ref={sortMenuRef}>
@@ -2075,8 +2071,8 @@ export default function RightSidebar({
                 disabled={documents.length <= 1}
                 className={`w-6 h-6 -ml-1 rounded transition-colors flex items-center justify-center ${
                   documents.length > 1
-                    ? "text-gray-400 hover:text-gray-200 hover:bg-white/5 cursor-pointer"
-                    : "text-gray-600 opacity-30 cursor-not-allowed"
+                    ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
+                    : "text-app-text-dim opacity-30 cursor-not-allowed"
                 }`}
                 title={documents.length > 1 ? t('right.sortSources') : t('right.addMoreSort')}
               >
@@ -2089,43 +2085,43 @@ export default function RightSidebar({
 
               {/* Sort Dropdown Menu (2 Sections with Divider: Criteria & Direction) */}
               {isSortMenuOpen && (
-                <div className="absolute left-0 top-7 z-30 w-36 rounded-xl bg-[#28292c] border border-white/15 shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute left-0 top-7 z-30 w-36 rounded-xl bg-app-dropdown border border-app-border-strong shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-app-text">
                   {/* Section 1: Sort Criteria */}
                   <div className="space-y-0.5 pb-0.5">
                     <button
                       onClick={() => { setSortBy("title"); setIsSortMenuOpen(false); }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-gray-300 hover:text-white hover:bg-white/10"
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
                     >
-                      <span className={sortBy === "title" ? "text-white font-medium" : "text-gray-300"}>Title</span>
-                      {sortBy === "title" && <Check size={13} className="text-white" strokeWidth={2.5} />}
+                      <span className={sortBy === "title" ? "text-app-text font-medium" : "text-app-text-muted"}>Title</span>
+                      {sortBy === "title" && <Check size={13} className="text-blue-500" strokeWidth={2.5} />}
                     </button>
                     <button
                       onClick={() => { setSortBy("date"); setIsSortMenuOpen(false); }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-gray-300 hover:text-white hover:bg-white/10"
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
                     >
-                      <span className={sortBy === "date" ? "text-white font-medium" : "text-gray-300"}>Date added</span>
-                      {sortBy === "date" && <Check size={13} className="text-white" strokeWidth={2.5} />}
+                      <span className={sortBy === "date" ? "text-app-text font-medium" : "text-app-text-muted"}>Date added</span>
+                      {sortBy === "date" && <Check size={13} className="text-blue-500" strokeWidth={2.5} />}
                     </button>
                   </div>
 
                   {/* Section Divider Line */}
-                  <div className="border-t border-white/10 my-1" />
+                  <div className="border-t border-app-divider my-1" />
 
                   {/* Section 2: Sort Direction (Ascending / Descending) */}
                   <div className="space-y-0.5 pt-0.5">
                     <button
                       onClick={() => { setSortDirection("asc"); setIsSortMenuOpen(false); }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-gray-300 hover:text-white hover:bg-white/10"
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
                     >
-                      <span className={sortDirection === "asc" ? "text-white font-medium" : "text-gray-300"}>Ascending</span>
-                      {sortDirection === "asc" && <Check size={13} className="text-white" strokeWidth={2.5} />}
+                      <span className={sortDirection === "asc" ? "text-app-text font-medium" : "text-app-text-muted"}>Ascending</span>
+                      {sortDirection === "asc" && <Check size={13} className="text-blue-500" strokeWidth={2.5} />}
                     </button>
                     <button
                       onClick={() => { setSortDirection("desc"); setIsSortMenuOpen(false); }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-gray-300 hover:text-white hover:bg-white/10"
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
                     >
-                      <span className={sortDirection === "desc" ? "text-white font-medium" : "text-gray-300"}>Descending</span>
-                      {sortDirection === "desc" && <Check size={13} className="text-white" strokeWidth={2.5} />}
+                      <span className={sortDirection === "desc" ? "text-app-text font-medium" : "text-app-text-muted"}>Descending</span>
+                      {sortDirection === "desc" && <Check size={13} className="text-blue-500" strokeWidth={2.5} />}
                     </button>
                   </div>
                 </div>
@@ -2140,13 +2136,13 @@ export default function RightSidebar({
                 disabled={documents.length <= 1 || isCleaningDuplicates}
                 className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
                   documents.length > 1 && !isCleaningDuplicates
-                    ? "text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
-                    : "text-gray-600 opacity-30 cursor-not-allowed"
+                    ? "text-app-text-muted hover:text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
+                    : "text-app-text-dim opacity-30 cursor-not-allowed"
                 }`}
                 title={t('right.cleanDup')}
               >
                 {isCleaningDuplicates ? (
-                  <Loader2 size={14} className="animate-spin text-emerald-400" />
+                  <Loader2 size={14} className="animate-spin text-emerald-500" />
                 ) : (
                   <Sparkles size={14} />
                 )}
@@ -2158,10 +2154,10 @@ export default function RightSidebar({
                 disabled={selectedCount !== 1}
                 className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
                   selectedCount === 1
-                    ? "text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 cursor-pointer"
+                    ? "text-app-text-muted hover:text-blue-500 hover:bg-blue-500/10 cursor-pointer"
                     : selectedCount > 1
-                    ? "text-gray-600 opacity-25 cursor-not-allowed"
-                    : "text-gray-600 opacity-30 cursor-not-allowed"
+                    ? "text-app-text-dim opacity-25 cursor-not-allowed"
+                    : "text-app-text-dim opacity-30 cursor-not-allowed"
                 }`}
                 title={
                   selectedCount === 1
@@ -2194,13 +2190,13 @@ export default function RightSidebar({
                     disabled={!canDownload}
                     className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
                       canDownload
-                        ? "text-gray-400 hover:text-gray-200 hover:bg-white/5 cursor-pointer"
-                        : "text-gray-600 opacity-30 cursor-not-allowed"
+                        ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
+                        : "text-app-text-dim opacity-30 cursor-not-allowed"
                     }`}
                     title={tooltipText}
                   >
                     {isBulkDownloading ? (
-                      <Loader2 size={15} className="animate-spin text-blue-400" />
+                      <Loader2 size={15} className="animate-spin text-blue-500" />
                     ) : (
                       <Download size={15} />
                     )}
@@ -2214,8 +2210,8 @@ export default function RightSidebar({
                 disabled={selectedCount === 0 || isBulkDeleting}
                 className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
                   selectedCount > 0
-                    ? "text-gray-400 hover:text-red-400 hover:bg-white/5 cursor-pointer"
-                    : "text-gray-600 opacity-30 cursor-not-allowed"
+                    ? "text-app-text-muted hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                    : "text-app-text-dim opacity-30 cursor-not-allowed"
                 }`}
                 title={selectedCount > 0 ? t('right.deleteSelected').replace('{n}', selectedCount.toString()) : t('right.selectToDelete')}
               >
@@ -2228,17 +2224,17 @@ export default function RightSidebar({
           <div className={`flex items-center gap-2 pr-0.5 whitespace-nowrap select-none ${
             documents.length === 0 ? "opacity-30 pointer-events-none" : ""
           }`}>
-            <span className="text-[11px] font-medium text-gray-400 select-none">{t('right.selectAll')}</span>
+            <span className="text-[11px] font-medium text-app-text-muted select-none">{t('right.selectAll')}</span>
             <button
               type="button"
               onClick={handleToggleSelectAll}
               disabled={documents.length === 0}
               className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
                 documents.length === 0 
-                  ? "border-gray-600 bg-transparent cursor-not-allowed"
+                  ? "border-app-border-strong bg-transparent cursor-not-allowed"
                   : isAllSelected || isPartiallySelected 
                   ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:border-gray-300" 
-                  : "border-gray-500 bg-transparent cursor-pointer hover:border-gray-300"
+                  : "border-app-border-strong bg-transparent cursor-pointer hover:border-blue-500"
               }`}
               title={documents.length === 0 ? t('right.noSourcesAvail') : isAllSelected ? t('right.unselectAll') : t('right.selectAll')}
             >
@@ -2254,10 +2250,10 @@ export default function RightSidebar({
         {/* 4. Saved Documents / Sources List (Compact height per item, flush left & right align) */}
         <div className="w-full flex-1 space-y-0.5 pt-0.5">
           {sortedDocuments.length === 0 && pendingSources.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center text-gray-400 px-3">
-              <FileText size={30} className="text-gray-600 mb-2 stroke-[1.5]" />
-              <h4 className="text-xs font-semibold text-gray-300">{t('ui.noSources')}</h4>
-              <p className="text-[11px] text-gray-500 mt-1 max-w-[220px] leading-relaxed">
+            <div className="flex flex-col items-center justify-center py-10 text-center text-app-text-muted px-3">
+              <FileText size={30} className="text-app-text-dim mb-2 stroke-[1.5]" />
+              <h4 className="text-xs font-semibold text-app-text">{t('ui.noSources')}</h4>
+              <p className="text-[11px] text-app-text-dim mt-1 max-w-[220px] leading-relaxed">
                 {t('ui.noSourcesDesc')}
               </p>
             </div>
@@ -2273,13 +2269,13 @@ export default function RightSidebar({
                   <div
                     key={doc.id}
                     onClick={() => setViewingDoc(doc)}
-                    className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-white/5 transition-colors cursor-pointer group"
+                    className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-app-item-hover transition-colors cursor-pointer group"
                   >
                     {/* Left: Clean Monospace Index + Compact Format Badge + File Name */}
                     <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
                       {/* Clean Minimalist Index */}
                       <span 
-                        className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-gray-500 group-hover:text-gray-300 transition-colors shrink-0 select-none tabular-nums"
+                        className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-app-text-dim group-hover:text-app-text transition-colors shrink-0 select-none tabular-nums"
                         title={`Permanent Reference Index [${docIndex}]`}
                       >
                         {docIndex}.
@@ -2295,7 +2291,7 @@ export default function RightSidebar({
                           displayTitle = displayTitle.toLowerCase().replace(/\b\w/g, (c: string) => c.toUpperCase());
                         }
                         return (
-                          <span className="text-[11.5px] text-gray-300 truncate group-hover:text-white font-normal" title={displayTitle}>
+                          <span className="text-[11.5px] text-app-text truncate group-hover:text-blue-500 font-medium transition-colors" title={displayTitle}>
                             {displayTitle}
                           </span>
                         );
@@ -2312,7 +2308,7 @@ export default function RightSidebar({
                       title={isChecked ? "Exclude from AI context" : "Include in AI context"}
                     >
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
-                        isChecked ? "bg-blue-600 border-blue-600 text-white" : "border-gray-500 bg-transparent"
+                        isChecked ? "bg-blue-600 border-blue-600 text-white" : "border-app-border-strong bg-transparent"
                       }`}>
                         {isChecked && <Check size={9} strokeWidth={3} />}
                       </div>
@@ -2329,12 +2325,12 @@ export default function RightSidebar({
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-white/5 transition-colors select-none group"
+                    className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-app-item-hover transition-colors select-none group"
                   >
                     {/* Left: Monospace Number + Badge + File / DOI Name */}
                     <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
                       <span 
-                        className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-gray-500 shrink-0 select-none tabular-nums"
+                        className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-app-text-dim shrink-0 select-none tabular-nums"
                       >
                         {itemNumber}.
                       </span>
@@ -2345,7 +2341,7 @@ export default function RightSidebar({
 
                       <span 
                         className={`text-[11.5px] truncate font-normal ${
-                          item.status === "error" ? "text-red-300 line-through opacity-80" : "text-gray-300"
+                          item.status === "error" ? "text-red-500 line-through opacity-80" : "text-app-text-muted"
                         }`} 
                         title={item.filename}
                       >
@@ -2370,7 +2366,7 @@ export default function RightSidebar({
                           <button
                             type="button"
                             onClick={() => setInternalPendingSources(prev => prev.filter(p => p.id !== item.id))}
-                            className="text-gray-500 hover:text-gray-300 p-0.5 rounded cursor-pointer"
+                            className="text-app-text-dim hover:text-app-text p-0.5 rounded cursor-pointer"
                             title={t('right.dismiss')}
                           >
                             <X size={12} />
@@ -2393,11 +2389,11 @@ export default function RightSidebar({
             setIsAddSourcesModalOpen(false);
             setDoiInput("");
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#1e1f22] border border-white/15 rounded-3xl w-full max-w-xl p-6 sm:p-7 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 relative text-gray-200"
+            className="bg-app-modal border border-app-border-strong rounded-3xl w-full max-w-xl p-6 sm:p-7 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 relative text-app-text"
           >
             {/* Close Button */}
             <button
@@ -2405,7 +2401,7 @@ export default function RightSidebar({
                 setIsAddSourcesModalOpen(false);
                 setDoiInput("");
               }}
-              className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
+              className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-app-item-hover text-app-text-muted hover:text-app-text transition-colors cursor-pointer"
               title={t('right.close')}
             >
               <X size={18} />
@@ -2413,10 +2409,10 @@ export default function RightSidebar({
 
             {/* Modal Header */}
             <div className="space-y-1.5 pr-8">
-              <h2 className="text-xl font-bold text-white tracking-tight leading-snug">
+              <h2 className="text-xl font-bold text-app-text tracking-tight leading-snug">
                 {t('ui.addSources')}
               </h2>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-app-text-muted">
                 {t('right.addSourcesModalDesc')}
               </p>
             </div>
@@ -2425,7 +2421,7 @@ export default function RightSidebar({
             <div className="space-y-2">
               <form onSubmit={handleImportDoi} className="relative flex items-center">
                 <div className="relative w-full">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-app-text-dim pointer-events-none">
                     <Search size={15} />
                   </div>
                   <input
@@ -2433,7 +2429,7 @@ export default function RightSidebar({
                     value={doiInput}
                     onChange={(e) => setDoiInput(e.target.value)}
                     placeholder={t('right.enterDoi')}
-                    className="w-full h-11 pl-10 pr-24 rounded-full bg-[#131416] border border-white/15 focus:border-blue-500 text-xs text-white placeholder-gray-500 focus:outline-none transition-all"
+                    className="w-full h-11 pl-10 pr-24 rounded-full bg-app-input-surface border border-app-border focus:border-blue-500 text-xs text-app-text placeholder:text-app-text-dim focus:outline-none transition-all"
                   />
                 </div>
                 <button
@@ -2472,17 +2468,17 @@ export default function RightSidebar({
               className={`p-8 sm:p-10 rounded-2xl border-2 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center space-y-3 ${
                 isDraggingOver
                   ? "border-blue-500 bg-blue-500/10 scale-[1.01]"
-                  : "border-white/15 hover:border-white/30 bg-[#161719] hover:bg-[#191a1d]"
+                  : "border-app-border-strong hover:border-blue-500/50 bg-app-card hover:bg-app-card-hover"
               }`}
             >
-              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-300">
-                <UploadCloud size={24} className="text-gray-300" />
+              <div className="w-12 h-12 rounded-full bg-app-surface border border-app-border flex items-center justify-center text-app-text-muted">
+                <UploadCloud size={24} className="text-app-text-muted" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-gray-200">
+                <p className="text-sm font-semibold text-app-text">
                   {t('right.dropFiles')}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-app-text-dim">
                   {t('right.supportedFormats')}
                 </p>
               </div>
@@ -2490,13 +2486,13 @@ export default function RightSidebar({
 
             {/* Section 3: Capacity Progress Bar (300 Sources Max) */}
             <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between text-xs text-gray-400">
+              <div className="flex items-center justify-between text-xs text-app-text-muted">
                 <span>{t('right.sourcesCapacity')}</span>
-                <span className="font-medium text-gray-300 font-mono">
+                <span className="font-medium text-app-text font-mono">
                   {documents.length + pendingSources.length} / 300
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-[#131416] rounded-full overflow-hidden border border-white/5">
+              <div className="w-full h-1.5 bg-app-input-surface rounded-full overflow-hidden border border-app-border">
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300"
                   style={{ width: `${Math.min(100, ((documents.length + pendingSources.length) / 300) * 100)}%` }}
@@ -2515,24 +2511,24 @@ export default function RightSidebar({
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
           >
             <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-white">
+              <h3 className="text-base font-semibold text-app-text">
                 {t('right.deleteConfirmTitle', { count: selectedCount.toString() })}
               </h3>
-              <p className="text-xs text-gray-400 leading-relaxed">
+              <p className="text-xs text-app-text-muted leading-relaxed">
                 {t('right.deleteConfirmDesc')}
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowBulkDeleteConfirm(false)}
                 disabled={isBulkDeleting}
-                className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+                className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
               >
                 {t('action.cancel')}
               </Button>
@@ -2564,11 +2560,11 @@ export default function RightSidebar({
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-gray-200"
+            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
           >
             <div className="space-y-1">
-              <h3 className="text-base font-semibold text-white">{t('right.renameSource')}</h3>
-              <p className="text-xs text-gray-400 truncate" title={renamingDoc.filename}>
+              <h3 className="text-base font-semibold text-app-text">{t('right.renameSource')}</h3>
+              <p className="text-xs text-app-text-muted truncate" title={renamingDoc.filename}>
                 {t('right.filePrefix')}{renamingDoc.filename}
               </p>
             </div>
@@ -2578,32 +2574,21 @@ export default function RightSidebar({
                 <input
                   type="text"
                   value={renameTitleInput}
-                  onChange={(e) => {
-                    setRenameTitleInput(e.target.value);
-                    if (renameError) setRenameError(null);
-                  }}
+                  onChange={(e) => setRenameTitleInput(e.target.value)}
+                  placeholder={t('right.renamePlaceholder')}
+                  className="w-full h-10 px-3.5 rounded-xl bg-app-input-surface border border-app-border focus:border-blue-500 text-xs text-app-text placeholder:text-app-text-dim focus:outline-none transition-all"
                   autoFocus
-                  placeholder={t('right.enterSourceTitle')}
-                  className="w-full h-10 px-3.5 rounded-xl bg-[#1a1b1d] border border-white/15 focus:border-blue-500 text-xs text-white placeholder-gray-500 focus:outline-none transition-all"
-                  disabled={isSavingRename}
                 />
               </div>
 
-              {renameError && (
-                <div className="px-3 py-1.5 rounded-lg bg-red-950/40 border border-red-800/50 text-red-300 text-[11.5px] flex items-center gap-2 animate-in fade-in duration-150">
-                  <AlertCircle size={14} className="shrink-0 text-red-400" />
-                  <span>{renameError}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-app-divider">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsRenameModalOpen(false)}
                   disabled={isSavingRename}
-                  className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+                  className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
                 >
                   {t('action.cancel')}
                 </Button>
@@ -2611,13 +2596,13 @@ export default function RightSidebar({
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={isSavingRename || !renameTitleInput.trim()}
-                  className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow flex items-center gap-1.5"
+                  disabled={!renameTitleInput.trim() || isSavingRename}
+                  className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow flex items-center gap-1.5"
                 >
                   {isSavingRename ? (
                     <>
                       <Loader2 size={12} className="animate-spin" />
-                      <span>{t('right.saving')}</span>
+                      <span>Saving...</span>
                     </>
                   ) : (
                     <span>{t('action.save')}</span>
@@ -2628,9 +2613,6 @@ export default function RightSidebar({
           </div>
         </div>
       )}
-
-      {/* Google Drive Style Download Floating Progress Toast */}
-      <DownloadManager task={downloadTask} onClose={() => setDownloadTask(null)} />
     </aside>
   );
 }

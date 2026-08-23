@@ -182,16 +182,16 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
             return next;
           });
         }}
-        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer group focus:outline-none"
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[12.5px] text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer group focus:outline-none"
         title={t('model.select')}
       >
         {(() => {
           const { groupName, tierName } = getDisplayInfo();
           return (
-            <span className="font-normal text-gray-200 group-hover:text-white truncate max-w-[130px] min-[1100px]:max-w-[220px] flex items-center gap-1.5">
+            <span className="font-normal text-app-text truncate max-w-[130px] min-[1100px]:max-w-[220px] flex items-center gap-1.5">
               <span className="truncate">{groupName}</span>
               {tierName && (
-                <span className="text-gray-400 font-normal text-[11.5px] group-hover:text-gray-300 transition-colors shrink-0">
+                <span className="text-app-text-dim font-normal text-[11.5px] group-hover:text-app-text transition-colors shrink-0">
                   {tierName}
                 </span>
               )}
@@ -200,16 +200,16 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
         })()}
         <ChevronUp 
           size={13} 
-          className={`text-gray-400 group-hover:text-gray-200 transition-transform duration-200 ${isOpen ? "rotate-180 text-blue-400" : ""}`} 
+          className={`text-app-text-dim group-hover:text-app-text transition-transform duration-200 ${isOpen ? "rotate-180 text-blue-500" : ""}`} 
         />
       </button>
 
       {/* Popover Menu Opening Upwards */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 mb-2.5 w-64 sm:w-72 rounded-xl bg-[#1e1f22] border border-white/15 shadow-2xl z-50 p-1.5 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 overflow-visible">
+        <div className="absolute bottom-full left-0 mb-2.5 w-64 sm:w-72 rounded-xl bg-app-dropdown border border-app-border-strong shadow-2xl z-50 p-1.5 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 overflow-visible text-app-text">
           {/* Header */}
           <div className="px-2.5 py-1 mb-1">
-            <span className="text-[11px] font-medium text-gray-400">
+            <span className="text-[11px] font-medium text-app-text-muted">
               {t('model.select')}
             </span>
           </div>
@@ -241,16 +241,16 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
                     }}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-2 text-[12.5px] transition-colors cursor-pointer ${
                       isGroupActive 
-                        ? "bg-[#2b2c31] border border-blue-500/50 text-white font-medium shadow-sm" 
+                        ? "bg-app-item-active border border-blue-500/50 text-app-text font-medium shadow-sm" 
                         : isSubmenuOpen
-                          ? "bg-white/[0.08] text-white"
-                          : "hover:bg-white/[0.06] text-gray-300 hover:text-white font-normal"
+                          ? "bg-app-item-active text-app-text"
+                          : "hover:bg-app-item-hover text-app-text-muted hover:text-app-text font-normal"
                     }`}
                   >
                     <span className="truncate flex-1 flex items-center gap-1.5">
                       <span>{group.name}</span>
                       {activeTier && (
-                        <span className="text-gray-400 font-normal text-[11.5px]">
+                        <span className="text-app-text-dim font-normal text-[11.5px]">
                           {activeTier.name}
                         </span>
                       )}
@@ -258,16 +258,16 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
 
                     <div className="flex items-center gap-1 shrink-0">
                       {group.badge && (
-                        <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10px] text-gray-400 bg-white/5 border border-white/10">
+                        <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[10px] text-app-text-muted bg-app-item-hover border border-app-border">
                           {group.badge}
                           <Info size={9} className="opacity-70" />
                         </span>
                       )}
 
                       {hasTiers ? (
-                        <ChevronRight size={13} className={`transition-transform duration-150 ${isSubmenuOpen ? "text-blue-400 rotate-90 sm:rotate-0" : "text-gray-400"}`} />
+                        <ChevronRight size={13} className={`transition-transform duration-150 ${isSubmenuOpen ? "text-blue-500 rotate-90 sm:rotate-0" : "text-app-text-dim"}`} />
                       ) : isDirectActive ? (
-                        <Check size={13} className="text-blue-400 ml-0.5" />
+                        <Check size={13} className="text-blue-500 ml-0.5" />
                       ) : null}
                     </div>
                   </button>
@@ -276,7 +276,7 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
                   {hasTiers && isSubmenuOpen && (
                     <div 
                       data-submenu={group.id}
-                      className="absolute left-full top-0 ml-1.5 w-32 rounded-xl bg-[#232428] border border-white/15 shadow-2xl p-1 z-[60] animate-in fade-in slide-in-from-left-1 duration-100 before:absolute before:top-0 before:-left-3 before:w-4 before:h-full"
+                      className="absolute left-full top-0 ml-1.5 w-32 rounded-xl bg-app-dropdown border border-app-border-strong shadow-2xl p-1 z-[60] animate-in fade-in slide-in-from-left-1 duration-100 before:absolute before:top-0 before:-left-3 before:w-4 before:h-full text-app-text"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {group.tiers!.map((tier) => {
@@ -292,13 +292,13 @@ export default function ModelSelector({ backendUrl }: ModelSelectorProps) {
                             disabled={isUpdating}
                             className={`w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center justify-between transition-colors cursor-pointer ${
                               isTierSelected 
-                                ? "bg-white/15 text-white font-semibold" 
-                                : "hover:bg-white/[0.08] text-gray-300 hover:text-white font-normal"
+                                ? "bg-app-item-active text-app-text font-semibold" 
+                                : "hover:bg-app-item-hover text-app-text-muted hover:text-app-text font-normal"
                             }`}
                           >
                             <span>{tier.name}</span>
                             {isTierSelected && (
-                              <Check size={12} className="text-blue-400" />
+                              <Check size={12} className="text-blue-500" />
                             )}
                           </button>
                         );

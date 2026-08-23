@@ -143,25 +143,25 @@ export default function LeftSidebar({
   );
 
   return (
-    <div className="w-full lg:w-[260px] bg-[#171717] flex flex-col h-full text-sm border-r border-white/5 select-none shrink-0">
+    <div className="w-full lg:w-[260px] bg-app-sidebar flex flex-col h-full text-sm border-r border-app-divider select-none shrink-0">
       {/* Top Header with NotbookLM Logo and Sidebar Toggle (Desktop Only) */}
       <div className="w-full p-3.5 sm:p-4 items-center justify-between hidden lg:flex">
         {/* Logo NotbookLM (Clickable -> New Chat) */}
         <div 
           onClick={onCreateChat}
-          className="flex items-center gap-2 font-bold text-white tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2 font-bold text-app-text tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
         >
           <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm flex items-center justify-center">
             <Sparkles size={14} />
           </div>
-          <span className="text-sm font-bold text-white">NotbookLM</span>
+          <span className="text-sm font-bold text-app-text">NotbookLM</span>
         </div>
 
         {/* Hide Sidebar Button (Only visible on desktop) */}
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-8 w-8 text-gray-400 hover:text-white hover:bg-white/10 cursor-pointer hidden lg:flex"
+          className="h-8 w-8 text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer hidden lg:flex"
           onClick={onToggleSidebar}
           title={t('left.closeSidebar')}
         >
@@ -170,51 +170,51 @@ export default function LeftSidebar({
       </div>
 
       {/* Top Action Items: New chat, Search, & Library */}
-      <div className="w-full px-3 pt-3 lg:pt-1 pb-3 space-y-1 border-b border-white/5">
+      <div className="w-full px-3 pt-3 lg:pt-1 pb-3 space-y-1 border-b border-app-divider">
         <Button 
           variant="ghost" 
           className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
             currentView === "chat" && !activeChatId
-              ? "bg-white/10 text-white font-semibold"
-              : "text-gray-300 hover:text-white hover:bg-white/10"
+              ? "bg-app-item-active text-app-text font-semibold"
+              : "text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
           }`}
           onClick={() => {
             setSearchQuery("");
             onCreateChat();
           }}
         >
-          <SquarePen className="mr-2.5 text-gray-400" size={16} /> {t('ui.newChat')}
+          <SquarePen className="mr-2.5 text-app-text-dim" size={16} /> {t('ui.newChat')}
         </Button>
 
         <Button 
           variant="ghost" 
           className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
             currentView === "library"
-              ? "bg-white/10 text-white font-semibold"
-              : "text-gray-300 hover:text-white hover:bg-white/10"
+              ? "bg-app-item-active text-app-text font-semibold"
+              : "text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
           }`}
           onClick={() => onOpenLibrary?.("all")}
         >
-          <FolderArchive className="mr-2.5 text-gray-400" size={16} /> {t('ui.library')}
+          <FolderArchive className="mr-2.5 text-app-text-dim" size={16} /> {t('ui.library')}
         </Button>
 
         <Button 
           variant="ghost" 
           className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
             currentView === "search" 
-              ? "bg-white/10 text-white font-semibold" 
-              : "text-gray-300 hover:text-white hover:bg-white/10"
+              ? "bg-app-item-active text-app-text font-semibold" 
+              : "text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
           }`}
           onClick={() => onOpenSearch?.()}
         >
-          <Search className="mr-2.5 text-gray-400" size={16} /> {t('ui.searchChat')}
+          <Search className="mr-2.5 text-app-text-dim" size={16} /> {t('ui.searchChat')}
         </Button>
       </div>
 
       {/* History List */}
       <div className="w-full flex-1 overflow-y-auto px-2 sm:px-3 pt-3 space-y-4 min-h-0 custom-scrollbar">
         {filteredSessions.length === 0 ? (
-          <div className="text-center text-xs text-gray-500 py-8 px-4">
+          <div className="text-center text-xs text-app-text-dim py-8 px-4">
             {searchQuery ? t('ui.noConversationsFound') : t('ui.noChatHistory')}
           </div>
         ) : (
@@ -232,15 +232,15 @@ export default function LeftSidebar({
                     onClick={() => onSelectChat(session.id)}
                     className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg transition-all cursor-pointer text-xs ${
                       isActive 
-                        ? "bg-[#2a2a2a] text-white font-medium shadow-sm" 
-                        : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                        ? "bg-app-item-active text-app-text font-medium shadow-sm" 
+                        : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate mr-1">
                       {session.is_pinned ? (
-                        <Pin size={13} className="shrink-0 text-amber-400 fill-amber-400/20" />
+                        <Pin size={13} className="shrink-0 text-amber-500 fill-amber-500/20" />
                       ) : (
-                        <MessageSquare size={14} className="shrink-0 text-gray-400" />
+                        <MessageSquare size={14} className="shrink-0 text-app-text-dim" />
                       )}
                       <span className="truncate">{session.title}</span>
                     </div>
@@ -252,7 +252,7 @@ export default function LeftSidebar({
                           e.stopPropagation();
                           setOpenMenuId(isMenuOpen ? null : session.id);
                         }}
-                        className={`p-1 rounded-md text-gray-400 hover:text-white hover:bg-white/10 transition-opacity cursor-pointer ${
+                        className={`p-1 rounded-md text-app-text-dim hover:text-app-text hover:bg-app-item-hover transition-opacity cursor-pointer ${
                           isMenuOpen || isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                         }`}
                         title={t('left.options')}
@@ -266,30 +266,30 @@ export default function LeftSidebar({
                   {isMenuOpen && (
                     <div
                       ref={menuRef}
-                      className="absolute right-1 top-9 z-50 w-44 rounded-xl bg-[#222222] border border-white/10 shadow-2xl p-1 text-xs text-gray-200 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                      className="absolute right-1 top-9 z-50 w-44 rounded-xl bg-app-dropdown border border-app-border-strong shadow-2xl p-1 text-xs text-app-text animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                     >
                       {/* Rename */}
                       <button
                         onClick={(e) => handleStartRename(session, e)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-app-item-hover hover:text-app-text transition-colors cursor-pointer"
                       >
-                        <Pencil size={13} className="text-gray-400" />
+                        <Pencil size={13} className="text-app-text-dim" />
                         <span>{t('action.rename')}</span>
                       </button>
 
                       {/* Pin / Unpin */}
                       <button
                         onClick={(e) => handleTogglePin(session, e)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-app-item-hover hover:text-app-text transition-colors cursor-pointer"
                       >
                         {session.is_pinned ? (
                           <>
-                            <PinOff size={13} className="text-amber-400" />
+                            <PinOff size={13} className="text-amber-500" />
                             <span>{t('action.unpin')}</span>
                           </>
                         ) : (
                           <>
-                            <Pin size={13} className="text-gray-400" />
+                            <Pin size={13} className="text-app-text-dim" />
                             <span>{t('action.pin')}</span>
                           </>
                         )}
@@ -298,7 +298,7 @@ export default function LeftSidebar({
                       {/* Delete */}
                       <button
                         onClick={(e) => handleRequestDelete(session, e)}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors cursor-pointer"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-500 hover:bg-red-500/10 hover:text-red-600 transition-colors cursor-pointer"
                       >
                         <Trash2 size={13} />
                         <span>{t('action.deleteChat')}</span>
@@ -314,12 +314,10 @@ export default function LeftSidebar({
                 {/* Pinned Section */}
                 {pinnedList.length > 0 && (
                   <div className="space-y-1">
-                    <div className="px-2 text-xs font-medium text-gray-400">
+                    <div className="px-2 text-xs font-semibold text-app-text-dim">
                       {t('ui.pinned')}
                     </div>
-                    <div className="space-y-0.5">
-                      {pinnedList.map(renderSessionItem)}
-                    </div>
+                    {pinnedList.map(renderSessionItem)}
                   </div>
                 )}
 
@@ -341,15 +339,15 @@ export default function LeftSidebar({
       </div>
 
       {/* Desktop-only Footer: App Version & Settings Gear Button */}
-      <div className="hidden lg:flex items-center justify-between px-4 py-3 border-t border-white/10 text-xs text-gray-400 shrink-0">
-        <span className="font-medium tracking-wide text-gray-400 select-none">
-          NotbookLM <span className="text-[11px] text-gray-500 font-mono">v0.1</span>
+      <div className="hidden lg:flex items-center justify-between px-4 py-3 border-t border-app-divider text-xs text-app-text-muted shrink-0">
+        <span className="font-medium tracking-wide text-app-text-muted select-none">
+          NotbookLM <span className="text-[11px] text-app-text-dim font-mono">v0.1</span>
         </span>
         <button
           type="button"
           onClick={onOpenSettings}
           title={t('ui.settings') || "Settings"}
-          className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+          className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
         >
           <Settings size={15} />
         </button>
@@ -363,11 +361,11 @@ export default function LeftSidebar({
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
           >
             <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-white">{t('left.renameConversation')}</h3>
-              <p className="text-xs text-gray-400">
+              <h3 className="text-base font-semibold text-app-text">{t('left.renameConversation')}</h3>
+              <p className="text-xs text-app-text-muted">
                 {t('left.renameDesc')}
               </p>
             </div>
@@ -382,16 +380,16 @@ export default function LeftSidebar({
                   if (e.key === "Escape") handleCancelRename();
                 }}
                 placeholder={t('left.renamePlaceholder')}
-                className="w-full bg-[#1b1c1e] border border-white/15 focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-white outline-none transition-colors"
+                className="w-full bg-app-input-surface border border-app-border focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-app-text outline-none transition-colors"
               />
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={handleCancelRename}
-                  className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+                  className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
                 >
                   {t('action.cancel')}
                 </Button>
@@ -418,21 +416,21 @@ export default function LeftSidebar({
         >
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#28292c] border border-white/10 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
           >
             <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-white">{t('ui.deleteConfirmTitle')}</h3>
-              <p className="text-xs text-gray-400 leading-relaxed">
+              <h3 className="text-base font-semibold text-app-text">{t('ui.deleteConfirmTitle')}</h3>
+              <p className="text-xs text-app-text-muted leading-relaxed">
                 {t('ui.deleteConfirmDesc').replace('{title}', chatToDelete.title)}
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setChatToDelete(null)}
-                className="text-xs text-gray-300 hover:text-white hover:bg-white/10 rounded-lg px-3.5 h-8 cursor-pointer"
+                className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
               >
                 {t('action.cancel')}
               </Button>

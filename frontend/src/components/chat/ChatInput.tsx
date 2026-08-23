@@ -313,33 +313,33 @@ export const ChatInputBox = memo(function ChatInputBox({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
           <div 
             onClick={(e) => e.stopPropagation()}
-            className="bg-[#1e1f20] border border-white/10 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 relative text-left"
+            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 relative text-left text-app-text"
           >
             <div className="flex items-start justify-between">
-              <h3 className="text-base font-semibold text-white">File added to chat only</h3>
+              <h3 className="text-base font-semibold text-app-text">File added to chat only</h3>
               <button
                 type="button"
                 onClick={() => setStorageWarningFile(null)}
-                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                className="text-app-text-muted hover:text-app-text p-1 rounded-lg hover:bg-app-item-hover transition-colors"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p className="text-sm text-gray-300 leading-relaxed">
+            <p className="text-sm text-app-text-muted leading-relaxed">
               You don&apos;t have enough storage space left to save this file. Remove files to create space.
             </p>
 
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[#141415] border border-white/10">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-app-input-surface border border-app-border">
               <div className="flex items-center gap-3 min-w-0 pr-3">
-                <div className="p-2 rounded-lg bg-white/5 border border-white/10 shrink-0">
-                  <FileText size={18} className="text-gray-300" />
+                <div className="p-2 rounded-lg bg-app-item-hover border border-app-border shrink-0">
+                  <FileText size={18} className="text-app-text-muted" />
                 </div>
-                <span className="text-sm font-medium text-white truncate">
+                <span className="text-sm font-medium text-app-text truncate">
                   {storageWarningFile.filename}
                 </span>
               </div>
-              <span className="text-xs text-gray-400 font-mono shrink-0">
+              <span className="text-xs text-app-text-dim font-mono shrink-0">
                 {formatFileSize(storageWarningFile.size)}
               </span>
             </div>
@@ -351,7 +351,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                   setStorageWarningFile(null);
                   onOpenStorage?.();
                 }}
-                className="px-4 py-2 text-xs font-medium text-white bg-[#2a2b2e] hover:bg-[#35373b] border border-white/10 rounded-full transition-colors cursor-pointer shadow-sm"
+                className="px-4 py-2 text-xs font-medium text-app-text bg-app-card hover:bg-app-card-hover border border-app-border rounded-full transition-colors cursor-pointer shadow-sm"
               >
                 Manage storage
               </button>
@@ -361,26 +361,26 @@ export const ChatInputBox = memo(function ChatInputBox({
       )}
 
       {queuedPrompts && queuedPrompts.length > 0 && (
-        <div className="mb-2.5 rounded-2xl bg-[#1e1f22] border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <div className="flex items-center justify-between px-3.5 py-2 border-b border-white/5 bg-[#25262a]">
+        <div className="mb-2.5 rounded-2xl bg-app-card border border-app-border shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 text-app-text">
+          <div className="flex items-center justify-between px-3.5 py-2 border-b border-app-divider bg-app-surface">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-semibold text-gray-200">{t('chat.queuedMessages')}</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-white/10 text-gray-300 text-[11px] font-mono font-medium">
+              <span className="text-[12px] font-semibold text-app-text">{t('chat.queuedMessages')}</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-app-item-active text-app-text text-[11px] font-mono font-medium">
                 {queuedPrompts.length}
               </span>
-              <span className="text-[11px] text-gray-400 font-normal hidden sm:inline">
+              <span className="text-[11px] text-app-text-muted font-normal hidden sm:inline">
                 Sends after agent finishes working
               </span>
             </div>
           </div>
 
-          <div className="p-2 space-y-1 divide-y divide-white/5">
+          <div className="p-2 space-y-1 divide-y divide-app-divider">
             {queuedPrompts.map((qText, qIdx) => (
               <div 
                 key={qIdx}
-                className="flex items-center justify-between gap-3 px-2 py-1.5 group rounded-lg hover:bg-white/[0.03] transition-colors"
+                className="flex items-center justify-between gap-3 px-2 py-1.5 group rounded-lg hover:bg-app-item-hover transition-colors"
               >
-                <p className="text-xs text-gray-200 truncate flex-1 font-normal select-text">
+                <p className="text-xs text-app-text truncate flex-1 font-normal select-text">
                   {qText}
                 </p>
 
@@ -388,10 +388,10 @@ export const ChatInputBox = memo(function ChatInputBox({
                   <button
                     type="button"
                     onClick={() => onPromoteQueuedPrompt?.(qIdx)}
-                    className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                    className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer flex items-center gap-1"
                     title={t('chat.switchProcess')}
                   >
-                    <ArrowRight size={14} className="text-blue-400" />
+                    <ArrowRight size={14} className="text-blue-500" />
                   </button>
                   <button
                     type="button"
@@ -400,7 +400,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                       onRemoveQueuedPrompt?.(qIdx);
                       textareaRef.current?.focus();
                     }}
-                    className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
                     title={t('chat.editQueued')}
                   >
                     <Pencil size={13} />
@@ -408,7 +408,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                   <button
                     type="button"
                     onClick={() => onRemoveQueuedPrompt?.(qIdx)}
-                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                    className="p-1.5 text-app-text-muted hover:text-red-500 hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
                     title={t('chat.removeQueued')}
                   >
                     <Trash2 size={13} />
@@ -431,7 +431,7 @@ export const ChatInputBox = memo(function ChatInputBox({
           <button
             type="button"
             onClick={onClearTargetedSource}
-            className="p-1 text-gray-400 hover:text-white rounded-md hover:bg-white/10 transition-colors shrink-0"
+            className="p-1 text-app-text-muted hover:text-app-text rounded-md hover:bg-app-item-hover transition-colors shrink-0 cursor-pointer"
             title={t('chat.clearTargeted')}
           >
             <X size={14} />
@@ -440,7 +440,7 @@ export const ChatInputBox = memo(function ChatInputBox({
       )}
 
       <div 
-        className={`relative flex flex-col rounded-3xl bg-[#1e1f20] border ${isDragActive ? 'border-blue-500 bg-[#25252b]' : 'border-white/10'} shadow-2xl focus-within:border-white/20 transition-all p-3`}
+        className={`relative flex flex-col rounded-3xl bg-app-input border ${isDragActive ? 'border-blue-500 bg-blue-500/5' : 'border-app-border-strong'} shadow-2xl focus-within:border-blue-500/50 transition-all p-3`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -455,34 +455,34 @@ export const ChatInputBox = memo(function ChatInputBox({
               const isSheet = ['xlsx', 'xls', 'csv', 'tsv'].includes(ext);
 
               return (
-                <div key={i} className="relative group flex items-center bg-[#25262b] rounded-2xl p-2 pr-3.5 border border-white/10 max-w-[260px] shadow-sm">
+                <div key={i} className="relative group flex items-center bg-app-card rounded-2xl p-2 pr-3.5 border border-app-border max-w-[260px] shadow-sm">
                   {att.type === 'image' && att.previewUrl ? (
                     <img src={att.previewUrl} alt={att.filename} className="w-8 h-8 object-cover rounded-xl mr-2.5 shrink-0" />
                   ) : isWord ? (
-                    <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-xs mr-2.5 shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 font-bold text-xs mr-2.5 shrink-0">
                       W
                     </div>
                   ) : isPdf ? (
-                    <div className="w-8 h-8 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-[10px] mr-2.5 shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 font-bold text-[10px] mr-2.5 shrink-0">
                       PDF
                     </div>
                   ) : isZip ? (
-                    <div className="w-8 h-8 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-400 mr-2.5 shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center text-amber-500 mr-2.5 shrink-0">
                       <FileArchive size={16} />
                     </div>
                   ) : isSheet ? (
-                    <div className="w-8 h-8 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mr-2.5 shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-500 mr-2.5 shrink-0">
                       <FileSpreadsheet size={16} />
                     </div>
                   ) : (
-                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-300 mr-2.5 shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-app-item-hover border border-app-border flex items-center justify-center text-app-text-muted mr-2.5 shrink-0">
                       <FileText size={16} />
                     </div>
                   )}
                   <div className="flex flex-col min-w-0 pr-1">
-                    <span className="text-xs text-gray-200 font-medium truncate">{att.filename}</span>
+                    <span className="text-xs text-app-text font-medium truncate">{att.filename}</span>
                     {att.size && att.size > 0 ? (
-                      <span className="text-[10px] text-gray-400 font-mono">{formatFileSize(att.size)}</span>
+                      <span className="text-[10px] text-app-text-dim font-mono">{formatFileSize(att.size)}</span>
                     ) : null}
                   </div>
                   <button 
@@ -492,7 +492,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                       newAtts.splice(i, 1);
                       setAttachments(newAtts);
                     }}
-                    className="absolute -top-1.5 -right-1.5 p-1 bg-[#1e1f20] text-gray-400 hover:text-white hover:bg-red-500/80 rounded-full border border-white/20 opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md"
+                    className="absolute -top-1.5 -right-1.5 p-1 bg-app-card text-app-text-muted hover:text-white hover:bg-red-500 rounded-full border border-app-border opacity-0 group-hover:opacity-100 transition-all cursor-pointer shadow-md"
                   >
                     <X size={12} />
                   </button>
@@ -514,7 +514,7 @@ export const ChatInputBox = memo(function ChatInputBox({
           }}
           placeholder={targetedSource ? t('chat.inputPlaceholderTargeted').replace('{title}', targetedSource.title || targetedSource.filename) : t('chat.inputPlaceholder')}
           rows={1}
-          className="w-full bg-transparent text-white placeholder-gray-400 text-[15px] focus:outline-none resize-none px-3 py-2 leading-relaxed custom-scrollbar max-h-[180px]"
+          className="w-full bg-transparent text-app-text placeholder-app-text-dim text-[15px] focus:outline-none resize-none px-3 py-2 leading-relaxed custom-scrollbar max-h-[180px]"
         />
 
         {/* Bottom Actions Row */}
@@ -524,7 +524,7 @@ export const ChatInputBox = memo(function ChatInputBox({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+              className="p-1.5 rounded-full text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors shrink-0 cursor-pointer"
               title={t('chat.attachTitle')}
             >
               <Plus size={20} />
@@ -555,13 +555,13 @@ export const ChatInputBox = memo(function ChatInputBox({
             <button 
               type="button"
               onClick={onToggleRightSidebar}
-              className="relative p-2 min-[1100px]:px-3 min-[1100px]:py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium border border-white/5 transition-colors cursor-pointer shrink-0 flex items-center justify-center min-[1100px]:gap-1.5"
+              className="relative p-2 min-[1100px]:px-3 min-[1100px]:py-1.5 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text text-xs font-medium border border-app-border transition-colors cursor-pointer shrink-0 flex items-center justify-center min-[1100px]:gap-1.5"
               title={t('chat.sourcesCount').replace('{count}', documentsCount.toString())}
             >
-              <FileText size={15} className="text-blue-400 fill-blue-400/20 shrink-0" />
+              <FileText size={15} className="text-blue-500 fill-blue-500/20 shrink-0" />
               <span className="hidden min-[1100px]:inline">{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
               {documentsCount > 0 && (
-                <span className="min-[1100px]:hidden absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-[#1e1f20] leading-none shadow">
+                <span className="min-[1100px]:hidden absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-app-input leading-none shadow">
                   {documentsCount}
                 </span>
               )}
@@ -571,7 +571,7 @@ export const ChatInputBox = memo(function ChatInputBox({
               <button
                 type="button"
                 onClick={onStopGeneration}
-                className="p-2 rounded-full bg-white text-black hover:bg-gray-200 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
+                className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
                 title={t('chat.stopTitle')}
               >
                 <Square size={16} className="fill-current" />
@@ -581,7 +581,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                 type="button"
                 onClick={handleSend}
                 disabled={(!input.trim() && attachments.length === 0) || isUploading}
-                className="p-2 rounded-full bg-white text-black hover:bg-gray-200 disabled:opacity-30 disabled:hover:bg-white transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0"
+                className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 disabled:opacity-30 disabled:hover:opacity-30 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0"
                 title={t('chat.sendTitle')}
               >
                 <ArrowUp size={18} strokeWidth={2.5} />
@@ -593,7 +593,7 @@ export const ChatInputBox = memo(function ChatInputBox({
 
       {/* Bottom Disclaimer / Caveat */}
       <div className="relative">
-        <p className="text-center text-[11px] text-gray-400 mt-2 px-2 select-none relative z-10">
+        <p className="text-center text-[11px] text-app-text-dim mt-2 px-2 select-none relative z-10">
           {t('chat.mistakeWarning')}
         </p>
       </div>

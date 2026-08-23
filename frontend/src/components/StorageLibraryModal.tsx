@@ -310,36 +310,36 @@ export default function StorageLibraryModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-[#18181b] text-white animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-app-bg text-app-text animate-in fade-in duration-200">
       {/* Top Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-[#141416]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-app-divider bg-app-sidebar">
         <div className="flex items-center gap-3">
           <button 
             onClick={onClose} 
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
             title={t('ui.back')}
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="text-xl font-bold text-white tracking-tight">{t('library.title')}</h1>
+          <h1 className="text-xl font-bold text-app-text tracking-tight">{t('library.title')}</h1>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Search Box */}
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-text-dim" />
             <input 
               type="text" 
               placeholder={t('library.searchPlaceholder')} 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-[#212124] border border-white/10 rounded-full pl-9 pr-4 py-1.5 text-xs text-white w-56 sm:w-72 focus:border-white/20 outline-none transition-all placeholder:text-gray-500"
+              className="bg-app-input border border-app-border rounded-full pl-9 pr-4 py-1.5 text-xs text-app-text w-56 sm:w-72 focus:border-blue-500/50 outline-none transition-all placeholder:text-app-text-dim"
             />
           </div>
 
           <button 
             onClick={onClose} 
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
             title={t('settings.close')}
           >
             <X size={18} />
@@ -348,15 +348,15 @@ export default function StorageLibraryModal({
       </div>
 
       {/* Filter Tabs & Selection Actions Toolbar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-white/5 bg-[#18181b]">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-app-divider bg-app-sidebar">
         {/* Left Side: Category Tabs & Inline Selection Action Bar */}
         <div className="flex items-center gap-3">
           {/* Pill Category Tabs */}
-          <div className="flex items-center gap-1.5 bg-[#212124] p-1 rounded-full border border-white/10">
+          <div className="flex items-center gap-1.5 bg-app-surface p-1 rounded-full border border-app-border">
             <button 
               onClick={() => setCategory("all")}
               className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                category === "all" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
+                category === "all" ? "bg-app-item-active text-app-text shadow-sm" : "text-app-text-muted hover:text-app-text"
               }`}
             >
               {t('library.all')}
@@ -364,7 +364,7 @@ export default function StorageLibraryModal({
             <button 
               onClick={() => setCategory("images")}
               className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                category === "images" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
+                category === "images" ? "bg-app-item-active text-app-text shadow-sm" : "text-app-text-muted hover:text-app-text"
               }`}
             >
               {t('library.images')}
@@ -372,7 +372,7 @@ export default function StorageLibraryModal({
             <button 
               onClick={() => setCategory("documents")}
               className={`px-3.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                category === "documents" ? "bg-[#333338] text-white shadow-sm" : "text-gray-400 hover:text-gray-200"
+                category === "documents" ? "bg-app-item-active text-app-text shadow-sm" : "text-app-text-muted hover:text-app-text"
               }`}
             >
               {t('library.documents')}
@@ -381,30 +381,30 @@ export default function StorageLibraryModal({
 
           {/* Inline Selection Action Bar (Adjacent to category tabs) */}
           {selectedIds.size > 0 && (
-            <div className="flex items-center gap-2 bg-[#28292c] px-3 py-1 rounded-full border border-blue-500/30 animate-in fade-in slide-in-from-left-2 duration-150 shadow-sm">
-              <span className="text-xs font-semibold text-blue-400 pl-1 select-none">
+            <div className="flex items-center gap-2 bg-app-card px-3 py-1 rounded-full border border-blue-500/30 animate-in fade-in slide-in-from-left-2 duration-150 shadow-sm text-app-text">
+              <span className="text-xs font-semibold text-blue-500 pl-1 select-none">
                 {t('library.selectedCount', { count: selectedIds.size.toString() })}
               </span>
-              <div className="h-3.5 w-px bg-white/20"></div>
+              <div className="h-3.5 w-px bg-app-divider"></div>
               
               {/* Download Button */}
               <button 
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="flex items-center gap-1.5 text-xs text-gray-300 hover:text-white font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
+                className="flex items-center gap-1.5 text-xs text-app-text-muted hover:text-app-text font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
                 title={t('library.download')}
               >
                 <Download size={13} />
                 <span>{isDownloading ? t('download.preparing') : t('library.download')}</span>
               </button>
 
-              <div className="h-3.5 w-px bg-white/20"></div>
+              <div className="h-3.5 w-px bg-app-divider"></div>
 
               {/* Delete Button */}
               <button 
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
+                className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600 font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
                 title={t('library.delete')}
               >
                 <Trash2 size={13} />
@@ -416,17 +416,17 @@ export default function StorageLibraryModal({
 
         {/* Right Side: View Mode Toggle */}
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center bg-[#212124] border border-white/10 rounded-lg p-0.5">
+          <div className="flex items-center bg-app-surface border border-app-border rounded-lg p-0.5">
             <button 
               onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "list" ? "bg-white/10 text-white" : "text-gray-400 hover:text-gray-200"}`}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "list" ? "bg-app-item-active text-app-text" : "text-app-text-muted hover:text-app-text"}`}
               title={t('library.listView')}
             >
               <ListIcon size={14} />
             </button>
             <button 
               onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "grid" ? "bg-white/10 text-white" : "text-gray-400 hover:text-gray-200"}`}
+              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "grid" ? "bg-app-item-active text-app-text" : "text-app-text-muted hover:text-app-text"}`}
               title={t('library.gridView')}
             >
               <LayoutGrid size={14} />
@@ -438,30 +438,30 @@ export default function StorageLibraryModal({
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-scroll [scrollbar-gutter:stable] custom-scrollbar p-6 relative">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-400 space-y-2">
-            <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-            <p className="text-xs text-gray-500">{t('settings.loadingStorage')}</p>
+          <div className="flex flex-col items-center justify-center h-64 text-app-text-dim space-y-2">
+            <div className="w-6 h-6 border-2 border-app-border border-t-blue-500 rounded-full animate-spin"></div>
+            <p className="text-xs text-app-text-dim">{t('settings.loadingStorage')}</p>
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-500 space-y-3">
+          <div className="flex flex-col items-center justify-center h-64 text-app-text-dim space-y-3">
             <LayoutGrid size={40} className="opacity-25" />
             <p className="text-sm font-medium">{t('library.noItems')}</p>
-            <p className="text-xs text-gray-600">{t('library.noItemsDesc')}</p>
+            <p className="text-xs text-app-text-dim">{t('library.noItemsDesc')}</p>
           </div>
         ) : viewMode === "list" ? (
           <div className="w-full space-y-1">
             {/* Table Header */}
-            <div className="flex items-center px-3 py-2 text-xs font-semibold text-gray-500 border-b border-white/5 select-none">
+            <div className="flex items-center px-3 py-2 text-xs font-semibold text-app-text-dim border-b border-app-divider select-none">
               <div className="w-9 shrink-0 flex items-center">
                 <input 
                   ref={headerCheckboxRef}
                   type="checkbox"
                   checked={isAllSelected}
                   onChange={toggleSelectAll}
-                  className="rounded border-white/20 bg-black/40 cursor-pointer"
+                  className="rounded border-app-border-strong bg-transparent cursor-pointer accent-blue-500"
                 />
               </div>
-
+              
               {/* Name Column */}
               <div 
                 onClick={() => {
@@ -472,12 +472,12 @@ export default function StorageLibraryModal({
                     setSortOrder("asc");
                   }
                 }}
-                className="flex-1 min-w-0 pr-4 pl-1 cursor-pointer hover:text-gray-300 transition-colors select-none truncate"
+                className="flex-1 min-w-0 pr-4 pl-1 cursor-pointer hover:text-app-text transition-colors select-none truncate"
               >
                 {t('library.colName')} {sort === "name" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
 
-              {/* Conversation Column */}
+              {/* Conversation / Chat Column */}
               <div 
                 onClick={() => {
                   if (sort === "chat") {
@@ -487,12 +487,12 @@ export default function StorageLibraryModal({
                     setSortOrder("asc");
                   }
                 }}
-                className="w-44 sm:w-48 md:w-56 shrink-0 text-left pr-4 cursor-pointer hover:text-gray-300 transition-colors select-none truncate"
+                className="w-44 sm:w-48 md:w-56 shrink-0 text-left pr-4 cursor-pointer hover:text-app-text transition-colors select-none truncate"
               >
                 {t('library.colConversation')} {sort === "chat" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
 
-              {/* Modified Column */}
+              {/* Modified Date Column */}
               <div 
                 onClick={() => {
                   if (sort === "date") {
@@ -502,7 +502,7 @@ export default function StorageLibraryModal({
                     setSortOrder("desc");
                   }
                 }}
-                className="w-28 shrink-0 text-left cursor-pointer hover:text-gray-300 select-none"
+                className="w-28 shrink-0 text-left cursor-pointer hover:text-app-text select-none"
               >
                 {t('library.colModified')} {sort === "date" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
@@ -517,18 +517,18 @@ export default function StorageLibraryModal({
                     setSortOrder("desc");
                   }
                 }}
-                className="w-24 shrink-0 text-right cursor-pointer hover:text-gray-300 pr-2 select-none"
+                className="w-24 shrink-0 text-right pr-2 cursor-pointer hover:text-app-text select-none"
               >
                 {t('library.colSize')} {sort === "size" && (sortOrder === "desc" ? "↓" : "↑")}
               </div>
             </div>
 
-            {/* Rows */}
-            {items.map(item => (
+            {/* Table Rows */}
+            {items.map((item) => (
               <div 
                 key={item.id} 
-                className={`flex items-center px-3 py-2.5 hover:bg-white/5 rounded-xl cursor-pointer transition-colors group ${
-                  selectedIds.has(item.id) ? "bg-white/5" : ""
+                className={`flex items-center px-3 py-2.5 hover:bg-app-item-hover rounded-xl cursor-pointer transition-colors group ${
+                  selectedIds.has(item.id) ? "bg-app-item-active" : ""
                 }`}
                 onClick={() => toggleSelect(item.id)}
               >
@@ -538,14 +538,14 @@ export default function StorageLibraryModal({
                     type="checkbox" 
                     checked={selectedIds.has(item.id)}
                     onChange={() => toggleSelect(item.id)}
-                    className="rounded border-white/20 bg-black/40 cursor-pointer"
+                    className="rounded border-app-border-strong bg-transparent cursor-pointer accent-blue-500"
                   />
                 </div>
 
                 {/* Name */}
                 <div className="flex-1 min-w-0 pr-4 flex items-center gap-3">
                   {renderFileIcon(item.name)}
-                  <span className="text-sm text-gray-200 group-hover:text-white truncate font-medium">
+                  <span className="text-sm text-app-text truncate font-medium">
                     {item.name}
                   </span>
                 </div>
@@ -562,23 +562,23 @@ export default function StorageLibraryModal({
                         }
                       }}
                       title={t('library.goToConversation', { title: item.chat_title })}
-                      className="text-gray-400 group-hover:text-gray-200 hover:!text-blue-400 transition-colors inline-flex items-center gap-1.5 truncate max-w-full cursor-pointer"
+                      className="text-app-text-muted hover:!text-blue-500 transition-colors inline-flex items-center gap-1.5 truncate max-w-full"
                     >
                       <MessageSquare size={13} className="shrink-0 opacity-70" />
                       <span className="truncate">{item.chat_title}</span>
                     </span>
                   ) : (
-                    <span className="text-gray-600 font-mono text-[11px]">-</span>
+                    <span className="text-app-text-dim font-mono text-[11px]">-</span>
                   )}
                 </div>
 
                 {/* Modified */}
-                <div className="w-28 shrink-0 text-xs text-gray-400 font-mono">
+                <div className="w-28 shrink-0 text-xs text-app-text-dim font-mono">
                   {formatDate(item.modified)}
                 </div>
 
                 {/* Size */}
-                <div className="w-24 shrink-0 text-xs text-gray-400 text-right font-mono pr-2">
+                <div className="w-24 shrink-0 text-xs text-app-text-dim text-right font-mono pr-2">
                   {formatBytes(item.size_bytes)}
                 </div>
               </div>
@@ -591,8 +591,8 @@ export default function StorageLibraryModal({
               <div 
                 key={item.id} 
                 onClick={() => toggleSelect(item.id)}
-                className={`relative group cursor-pointer aspect-square rounded-2xl border bg-[#18181a] overflow-hidden hover:border-white/20 transition-all flex flex-col justify-between p-3.5 ${
-                  selectedIds.has(item.id) ? "border-blue-500 ring-1 ring-blue-500 bg-blue-500/5" : "border-white/10"
+                className={`relative group cursor-pointer aspect-square rounded-2xl border bg-app-card overflow-hidden hover:border-app-border-strong transition-all flex flex-col justify-between p-3.5 ${
+                  selectedIds.has(item.id) ? "border-blue-500 ring-1 ring-blue-500 bg-blue-500/5" : "border-app-border"
                 }`}
               >
                 {/* Checkbox Top Left */}
@@ -604,7 +604,7 @@ export default function StorageLibraryModal({
                     type="checkbox" 
                     checked={selectedIds.has(item.id)}
                     onChange={() => toggleSelect(item.id)}
-                    className="w-4 h-4 rounded border-white/20 bg-black/40 cursor-pointer"
+                    className="w-4 h-4 rounded border-app-border-strong bg-transparent cursor-pointer accent-blue-500"
                   />
                 </div>
 
@@ -615,8 +615,8 @@ export default function StorageLibraryModal({
 
                 {/* Bottom Info Bar */}
                 <div className="w-full text-left pt-1">
-                  <p className="text-xs font-medium text-gray-200 group-hover:text-white truncate">{item.name}</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5 truncate font-mono">
+                  <p className="text-xs font-medium text-app-text truncate">{item.name}</p>
+                  <p className="text-[11px] text-app-text-dim mt-0.5 truncate font-mono">
                     {item.chat_title ? item.chat_title : formatBytes(item.size_bytes)}
                   </p>
                 </div>

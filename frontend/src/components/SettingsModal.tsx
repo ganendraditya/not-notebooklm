@@ -22,6 +22,8 @@ import { ChatSession } from "@/stores/chatStore";
 import { useTranslation, languages } from "@/lib/i18n";
 import StorageLibraryModal from "./StorageLibraryModal";
 
+import { useTheme, type AppearanceMode } from "@/lib/theme";
+
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -72,10 +74,8 @@ export default function SettingsModal({
   const [isCleaningOrphans, setIsCleaningOrphans] = useState(false);
   const [cleanReport, setCleanReport] = useState<string | null>(null);
   
-  // General Tab Settings State
-  const [appearance, setAppearance] = useState<string>("system");
-  const [contrast, setContrast] = useState<string>("default");
-  const [accentColor, setAccentColor] = useState<string>("default");
+  // General Tab Settings State from ThemeContext
+  const { appearance, setAppearance } = useTheme();
 
   // Notifications State
   const [notifyResponses, setNotifyResponses] = useState<string>("push");
@@ -92,15 +92,6 @@ export default function SettingsModal({
   // Load preferences from localStorage
   useEffect(() => {
     try {
-      const savedAppearance = localStorage.getItem("notbooklm_appearance");
-      if (savedAppearance) setAppearance(savedAppearance);
-
-      const savedContrast = localStorage.getItem("notbooklm_contrast");
-      if (savedContrast) setContrast(savedContrast);
-
-      const savedAccent = localStorage.getItem("notbooklm_accent");
-      if (savedAccent) setAccentColor(savedAccent);
-
       const savedNotifyResponses = localStorage.getItem("notbooklm_notify_responses");
       if (savedNotifyResponses) setNotifyResponses(savedNotifyResponses);
 
@@ -115,18 +106,7 @@ export default function SettingsModal({
   }, []);
 
   const handleAppearanceChange = (val: string) => {
-    setAppearance(val);
-    try { localStorage.setItem("notbooklm_appearance", val); } catch {}
-  };
-
-  const handleContrastChange = (val: string) => {
-    setContrast(val);
-    try { localStorage.setItem("notbooklm_contrast", val); } catch {}
-  };
-
-  const handleAccentChange = (val: string) => {
-    setAccentColor(val);
-    try { localStorage.setItem("notbooklm_accent", val); } catch {}
+    setAppearance(val as AppearanceMode);
   };
 
   const handleNotifyResponsesChange = (val: string) => {
@@ -142,16 +122,6 @@ export default function SettingsModal({
   const handleNotifyDownloadsChange = (val: string) => {
     setNotifyDownloads(val);
     try { localStorage.setItem("notbooklm_notify_downloads", val); } catch {}
-  };
-
-  const accentColorMap: Record<string, string> = {
-    default: "bg-blue-500",
-    blue: "bg-blue-500",
-    violet: "bg-purple-500",
-    emerald: "bg-emerald-500",
-    amber: "bg-amber-500",
-    rose: "bg-rose-500",
-    zinc: "bg-zinc-400"
   };
 
   // Reset Confirmation State
@@ -271,20 +241,20 @@ export default function SettingsModal({
   return (
     <div 
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
     >
       <div 
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#212124] border border-white/10 rounded-2xl w-full max-w-2xl h-[580px] max-h-[85vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
+        className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-2xl h-[580px] max-h-[85vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#1b1c1e] shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-app-border bg-app-sidebar shrink-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-white">{t('settings.title')}</h2>
+            <h2 className="text-base font-semibold text-app-text">{t('settings.title')}</h2>
           </div>
           <button 
             onClick={onClose}
-            className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -293,16 +263,16 @@ export default function SettingsModal({
         {/* Modal Body: Two-column layout with sidebar tabs */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Settings Left Tab Menu */}
-          <div className="w-48 bg-[#18181b] border-r border-white/5 p-2 space-y-1 shrink-0 overflow-y-auto custom-scrollbar">
+          <div className="w-48 bg-app-sidebar border-r border-app-divider p-2 space-y-1 shrink-0 overflow-y-auto custom-scrollbar">
             <button
               onClick={() => setActiveTab("general")}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
                 activeTab === "general" 
-                  ? "bg-white/10 text-white shadow-sm" 
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                  ? "bg-app-item-active text-app-text shadow-sm" 
+                  : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
               }`}
             >
-              <Settings size={15} className={activeTab === "general" ? "text-blue-400" : "text-gray-400"} />
+              <Settings size={15} className={activeTab === "general" ? "text-blue-500" : "text-app-text-dim"} />
               <span>{t('settings.general')}</span>
             </button>
 
@@ -310,11 +280,11 @@ export default function SettingsModal({
               onClick={() => setActiveTab("storage")}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
                 activeTab === "storage" 
-                  ? "bg-white/10 text-white shadow-sm" 
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                  ? "bg-app-item-active text-app-text shadow-sm" 
+                  : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
               }`}
             >
-              <HardDrive size={15} className={activeTab === "storage" ? "text-blue-400" : "text-gray-400"} />
+              <HardDrive size={15} className={activeTab === "storage" ? "text-blue-500" : "text-app-text-dim"} />
               <span>{t('settings.storage')}</span>
             </button>
 
@@ -322,30 +292,30 @@ export default function SettingsModal({
               onClick={() => setActiveTab("notifications")}
               className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
                 activeTab === "notifications" 
-                  ? "bg-white/10 text-white shadow-sm" 
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                  ? "bg-app-item-active text-app-text shadow-sm" 
+                  : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
               }`}
             >
-              <Bell size={15} className={activeTab === "notifications" ? "text-blue-400" : "text-gray-400"} />
+              <Bell size={15} className={activeTab === "notifications" ? "text-blue-500" : "text-app-text-dim"} />
               <span>{t('settings.notifications')}</span>
             </button>
           </div>
 
           {/* Settings Tab Content */}
-          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar min-h-0">
+          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar min-h-0 bg-app-modal">
             {/* TAB: GENERAL */}
             {activeTab === "general" && (
               <div>
-                <h3 className="text-sm font-semibold text-white">{t('settings.general')}</h3>
+                <h3 className="text-sm font-semibold text-app-text">{t('settings.general')}</h3>
 
-                <div className="divide-y divide-white/5 mt-4">
+                <div className="divide-y divide-app-divider mt-4">
                   {/* Appearance */}
                   <div className="flex items-center justify-between gap-6 py-3">
-                    <span className="min-w-0 flex-1 text-sm text-gray-200 truncate">{t('settings.appearance')}</span>
+                    <span className="min-w-0 flex-1 text-sm text-app-text truncate">{t('settings.appearance')}</span>
                     <select 
                       value={appearance}
                       onChange={(e) => handleAppearanceChange(e.target.value)}
-                      className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer"
+                      className="shrink-0 w-44 bg-app-input-surface border border-app-border text-xs text-app-text rounded-lg px-3 py-1.5 outline-none cursor-pointer"
                     >
                       <option value="system">{t('settings.appearance.system')}</option>
                       <option value="dark">{t('settings.appearance.dark')}</option>
@@ -353,48 +323,13 @@ export default function SettingsModal({
                     </select>
                   </div>
 
-                  {/* Contrast */}
-                  <div className="flex items-center justify-between gap-6 py-3">
-                    <span className="min-w-0 flex-1 text-sm text-gray-200 truncate">{t('settings.contrast')}</span>
-                    <select 
-                      value={contrast}
-                      onChange={(e) => handleContrastChange(e.target.value)}
-                      className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer"
-                    >
-                      <option value="system">{t('settings.contrast.system')}</option>
-                      <option value="default">{t('settings.contrast.default')}</option>
-                      <option value="high">{t('settings.contrast.high')}</option>
-                    </select>
-                  </div>
-
-                  {/* Accent Color */}
-                  <div className="flex items-center justify-between gap-6 py-3">
-                    <span className="min-w-0 flex-1 text-sm text-gray-200 truncate">{t('settings.accent')}</span>
-                    <div className="shrink-0 flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${accentColorMap[accentColor] || "bg-blue-500"} shrink-0`}></div>
-                      <select 
-                        value={accentColor}
-                        onChange={(e) => handleAccentChange(e.target.value)}
-                        className="w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer"
-                      >
-                        <option value="default">{t('settings.accent.default')}</option>
-                        <option value="blue">{t('settings.accent.blue')}</option>
-                        <option value="violet">{t('settings.accent.violet')}</option>
-                        <option value="emerald">{t('settings.accent.emerald')}</option>
-                        <option value="amber">{t('settings.accent.amber')}</option>
-                        <option value="rose">{t('settings.accent.rose')}</option>
-                        <option value="zinc">{t('settings.accent.zinc')}</option>
-                      </select>
-                    </div>
-                  </div>
-
                   {/* Language */}
                   <div className="flex items-center justify-between gap-6 py-3">
-                    <span className="min-w-0 flex-1 text-sm text-gray-200 truncate">{t('settings.language')}</span>
+                    <span className="min-w-0 flex-1 text-sm text-app-text truncate">{t('settings.language')}</span>
                     <select 
                       value={language}
                       onChange={(e) => setLanguage(e.target.value)}
-                      className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer truncate"
+                      className="shrink-0 w-44 bg-app-input-surface border border-app-border text-xs text-app-text rounded-lg px-3 py-1.5 outline-none cursor-pointer truncate"
                     >
                       <option value="auto">{t('language.auto')}</option>
                       {languages.map(lang => (
@@ -411,19 +346,19 @@ export default function SettingsModal({
             {/* TAB: NOTIFICATIONS */}
             {activeTab === "notifications" && (
               <div>
-                <h3 className="text-sm font-semibold text-white">{t('settings.notifications')}</h3>
+                <h3 className="text-sm font-semibold text-app-text">{t('settings.notifications')}</h3>
 
-                <div className="divide-y divide-white/5 mt-4">
+                <div className="divide-y divide-app-divider mt-4">
                   {/* Responses */}
                   <div className="flex items-center justify-between gap-6 py-3">
                     <div className="min-w-0 flex-1 pr-2">
-                      <h4 className="text-sm font-medium text-gray-200 truncate">{t('settings.notifications.responses')}</h4>
-                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed break-words">{t('settings.notifications.responses.desc')}</p>
+                      <h4 className="text-sm font-medium text-app-text truncate">{t('settings.notifications.responses')}</h4>
+                      <p className="text-xs text-app-text-muted mt-0.5 leading-relaxed break-words">{t('settings.notifications.responses.desc')}</p>
                     </div>
                     <select 
                       value={notifyResponses}
                       onChange={(e) => handleNotifyResponsesChange(e.target.value)}
-                      className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer"
+                      className="shrink-0 w-44 bg-app-input-surface border border-app-border text-xs text-app-text rounded-lg px-3 py-1.5 outline-none cursor-pointer"
                     >
                       <option value="push">{t('settings.notifications.push')}</option>
                       <option value="off">{t('settings.notifications.off')}</option>
@@ -433,13 +368,13 @@ export default function SettingsModal({
                   {/* Tasks & Queue */}
                   <div className="flex items-center justify-between gap-6 py-3">
                     <div className="min-w-0 flex-1 pr-2">
-                      <h4 className="text-sm font-medium text-gray-200 truncate">{t('settings.notifications.tasks')}</h4>
-                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed break-words">{t('settings.notifications.tasks.desc')}</p>
+                      <h4 className="text-sm font-medium text-app-text truncate">{t('settings.notifications.tasks')}</h4>
+                      <p className="text-xs text-app-text-muted mt-0.5 leading-relaxed break-words">{t('settings.notifications.tasks.desc')}</p>
                     </div>
                     <select 
                       value={notifyTasks}
                       onChange={(e) => handleNotifyTasksChange(e.target.value)}
-                      className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer"
+                      className="shrink-0 w-44 bg-app-input-surface border border-app-border text-xs text-app-text rounded-lg px-3 py-1.5 outline-none cursor-pointer"
                     >
                       <option value="push">{t('settings.notifications.push')}</option>
                       <option value="off">{t('settings.notifications.off')}</option>
@@ -449,13 +384,13 @@ export default function SettingsModal({
                   {/* Downloads & Exports */}
                   <div className="flex items-center justify-between gap-6 py-3">
                     <div className="min-w-0 flex-1 pr-2">
-                      <h4 className="text-sm font-medium text-gray-200 truncate">{t('settings.notifications.downloads')}</h4>
-                      <p className="text-xs text-gray-400 mt-0.5 leading-relaxed break-words">{t('settings.notifications.downloads.desc')}</p>
+                      <h4 className="text-sm font-medium text-app-text truncate">{t('settings.notifications.downloads')}</h4>
+                      <p className="text-xs text-app-text-muted mt-0.5 leading-relaxed break-words">{t('settings.notifications.downloads.desc')}</p>
                     </div>
                     <select 
                       value={notifyDownloads}
                       onChange={(e) => handleNotifyDownloadsChange(e.target.value)}
-                      className="shrink-0 w-44 bg-[#18181b] border border-white/10 text-xs text-white rounded-lg px-3 py-1.5 outline-none cursor-pointer"
+                      className="shrink-0 w-44 bg-app-input-surface border border-app-border text-xs text-app-text rounded-lg px-3 py-1.5 outline-none cursor-pointer"
                     >
                       <option value="push">{t('settings.notifications.push')}</option>
                       <option value="off">{t('settings.notifications.off')}</option>
@@ -468,17 +403,17 @@ export default function SettingsModal({
             {/* TAB: STORAGE & MEDIA */}
             {activeTab === "storage" && (
               <div>
-                <h3 className="text-sm font-semibold text-white">{t('settings.storage')}</h3>
+                <h3 className="text-sm font-semibold text-app-text">{t('settings.storage')}</h3>
 
                 <div className="space-y-6 mt-4">
                   <div className="py-3">
-                    <div className="text-xs text-gray-300 font-medium">
-                      <span className="font-semibold text-white">
+                    <div className="text-xs text-app-text-muted font-medium">
+                      <span className="font-semibold text-app-text">
                         {storageSummary ? formatBytes(storageSummary.used_bytes || 0) : "0 B"}
                       </span>{" "}
                       of {storageSummary ? formatBytes(storageSummary.total_bytes) : "10.0 GB"} {t('settings.used')}
                     </div>
-                    <div className="mt-2.5 w-full bg-[#18181b] rounded-full h-2.5 overflow-hidden flex border border-white/10">
+                    <div className="mt-2.5 w-full bg-app-input-surface rounded-full h-2.5 overflow-hidden flex border border-app-border">
                       {storageSummary && (
                         <>
                           <div 
@@ -494,11 +429,11 @@ export default function SettingsModal({
                   {/* Manage Storage Section */}
                   <div>
                     <div className="mb-2">
-                      <div className="text-sm font-semibold text-white">{t('settings.manageStorage')}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{t('settings.manageStorageDesc')}</div>
+                      <div className="text-sm font-semibold text-app-text">{t('settings.manageStorage')}</div>
+                      <div className="text-xs text-app-text-muted mt-0.5">{t('settings.manageStorageDesc')}</div>
                     </div>
 
-                    <div className="divide-y divide-white/5">
+                    <div className="divide-y divide-app-divider">
                       {/* Files Row */}
                       <button
                         onClick={() => {
@@ -510,17 +445,17 @@ export default function SettingsModal({
                             setLibraryOpen(true);
                           }
                         }}
-                        className="w-full flex items-center justify-between py-3.5 px-0 hover:bg-white/[0.03] transition-colors text-left group cursor-pointer"
+                        className="w-full flex items-center justify-between py-3.5 px-0 hover:bg-app-item-hover transition-colors text-left group cursor-pointer"
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm text-gray-200 group-hover:text-white font-medium">
+                          <div className="text-sm text-app-text font-medium">
                             {t('settings.filesAndDocuments')}
                           </div>
-                          <div className="text-xs text-gray-400 mt-0.5">
+                          <div className="text-xs text-app-text-muted mt-0.5">
                             {storageSummary ? formatBytes(storageSummary.categories?.documents || 0) : "0 B"} • {t('settings.filesCount', { count: (storageSummary?.category_counts?.documents ?? 0).toString() })}
                           </div>
                         </div>
-                        <ChevronRight size={16} className="text-gray-500 group-hover:text-gray-300 transition-colors shrink-0 ml-2" />
+                        <ChevronRight size={16} className="text-app-text-dim group-hover:text-app-text transition-colors shrink-0 ml-2" />
                       </button>
 
                       {/* Images Row */}
@@ -534,17 +469,17 @@ export default function SettingsModal({
                             setLibraryOpen(true);
                           }
                         }}
-                        className="w-full flex items-center justify-between py-3.5 px-0 hover:bg-white/[0.03] transition-colors text-left group cursor-pointer"
+                        className="w-full flex items-center justify-between py-3.5 px-0 hover:bg-app-item-hover transition-colors text-left group cursor-pointer"
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm text-gray-200 group-hover:text-white font-medium">
+                          <div className="text-sm text-app-text font-medium">
                             {t('settings.imagesAndMedia')}
                           </div>
-                          <div className="text-xs text-gray-400 mt-0.5">
+                          <div className="text-xs text-app-text-muted mt-0.5">
                             {storageSummary ? formatBytes(storageSummary.categories?.images || 0) : "0 B"} • {t('settings.imagesCount', { count: (storageSummary?.category_counts?.images ?? 0).toString() })}
                           </div>
                         </div>
-                        <ChevronRight size={16} className="text-gray-500 group-hover:text-gray-300 transition-colors shrink-0 ml-2" />
+                        <ChevronRight size={16} className="text-app-text-dim group-hover:text-app-text transition-colors shrink-0 ml-2" />
                       </button>
                     </div>
                   </div>
@@ -555,8 +490,8 @@ export default function SettingsModal({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-6">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-200">{t('settings.orphanCleanup')}</div>
-                          <div className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                          <div className="text-sm font-medium text-app-text">{t('settings.orphanCleanup')}</div>
+                          <div className="text-xs text-app-text-muted mt-0.5 leading-relaxed">
                             {t('settings.orphanCleanupDesc')}
                           </div>
                         </div>
@@ -566,14 +501,14 @@ export default function SettingsModal({
                             variant="outline"
                             onClick={handleCleanOrphans}
                             disabled={isCleaningOrphans}
-                            className="w-full text-xs border-white/10 text-gray-200 hover:bg-white/10 hover:text-white cursor-pointer h-8 whitespace-nowrap px-3"
+                            className="w-full text-xs border-app-border text-app-text hover:bg-app-item-hover cursor-pointer h-8 whitespace-nowrap px-3"
                           >
                             {isCleaningOrphans ? t('settings.cleaning') : t('settings.cleanOrphans')}
                           </Button>
                         </div>
                       </div>
                       {cleanReport && (
-                        <div className="text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+                        <div className="text-xs text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
                           {cleanReport}
                         </div>
                       )}
@@ -583,8 +518,8 @@ export default function SettingsModal({
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-6">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-200">{t('settings.batchDelete')}</div>
-                          <div className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                          <div className="text-sm font-medium text-app-text">{t('settings.batchDelete')}</div>
+                          <div className="text-xs text-app-text-muted mt-0.5 leading-relaxed">
                             {t('settings.batchDeleteDesc')}
                           </div>
                         </div>
@@ -596,7 +531,7 @@ export default function SettingsModal({
                             className={`w-full text-xs h-8 justify-center whitespace-nowrap px-3 transition-colors ${
                               selectedChatIds.length > 0
                                 ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm"
-                                : "bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed opacity-50"
+                                : "bg-app-item-hover border border-app-border text-app-text-dim cursor-not-allowed opacity-50"
                             }`}
                           >
                             {isDeletingChats
@@ -609,8 +544,8 @@ export default function SettingsModal({
                       </div>
 
                       {sessions.length > 0 ? (
-                        <div className="border border-white/10 rounded-xl overflow-hidden divide-y divide-white/5 bg-transparent">
-                          <div className="flex items-center justify-between px-3 py-2 bg-white/[0.02] text-xs font-medium text-gray-300">
+                        <div className="border border-app-border rounded-xl overflow-hidden divide-y divide-app-divider bg-transparent">
+                          <div className="flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted">
                             <span>Conversations</span>
                             <div className="flex items-center shrink-0 pr-[8px]">
                               <input 
@@ -621,11 +556,11 @@ export default function SettingsModal({
                               />
                             </div>
                           </div>
-                          <div className="max-h-40 overflow-y-auto custom-scrollbar divide-y divide-white/5">
+                          <div className="max-h-40 overflow-y-auto custom-scrollbar divide-y divide-app-divider">
                             {sessions.map((s) => (
                               <label 
                                 key={s.id} 
-                                className="flex items-center justify-between px-3 py-2 hover:bg-white/5 text-xs text-gray-300 cursor-pointer transition-colors"
+                                className="flex items-center justify-between px-3 py-2 hover:bg-app-item-hover text-xs text-app-text cursor-pointer transition-colors"
                               >
                                 <span className="truncate pr-3">{s.title}</span>
                                 <input 
@@ -639,7 +574,7 @@ export default function SettingsModal({
                           </div>
                         </div>
                       ) : (
-                        <div className="text-xs text-gray-400">{t('settings.noConversations')}</div>
+                        <div className="text-xs text-app-text-dim">{t('settings.noConversations')}</div>
                       )}
                     </div>
 
@@ -647,8 +582,8 @@ export default function SettingsModal({
                     <div className="space-y-2 pt-4">
                       <div className="flex items-center justify-between gap-6">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-red-400">{t('settings.factoryReset')}</div>
-                          <div className="text-xs text-gray-400 mt-0.5 leading-relaxed">
+                          <div className="text-sm font-medium text-red-500">{t('settings.factoryReset')}</div>
+                          <div className="text-xs text-app-text-muted mt-0.5 leading-relaxed">
                             {t('settings.factoryResetDesc')}
                           </div>
                         </div>
@@ -657,7 +592,7 @@ export default function SettingsModal({
                             size="sm"
                             variant="destructive"
                             onClick={() => setIsResetConfirmOpen(true)}
-                            className="w-full text-xs bg-red-950/60 text-red-400 border border-red-500/30 hover:bg-red-900 hover:text-white cursor-pointer h-8 whitespace-nowrap px-3"
+                            className="w-full text-xs bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/30 hover:bg-red-500/20 cursor-pointer h-8 whitespace-nowrap px-3"
                           >
                             {t('settings.factoryReset')}
                           </Button>
@@ -676,25 +611,25 @@ export default function SettingsModal({
       {isResetConfirmOpen && (
         <div 
           onClick={(e) => e.stopPropagation()}
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-100"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-100"
         >
-          <div className="bg-[#28292c] border border-red-500/30 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2.5 text-red-400 font-semibold text-sm">
+          <div className="bg-app-modal border border-red-500/30 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 text-app-text">
+            <div className="flex items-center gap-2.5 text-red-500 font-semibold text-sm">
               <AlertTriangle size={18} />
               <span>Confirm Factory Reset</span>
             </div>
-            <p className="text-xs text-gray-300 leading-relaxed">
+            <p className="text-xs text-app-text-muted leading-relaxed">
               This will permanently destroy all conversations, uploaded documents, and vector data.
-              To confirm, type <span className="font-mono text-red-300 font-bold">reset-all-data</span> below:
+              To confirm, type <span className="font-mono text-red-500 font-bold">reset-all-data</span> below:
             </p>
             <input
               type="text"
               value={resetConfirmInput}
               onChange={(e) => setResetConfirmInput(e.target.value)}
               placeholder="reset-all-data"
-              className="w-full bg-[#18181b] border border-white/15 focus:border-red-500 rounded-xl px-3 py-2 text-xs text-white outline-none font-mono"
+              className="w-full bg-app-input-surface border border-app-border focus:border-red-500 rounded-xl px-3 py-2 text-xs text-app-text outline-none font-mono"
             />
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
               <Button
                 variant="ghost"
                 size="sm"
@@ -702,7 +637,7 @@ export default function SettingsModal({
                   setIsResetConfirmOpen(false);
                   setResetConfirmInput("");
                 }}
-                className="text-xs text-gray-400 hover:text-white cursor-pointer h-8"
+                className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer h-8"
               >
                 Cancel
               </Button>

@@ -210,12 +210,12 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       <div 
         className={`relative inline-block max-w-[95%] sm:max-w-[85%] leading-relaxed tracking-wide ${
           isUser 
-            ? "bg-[#18181b] border border-white/5 text-gray-200 px-5 py-3.5 rounded-[1.5rem] rounded-tr-sm shadow-md"
-            : "text-gray-300 w-full"
+            ? "bg-app-user-bubble border border-app-border text-app-text px-5 py-3.5 rounded-[1.5rem] rounded-tr-sm shadow-md"
+            : "text-app-text w-full"
         }`}
       >
         {isUser && msg.attachments && msg.attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 mb-2 pb-2 border-b border-white/10">
+          <div className="flex flex-wrap gap-2 mb-2 pb-2 border-b border-app-divider">
             {msg.attachments.map((att, idx) => {
               const fileHref = att.url?.startsWith("http") ? att.url : `${backendUrl}${att.url || ""}`;
               return (
@@ -223,19 +223,19 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                   key={idx} 
                   href={fileHref} 
                   target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 p-1.5 pr-3 rounded-lg bg-black/40 border border-white/5 hover:border-white/20 transition-colors"
+                  rel="noopener noreferrer" 
+                  className="flex items-center gap-2 p-1.5 pr-3 rounded-lg bg-black/5 dark:bg-black/40 border border-app-border hover:border-app-border-strong transition-colors"
                 >
                   {att.type === "image" ? (
-                    <div className="w-10 h-10 rounded shrink-0 overflow-hidden bg-black/60">
+                    <div className="w-10 h-10 rounded shrink-0 overflow-hidden bg-black/10 dark:bg-black/60">
                       <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
                     </div>
                   ) : (
-                    <div className="w-10 h-10 rounded shrink-0 bg-white/5 flex items-center justify-center">
-                      <FileText size={18} className="text-gray-400" />
+                    <div className="w-10 h-10 rounded shrink-0 bg-app-item-hover flex items-center justify-center">
+                      <FileText size={18} className="text-app-text-muted" />
                     </div>
                   )}
-                  <span className="text-[11px] text-gray-300 font-medium truncate max-w-[150px]">{att.filename}</span>
+                  <span className="text-[11px] text-app-text font-medium truncate max-w-[150px]">{att.filename}</span>
                 </a>
               );
             })}
@@ -244,49 +244,49 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
     <div className="w-full space-y-2 min-w-0 overflow-hidden break-words">
       {/* 1. Main Markdown Text Content */}
-      <div className="prose prose-invert max-w-none text-[16px] leading-[1.65] break-words [word-break:break-word]">
+      <div className="prose dark:prose-invert max-w-none text-[16px] leading-[1.65] break-words [word-break:break-word] text-app-text">
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
-            p: ({ children }) => <p className="mb-2 last:mb-0 text-gray-100 leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "p")}</p>,
-            h1: ({ children }) => <h1 className="text-2xl font-bold text-white mt-5 mb-2.5 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h1")}</h1>,
-            h2: ({ children }) => <h2 className="text-xl font-bold text-white mt-4 mb-2 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h2")}</h2>,
-            h3: ({ children }) => <h3 className="text-lg font-semibold text-white mt-3 mb-1.5">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h3")}</h3>,
-            ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ul>,
-            ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-gray-100">{children}</ol>,
+            p: ({ children }) => <p className="mb-2 last:mb-0 text-app-text leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "p")}</p>,
+            h1: ({ children }) => <h1 className="text-2xl font-bold text-app-text mt-5 mb-2.5 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h1")}</h1>,
+            h2: ({ children }) => <h2 className="text-xl font-bold text-app-text mt-4 mb-2 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h2")}</h2>,
+            h3: ({ children }) => <h3 className="text-lg font-semibold text-app-text mt-3 mb-1.5">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h3")}</h3>,
+            ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-app-text">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-app-text">{children}</ol>,
             li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "li")}</li>,
             em: ({ children }) => <em className="italic">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "em")}</em>,
-            strong: ({ children }) => <strong className="font-semibold text-white">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "strong")}</strong>,
+            strong: ({ children }) => <strong className="font-semibold text-app-text">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "strong")}</strong>,
             a: ({ href, children }) => (
               <a 
                 href={href} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="text-blue-400 hover:text-blue-300 underline font-medium break-all"
+                className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium break-all"
               >
                 {children}
               </a>
             ),
             table: ({ children }) => (
-              <div className="overflow-x-auto my-4 rounded-xl border border-white/10 shadow-md">
-                <table className="w-full text-left text-sm border-collapse bg-[#1a1b1e]">
+              <div className="overflow-x-auto my-4 rounded-xl border border-app-border shadow-md">
+                <table className="w-full text-left text-sm border-collapse bg-app-table-bg">
                   {children}
                 </table>
               </div>
             ),
-            thead: ({ children }) => <thead className="bg-[#24262b] text-gray-200 border-b border-white/10 font-semibold">{children}</thead>,
-            tbody: ({ children }) => <tbody className="divide-y divide-white/5">{children}</tbody>,
-            tr: ({ children }) => <tr className="hover:bg-white/[0.02] transition-colors">{children}</tr>,
-            th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-gray-200 text-xs tracking-wider uppercase">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "th")}</th>,
-            td: ({ children }) => <td className="py-2.5 px-3 text-gray-300 text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "td")}</td>,
+            thead: ({ children }) => <thead className="bg-app-table-header text-app-text border-b border-app-border font-semibold">{children}</thead>,
+            tbody: ({ children }) => <tbody className="divide-y divide-app-divider">{children}</tbody>,
+            tr: ({ children }) => <tr className="hover:bg-app-item-hover transition-colors">{children}</tr>,
+            th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "th")}</th>,
+            td: ({ children }) => <td className="py-2.5 px-3 text-app-text-muted text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "td")}</td>,
             blockquote: ({ children }) => (
-              <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-gray-300 bg-blue-500/5 rounded-r-lg italic">
+              <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-app-text-muted bg-blue-500/5 rounded-r-lg italic">
                 {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "blockquote")}
               </blockquote>
             ),
             pre: ({ children }) => (
               <div className="relative group my-3">
-                <pre className="bg-[#16171a] p-3.5 rounded-xl overflow-x-auto text-xs text-gray-200 font-mono border border-white/10">
+                <pre className="bg-app-code-bg p-3.5 rounded-xl overflow-x-auto text-xs text-app-text font-mono border border-app-border">
                   {children}
                 </pre>
               </div>
@@ -294,7 +294,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             code: ({ inline, className, children, ...props }: any) => {
               if (inline) {
                 return (
-                  <code className="bg-white/10 text-blue-300 px-1.5 py-0.5 rounded text-xs font-mono break-all" {...props}>
+                  <code className="bg-app-item-hover text-blue-600 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs font-mono break-all" {...props}>
                     {children}
                   </code>
                 );
@@ -313,36 +313,36 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
       {/* 2. Embedded Interactive Paper Source Cards */}
       {sources.length > 0 && (
-        <div className="mt-4 rounded-2xl bg-[#1e1f20] border border-white/10 overflow-hidden shadow-lg animate-in fade-in duration-200">
+        <div className="mt-4 rounded-2xl bg-app-card border border-app-border overflow-hidden shadow-lg animate-in fade-in duration-200">
           <div 
-            className="p-3.5 px-4 bg-[#28292c] flex items-center justify-between cursor-pointer select-none hover:bg-[#2d2e32] transition-colors border-b border-white/5"
+            className="p-3.5 px-4 bg-app-surface flex items-center justify-between cursor-pointer select-none hover:bg-app-card-hover transition-colors border-b border-app-divider"
             onClick={() => setIsCollapsed(!isCollapsed)}
           >
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm text-white">
+              <span className="font-semibold text-sm text-app-text">
                 Report &amp; Outside sources ({sources.length})
               </span>
             </div>
-            <div className="flex items-center gap-2 text-gray-400">
+            <div className="flex items-center gap-2 text-app-text-muted">
               <ChevronDown size={16} className={`transition-transform duration-200 ${isCollapsed ? "-rotate-90" : ""}`} />
             </div>
           </div>
 
           {!isCollapsed && (
             <>
-              <div className="px-4 py-2 bg-[#222325] border-b border-white/5 flex items-center justify-between text-xs text-gray-300">
-                <span className="text-gray-400">{t('chat.researchFound')}</span>
+              <div className="px-4 py-2 bg-app-surface border-b border-app-divider flex items-center justify-between text-xs text-app-text-muted">
+                <span className="text-app-text-muted">{t('chat.researchFound')}</span>
                 {novelSourcesCount > 0 && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
-                    className="hover:text-white font-medium cursor-pointer transition-colors text-blue-400"
+                    className="hover:text-blue-600 font-medium cursor-pointer transition-colors text-blue-500"
                   >
                     {allNovelSelected ? "Deselect All" : "Select All"}
                   </button>
                 )}
               </div>
 
-              <div className="max-h-[360px] overflow-y-auto divide-y divide-white/5 p-1 custom-scrollbar">
+              <div className="max-h-[360px] overflow-y-auto divide-y divide-app-divider p-1 custom-scrollbar">
                 {sources.map((src, i) => {
                   const isAlreadyAdded = isDuplicateSource(src);
                   const isChecked = isAlreadyAdded || isSourceChecked(src, i);
@@ -358,28 +358,28 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                         isAlreadyAdded 
                           ? "bg-emerald-500/[0.04] border border-emerald-500/10 cursor-default" 
                           : isChecked 
-                            ? "bg-white/[0.04] hover:bg-white/5 cursor-pointer" 
-                            : "hover:bg-white/5 cursor-pointer"
+                            ? "bg-app-item-hover cursor-pointer" 
+                            : "hover:bg-app-item-hover cursor-pointer"
                       }`}
                     >
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${
-                          isAlreadyAdded ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"
+                          isAlreadyAdded ? "bg-emerald-500/10 text-emerald-500" : "bg-blue-500/10 text-blue-500"
                         }`}>
                           <BookOpen size={16} />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2 flex-wrap">
-                            <h4 className="text-xs font-semibold text-white leading-snug line-clamp-2">
+                            <h4 className="text-xs font-semibold text-app-text leading-snug line-clamp-2">
                               {src.title}
                             </h4>
                             {src.year && src.year !== "N/A" && (
-                              <span className="text-[11px] text-gray-400 shrink-0">
+                              <span className="text-[11px] text-app-text-dim shrink-0">
                                 ({src.year})
                               </span>
                             )}
                             {isAlreadyAdded && (
-                              <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full shrink-0">
+                              <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full shrink-0">
                                 In Sources
                               </span>
                             )}
@@ -391,19 +391,19 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                                 target="_blank" 
                                 rel="noopener noreferrer" 
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline flex items-center gap-1 shrink-0"
+                                className="text-[11px] text-blue-500 hover:text-blue-600 hover:underline flex items-center gap-1 shrink-0"
                               >
                                 <span>{src.doi ? `DOI: ${src.doi}` : "Journal Link"}</span>
                                 <ExternalLink size={10} />
                               </a>
                             ) : src.doi ? (
-                              <span className="text-[11px] text-gray-400 font-mono">
+                              <span className="text-[11px] text-app-text-dim font-mono">
                                 DOI: {src.doi}
                               </span>
                             ) : null}
                           </div>
                           {src.snippet && (
-                            <p className="text-[11px] text-gray-400 line-clamp-1 leading-normal mt-0.5">
+                            <p className="text-[11px] text-app-text-muted line-clamp-1 leading-normal mt-0.5">
                               {src.snippet}
                             </p>
                           )}
@@ -412,10 +412,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
                       <div className={`w-4 h-4 rounded border mt-1 flex items-center justify-center shrink-0 transition-colors ${
                         isAlreadyAdded 
-                          ? "bg-emerald-600/30 border-emerald-500/40 text-emerald-300"
+                          ? "bg-emerald-600/30 border-emerald-500/40 text-emerald-600 dark:text-emerald-300"
                           : isChecked 
                             ? "bg-blue-600 border-blue-600 text-white" 
-                            : "border-gray-500 bg-transparent"
+                            : "border-app-border-strong bg-transparent"
                       }`}>
                         {(isAlreadyAdded || isChecked) && <Check size={11} strokeWidth={3} />}
                       </div>
@@ -424,8 +424,8 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 })}
               </div>
 
-              <div className="p-3 px-4 bg-[#18191a] border-t border-white/5 flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-medium">
+              <div className="p-3 px-4 bg-app-surface border-t border-app-divider flex items-center justify-between">
+                <span className="text-xs text-app-text-muted font-medium">
                   {selectedCount}/{novelSourcesCount} new selected
                 </span>
 

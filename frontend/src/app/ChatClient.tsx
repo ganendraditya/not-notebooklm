@@ -826,16 +826,16 @@ export default function ChatClient() {
   const [mobileTab, setMobileTab] = useState<"menu" | "chat" | "sources">("chat");
 
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-[#212121]">
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-app-bg text-app-text">
       {/* Mobile/Tablet NotebookLM Top Header Bar (< lg) */}
-      <div className="lg:hidden shrink-0 bg-[#1b1c1e] border-b border-white/10 z-50 flex flex-col">
+      <div className="lg:hidden shrink-0 bg-app-sidebar border-b border-app-border z-50 flex flex-col">
         {/* Row 1: Brand / Active Chat Title + Settings Gear Icon */}
         <div className="px-4 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 pr-2">
             <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm flex items-center justify-center shrink-0">
               <Sparkles size={14} />
             </div>
-            <span className="text-sm font-semibold text-white truncate">
+            <span className="text-sm font-semibold text-app-text truncate">
               {currentView === "library" 
                 ? "Library" 
                 : currentView === "search" 
@@ -847,7 +847,7 @@ export default function ChatClient() {
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
               title="Settings"
             >
               <Settings size={17} />
@@ -856,7 +856,7 @@ export default function ChatClient() {
         </div>
 
         {/* Row 2: 3 Tabs (Menu | Chat | Sources) */}
-        <div className="flex items-center justify-around text-xs font-medium border-t border-white/5">
+        <div className="flex items-center justify-around text-xs font-medium border-t border-app-divider">
           {/* 1. Left Tab: Menu */}
           <button
             onClick={() => {
@@ -864,7 +864,7 @@ export default function ChatClient() {
               setIsSidebarOpen(true);
             }}
             className={`flex-1 py-2.5 text-center relative transition-colors cursor-pointer ${
-              mobileTab === "menu" ? "text-white font-semibold" : "text-gray-400 hover:text-gray-200"
+              mobileTab === "menu" ? "text-app-text font-semibold" : "text-app-text-muted hover:text-app-text"
             }`}
           >
             <span>{t('nav.menu')}</span>
@@ -879,7 +879,7 @@ export default function ChatClient() {
               setMobileTab("chat");
             }}
             className={`flex-1 py-2.5 text-center relative transition-colors cursor-pointer ${
-              mobileTab === "chat" ? "text-white font-semibold" : "text-gray-400 hover:text-gray-200"
+              mobileTab === "chat" ? "text-app-text font-semibold" : "text-app-text-muted hover:text-app-text"
             }`}
           >
             <span>
@@ -898,7 +898,7 @@ export default function ChatClient() {
                 setIsRightSidebarOpen(true);
               }}
               className={`flex-1 py-2.5 text-center relative transition-colors cursor-pointer ${
-                mobileTab === "sources" ? "text-white font-semibold" : "text-gray-400 hover:text-gray-200"
+                mobileTab === "sources" ? "text-app-text font-semibold" : "text-app-text-muted hover:text-app-text"
               }`}
             >
               <span>{t('nav.sources')}</span>
@@ -908,7 +908,7 @@ export default function ChatClient() {
             </button>
           ) : (
             <div
-              className="flex-1 py-2.5 text-center relative text-gray-600 cursor-not-allowed select-none opacity-40"
+              className="flex-1 py-2.5 text-center relative text-app-text-dim cursor-not-allowed select-none opacity-40"
               title={t('nav.sourcesDisabledTooltip')}
             >
               <span>{t('nav.sources')}</span>

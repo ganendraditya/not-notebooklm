@@ -313,19 +313,19 @@ export default function SearchFilterPopover({
   );
 
   return (
-    <div className="relative inline-block text-left select-none" ref={containerRef}>
+    <div className="relative inline-block text-left select-none text-app-text" ref={containerRef}>
       {/* Trigger Button (Responsive: Pill with Text on >=1100px, Compact Icon on <1100px) */}
       <button
         type="button"
         onClick={onToggle}
         className={
           appliedCount > 0 
-            ? "flex items-center gap-1.5 px-2.5 min-[1100px]:px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-300 font-medium shadow-sm" 
-            : "flex items-center gap-1.5 px-2.5 min-[1100px]:px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-white/5 hover:bg-white/10 border-white/5 text-gray-300 hover:text-white font-medium"
+            ? "flex items-center gap-1.5 px-2.5 min-[1100px]:px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-500 font-medium shadow-sm" 
+            : "flex items-center gap-1.5 px-2.5 min-[1100px]:px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-app-item-hover hover:bg-app-item-active border-app-border text-app-text-muted hover:text-app-text font-medium"
         }
         title={t('filter.button')}
       >
-        <SlidersHorizontal size={13} className={appliedCount > 0 ? "text-blue-400" : "text-gray-400"} />
+        <SlidersHorizontal size={13} className={appliedCount > 0 ? "text-blue-500" : "text-app-text-dim"} />
         <span className="hidden min-[1100px]:inline">{t('filter.button')}</span>
         {appliedCount > 0 && (
           <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-mono font-semibold">
@@ -336,19 +336,19 @@ export default function SearchFilterPopover({
 
       {/* Floating Popover Card Opening Upwards */}
       {isOpen && (
-        <div className="absolute bottom-full right-0 mb-2.5 w-[360px] sm:w-[440px] rounded-2xl bg-[#1c1d21] border border-white/15 shadow-2xl z-50 p-4 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150 text-gray-200">
+        <div className="absolute bottom-full right-0 mb-2.5 w-[360px] sm:w-[440px] rounded-2xl bg-app-dropdown border border-app-border-strong shadow-2xl z-50 p-4 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150 text-app-text">
           
           {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 border-b border-white/10">
+          <div className="flex items-center justify-between pb-3 border-b border-app-divider">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+              <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
                 <SlidersHorizontal size={15} />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white leading-tight">
+                <h3 className="text-sm font-semibold text-app-text leading-tight">
                   {t('filter.title')}
                 </h3>
-                <span className="text-[11px] text-gray-400">
+                <span className="text-[11px] text-app-text-muted">
                   {t('filter.desc')}
                 </span>
               </div>
@@ -357,7 +357,7 @@ export default function SearchFilterPopover({
             <button
               type="button"
               onClick={onClose}
-              className="h-7 w-7 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+              className="h-7 w-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
               title="Close (Esc)"
             >
               <X size={15} />
@@ -369,8 +369,8 @@ export default function SearchFilterPopover({
             
             {/* 1. Year Range Filter */}
             <div className="space-y-2">
-              <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
-                <Calendar size={13} className="text-blue-400" />
+              <span className="text-xs font-semibold text-app-text flex items-center gap-1.5">
+                <Calendar size={13} className="text-blue-500" />
                 {t('filter.year')}
               </span>
 
@@ -380,8 +380,8 @@ export default function SearchFilterPopover({
                   onClick={() => setYearPreset(localFilter.yearFrom === "2023" && localFilter.yearTo === "2026" ? "" : "2023", localFilter.yearFrom === "2023" && localFilter.yearTo === "2026" ? "" : "2026")}
                   className={
                     localFilter.yearFrom === "2023" && localFilter.yearTo === "2026"
-                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-white font-medium shadow-sm"
-                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
+                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
+                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
                   }
                 >
                   {t('filter.past3years')}
@@ -391,8 +391,8 @@ export default function SearchFilterPopover({
                   onClick={() => setYearPreset(localFilter.yearFrom === "2020" && localFilter.yearTo === "2026" ? "" : "2020", localFilter.yearFrom === "2020" && localFilter.yearTo === "2026" ? "" : "2026")}
                   className={
                     localFilter.yearFrom === "2020" && localFilter.yearTo === "2026"
-                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-white font-medium shadow-sm"
-                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
+                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
+                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
                   }
                 >
                   {t('filter.past5years')}
@@ -402,8 +402,8 @@ export default function SearchFilterPopover({
                   onClick={() => setYearPreset(localFilter.yearFrom === "2015" && localFilter.yearTo === "2026" ? "" : "2015", localFilter.yearFrom === "2015" && localFilter.yearTo === "2026" ? "" : "2026")}
                   className={
                     localFilter.yearFrom === "2015" && localFilter.yearTo === "2026"
-                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-white font-medium shadow-sm"
-                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300"
+                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
+                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
                   }
                 >
                   {t('filter.past10years')}
@@ -416,23 +416,23 @@ export default function SearchFilterPopover({
                   placeholder={t('filter.from')}
                   value={localFilter.yearFrom}
                   onChange={(e) => setLocalFilter(prev => ({ ...prev, yearFrom: e.target.value }))}
-                  className="w-full bg-[#131417] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-app-input-surface border border-app-border rounded-lg px-2.5 py-1.5 text-xs text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500"
                 />
-                <span className="text-gray-400 text-xs">-</span>
+                <span className="text-app-text-dim text-xs">-</span>
                 <input
                   type="number"
                   placeholder={t('filter.to')}
                   value={localFilter.yearTo}
                   onChange={(e) => setLocalFilter(prev => ({ ...prev, yearTo: e.target.value }))}
-                  className="w-full bg-[#131417] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-app-input-surface border border-app-border rounded-lg px-2.5 py-1.5 text-xs text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500"
                 />
               </div>
             </div>
 
             {/* 2. Minimum Citations Filter */}
-            <div className="space-y-2 pt-2 border-t border-white/10">
-              <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
-                <Award size={13} className="text-blue-400" />
+            <div className="space-y-2 pt-2 border-t border-app-divider">
+              <span className="text-xs font-semibold text-app-text flex items-center gap-1.5">
+                <Award size={13} className="text-blue-500" />
                 {t('filter.minCitations')}
               </span>
 
@@ -455,8 +455,8 @@ export default function SearchFilterPopover({
                       }))}
                       className={
                         isSelected
-                          ? "py-1 px-1 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-white font-semibold shadow-sm text-[11px]"
-                          : "py-1 px-1 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300 text-[11px]"
+                          ? "py-1 px-1 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-semibold shadow-sm text-[11px]"
+                          : "py-1 px-1 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text text-[11px]"
                       }
                     >
                       {preset.label}
@@ -467,28 +467,28 @@ export default function SearchFilterPopover({
 
               {/* Custom numeric input */}
               <div className="flex items-center gap-2 pt-0.5">
-                <span className="text-[11px] text-gray-400 shrink-0">{t('filter.customMin')}</span>
+                <span className="text-[11px] text-app-text-dim shrink-0">{t('filter.customMin')}</span>
                 <input
                   type="number"
                   min="0"
                   placeholder="e.g. 5, 20, 100"
                   value={localFilter.minCitations}
                   onChange={(e) => setLocalFilter(prev => ({ ...prev, minCitations: e.target.value }))}
-                  className="w-full bg-[#131417] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500 font-mono"
+                  className="w-full bg-app-input-surface border border-app-border rounded-lg px-2.5 py-1.5 text-xs text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500 font-mono"
                 />
               </div>
             </div>
 
             {/* 3. Journal Indexing & Reputation (Scopus & SINTA) */}
-            <div className="space-y-2.5 pt-2 border-t border-white/10">
-              <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
-                <Award size={13} className="text-blue-400" />
+            <div className="space-y-2.5 pt-2 border-t border-app-divider">
+              <span className="text-xs font-semibold text-app-text flex items-center gap-1.5">
+                <Award size={13} className="text-blue-500" />
                 {t('filter.journalReputation')}
               </span>
 
               {/* Scopus Quartiles Chips */}
               <div className="space-y-1">
-                <div className="text-[11px] text-gray-400 font-medium">{t('filter.scopusQuartile')}</div>
+                <div className="text-[11px] text-app-text-muted font-medium">{t('filter.scopusQuartile')}</div>
                 <div className="grid grid-cols-4 gap-1.5">
                   {SCOPUS_QUARTILES.map((sc) => {
                     const isChecked = localFilter.scopusQuartiles.includes(sc.id);
@@ -499,8 +499,8 @@ export default function SearchFilterPopover({
                         onClick={() => toggleScopus(sc.id)}
                         className={
                           isChecked
-                            ? "py-1.5 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-white font-semibold shadow-sm text-xs"
-                            : "py-1.5 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300 text-xs"
+                            ? "py-1.5 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-semibold shadow-sm text-xs"
+                            : "py-1.5 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text text-xs"
                         }
                         title={`Scopus ${sc.label} (${sc.desc})`}
                       >
@@ -513,7 +513,7 @@ export default function SearchFilterPopover({
 
               {/* SINTA Indonesia Chips */}
               <div className="space-y-1 pt-1">
-                <div className="text-[11px] text-gray-400 font-medium">National Accreditation (SINTA):</div>
+                <div className="text-[11px] text-app-text-muted font-medium">National Accreditation (SINTA):</div>
                 <div className="grid grid-cols-6 gap-1 text-[11px]">
                   {SINTA_TIERS.map((st) => {
                     const isChecked = localFilter.sintaTiers.includes(st.id);
@@ -524,8 +524,8 @@ export default function SearchFilterPopover({
                         onClick={() => toggleSinta(st.id)}
                         className={
                           isChecked
-                            ? "py-1 rounded-md border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-white font-semibold shadow-sm text-[11px]"
-                            : "py-1 rounded-md border text-center transition-colors cursor-pointer bg-white/5 border-white/10 hover:bg-white/10 text-gray-300 text-[11px]"
+                            ? "py-1 rounded-md border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-semibold shadow-sm text-[11px]"
+                            : "py-1 rounded-md border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text text-[11px]"
                         }
                       >
                         {st.id}
@@ -537,9 +537,9 @@ export default function SearchFilterPopover({
             </div>
 
             {/* 4. On/Off Toggles (Exclude Preprints & Open Access) */}
-            <div className="space-y-2 pt-2 border-t border-white/10">
-              <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
-                <BookOpen size={13} className="text-blue-400" />
+            <div className="space-y-2 pt-2 border-t border-app-divider">
+              <span className="text-xs font-semibold text-app-text flex items-center gap-1.5">
+                <BookOpen size={13} className="text-blue-500" />
                 {t('filter.manuscriptAccess')}
               </span>
 
@@ -547,13 +547,13 @@ export default function SearchFilterPopover({
                 {/* Toggle: Exclude Preprints */}
                 <div 
                   onClick={() => setLocalFilter(prev => ({ ...prev, excludePreprints: !prev.excludePreprints }))}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-white/[0.08] border border-white/10 cursor-pointer transition-colors"
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-app-card hover:bg-app-card-hover border border-app-border cursor-pointer transition-colors"
                 >
                   <div>
-                    <div className="text-xs font-medium text-white flex items-center gap-1.5">
+                    <div className="text-xs font-medium text-app-text flex items-center gap-1.5">
                       <span>{t('filter.excludePreprints')}</span>
                     </div>
-                    <div className="text-[10px] text-gray-400">
+                    <div className="text-[10px] text-app-text-dim">
                       {t('filter.excludePreprintsDesc')}
                     </div>
                   </div>
@@ -563,14 +563,14 @@ export default function SearchFilterPopover({
                     className={
                       localFilter.excludePreprints 
                         ? "w-9 h-5 rounded-full bg-blue-600 p-0.5 transition-colors shrink-0 flex items-center" 
-                        : "w-9 h-5 rounded-full bg-white/15 p-0.5 transition-colors shrink-0 flex items-center"
+                        : "w-9 h-5 rounded-full bg-app-item-active p-0.5 transition-colors shrink-0 flex items-center"
                     }
                   >
                     <div 
                       className={
                         localFilter.excludePreprints 
                           ? "w-4 h-4 rounded-full bg-white shadow-md transform translate-x-4 transition-transform duration-200" 
-                          : "w-4 h-4 rounded-full bg-gray-300 shadow-md transform translate-x-0 transition-transform duration-200"
+                          : "w-4 h-4 rounded-full bg-app-text-dim shadow-md transform translate-x-0 transition-transform duration-200"
                       } 
                     />
                   </div>
@@ -579,13 +579,13 @@ export default function SearchFilterPopover({
                 {/* Toggle: Open Access Only */}
                 <div 
                   onClick={() => setLocalFilter(prev => ({ ...prev, openAccessOnly: !prev.openAccessOnly }))}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 hover:bg-white/[0.08] border border-white/10 cursor-pointer transition-colors"
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-app-card hover:bg-app-card-hover border border-app-border cursor-pointer transition-colors"
                 >
                   <div>
-                    <div className="text-xs font-medium text-white flex items-center gap-1.5">
+                    <div className="text-xs font-medium text-app-text flex items-center gap-1.5">
                       <span>{t('filter.openAccessOnly')}</span>
                     </div>
-                    <div className="text-[10px] text-gray-400">
+                    <div className="text-[10px] text-app-text-dim">
                       {t('filter.openAccessOnlyDesc')}
                     </div>
                   </div>
@@ -594,14 +594,14 @@ export default function SearchFilterPopover({
                     className={
                       localFilter.openAccessOnly 
                         ? "w-9 h-5 rounded-full bg-blue-600 p-0.5 transition-colors shrink-0 flex items-center" 
-                        : "w-9 h-5 rounded-full bg-white/15 p-0.5 transition-colors shrink-0 flex items-center"
+                        : "w-9 h-5 rounded-full bg-app-item-active p-0.5 transition-colors shrink-0 flex items-center"
                     }
                   >
                     <div 
                       className={
                         localFilter.openAccessOnly 
                           ? "w-4 h-4 rounded-full bg-white shadow-md transform translate-x-4 transition-transform duration-200" 
-                          : "w-4 h-4 rounded-full bg-gray-300 shadow-md transform translate-x-0 transition-transform duration-200"
+                          : "w-4 h-4 rounded-full bg-app-text-dim shadow-md transform translate-x-0 transition-transform duration-200"
                       } 
                     />
                   </div>
@@ -610,10 +610,10 @@ export default function SearchFilterPopover({
             </div>
 
             {/* 5. Language Selector (Multi-select Checkboxes) */}
-            <div className="space-y-2 pt-2 border-t border-white/10">
+            <div className="space-y-2 pt-2 border-t border-app-divider">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5 truncate">
-                  <Globe size={13} className="text-blue-400 shrink-0" />
+                <span className="text-xs font-semibold text-app-text flex items-center gap-1.5 truncate">
+                  <Globe size={13} className="text-blue-500 shrink-0" />
                   <span className="truncate">
                     {localFilter.languages.length ? t('filter.languagesCount').replace('{count}', localFilter.languages.length.toString()) : t('filter.languagesAll')}
                   </span>
@@ -622,20 +622,20 @@ export default function SearchFilterPopover({
 
               {/* Search Language or Country Input */}
               <div className="relative">
-                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-app-text-dim" />
                 <input
                   type="text"
                   placeholder={t('filter.searchLangPlaceholder')}
                   value={languageSearch}
                   onChange={(e) => setLanguageSearch(e.target.value)}
-                  className="w-full bg-[#131417] border border-white/10 rounded-lg pl-7 pr-2.5 py-1.5 text-[11.5px] text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-app-input-surface border border-app-border rounded-lg pl-7 pr-2.5 py-1.5 text-[11.5px] text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               {/* Scrollable Language Grid */}
               <div className="grid grid-cols-2 gap-1.5 max-h-[160px] overflow-y-auto pr-0.5 custom-scrollbar">
                 {filteredLanguages.filter(l => l.id !== "all").length === 0 ? (
-                  <div className="col-span-2 text-center text-xs text-gray-500 py-3">
+                  <div className="col-span-2 text-center text-xs text-app-text-dim py-3">
                     {t('filter.noLangFound')}
                   </div>
                 ) : (
@@ -650,8 +650,8 @@ export default function SearchFilterPopover({
                           onClick={() => toggleLanguage(lang.id)}
                           className={
                             isChecked
-                              ? "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-blue-600/20 border-blue-500/70 text-white font-medium shadow-sm"
-                              : "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-white/5 border-white/10 hover:bg-white/10 text-gray-300 hover:text-white"
+                              ? "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-blue-600/20 border-blue-500/70 text-app-text font-medium shadow-sm"
+                              : "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
                           }
                         >
                           <div className="flex items-center gap-1.5 truncate min-w-0">
@@ -660,7 +660,7 @@ export default function SearchFilterPopover({
                               <div className="flex items-center gap-1 truncate">
                                 <span className="truncate">{lang.label}</span>
                                 {lang.papersCount !== undefined && (
-                                  <span className="text-[9.5px] text-gray-500 font-mono shrink-0">
+                                  <span className="text-[9.5px] text-app-text-dim font-mono shrink-0">
                                     ({formatPaperCount(lang.papersCount)})
                                   </span>
                                 )}
@@ -668,7 +668,7 @@ export default function SearchFilterPopover({
                             </div>
                           </div>
                           <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                            isChecked ? "bg-blue-600 border-blue-500 text-white" : "border-gray-500 bg-transparent"
+                            isChecked ? "bg-blue-600 border-blue-500 text-white" : "border-app-border-strong bg-transparent"
                           }`}>
                             {isChecked && <Check size={10} strokeWidth={3} />}
                           </div>
@@ -680,27 +680,27 @@ export default function SearchFilterPopover({
             </div>
 
             {/* 6. Fields of Study (Multi-select Checkboxes) */}
-            <div className="space-y-2 pt-2 border-t border-white/10">
-              <span className="text-xs font-semibold text-gray-200 flex items-center gap-1.5">
-                <GraduationCap size={13} className="text-blue-400" />
+            <div className="space-y-2 pt-2 border-t border-app-divider">
+              <span className="text-xs font-semibold text-app-text flex items-center gap-1.5">
+                <GraduationCap size={13} className="text-blue-500" />
                 {localFilter.fieldsOfStudy.length ? t('filter.fieldsCount').replace('{count}', localFilter.fieldsOfStudy.length.toString()) : t('filter.fieldsAll')}
               </span>
 
               {/* Search Domain Input */}
               <div className="relative">
-                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-app-text-dim" />
                 <input
                   type="text"
                   placeholder={t('filter.searchFieldPlaceholder')}
                   value={domainSearch}
                   onChange={(e) => setDomainSearch(e.target.value)}
-                  className="w-full bg-[#131417] border border-white/10 rounded-lg pl-7 pr-2.5 py-1.5 text-[11.5px] text-white placeholder:text-gray-500 focus:outline-none focus:border-blue-500"
+                  className="w-full bg-app-input-surface border border-app-border rounded-lg pl-7 pr-2.5 py-1.5 text-[11.5px] text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-1.5 max-h-[160px] overflow-y-auto pr-0.5 custom-scrollbar">
                 {filteredDomains.length === 0 ? (
-                  <div className="col-span-2 text-center text-xs text-gray-500 py-3">
+                  <div className="col-span-2 text-center text-xs text-app-text-dim py-3">
                     {t('filter.noFieldFound')}
                   </div>
                 ) : (
@@ -713,8 +713,8 @@ export default function SearchFilterPopover({
                         onClick={() => toggleField(f.id)}
                         className={
                           isChecked 
-                            ? "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-blue-600/20 border-blue-500/70 text-white font-medium shadow-sm"
-                            : "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-white/5 border-white/10 hover:bg-white/10 text-gray-300 hover:text-white"
+                            ? "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-blue-600/20 border-blue-500/70 text-app-text font-medium shadow-sm"
+                            : "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
                         }
                       >
                         <div className="flex items-center gap-1.5 truncate">
@@ -722,7 +722,7 @@ export default function SearchFilterPopover({
                           <span className="truncate">{t(`filter.field.${f.id}`) || f.label}</span>
                         </div>
                         <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                          isChecked ? "bg-blue-600 border-blue-500 text-white" : "border-gray-500 bg-transparent"
+                          isChecked ? "bg-blue-600 border-blue-500 text-white" : "border-app-border-strong bg-transparent"
                         }`}>
                           {isChecked && <Check size={10} strokeWidth={3} />}
                         </div>
@@ -736,11 +736,11 @@ export default function SearchFilterPopover({
           </div>
 
           {/* Footer Action Buttons */}
-          <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
+          <div className="pt-3 border-t border-app-divider flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={handleReset}
-              className="px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-white hover:bg-white/10 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <RotateCcw size={12} />
               <span>{t('filter.clear')}</span>
@@ -750,7 +750,7 @@ export default function SearchFilterPopover({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
               >
                 {t('action.cancel')}
               </button>
