@@ -555,16 +555,11 @@ export const ChatInputBox = memo(function ChatInputBox({
             <button 
               type="button"
               onClick={onToggleRightSidebar}
-              className="relative p-2 min-[1100px]:px-3 min-[1100px]:py-1.5 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text text-xs font-medium border border-app-border transition-colors cursor-pointer shrink-0 flex items-center justify-center min-[1100px]:gap-1.5"
+              className="relative px-3 py-1.5 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text text-xs font-medium border border-app-border transition-colors cursor-pointer shrink-0 flex items-center justify-center gap-1.5"
               title={t('chat.sourcesCount').replace('{count}', documentsCount.toString())}
             >
               <FileText size={15} className="text-blue-500 fill-blue-500/20 shrink-0" />
-              <span className="hidden min-[1100px]:inline">{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
-              {documentsCount > 0 && (
-                <span className="min-[1100px]:hidden absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-app-input leading-none shadow">
-                  {documentsCount}
-                </span>
-              )}
+              <span>{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
             </button>
 
             {isLoading && onStopGeneration ? (

@@ -314,19 +314,19 @@ export default function SearchFilterPopover({
 
   return (
     <div className="relative inline-block text-left select-none text-app-text" ref={containerRef}>
-      {/* Trigger Button (Responsive: Pill with Text on >=1100px, Compact Icon on <1100px) */}
+      {/* Trigger Button: Always display pill with Text + Icon */}
       <button
         type="button"
         onClick={onToggle}
         className={
           appliedCount > 0 
-            ? "flex items-center gap-1.5 px-2.5 min-[1100px]:px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-500 font-medium shadow-sm" 
-            : "flex items-center gap-1.5 px-2.5 min-[1100px]:px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-app-item-hover hover:bg-app-item-active border-app-border text-app-text-muted hover:text-app-text font-medium"
+            ? "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-500 font-medium shadow-sm" 
+            : "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-app-item-hover hover:bg-app-item-active border-app-border text-app-text-muted hover:text-app-text font-medium"
         }
         title={t('filter.button')}
       >
         <SlidersHorizontal size={13} className={appliedCount > 0 ? "text-blue-500" : "text-app-text-dim"} />
-        <span className="hidden min-[1100px]:inline">{t('filter.button')}</span>
+        <span>{t('filter.button')}</span>
         {appliedCount > 0 && (
           <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-mono font-semibold">
             {appliedCount}
