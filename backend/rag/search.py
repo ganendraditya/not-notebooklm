@@ -64,11 +64,21 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
     is_mostly_id = any(re.search(rf'\b{re.escape(w)}\b', query, re.I) for w in id_indicators)
     default_lang = "id" if is_mostly_id else "en"
 
-    # 1. Default heuristic fallback (adaptive 15 by default)
+    # Extract languages filter intent from prompt or [Filter Preferences: ...]
+    default_languages: List[str] = []
+    lang_pref_match = re.search(r'\[Filter Preferences:[^\]]*\blanguages:\s*([^,\]]+(?:,\s*[^,\]]+)*)', query, re.I)
+    if lang_pref_match:
+        raw_lang_str = lang_pref_match.group(1).split("discipline:")[0].split("year:")[0].split("min citations:")[0].strip()
+        raw_langs = [l.strip().lower() for l in raw_lang_str.split(",") if l.strip()]
+        default_languages = [l for l in raw_langs if l != "all" and len(l) <= 10]
+
+    # 1. Default heuristic fallback (adaptive by relevance, default cap 12-15)
     default_plan = {
         "en_query": clean_text if len(clean_text) >= 3 else query.strip(),
         "id_query": clean_text if len(clean_text) >= 3 else query.strip(),
-        "target_count": 15,
+        "native_query": clean_text if len(clean_text) >= 3 else query.strip(),
+        "target_count": 12,
+        "languages": default_languages,
         "language_preference": default_lang,
         "open_access_only": False,
         "scopus_quartiles": [],
@@ -148,45 +158,45 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
 
         prompt = (
             "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\n"
-            "Your job: Analyze the user's prompt and extract clean, high-precision academic search parameters in JSON.\n\n"
+            "Your job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n"
             f"{context_str}"
             "Current User Request:\n"
             f"\"{query}\"\n\n"
             "Rules for extraction:\n"
             "1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n"
-            "   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi', 'terkait tadi', 'yang tadi', 'coba lagi dong', 'yang analisis sentimen tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain (e.g. 'sentiment analysis machine learning') and retain it in en_query and id_query!\n"
+            "   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi', 'terkait tadi', 'yang tadi', 'coba lagi dong', 'yang analisis sentimen tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain (e.g. 'sentiment analysis machine learning') and retain it!\n"
             "   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt' or physics acronyms! 'gw' in Indonesian means 'me/I'.\n"
-            "2. 'en_query': Pure English academic search term for global scholarly databases. Remove all conversational filler words ('cariin', 'mau itu', 'campur aja', 'bebas', 'yang penting', 'gw', 'lah', 'dong', 'ya', 'coba', 'open access', 'q1', 'sinta', 'rekomendasiin', 'biar gw bisa import'). Convert domain abbreviations ('ML' -> 'machine learning', 'DL' -> 'deep learning', 'EPL' -> 'English Premier League').\n"
-            "3. 'id_query': Pure Indonesian academic search term for national journals (e.g. 'analisis sentimen machine learning').\n"
-            "4. 'target_count': Integer representing how many papers to search for.\n"
-            "   - If the user explicitly specified an exact number (e.g. 30, 50, 25, 100) or if recent history asked for 100, set target_count to that number (capped at 100 max per fetch).\n"
-            "   - If the user DID NOT specify an exact number, choose an optimal count between 15 and 30.\n"
-            "   - If the user asks for follow-up ('coba lagi', 'tambah lagi'), set target_count to 10-20 fresh papers.\n"
-            "5. 'open_access_only': Boolean true if user explicitly or in recent context requested open access / free PDF only, else false.\n"
-            "6. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n"
-            "7. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n"
-            "8. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n"
-            "9. 'user_requested_count': The exact integer if the user specified a number (e.g. 30, 50, 100), otherwise null.\n"
-            "10. 'min_year': Integer representing minimum publication year (e.g. 2020 if user mentioned '5 tahun terakhir' or 'terbaru', otherwise null).\n"
-            "11. 'min_citations': Integer representing minimum citations count threshold (e.g. 10 if user specified 'min 10 sitasi', otherwise 0).\n"
-            "12. 'language_preference' (CRITICAL):\n"
-            "   - 'en': By default, if the user writes in English, asks in English, or requests international literature, choose 'en'.\n"
-            "   - 'id': If the user writes in Indonesian and specifically asks for Indonesian journals/research, choose 'id'.\n"
-            "   - 'mixed': ONLY if the user explicitly asks for mixed languages (e.g. 'campur inggris dan indo', 'keduanya', 'both indonesian and english').\n"
+            "2. 'en_query': Pure English academic search term for global scholarly databases (OpenAlex, Europe PMC, Crossref). Remove all conversational filler words ('cariin', 'mau itu', 'campur aja', 'bebas', 'yang penting', 'gw', 'lah', 'dong', 'ya', 'coba', 'open access', 'q1', 'sinta', 'rekomendasiin', 'biar gw bisa import'). Convert domain abbreviations ('ML' -> 'machine learning', 'DL' -> 'deep learning', 'EPL' -> 'English Premier League').\n"
+            "3. 'native_query': Academic search term translated into the target language(s) if user writes in non-English or specifies target languages (e.g. Japanese Kanji/Katakana '心理学', Chinese '心理学', Spanish 'psicología', Indonesian 'psikologi').\n"
+            "4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"es\"], [\"ko\"], [\"id\"], [\"en\"], or multiple [\"zh\", \"ko\", \"ja\"]).\n"
+            "   - Priority 1: If '[Filter Preferences: ... languages: ja, zh]' is explicitly present in the query, strictly use those codes!\n"
+            "   - Priority 2: If the user wrote their prompt in Japanese (Kanji/Hiragana), Chinese (Hanzi), Korean (Hangul), Spanish, Arabic, etc., detect the user's prompt language and add its code (e.g. 'ja' for Japanese prompt, 'zh' for Chinese prompt).\n"
+            "   - Priority 3: If no specific language filter or non-English prompt, leave as empty [] (which means all / global English).\n"
+            "5. 'target_count': Integer representing how many papers to search for.\n"
+            "   - If the user explicitly specified an exact number (e.g. 10, 30, 50, 100), strictly set target_count to that number (capped at 100 max per fetch).\n"
+            "   - If the user DID NOT specify an exact number: DO NOT force an arbitrary 20! Set target_count to a natural relevant size between 8 and 15 so only truly relevant papers are returned without padding low-quality matches.\n"
+            "   - If the user asks for follow-up ('coba lagi', 'tambah lagi'), set target_count to 8-12 fresh papers.\n"
+            "6. 'open_access_only': Boolean true if user explicitly, in Filter Preferences, or in recent context requested open access / free PDF only, else false.\n"
+            "7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n"
+            "8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n"
+            "9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n"
+            "10. 'user_requested_count': The exact integer if the user specified a number (e.g. 30, 50, 100), otherwise null.\n"
+            "11. 'min_year': Integer representing minimum publication year (e.g. 2020 if user mentioned '5 tahun terakhir' or 'terbaru', otherwise null).\n"
+            "12. 'min_citations': Integer representing minimum citations count threshold (e.g. 10 if user specified 'min 10 sitasi', otherwise 0).\n"
             "13. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\n"
             "Example Output:\n"
             "{\n"
-            "  \"en_query\": \"sentiment analysis machine learning\",\n"
-            "  \"id_query\": \"analisis sentimen machine learning\",\n"
-            "  \"target_count\": 100,\n"
+            "  \"en_query\": \"psychology clinical therapy\",\n"
+            "  \"native_query\": \"心理学 臨床心理学\",\n"
+            "  \"languages\": [\"ja\"],\n"
+            "  \"target_count\": 12,\n"
             "  \"open_access_only\": true,\n"
             "  \"scopus_quartiles\": [],\n"
             "  \"sinta_tiers\": [],\n"
             "  \"exclude_preprints\": false,\n"
-            "  \"user_requested_count\": 100,\n"
+            "  \"user_requested_count\": null,\n"
             "  \"min_year\": 2021,\n"
-            "  \"min_citations\": 0,\n"
-            "  \"language_preference\": \"en\"\n"
+            "  \"min_citations\": 0\n"
             "}"
         )
         
@@ -226,19 +236,34 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
             else:
                 m_cit = default_min_citations
                     
+            native_q = str(parsed.get("native_query", "")).strip() or str(parsed.get("id_query", "")).strip() or default_plan["native_query"]
+            parsed_langs = parsed.get("languages")
+            target_langs: List[str] = []
+            if isinstance(parsed_langs, list):
+                target_langs = [str(l).strip().lower() for l in parsed_langs if str(l).strip() and str(l).strip().lower() != "all"]
+            elif isinstance(parsed_langs, str) and parsed_langs.strip():
+                target_langs = [l.strip().lower() for l in parsed_langs.split(",") if l.strip() and l.strip().lower() != "all"]
+
+            # If default_languages came from [Filter Preferences:], it strictly overrides unless empty
+            if default_languages:
+                target_langs = default_languages
+
             lang = str(parsed.get("language_preference", default_plan["language_preference"])).lower()
-            if lang not in ["mixed", "en", "id"]:
-                lang = default_plan["language_preference"]
+            if not target_langs and lang in ["id", "en", "mixed"]:
+                if lang == "id": target_langs = ["id"]
+                elif lang == "en": target_langs = ["en"]
 
             oa_only = bool(parsed.get("open_access_only", default_plan["open_access_only"])) or default_plan["open_access_only"]
             scopus_q = parsed.get("scopus_quartiles") or default_plan["scopus_quartiles"]
             sinta_t = parsed.get("sinta_tiers") or default_plan["sinta_tiers"]
             ex_prep = bool(parsed.get("exclude_preprints", default_plan["exclude_preprints"])) or default_plan["exclude_preprints"]
             
-            print(f"[AI Query Planner] en_query='{en_q}' | id_query='{id_q}' | count={cnt} | oa={oa_only} | scopus={scopus_q} | sinta={sinta_t} | min_year={m_year} | min_citations={m_cit} | lang='{lang}'")
+            print(f"[AI Query Planner] en_query='{en_q}' | native_query='{native_q}' | languages={target_langs} | count={cnt} | oa={oa_only} | scopus={scopus_q} | sinta={sinta_t} | min_year={m_year} | min_citations={m_cit}")
             return {
                 "en_query": en_q,
-                "id_query": id_q,
+                "id_query": native_q,
+                "native_query": native_q,
+                "languages": target_langs,
                 "target_count": cnt,
                 "open_access_only": oa_only,
                 "scopus_quartiles": scopus_q,
@@ -558,7 +583,7 @@ def search_academic_papers_planned(
         return fetched
 
     # 2. OpenAlex Search with deep pagination
-    def fetch_openalex(term: str, target_count: int):
+    def fetch_openalex(term: str, target_count: int, lang_codes: Optional[List[str]] = None):
         fetched = []
         if not term.strip(): return fetched
         page = 1
@@ -572,6 +597,10 @@ def search_academic_papers_planned(
                 if min_year: filter_parts.append(f"publication_year:{min_year}-2026")
                 if min_citations > 0: filter_parts.append(f"cited_by_count:>{min_citations - 1}")
                 if open_access_only: filter_parts.append("is_oa:true")
+                if lang_codes and len(lang_codes) > 0:
+                    clean_codes = [c.lower().strip() for c in lang_codes if c.lower().strip() != "all"]
+                    if clean_codes:
+                        filter_parts.append(f"language:{'|'.join(clean_codes)}")
                 if filter_parts: params["filter"] = ",".join(filter_parts)
                     
                 resp = requests.get(url, params=params, headers=headers, timeout=8)
@@ -580,7 +609,9 @@ def search_academic_papers_planned(
                     if not results_list: break
                     for work in results_list:
                         if len(fetched) >= target_count: break
-                        title = work.get("title", "").strip()
+                        raw_t = work.get("title", "") or ""
+                        title = html.unescape(raw_t).strip()
+                        title = re.sub(r'<[^>]+>', '', title).strip()
                         doi = work.get("doi", "")
                         if not title or not is_valid_academic_title(title) or is_candidate_duplicate(title, doi): continue
                             
@@ -595,14 +626,14 @@ def search_academic_papers_planned(
                         if open_access_only and not is_oa_work:
                             continue
 
-                        work_type = loc.get("source", {}).get("type") or work.get("type", "")
-                        is_preprint_work = work_type == "preprint" or "preprint" in (loc.get("source", {}).get("display_name") or "").lower()
+                        work_type = (loc.get("source") or {}).get("type") or work.get("type", "")
+                        is_preprint_work = work_type == "preprint" or "preprint" in ((loc.get("source") or {}).get("display_name") or "").lower()
                         if exclude_preprints and is_preprint_work:
                             continue
 
                         landing_url = loc.get("landing_page_url") or doi or f"https://openalex.org/{work.get('id')}"
-                        oa_pdf = work.get("best_oa_location", {}).get("pdf_url") or loc.get("pdf_url") or ""
-                        venue = loc.get("source", {}).get("display_name") if loc.get("source") else ""
+                        oa_pdf = (work.get("best_oa_location") or {}).get("pdf_url") or loc.get("pdf_url") or ""
+                        venue = (loc.get("source") or {}).get("display_name") if loc.get("source") else ""
                         authors = [a.get("author", {}).get("display_name", "") for a in work.get("authorships", [])]
                         
                         abstract = ""
@@ -704,8 +735,31 @@ def search_academic_papers_planned(
                 break
         return fetched
 
+    target_languages = plan.get("languages") or []
+    native_query = plan.get("native_query") or plan.get("id_query") or en_query
+
     # Execute Search Orchestration
-    if lang_pref == "mixed" and en_query.lower() != id_query.lower():
+    # Case A: User explicitly specified target non-English languages (e.g. ja, zh, es, ko, id, etc.)
+    non_en_langs = [l for l in target_languages if l not in ["en", "all"]]
+    if non_en_langs:
+        # Search OpenAlex filtered by exact ISO language codes (e.g. language:ja or language:zh|ja)
+        # Search with native translated query first, then en_query as fallback
+        lang_oa_papers = fetch_openalex(native_query, limit, lang_codes=non_en_langs)
+        results.extend(lang_oa_papers)
+        
+        if len(results) < limit:
+            oa_en_terms_with_lang = fetch_openalex(en_query, limit - len(results), lang_codes=non_en_langs)
+            results.extend(oa_en_terms_with_lang)
+            
+        if len(results) < limit:
+            cr_native = fetch_crossref(native_query, limit - len(results))
+            results.extend(cr_native)
+
+        # STRICT LANGUAGE COMPLIANCE:
+        # Do NOT spill over to global English papers if the user explicitly set a non-English language filter!
+        # Return whatever relevant papers found in the requested language.
+            
+    elif lang_pref == "mixed" and en_query.lower() != id_query.lower():
         en_quota = limit // 2
         
         # 1. Fetch International English papers
@@ -716,19 +770,19 @@ def search_academic_papers_planned(
         
         # 2. Fetch Indonesian / Local papers
         actual_id_quota = limit - len(results)
-        id_papers = fetch_openalex(id_query, actual_id_quota)
+        id_papers = fetch_openalex(id_query, actual_id_quota, lang_codes=["id"])
         results.extend(id_papers)
         if len(results) < limit:
             cr_id = fetch_crossref(id_query, limit - len(results))
             results.extend(cr_id)
 
-        # 3. Dynamic Quota Spillover: If local papers are scarce, exhaust remaining quota from global English sources!
+        # 3. Dynamic Quota Spillover
         if len(results) < limit:
             remaining_needed = limit - len(results)
             spillover_oa = fetch_openalex(en_query, remaining_needed)
             results.extend(spillover_oa)
     elif lang_pref == "id":
-        id_papers = fetch_openalex(id_query, limit)
+        id_papers = fetch_openalex(id_query, limit, lang_codes=["id"])
         results.extend(id_papers)
         if len(results) < limit:
             cr_id = fetch_crossref(id_query, limit - len(results))
@@ -740,13 +794,39 @@ def search_academic_papers_planned(
         epmc_papers = fetch_europe_pmc(en_query, limit // 2 + 2)
         results.extend(epmc_papers)
         if len(results) < limit:
-            oa_papers = fetch_openalex(en_query, limit - len(results))
+            oa_papers = fetch_openalex(en_query, limit - len(results), lang_codes=["en"] if "en" in target_languages else None)
             results.extend(oa_papers)
             
     # Final Fallback to Crossref if still under limit
     if len(results) < limit:
         extra_cr = fetch_crossref(en_query or id_query, limit - len(results))
         results.extend(extra_cr)
+
+    # 4. Semantic Reranking with FlashRank (Cross-Encoder)
+    if len(results) > limit:
+        try:
+            from flashrank import Ranker, RerankRequest
+            ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+            passages = [
+                {
+                    "id": idx,
+                    "text": f"{p.get('title', '')}. {p.get('snippet', '')}"[:500]
+                }
+                for idx, p in enumerate(results)
+            ]
+            rerank_q = en_query or query_term or "academic research"
+            rerank_req = RerankRequest(query=rerank_q, passages=passages)
+            ranked_passages = ranker.rerank(rerank_req)
+            
+            reranked_results = []
+            for item in ranked_passages:
+                p_idx = item.get("id")
+                if isinstance(p_idx, int) and 0 <= p_idx < len(results):
+                    reranked_results.append(results[p_idx])
+            if reranked_results:
+                results = reranked_results
+        except Exception as rerank_err:
+            logger.debug(f"[Search Rerank Fallback]: {rerank_err}")
 
     return results[:limit]
 
@@ -1398,6 +1478,7 @@ def search_academic_papers(query: str, limit: int = 10) -> List[dict]:
     plan = {
         "en_query": core_topic,
         "id_query": core_topic,
+        "native_query": core_topic,
         "target_count": limit,
         "language_preference": lang_pref
     }

@@ -146,7 +146,7 @@ export default function ChatArea({
 
   const handleCopy = useCallback((text: string, idx: number) => {
     // Convert bracket or parenthesis citations into clean academic brackets e.g. [2], [13]
-    let cleanText = text
+    const cleanText = text
       .replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "")
       .replace(/<!-- SOURCES_ACTION:[\s\S]*?-->/g, "")
       .trim();

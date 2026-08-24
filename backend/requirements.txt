@@ -16,3 +16,6 @@ requests
 ddgs
 pymupdf4llm
 python-docx
+flashrank
+pytest
+httpx

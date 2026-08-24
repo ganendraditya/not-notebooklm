@@ -1017,8 +1017,12 @@ export default function ChatClient() {
                 }}
                 isRightSidebarOpen={isRightSidebarOpen}
                 onToggleRightSidebar={() => {
-                  setIsRightSidebarOpen(prev => !prev);
-                  setMobileTab(prev => (prev === "sources" ? "chat" : "sources"));
+                  if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                    setMobileTab(prev => (prev === "sources" ? "chat" : "sources"));
+                    setIsRightSidebarOpen(true);
+                  } else {
+                    setIsRightSidebarOpen(prev => !prev);
+                  }
                 }}
                 targetedSource={targetedSource}
                 onClearTargetedSource={() => setTargetedSource(null)}

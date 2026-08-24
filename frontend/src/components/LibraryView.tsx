@@ -78,7 +78,7 @@ export default function LibraryView({
       const res = await fetch(`${backendUrl}/storage/files?category=${backendCat}`);
       if (res.ok) {
         const data = await res.json();
-        let filtered = data.filter((item: any) => 
+        const filtered = data.filter((item: any) => 
           (item.filename || "").toLowerCase().includes(q.toLowerCase()) ||
           (item.chat_title || "").toLowerCase().includes(q.toLowerCase())
         );

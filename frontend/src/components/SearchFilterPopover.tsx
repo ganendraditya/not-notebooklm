@@ -334,38 +334,44 @@ export default function SearchFilterPopover({
         )}
       </button>
 
-      {/* Floating Popover Card Opening Upwards */}
+      {/* Centered Modal Overlay (Option 1: Centered Dialog with Backdrop) */}
       {isOpen && (
-        <div className="absolute bottom-full right-0 mb-2.5 w-[360px] sm:w-[440px] rounded-2xl bg-app-dropdown border border-app-border-strong shadow-2xl z-50 p-4 backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150 text-app-text">
-          
-          {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 border-b border-app-divider">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
-                <SlidersHorizontal size={15} />
+        <div 
+          onClick={onClose}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg max-h-[85vh] rounded-2xl bg-app-modal border border-app-border-strong shadow-2xl overflow-hidden flex flex-col p-4 sm:p-5 backdrop-blur-2xl animate-in zoom-in-95 duration-150 text-app-text"
+          >
+            {/* Header Bar */}
+            <div className="flex items-center justify-between pb-3 border-b border-app-divider shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                  <SlidersHorizontal size={15} />
+                </div>
+                <div className="flex flex-col justify-between h-8 py-0.5">
+                  <h3 className="text-xs sm:text-sm font-semibold text-app-text leading-none">
+                    {t('filter.title')}
+                  </h3>
+                  <span className="text-[11px] text-app-text-muted leading-none">
+                    {t('filter.desc')}
+                  </span>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-app-text leading-tight">
-                  {t('filter.title')}
-                </h3>
-                <span className="text-[11px] text-app-text-muted">
-                  {t('filter.desc')}
-                </span>
-              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-7 w-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
+                title="Close (Esc)"
+              >
+                <X size={15} />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="h-7 w-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
-              title="Close (Esc)"
-            >
-              <X size={15} />
-            </button>
-          </div>
-
-          {/* Scrollable Body */}
-          <div className="py-3 space-y-4 max-h-[420px] overflow-y-auto pr-1 custom-scrollbar">
+            {/* Scrollable Body */}
+            <div className="py-3 space-y-4 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
             
             {/* 1. Year Range Filter */}
             <div className="space-y-2">
@@ -735,40 +741,40 @@ export default function SearchFilterPopover({
 
           </div>
 
-          {/* Footer Action Buttons */}
-          <div className="pt-3 border-t border-app-divider flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-3 py-1.5 rounded-lg text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <RotateCcw size={12} />
-              <span>{t('filter.clear')}</span>
-            </button>
+            {/* Footer Action Buttons */}
+            <div className="pt-3 border-t border-app-divider flex items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="px-3 py-1.5 rounded-lg text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <RotateCcw size={12} />
+                <span>{t('filter.clear')}</span>
+              </button>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
-              >
-                {t('action.cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleApply}
-                className="px-4 py-1.5 rounded-lg text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors cursor-pointer shadow flex items-center gap-1.5"
-              >
-                <span>{t('filter.apply')}</span>
-                {activeLocalCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white text-[10px] font-mono">
-                    {activeLocalCount}
-                  </span>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3 py-1.5 rounded-lg text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
+                >
+                  {t('action.cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="px-4 py-1.5 rounded-lg text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors cursor-pointer shadow flex items-center gap-1.5"
+                >
+                  <span>{t('filter.apply')}</span>
+                  {activeLocalCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-white text-[10px] font-mono">
+                      {activeLocalCount}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-
         </div>
       )}
     </div>
