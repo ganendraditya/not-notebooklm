@@ -126,6 +126,36 @@ async def upload_document(chat_id: str, file: UploadFile = File(...), db: Sessio
         except Exception:
             is_valid_pdf = False
 
+    # AI Metadata Auditor on upload if abstract/title still missing
+    if raw_header and (not resolved_abstract or resolved_title == clean_fn_title):
+        try:
+            ai_audit = await asyncio.to_thread(
+                rag.audit_paper_metadata_with_ai,
+                paper_title=resolved_title,
+                raw_authors=resolved_authors,
+                raw_journal=resolved_journal,
+                raw_year=resolved_year,
+                raw_doi=resolved_doi,
+                raw_citations=0,
+                raw_abstract_or_html=raw_header[:3500],
+                is_oa=is_valid_pdf
+            )
+            if ai_audit:
+                if ai_audit.get("abstract") and len(ai_audit["abstract"]) > 40:
+                    resolved_abstract = ai_audit["abstract"]
+                if ai_audit.get("title") and len(ai_audit["title"]) > 5:
+                    resolved_title = ai_audit["title"]
+                if ai_audit.get("authors"):
+                    resolved_authors = ai_audit["authors"]
+                if ai_audit.get("year"):
+                    resolved_year = ai_audit["year"]
+                if ai_audit.get("journal"):
+                    resolved_journal = ai_audit["journal"]
+                if ai_audit.get("journal_metric"):
+                    resolved_metric = ai_audit["journal_metric"]
+        except Exception as upload_audit_err:
+            logger.debug(f"[Upload AI Audit Warning]: {upload_audit_err}")
+
     authors_json = json.dumps(resolved_authors, ensure_ascii=False) if resolved_authors else None
     db_doc = Document(
         chat_id=chat_id,
@@ -731,6 +761,36 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
             res_data["abstract_type"] = "ai_summary"
         else:
             res_data["abstract_type"] = "official"
+    elif raw_content and len(raw_content.strip()) > 300:
+        # LLM Academic Auditor Fallback: Let AI read the first 4000 characters to extract Title, Authors, and Abstract
+        try:
+            ai_audit = await asyncio.to_thread(
+                rag.audit_paper_metadata_with_ai,
+                paper_title=res_data["title"],
+                raw_authors=res_data["authors"],
+                raw_journal=res_data["journal"],
+                raw_year=res_data["year"],
+                raw_doi=extracted_doi,
+                raw_citations=res_data["citations"],
+                raw_abstract_or_html=raw_content[:4000],
+                is_oa=True
+            )
+            if ai_audit:
+                if ai_audit.get("abstract") and len(ai_audit["abstract"]) > 40:
+                    res_data["abstract"] = ai_audit["abstract"]
+                    res_data["abstract_type"] = ai_audit.get("abstract_type", "official")
+                if ai_audit.get("title") and len(ai_audit["title"]) > 5 and ai_audit["title"].lower() not in _GENERIC_HEADERS:
+                    res_data["title"] = ai_audit["title"]
+                if ai_audit.get("authors"):
+                    res_data["authors"] = ai_audit["authors"]
+                if ai_audit.get("year"):
+                    res_data["year"] = ai_audit["year"]
+                if ai_audit.get("journal"):
+                    res_data["journal"] = ai_audit["journal"]
+                if ai_audit.get("journal_metric"):
+                    res_data["journal_metric"] = ai_audit["journal_metric"]
+        except Exception as audit_err:
+            logger.debug(f"[Document Content AI Audit Warning]: {audit_err}")
         
     target_lookup_title = res_data["title"] if res_data["title"].lower() not in _GENERIC_HEADERS else clean_filename_title
     # Keep the original title from file before API lookup
