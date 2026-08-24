@@ -285,7 +285,7 @@ export default function ChatArea({
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pt-12 lg:pt-14 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
       >
-          <div className={`w-full lg:max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
+          <div className={`w-full max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
           {isChatEmpty ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4 w-full max-w-2xl mx-auto my-auto">
               <div className="p-3.5 rounded-full bg-app-surface border border-app-border mb-4 shadow-sm">
@@ -317,7 +317,7 @@ export default function ChatArea({
                 <div key={idx} className="space-y-2 group">
                   {msg.role === "user" ? (
                     <div className="flex flex-col items-end">
-                      <div className="flex flex-col items-end w-full max-w-[85%] -mr-[7px]">
+                      <div className="flex flex-col items-end w-full max-w-[85%]">
                         {/* Always display attachments above, even during edit */}
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div className="flex flex-wrap justify-end gap-2 mb-2">
@@ -508,7 +508,7 @@ export default function ChatArea({
       {/* Floating Gradient Backdrop for Input (width capped to input box width only, zero side overflow) */}
       {!isChatEmpty && (
         <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-20 flex justify-center px-4 sm:px-6 md:px-8">
-          <div className="w-full lg:max-w-3xl pointer-events-auto min-w-0 relative">
+          <div className="w-full max-w-3xl pointer-events-auto min-w-0 relative">
             <div className="absolute -inset-x-4 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             <ChatInputBox 
               isLoading={isLoading}
