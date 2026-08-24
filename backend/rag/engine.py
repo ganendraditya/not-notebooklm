@@ -726,13 +726,14 @@ async def query_chat(
                     try:
                         parsed_text = parse_document_to_markdown(fpath)
                         if parsed_text and len(parsed_text.strip()) >= 150:
-                            # If it contains our fallback archive header or file is small, it's an abstract brief
-                            if "NOTBOOKLM SCHOLARLY ARCHIVE" in parsed_text or fsize < 35000:
+                            if "NOTBOOKLM SCHOLARLY ARCHIVE" in parsed_text:
+                                is_full_paper = False
+                            elif fpath.lower().endswith(".pdf") and fsize < 35000:
                                 is_full_paper = False
                             else:
                                 is_full_paper = True
                             # Dynamic allocation: keep rich content without blowing context limits
-                            max_chars = 2500 if len(local_docs) > 20 else 6000
+                            max_chars = 4000 if len(local_docs) > 20 else 12000
                             content_snippet = parsed_text[:max_chars]
                     except Exception as parse_err:
                         logger.debug(f"[Doc Parse Error for {fname}]: {parse_err}")
