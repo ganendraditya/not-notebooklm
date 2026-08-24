@@ -25,3 +25,10 @@ uploads/
 backend/qdrant_data/
 qdrant_data/
 scratch/
+
+# Agent instructions & rules
+.agents/
+AGENTS.md
+*/AGENTS.md
+.cursorrules
+.windsurfrules
