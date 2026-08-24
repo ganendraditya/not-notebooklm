@@ -211,15 +211,24 @@ ALLOWED_ATTACHMENT_EXTENSIONS = {
     ".pdf", ".docx", ".doc", ".txt", ".md", ".csv", ".tsv", ".bib", ".bibtex", ".ris",
     ".jpg", ".jpeg", ".png", ".webp", ".gif"
 }
+MAX_ATTACHMENT_FILE_SIZE_BYTES = 25 * 1024 * 1024  # 25MB per file
 
 @router.post("/chats/{chat_id}/upload_chat_media")
 async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
-    """Uploads an image/media attachment for a chat session."""
+    """Uploads an image/media attachment for a chat session with validation."""
     file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ".jpg"
     if file_ext not in ALLOWED_ATTACHMENT_EXTENSIONS:
         raise HTTPException(
             status_code=400, 
             detail=f"Unsupported file format '{file_ext}'. Allowed formats: {', '.join(sorted(ALLOWED_ATTACHMENT_EXTENSIONS))}"
+        )
+
+    # Check file size limit (25MB)
+    file_content = await file.read()
+    if len(file_content) > MAX_ATTACHMENT_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{file.filename}' exceeds maximum allowable size of 25MB."
         )
 
     # Check current storage usage against 10GB limit
@@ -236,14 +245,13 @@ async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
     is_storage_full = used_bytes >= total_bytes_limit
 
     # Save file
-    file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ".jpg"
     safe_filename = f"{chat_id}_{uuid.uuid4().hex[:8]}{file_ext}"
     file_path = os.path.join(CHAT_MEDIA_DIR, safe_filename)
     
     with open(file_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
+        f.write(file_content)
         
-    file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+    file_size = len(file_content)
 
     # Return attachment metadata with storage limit awareness
     return {

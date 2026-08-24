@@ -154,11 +154,31 @@ export const ChatInputBox = memo(function ChatInputBox({
   const handleFileUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
-    // Filter only supported formats
+    // Check max attachment limit per prompt (10 files max)
+    const MAX_ATTACHMENTS = 10;
+    const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
+
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      alert(`Maximum ${MAX_ATTACHMENTS} file attachments allowed per prompt.`);
+      return;
+    }
+
+    // Filter only supported formats and validate file sizes
     const validFiles: File[] = [];
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+
     for (let i = 0; i < files.length; i++) {
+      if (validFiles.length >= remainingSlots) {
+        break;
+      }
       const file = files[i];
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        alert(`File "${file.name}" exceeds the 25MB maximum size limit.`);
+        continue;
+      }
+
       if (ALLOWED_ATTACHMENT_EXTS.has(ext)) {
         validFiles.push(file);
       }
