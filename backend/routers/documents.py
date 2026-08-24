@@ -708,11 +708,22 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
     elif extracted_doi:
         res_data["url"] = f"https://doi.org/{extracted_doi}"
         
-    abs_match = re.search(r'(?:##\s*Abstract|\*\*ABSTRAK\*\*|ABSTRAK|\*\*Abstract\*\*|Abstract|Ringkasan)[^\n]*\n+([\s\S]*?)(?:Kata\s*Kunci|Keywords|I\.\s*PENDAHULUAN|1\.\s*Pendahuluan|##|$)', raw_content, re.I)
-    local_abstract = abs_match.group(1).strip() if abs_match else ""
+    # Extract abstract from local raw content using section splitter + fallback regex
+    local_abstract = ""
+    try:
+        doc_sections = rag.split_markdown_into_academic_sections(raw_content, filename=doc.filename)
+        abs_sec = next((s for s in doc_sections if s.get("canonical_section") == "abstract"), None)
+        if abs_sec and abs_sec.get("raw_text"):
+            local_abstract = abs_sec.get("raw_text").strip()
+    except Exception:
+        local_abstract = ""
+
     if not local_abstract:
-        abs_match_fb = re.search(r'##\s*Abstract[^\n]*\n+([\s\S]+)', raw_content)
-        local_abstract = abs_match_fb.group(1).strip() if abs_match_fb else ""
+        abs_match = re.search(r'(?:##\s*Abstract|\*\*ABSTRAK\*\*|ABSTRAK|\*\*Abstract\*\*|Abstract|Ringkasan)[^\n]*\n+([\s\S]*?)(?:Kata\s*Kunci|Keywords|I\.\s*PENDAHULUAN|1\.\s*Pendahuluan|##|$)', raw_content, re.I)
+        local_abstract = abs_match.group(1).strip() if abs_match else ""
+        if not local_abstract:
+            abs_match_fb = re.search(r'##\s*Abstract[^\n]*\n+([\s\S]+)', raw_content)
+            local_abstract = abs_match_fb.group(1).strip() if abs_match_fb else ""
 
     if local_abstract and rag.is_valid_abstract_content(local_abstract):
         res_data["abstract"] = rag.clean_academic_abstract(local_abstract)
