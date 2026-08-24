@@ -303,10 +303,10 @@ function getHighlightedContent(
                       highlightRefsMap.current.set(clusterIdx, el);
                     }
                   }}
-                  className={`font-medium px-0.5 py-0.5 rounded-sm inline leading-relaxed transition-all box-decoration-clone ${
+                  className={`font-medium px-1 py-0.5 rounded inline leading-relaxed transition-all box-decoration-clone ${
                     isActiveCluster
-                      ? "bg-amber-400/40 text-amber-100 ring-2 ring-amber-400/50 shadow-sm"
-                      : "bg-amber-400/20 text-amber-200/90 border-b border-amber-400/30"
+                      ? "bg-amber-300 dark:bg-amber-500/40 text-amber-950 dark:text-amber-100 ring-2 ring-amber-500 shadow-sm"
+                      : "bg-amber-200/80 dark:bg-amber-500/25 text-amber-950 dark:text-amber-100 border-b-2 border-amber-500/50"
                   }`}
                   title={`AI Grounded Evidence ${clusterIdx + 1} of ${aiClusters.length}`}
                 >
@@ -558,10 +558,10 @@ function getHighlightedContent(
                   highlightRefsMap.current.set(clusterIdx, el);
                 }
               }}
-              className={`font-medium px-0.5 py-0.5 rounded-sm inline leading-relaxed transition-all box-decoration-clone ${
+              className={`font-medium px-1 py-0.5 rounded inline leading-relaxed transition-all box-decoration-clone ${
                 isActiveCluster
-                  ? "bg-amber-400/40 text-amber-100 ring-2 ring-amber-400/50 shadow-sm"
-                  : "bg-amber-400/20 text-amber-200/90 border-b border-amber-400/30"
+                  ? "bg-amber-300 dark:bg-amber-500/40 text-amber-950 dark:text-amber-100 ring-2 ring-amber-500 shadow-sm"
+                  : "bg-amber-200/80 dark:bg-amber-500/25 text-amber-950 dark:text-amber-100 border-b-2 border-amber-500/50"
               }`}
               title={`Evidence Match ${clusterIdx + 1} of ${clusters.length}`}
             >
