@@ -224,3 +224,11 @@
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb, #71717a) transparent;
 }
+
+/* Custom Number Input Spin Buttons (remove white wrapper, make arrows sleek) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  filter: invert(1);
+  opacity: 0.8;
+  cursor: pointer;
+}
