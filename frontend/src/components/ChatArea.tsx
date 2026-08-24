@@ -283,9 +283,10 @@ export default function ChatArea({
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-8 pt-12 lg:pt-14 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
+        className="flex-1 overflow-y-auto pt-12 lg:pt-14 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
       >
-          <div className={`w-full max-w-3xl mx-auto space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
+        <div className="w-full flex justify-center px-4 sm:px-6 md:px-8">
+          <div className={`w-full max-w-3xl space-y-6 ${isChatEmpty ? 'min-h-full flex flex-col justify-center' : ''}`}>
           {isChatEmpty ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4 w-full max-w-2xl mx-auto my-auto">
               <div className="p-3.5 rounded-full bg-app-surface border border-app-border mb-4 shadow-sm">
@@ -502,6 +503,7 @@ export default function ChatArea({
               <div ref={messagesEndRef} />
             </div>
           )}
+          </div>
         </div>
       </div>
 
