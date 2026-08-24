@@ -1,10 +1,10 @@
 # NotbookLM
 
-An open-source, customizable AI research and document workspace inspired by **NotebookLM** and **Consensus AI**. The name *NotbookLM* is a pun on Google's NotebookLM. Powered by FastAPI, Next.js, LlamaIndex, and Qdrant vector database.
+An open-source, customizable AI research and document workspace inspired by Google Notebook (formerly NotebookLM), Consensus AI, and Elicit. The name *NotbookLM* is a pun on Google's NotebookLM. Powered by FastAPI, Next.js, LlamaIndex, and Qdrant vector database.
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 You can run this project in two ways:
 
@@ -13,7 +13,7 @@ No need to install Python, Node.js, or local dependencies.
 
 1. **Clone repository:**
    ```bash
-   git clone https://github.com/your-username/not-notebooklm.git
+   git clone https://github.com/ganendraditya/not-notebooklm.git
    cd not-notebooklm
    ```
 
@@ -64,7 +64,7 @@ npm run dev
 
 ---
 
-## ⚙️ Architecture & Tech Stack
+## Architecture & Tech Stack
 
 * **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS.
 * **Backend:** FastAPI, SQLAlchemy (SQLite), LlamaIndex.
