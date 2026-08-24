@@ -283,10 +283,9 @@ export default function ChatArea({
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto pt-12 lg:pt-14 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar"
+        className="flex-1 overflow-y-auto pt-12 lg:pt-14 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar overflow-x-hidden"
       >
-        <div className="w-full flex justify-center px-4 sm:px-6 md:px-8">
-          <div className="w-full max-w-3xl space-y-6">
+        <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 space-y-6">
           {isChatEmpty ? (
             <div className="flex flex-col items-center justify-center py-12 text-center px-4 w-full max-w-2xl mx-auto my-auto">
               <div className="p-3.5 rounded-full bg-app-surface border border-app-border mb-4 shadow-sm">
@@ -503,15 +502,14 @@ export default function ChatArea({
               <div ref={messagesEndRef} />
             </div>
           )}
-          </div>
         </div>
       </div>
 
       {/* Floating Gradient Backdrop for Input (width capped to input box width only, zero side overflow) */}
       {!isChatEmpty && (
-        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-20 flex justify-center px-4 sm:px-6 md:px-8">
-          <div className="w-full max-w-3xl pointer-events-auto min-w-0 relative">
-            <div className="absolute -inset-x-4 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
+        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-20">
+          <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pointer-events-auto min-w-0 relative">
+            <div className="absolute inset-x-0 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             <ChatInputBox 
               isLoading={isLoading}
               documentsCount={documents.length}
