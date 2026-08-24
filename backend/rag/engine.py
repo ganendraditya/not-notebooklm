@@ -526,13 +526,39 @@ async def query_chat(
         text = re.sub(r'\[(?:Lihat\s+Bukti|Bukti\s+Metode|Bukti\s+Temuan)\](?:\([^)]*\))?', '', text, flags=re.IGNORECASE)
 
         # 4. Strip heading and text for manual quote sections, verification panels, anchor links (<a id=...>), and bulleted quote lists
-        text = re.sub(r'\n+#{1,4}\s*(?:Teks\s+Sitasi|Verifikasi\s+Teks|Panel\s+Verifikasi|Highlight\s+Bukti|Kutipan\s+Rujukan|Bukti\s+Klaim|Bukti\s+Kutipan|Kutipan\s+Verbatim|Pemetaan\s+Langsung|Bukti\s+Validasi)[\s\S]*$', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\n+(?:Teks\s+Sitasi\s+Rujukan|Verifikasi\s+Teks\s+Sitasi|Panel\s+Verifikasi\s+Bukti|Highlight\s+Bukti\s+Klaim|Bukti\s+Kutipan\s+Verbatim|Bukti\s+kutipan\s+langsung|Berikut\s+adalah\s+pemetaan\s+langsung|Berikut\s+adalah\s+bukti\s+validasi)[\s\S]*$', '', text, flags=re.IGNORECASE)
-        
-        # 5. Remove any lingering HTML anchors, raw link anchors, or mark tags that LLM attempts to output in chat body
+        # Also parse quotes if LLM wrote manual "Bukti Tekstual & Snippet Verifikasi Sumber" in response body into CITATION_MAP
         text = re.sub(r'<a\s+id=[\'"][^\'"]*[\'"]\s*>\s*(?:</a>)?', '', text, flags=re.IGNORECASE)
         text = re.sub(r'<a\s+href=[\'"]#[^\'"]*[\'"]\s*>([\s\S]*?)</a>', r'\1', text, flags=re.IGNORECASE)
-        
+
+        # Extract manual snippets into citation_map before stripping if CITATION_MAP wasn't generated
+        manual_quotes_match = re.search(
+            r'(?:#{1,4}\s*(?:Bukti\s+Tekstual|Teks\s+Sitasi|Verifikasi\s+Teks|Panel\s+Verifikasi|Highlight\s+Bukti|Kutipan\s+Rujukan|Bukti\s+Klaim|Bukti\s+Kutipan|Kutipan\s+Verbatim)[\s\S]*)$',
+            text,
+            flags=re.IGNORECASE
+        )
+        if manual_quotes_match:
+            manual_section = manual_quotes_match.group(0)
+            text = text[:manual_quotes_match.start()].rstrip()
+            
+            if not citation_map_comment:
+                extracted_quotes = {}
+                # Match patterns like "Sumber: [7]" or "[7]" followed by quoted snippet
+                doc_blocks = re.split(r'(?:Sumber:\s*|Dokumen:\s*)?\[(\d{1,3})\]', manual_section)
+                for b_idx in range(1, len(doc_blocks), 2):
+                    num = doc_blocks[b_idx]
+                    b_content = doc_blocks[b_idx + 1] if b_idx + 1 < len(doc_blocks) else ""
+                    # Find text in double quotes inside this block
+                    found_quotes = re.findall(r'"([^"]{25,})"', b_content)
+                    if not found_quotes:
+                        found_quotes = [
+                            s.strip() for s in b_content.splitlines() 
+                            if len(s.strip()) >= 30 and not re.search(r'^(?:Snippet|Sumber|Dokumen|http|\d+\.)', s.strip(), re.I)
+                        ]
+                    if found_quotes:
+                        extracted_quotes[num] = found_quotes
+                if extracted_quotes:
+                    citation_map_comment = f"\n\n<!-- CITATION_MAP: {json.dumps(extracted_quotes, ensure_ascii=False)} -->"
+
         text = text.strip() + citation_map_comment
 
         # Auto-extract CITATION_MAP fallback if LLM cited [1], [2] but forgot to output CITATION_MAP

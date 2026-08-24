@@ -211,6 +211,8 @@ function getHighlightedContent(
       // Check for exact substring match (bidirectional)
       let foundExact = false;
       rawSentences.forEach((s, idx) => {
+        // Skip title heading in matches
+        if (idx === 0 && /^#\s+/i.test(s.trim())) return;
         const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
         if (sClean.length >= 15 && (sClean.includes(cleanQuote) || cleanQuote.includes(sClean))) {
           aiHighlightedIndices.add(idx);
@@ -224,6 +226,8 @@ function getHighlightedContent(
         let highestScore = 0;
 
         rawSentences.forEach((s, idx) => {
+          // Never highlight Document Title (idx 0) on quote matching
+          if (idx === 0 && /^#\s+/i.test(s.trim())) return;
           const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
           // Skip very short fragments and metadata lines
           if (sClean.length < 15) return;
@@ -246,8 +250,8 @@ function getHighlightedContent(
           const numericBonus = quoteNumbers.length > 0 ? (numericHits / quoteNumbers.length) * 0.25 : 0;
           const combinedScore = wordRatio + numericBonus;
 
-          // Lower threshold to 20% for natural language paraphrase tolerance
-          if (wordRatio >= 0.20 && combinedScore > highestScore) {
+          // Require at least 25% word overlap for quote matching to avoid title/abstract drift
+          if (wordRatio >= 0.25 && combinedScore > highestScore) {
             highestScore = combinedScore;
             bestSentenceIdx = idx;
           }
