@@ -713,9 +713,9 @@ async def query_chat(
 
             from helpers import get_doc_file_path
 
-            for i, fname in enumerate(local_docs):
+            def load_single_doc_snippet(idx_fname):
+                i, fname = idx_fname
                 fpath = get_doc_file_path(chat_id, fname)
-                    
                 content_snippet = ""
                 db_record = db_docs_by_filename.get(fname)
                 is_full_paper = False
@@ -764,7 +764,7 @@ async def query_chat(
 
                 status_header = "VERIFIED WORKSPACE SOURCE"
 
-                full_docs_context_parts.append(
+                return (
                     f"--- DOKUMEN [{i+1}] ---\n"
                     f"Nomor Dokumen: [{i+1}]\n"
                     f"Judul Publikasi: {doc_display_title}\n"
@@ -772,6 +772,11 @@ async def query_chat(
                     f"Status Naskah: {status_header}\n"
                     f"Teks Dokumen:\n{content_snippet}\n"
                 )
+
+            # Load all documents concurrently in thread pool without blocking event loop
+            full_docs_context_parts = await asyncio.gather(
+                *(asyncio.to_thread(load_single_doc_snippet, (i, fname)) for i, fname in enumerate(local_docs))
+            )
             
             # Apply semantic reranker on parsed document snippets if there are many documents
             if len(local_docs) > 8:

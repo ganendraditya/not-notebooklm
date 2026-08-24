@@ -749,17 +749,32 @@ export default function RightSidebar({
     }
   }, [isLoadingDetails, activeMatchIndex, groundingHighlight, activeTab, paperDetails?.content]);
 
+  // Local memory cache for instant viewer loading without repeated network/parsing overhead
+  const paperDetailsCacheRef = useRef<Map<number, PaperDetailData>>(new Map());
+
   // Fetch document details when viewingDoc is set
   useEffect(() => {
     if (!viewingDoc || !activeChatId) {
       setPaperDetails(null);
       return;
     }
+
+    // Check client-side memory cache for zero-latency instant rendering
+    if (paperDetailsCacheRef.current.has(viewingDoc.id)) {
+      setPaperDetails(paperDetailsCacheRef.current.get(viewingDoc.id)!);
+      setIsLoadingDetails(false);
+      setIsCiteModalOpen(false);
+      return;
+    }
+
     setIsLoadingDetails(true);
     setIsCiteModalOpen(false);
     fetch(`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/content`)
       .then(res => res.json())
       .then(data => {
+        if (data && !data.error) {
+          paperDetailsCacheRef.current.set(viewingDoc.id, data);
+        }
         setPaperDetails(data);
       })
       .catch(err => {

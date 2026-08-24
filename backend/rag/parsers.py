@@ -345,8 +345,22 @@ def split_markdown_into_academic_sections(markdown_text: str, filename: str = ""
         
     return sections
 
+_PARSED_MARKDOWN_CACHE = {}
+
+def get_file_cache_key(file_path: str) -> str:
+    try:
+        mtime = os.path.getmtime(file_path)
+        fsize = os.path.getsize(file_path)
+        return f"{file_path}_{mtime}_{fsize}"
+    except Exception:
+        return file_path
+
 def parse_document_to_markdown(file_path: str) -> str:
-    """Parses any supported document format into Markdown text."""
+    """Parses any supported document format into Markdown text with in-memory caching."""
+    cache_key = get_file_cache_key(file_path)
+    if cache_key in _PARSED_MARKDOWN_CACHE:
+        return _PARSED_MARKDOWN_CACHE[cache_key]
+
     ext = os.path.splitext(file_path)[1].lower()
     filename = os.path.basename(file_path)
     
@@ -369,4 +383,5 @@ def parse_document_to_markdown(file_path: str) -> str:
     if not md_text or not md_text.strip():
         raise ValueError(f"Could not extract readable text from {filename}")
         
+    _PARSED_MARKDOWN_CACHE[cache_key] = md_text
     return md_text
