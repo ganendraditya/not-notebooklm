@@ -507,8 +507,8 @@ export default function ChatArea({
 
       {/* Floating Gradient Backdrop for Input (width capped to input box width only, zero side overflow) */}
       {!isChatEmpty && (
-        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-20 flex justify-center px-4 sm:px-6 md:px-8">
-          <div className="w-full max-w-3xl pointer-events-auto min-w-0 relative">
+        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-20 flex">
+          <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pointer-events-auto min-w-0 relative">
             <div className="absolute -inset-x-4 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             <ChatInputBox 
               isLoading={isLoading}
