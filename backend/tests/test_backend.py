@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 from fastapi.testclient import TestClient
 from main import app
@@ -49,3 +53,44 @@ def test_flashrank_reranker():
     ranked = ranker.rerank(req)
     assert len(ranked) == 2
     assert ranked[0]["id"] == 1
+
+def test_section_aware_academic_chunker():
+    """Verify section splitter accurately preserves breadcrumbs, tables, and IMRaD canonical tags."""
+    from rag.parsers import split_markdown_into_academic_sections, classify_canonical_section
+    
+    assert classify_canonical_section("1. Introduction") == "introduction"
+    assert classify_canonical_section("2. Methodology & Materials") == "methodology"
+    assert classify_canonical_section("3. Results & Discussion") in ("results", "discussion")
+    assert classify_canonical_section("4. Limitations") == "limitations"
+    
+    sample_paper_md = """# AI in Sports Medicine (2024)
+
+## 1. Introduction
+Artificial intelligence is rapidly transforming injury diagnosis in professional sports.
+
+## 2. Methods
+We conducted a randomized trial with 450 athletes.
+
+### 2.1 Participant Demographics
+| Group | Sample Size (n) | Age |
+|---|---|---|
+| Control | 225 | 24.1 |
+| Treatment | 225 | 23.8 |
+
+### 2.2 Intervention Protocol
+Athletes in the treatment group were monitored via computer vision tracking.
+
+## 3. Results & Findings
+The treatment group demonstrated a 34% decrease in muscular reinjury rates.
+"""
+    sections = split_markdown_into_academic_sections(sample_paper_md, filename="sports_ai.pdf")
+    assert len(sections) >= 3
+    
+    # Verify breadcrumb propagation
+    demo_sec = next((s for s in sections if "Demographics" in s["breadcrumb"]), None)
+    assert demo_sec is not None
+    assert demo_sec["canonical_section"] == "methodology"
+    assert "2. Methods > 2.1 Participant Demographics" in demo_sec["breadcrumb"]
+    assert "| Sample Size (n) |" in demo_sec["text"]
+    assert "Section: AI in Sports Medicine (2024) > 2. Methods > 2.1 Participant Demographics" in demo_sec["text"]
+

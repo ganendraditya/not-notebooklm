@@ -21,7 +21,10 @@ from llama_index.core.tools import FunctionTool
 from llama_index.core.agent import ReActAgent
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
-from .parsers import parse_document_to_markdown
+from .parsers import (
+    parse_document_to_markdown,
+    split_markdown_into_academic_sections
+)
 from helpers import get_doc_file_path
 from .search import (
     search_academic_papers,
@@ -140,25 +143,62 @@ ninerouter_llm, freellm_llm, gemini_llm, groq_llm = create_llm_instances()
 Settings.llm = ninerouter_llm or freellm_llm or gemini_llm or groq_llm
 
 def ingest_document_text(text: str, filename: str, chat_id: str):
-    """Ingests raw text into the vector database under a specific chat_id."""
-    doc = Document(
-        text=text,
-        metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
-    )
-    VectorStoreIndex.from_documents([doc], vector_store=vector_store, show_progress=False)
+    """Ingests text into the vector database under a specific chat_id with section-aware chunking."""
+    sections = split_markdown_into_academic_sections(text, filename=filename)
+    docs = []
+    for sec in sections:
+        docs.append(
+            Document(
+                text=sec.get("text", text),
+                metadata={
+                    "chat_id": chat_id,
+                    "source_type": "file",
+                    "filename": filename,
+                    "section": sec.get("section", "Overview"),
+                    "breadcrumb": sec.get("breadcrumb", "Overview"),
+                    "canonical_section": sec.get("canonical_section", "general")
+                }
+            )
+        )
+    if not docs:
+        docs = [
+            Document(
+                text=text,
+                metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
+            )
+        ]
+    VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
     return True
 
 def ingest_documents_batch(doc_items: List[tuple]):
-    """Batch ingests multiple (text, filename, chat_id) into Qdrant in a single embedding call."""
+    """Batch ingests multiple (text, filename, chat_id) into Qdrant with section-aware chunks."""
     if not doc_items:
         return True
-    docs = [
-        Document(
-            text=text,
-            metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
-        )
-        for text, filename, chat_id in doc_items
-    ]
+    docs = []
+    for text, filename, chat_id in doc_items:
+        sections = split_markdown_into_academic_sections(text, filename=filename)
+        for sec in sections:
+            docs.append(
+                Document(
+                    text=sec.get("text", text),
+                    metadata={
+                        "chat_id": chat_id,
+                        "source_type": "file",
+                        "filename": filename,
+                        "section": sec.get("section", "Overview"),
+                        "breadcrumb": sec.get("breadcrumb", "Overview"),
+                        "canonical_section": sec.get("canonical_section", "general")
+                    }
+                )
+            )
+    if not docs:
+        docs = [
+            Document(
+                text=text,
+                metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
+            )
+            for text, filename, chat_id in doc_items
+        ]
     VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
     return True
 
