@@ -388,8 +388,8 @@ function getHighlightedContent(
     if (/https?:\/\/|doi\.org|\bvol(?:ume)?\s*\d+|\bp-issn\b|\be-issn\b|\bissn\b|\bhalaman\b|\bavailable online\b|\.ac\.id|\.org\/index/i.test(sLower)) {
       return 0;
     }
-    // Skip very short lines (single chars, roman numerals, table separators)
-    if (s.trim().length < 8) {
+    // Skip top title, metadata lines, and heading 1 from matching if searching within body
+    if (idx === 0 && /^#\s+/i.test(s.trim())) {
       return 0;
     }
 
@@ -490,10 +490,10 @@ function getHighlightedContent(
     }
   }
 
-  // Fallback: If no match above threshold, highlight best matching sentence ONLY if it scored > 0
+  // Fallback: If no match above threshold, highlight best matching sentence ONLY if it scored >= 15 (strict significance)
   if (highlightedIndices.size === 0) {
     let fallbackIdx = -1;
-    let bestScore = 0; // Must have at least some score to be highlighted
+    let bestScore = 14; // Must have substantial overlap (at least 3 keywords or keyphrase/metric) to qualify
     sentenceScores.forEach((sc, idx) => {
       if (sc > bestScore) {
         bestScore = sc;

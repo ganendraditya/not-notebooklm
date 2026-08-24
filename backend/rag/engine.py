@@ -774,28 +774,11 @@ async def query_chat(
                 )
 
             # Load all documents concurrently in thread pool without blocking event loop
+            # Maintain deterministic ordering matching DOKUMEN [1], [2], ... [N]
             full_docs_context_parts = await asyncio.gather(
                 *(asyncio.to_thread(load_single_doc_snippet, (i, fname)) for i, fname in enumerate(local_docs))
             )
             
-            # Apply semantic reranker on parsed document snippets if there are many documents
-            if len(local_docs) > 8:
-                try:
-                    from flashrank import Ranker, RerankRequest
-                    ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
-                    passages = [
-                        {"id": idx, "text": f"DOKUMEN [{idx+1}]: {p[:400]}"}
-                        for idx, p in enumerate(full_docs_context_parts)
-                    ]
-                    rerank_req = RerankRequest(query=query, passages=passages)
-                    ranked = ranker.rerank(rerank_req)
-                    # Reorder top documents to the beginning of context for optimal attention
-                    top_indices = [item["id"] for item in ranked if isinstance(item.get("id"), int)]
-                    if top_indices:
-                        full_docs_context_parts = [full_docs_context_parts[i] for i in top_indices]
-                except Exception as rerank_err:
-                    logger.debug(f"[Workspace Rerank Error]: {rerank_err}")
-
             full_docs_context = "\n\n".join(full_docs_context_parts)
             
             system_msg = LlamaChatMessage(
