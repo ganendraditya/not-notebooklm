@@ -718,7 +718,7 @@ export default function RightSidebar({
   }, [externalViewingDoc]);
   const [paperDetails, setPaperDetails] = useState<PaperDetailData | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "preview">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "preview" | "pdf">("overview");
   
   // Citation Modal State
   const [isCiteModalOpen, setIsCiteModalOpen] = useState<boolean>(false);
@@ -1426,8 +1426,8 @@ export default function RightSidebar({
           </button>
         </div>
 
-        {/* 2. Simplified 2 Navigation Tabs: Overview & Full Paper */}
-        <div className="flex items-center px-4 border-b border-app-divider text-xs font-medium text-app-text-muted gap-6 shrink-0">
+        {/* 2. Simplified 3 Navigation Tabs: Overview, Full Text & PDF */}
+        <div className="flex items-center px-4 border-b border-app-divider text-xs font-medium text-app-text-muted gap-5 shrink-0">
           <button
             onClick={() => setActiveTab("overview")}
             className={`py-2.5 transition-colors cursor-pointer border-b-2 font-semibold ${
@@ -1443,6 +1443,14 @@ export default function RightSidebar({
             }`}
           >
             <span>{t('right.fullPaper')}</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("pdf")}
+            className={`py-2.5 transition-colors cursor-pointer border-b-2 font-medium flex items-center gap-1.5 ${
+              activeTab === "pdf" ? "text-app-text border-blue-500 font-semibold" : "text-app-text-muted hover:text-app-text border-transparent"
+            }`}
+          >
+            <span>PDF View</span>
           </button>
         </div>
 
@@ -1608,7 +1616,7 @@ export default function RightSidebar({
               </div>
             )}
           </div>
-        ) : (
+        ) : activeTab === "preview" ? (
           /* TAB 2: FULL PAPER / IN-APP NATIVE SCROLLABLE DOCUMENT READER */
           <div className="flex-1 flex flex-col min-h-0 bg-app-bg relative overflow-hidden">
             {/* Top Preview Controls Bar */}
@@ -1824,7 +1832,35 @@ export default function RightSidebar({
               )}
             </div>
           </div>
-        )}
+        ) : activeTab === "pdf" ? (
+          <div className="flex-1 w-full h-full bg-app-surface overflow-hidden relative">
+            {activeChatId && viewingDoc ? (
+              <object
+                data={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/stream#toolbar=1&navpanes=0`}
+                type="application/pdf"
+                className="w-full h-full"
+              >
+                <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3">
+                  <FileText size={36} className="text-blue-500 mx-auto stroke-[1.5]" />
+                  <p className="text-xs text-app-text font-medium">Pratinjau PDF di-intercept oleh ekstensi browser / IDM</p>
+                  <a
+                    href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
+                    download={viewingDoc.filename}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors"
+                  >
+                    <Download size={13} />
+                    <span>Buka / Unduh File PDF</span>
+                  </a>
+                </div>
+              </object>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-2">
+                <FileText size={32} className="text-app-text-dim mx-auto stroke-[1.5]" />
+                <p className="text-xs text-app-text font-medium">Naskah PDF tidak ditemukan</p>
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {/* 4. Consensus-style Bottom Floating Action Toolbar */}
         <div className={`p-3 border-t border-app-divider bg-app-sidebar flex items-center justify-between gap-1.5 shrink-0 select-none transition-opacity ${
