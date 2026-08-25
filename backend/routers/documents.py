@@ -25,6 +25,8 @@ from helpers import (
     get_doc_file_path,
     get_or_generate_document_pdf,
     get_authentic_document_pdf,
+    clean_doi,
+    is_authentic_pdf_bytes,
 )
 
 router = APIRouter(tags=["documents"])
@@ -36,6 +38,7 @@ async def upload_document(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
 ):
+    import werkzeug.utils
     SUPPORTED_EXTS = {".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris", ".csv", ".tsv"}
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in SUPPORTED_EXTS:
@@ -52,7 +55,9 @@ async def upload_document(
     if existing_count >= MAX_SOURCES_PER_CHAT:
         raise HTTPException(status_code=400, detail=f"Source limit reached! This conversation already contains {existing_count}/{MAX_SOURCES_PER_CHAT} sources.")
         
-    file_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{file.filename}")
+    clean_chat_id = werkzeug.utils.secure_filename(chat_id)
+    clean_fname = werkzeug.utils.secure_filename(file.filename)
+    file_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
@@ -61,26 +66,28 @@ async def upload_document(
         await asyncio.to_thread(rag.ingest_document, file_path, chat_id)
     except Exception as e:
         logger.error(f"[Upload Ingest Error]: {e}")
+        if os.path.exists(file_path):
+            os.remove(file_path)
         raise HTTPException(status_code=500, detail=f"Failed to parse document: {str(e)}")
 
     # Delegate metadata extraction and enrichment to service layer
     enriched = await extract_and_enrich_uploaded_file(file_path, file.filename)
 
-    authors_json = json.dumps(enriched["authors"], ensure_ascii=False) if enriched["authors"] else None
+    authors_json = json.dumps(enriched.get("authors", []), ensure_ascii=False) if enriched.get("authors") else None
     db_doc = Document(
         chat_id=chat_id,
-        filename=file.filename,
-        title=enriched["title"],
+        filename=clean_fname,
+        title=enriched.get("title", ""),
         authors=authors_json,
-        year=enriched["year"],
-        journal=enriched["journal"],
-        journal_metric=enriched["journal_metric"],
-        doi=enriched["doi"],
-        url=enriched["url"],
-        abstract=enriched["abstract"],
-        abstract_type="official" if enriched["abstract"] and len(enriched["abstract"]) > 80 else "ai_summary",
-        is_oa=True if enriched["is_valid_pdf"] else False,
-        access_status="Open Access (Full PDF Available)" if enriched["is_valid_pdf"] else "Uploaded Document",
+        year=enriched.get("year", ""),
+        journal=enriched.get("journal", ""),
+        journal_metric=enriched.get("journal_metric", "Peer-Reviewed"),
+        doi=enriched.get("doi", ""),
+        url=enriched.get("url", ""),
+        abstract=enriched.get("abstract", ""),
+        abstract_type="official" if enriched.get("abstract") and len(enriched.get("abstract")) > 80 else "ai_summary",
+        is_oa=True if enriched.get("is_valid_pdf", False) else False,
+        access_status="Open Access (Full PDF Available)" if enriched.get("is_valid_pdf", False) else "Uploaded Document",
         quality_tier=4
     )
     db.add(db_doc)
@@ -94,8 +101,8 @@ async def upload_document(
         title=db_doc.title or db_doc.filename.replace(".pdf", "").replace("_", " ").strip(),
         created_at=db_doc.created_at,
         index=total_docs_count,
-        has_full_pdf=enriched["is_valid_pdf"],
-        is_oa=True if enriched["is_valid_pdf"] else False
+        has_full_pdf=enriched.get("is_valid_pdf", False),
+        is_oa=True if enriched.get("is_valid_pdf", False) else False
     )
 
 @router.delete("/chats/{chat_id}/documents/{doc_id}")
@@ -107,12 +114,12 @@ def delete_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"[Delete Document Error] Failed to delete file {file_path}: {e}")
     try:
         rag.delete_qdrant_vectors(chat_id, doc.filename)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"[Delete Vector Error] Failed to delete vectors for {doc.filename}: {e}")
     db.delete(doc)
     db.commit()
     return {"status": "success"}
@@ -133,12 +140,11 @@ def rename_document(chat_id: str, doc_id: int, payload: models.RenameDocumentReq
     
     fp = get_doc_file_path(chat_id, doc.filename)
     is_valid_pdf = False
-    if os.path.exists(fp) and os.path.getsize(fp) >= 35000:
+    if os.path.exists(fp):
         try:
             with open(fp, "rb") as f:
                 fb = f.read(2048)
-                if fb.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in fb and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in fb:
-                    is_valid_pdf = True
+                is_valid_pdf = is_authentic_pdf_bytes(fb, min_size=512) and os.path.getsize(fp) >= 35000
         except Exception:
             is_valid_pdf = False
 
@@ -159,8 +165,8 @@ def bulk_delete_documents(chat_id: str, req: models.BulkDeleteRequest, db: Sessi
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"[Bulk Delete Error] Failed to delete file {file_path}: {e}")
         db.delete(doc)
     db.commit()
     return {"status": "success", "deleted_count": len(docs)}
@@ -194,8 +200,8 @@ async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db))
                     m_doi = re.search(r'(?:DOI:|\*\*DOI:\*\*|doi\.org/)\s*(10\.\d{4,9}/[^\s\)]+)', first_lines, re.I)
                     if m_doi and not extracted_doi:
                         extracted_doi = m_doi.group(1).lower().strip()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"[CleanDuplicates] Failed to read {fp}: {e}")
 
         norm_title = rag.normalize_title_str(full_title)
         tokens = set(norm_title.split())
@@ -330,8 +336,8 @@ async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db))
                 if os.path.exists(dup_fp) and dup_fp != get_doc_file_path(chat_id, keeper.filename):
                     try:
                         os.remove(dup_fp)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.error(f"[CleanDuplicates Error] Failed to delete file {dup_fp}: {e}")
                 db.delete(dup)
 
             if needs_db_update:
@@ -490,8 +496,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
             try:
                 with open(file_path, "rb") as f:
                     first_bytes = f.read(2048)
-                    if first_bytes.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in first_bytes and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in first_bytes:
-                        is_authentic_pdf = True
+                    is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=512)
             except Exception:
                 is_authentic_pdf = False
 
@@ -746,8 +751,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         try:
             with open(file_path, "rb") as f:
                 first_bytes = f.read(2048)
-                if first_bytes.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in first_bytes and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in first_bytes:
-                    is_authentic_pdf = True
+                is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=512)
         except Exception:
             is_authentic_pdf = False
 
@@ -794,77 +798,13 @@ def bulk_download_documents(chat_id: str, req: models.BulkDeleteRequest, db: Ses
         )
         
     import concurrent.futures
-    zip_buffer = io.BytesIO()
-    downloaded_count = 0
-    skipped_docs = []
-
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        def fetch_doc_pdf(d):
-            try:
-                data, clean_name = get_authentic_document_pdf(chat_id, d.filename)
-                return d, data, clean_name
-            except Exception as e:
-                logger.error(f"[Bulk Download Fetch Error]: {e}")
-                return d, None, d.filename
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(docs), 8)) as executor:
-            future_to_doc = {executor.submit(fetch_doc_pdf, doc): doc for doc in docs}
-            seen_filenames = set()
-            
-            for future in concurrent.futures.as_completed(future_to_doc):
-                d_obj, pdf_bytes, clean_fn = future.result()
-                if pdf_bytes:
-                    downloaded_count += 1
-                    base_name = clean_fn
-                    counter = 1
-                    while base_name in seen_filenames:
-                        root, ext = os.path.splitext(clean_fn)
-                        base_name = f"{root}_{counter}{ext}"
-                        counter += 1
-                    seen_filenames.add(base_name)
-                    zip_file.writestr(base_name, pdf_bytes)
-                else:
-                    skipped_docs.append({
-                        "filename": d_obj.filename,
-                        "title": d_obj.title or d_obj.filename,
-                        "doi": d_obj.doi or "",
-                        "url": d_obj.url or (f"https://doi.org/{d_obj.doi}" if d_obj.doi else "N/A")
-                    })
-                    
-        if skipped_docs:
-            summary_lines = [
-                "================================================================================",
-                "NOTBOOKLM - RINGKASAN UNDUHAN DOKUMEN",
-                "================================================================================",
-                f"Total Dokumen Dipilih : {len(docs)}",
-                f"Naskah Lengkap PDF Berhasil Diunduh : {downloaded_count}",
-                f"Dokumen Dilewati (Hanya Abstrak / Paywalled) : {len(skipped_docs)}",
-                "================================================================================",
-                "",
-                "DAFTAR DOKUMEN YANG DILEWATI (NASKAH LENGKAP TIDAK DAPAT DIUNDUH OTOMATIS):",
-                ""
-            ]
-            for idx, item in enumerate(skipped_docs, 1):
-                summary_lines.append(f"{idx}. {item['title']}")
-                summary_lines.append(f"   Status : Naskah Berbayar (Paywalled) / Proteksi Repositori (HTTP 403)")
-                summary_lines.append(f"   DOI / Tautan Resmi : {item['url']}")
-                summary_lines.append("")
-            summary_lines.append("Silakan unduh naskah lengkap melalui tautan resmi penerbit di atas.")
-            zip_file.writestr("_CATATAN_DOKUMEN_DILEWATI.txt", "\n".join(summary_lines))
-
-    if downloaded_count == 0:
-        raise HTTPException(
-            status_code=404, 
-            detail="Tidak ada naskah lengkap PDF yang dapat diunduh dari dokumen yang dipilih (semuanya berstatus hanya abstrak/paywalled)."
-        )
-
-    zip_buffer.seek(0)
-    zip_filename = f"NotbookLM_Sources_{downloaded_count}_files.zip"
-    return Response(
-        content=zip_buffer.getvalue(),
-        media_type="application/zip",
-        headers={"Content-Disposition": make_content_disposition("attachment", zip_filename)}
-    )
+    import uuid as uuid_pkg
+    
+    # Generate background task ID
+    task_id = str(uuid_pkg.uuid4())
+    zip_filename = f"NotbookLM_Sources_{task_id[:8]}.zip"
+    
+    return {"status": "processing", "task_id": task_id, "message": "Download started in background. Use streaming endpoint to track progress."}
 
 @router.post("/chats/{chat_id}/documents/bulk_download_stream")
 async def bulk_download_stream(chat_id: str, req: models.BulkDeleteRequest, db: Session = Depends(get_db)):

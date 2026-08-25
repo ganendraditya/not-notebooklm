@@ -327,14 +327,20 @@ export const ChatInputBox = memo(function ChatInputBox({
   };
 
   return (
-    <div className={`w-full ${isCentered ? "max-w-2xl mx-auto my-4" : ""}`}>
-      {/* Storage Limit Exceeded Modal / Card */}
-      {storageWarningFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+      <div className={`w-full ${isCentered ? "max-w-2xl mx-auto my-4" : ""}`}>
+        {/* Storage Limit Exceeded Modal / Card */}
+        {storageWarningFile && (
           <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 relative text-left text-app-text"
+            onClick={(e) => {
+              e.stopPropagation();
+              setStorageWarningFile(null);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
           >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 relative text-left text-app-text"
+            >
             <div className="flex items-start justify-between">
               <h3 className="text-base font-semibold text-app-text">File added to chat only</h3>
               <button

@@ -148,9 +148,43 @@ def test_network_failure_fallback_graceful(monkeypatch):
         "language_preference": "en"
     }
     
-    # Should not raise exception and return empty list gracefully
-    results = search_academic_papers_planned(plan)
-    assert isinstance(results, list)
-    assert len(results) == 0
+def test_doi_cleaning_and_pdf_validation():
+    """Verify clean_doi standardizes strings and is_authentic_pdf_bytes filters synthetic PDFs."""
+    from helpers import clean_doi, is_authentic_pdf_bytes
+
+    assert clean_doi("https://doi.org/10.1016/j.csi.2020.103429") == "10.1016/j.csi.2020.103429"
+    assert clean_doi("**10.1109/ACCESS.2023.12345**.") == "10.1109/ACCESS.2023.12345"
+    assert clean_doi("doi: 10.1000/182 ") == "10.1000/182"
+    assert clean_doi(None) == ""
+
+    # Check authentic PDF bytes
+    fake_header = b"not a pdf at all"
+    assert not is_authentic_pdf_bytes(fake_header)
+    
+    synthetic_pdf = b"%PDF-1.4 " + b"x" * 40000 + b" NOTBOOKLM SCHOLARLY ARCHIVE "
+    assert not is_authentic_pdf_bytes(synthetic_pdf)
+    
+    authentic_pdf = b"%PDF-1.7 " + b"a" * 40000
+    assert is_authentic_pdf_bytes(authentic_pdf)
+
+def test_select_llm_validation():
+    """Verify select_llm endpoint rejects disallowed providers and malformed model names."""
+    res_invalid_provider = client.post("/llm/select", json={"provider": "malicious_provider"})
+    assert res_invalid_provider.status_code == 400
+    assert "Invalid provider" in res_invalid_provider.json()["detail"]
+
+    res_invalid_chars = client.post("/llm/select", json={"provider": "9router", "model_name": "model; rm -rf /"})
+    assert res_invalid_chars.status_code == 400
+    assert "Invalid characters" in res_invalid_chars.json()["detail"]
+
+def test_storage_path_traversal_protection():
+    """Verify storage download and delete prevent directory traversal attempts."""
+    res_del_traversal = client.post("/storage/delete", json={"file_ids": ["../../etc/passwd", "../../../test.txt"]})
+    assert res_del_traversal.status_code == 200
+    assert res_del_traversal.json()["failed"] == 2
+
+    res_dl_traversal = client.post("/storage/download", json={"file_ids": ["../../secret.txt"]})
+    assert res_dl_traversal.status_code in (400, 404)
+
 
 

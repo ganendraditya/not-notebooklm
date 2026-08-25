@@ -16,10 +16,53 @@ from helpers import (
     UPLOAD_DIR,
     MAX_SOURCES_PER_CHAT,
     sanitize_paper_filename,
+    clean_doi,
+    is_authentic_pdf_bytes,
 )
 
 router = APIRouter(tags=["papers"])
 logger = logging.getLogger("uvicorn.error")
+
+def _prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> tuple:
+    """Prepares paper file on disk, attempting authentic OA download or markdown fallback."""
+    filename = sanitize_paper_filename(paper.title)
+    abstract_text = (paper.snippet or "").strip()
+    c_doi = clean_doi(paper.doi)
+    full_doi = f"https://doi.org/{c_doi}" if c_doi and not c_doi.startswith("http") else c_doi
+
+    doc_text = f"# {paper.title} ({paper.year})\n\n"
+    if full_doi:
+        doc_text += f"**DOI:** {full_doi}  \n"
+    if paper.url:
+        doc_text += f"**URL:** {paper.url}  \n\n"
+    doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
+
+    save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
+    has_downloaded_pdf = False
+
+    if c_doi or paper.pdf_url or paper.url:
+        try:
+            fetched_oa = pdf_exporter.resolve_and_fetch_authentic_pdf(
+                doi=c_doi,
+                title=paper.title,
+                direct_url=paper.url or "",
+                candidate_pdf_url=paper.pdf_url or ""
+            )
+            if is_authentic_pdf_bytes(fetched_oa, min_size=40000):
+                with open(save_path, "wb") as f:
+                    f.write(fetched_oa)
+                has_downloaded_pdf = True
+        except Exception as e:
+            logger.debug(f"[OA Fetch on Import]: {e}")
+
+    if not has_downloaded_pdf:
+        try:
+            with open(save_path, "w", encoding="utf-8") as f:
+                f.write(doc_text)
+        except Exception as e:
+            logger.warning(f"[Doc text save Warning]: {e}")
+
+    return (doc_text, filename, chat_id, paper, c_doi, has_downloaded_pdf)
 
 @router.get("/search_papers", response_model=List[models.PaperCandidate])
 @router.get("/papers/search", response_model=List[models.PaperCandidate])
@@ -84,51 +127,8 @@ async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, 
         batch_docs_for_embedding = []
         
         for idx, paper in enumerate(allowed_sources, start=1):
-            filename = sanitize_paper_filename(paper.title)
-            abstract_text = paper.snippet.strip()
-            
-            # Sanitize DOI: strip markdown artifacts and trailing punctuation
-            clean_doi = (paper.doi or "").strip()
-            clean_doi = clean_doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
-            clean_doi = clean_doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
-            import re as _re
-            clean_doi = _re.sub(r'[;.,:)\s]+$', '', clean_doi).strip()
-            full_doi = f"https://doi.org/{clean_doi}" if clean_doi and not clean_doi.startswith("http") else clean_doi
-            
-            doc_text = f"# {paper.title} ({paper.year})\n\n"
-            if full_doi:
-                doc_text += f"**DOI:** {full_doi}  \n"
-            if paper.url:
-                doc_text += f"**URL:** {paper.url}  \n\n"
-            doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
-
-            save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
-            has_downloaded_pdf = False
-            
-            # 1. Proactively try fetching authentic Open Access PDF during import
-            if clean_doi or paper.pdf_url or paper.url:
-                try:
-                    fetched_oa = await asyncio.to_thread(
-                        pdf_exporter.resolve_and_fetch_authentic_pdf,
-                        doi=clean_doi,
-                        title=paper.title,
-                        direct_url=paper.url or "",
-                        candidate_pdf_url=paper.pdf_url or ""
-                    )
-                    if fetched_oa and len(fetched_oa) >= 40000 and fetched_oa.startswith(b"%PDF-"):
-                        with open(save_path, "wb") as f:
-                            f.write(fetched_oa)
-                        has_downloaded_pdf = True
-                except Exception as e:
-                    logger.debug(f"[OA Fetch on Import]: {e}")
-            
-            # 2. If OA PDF is paywalled/not downloadable, save structured markdown metadata & abstract (no synthetic PDF)
-            if not has_downloaded_pdf:
-                try:
-                    with open(save_path, "w", encoding="utf-8") as f:
-                        f.write(doc_text)
-                except Exception as e:
-                    logger.warning(f"[Doc text save Warning]: {e}")
+            doc_text, filename, _, _, c_doi, has_downloaded_pdf = await asyncio.to_thread(_prepare_paper_file_sync, chat_id, paper)
+            abstract_text = (paper.snippet or "").strip()
 
             # Save to DB with full metadata persisted
             local_db = SessionLocal()
@@ -144,7 +144,7 @@ async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, 
                     year=str(paper.year or ""),
                     journal=paper.venue or "",
                     journal_metric=paper.journal_metric or "",
-                    doi=clean_doi,
+                    doi=c_doi,
                     url=paper.url or "",
                     pdf_url=paper.pdf_url or "",
                     abstract=abstract_text,
@@ -213,59 +213,7 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
     allowed_sources = novel_sources[:remaining_slots]
     
     # 1. Prepare batch metadata and disk files concurrently
-    docs_to_ingest = []
-    created_docs = []
-
-    def prepare_paper_file(paper):
-        filename = sanitize_paper_filename(paper.title)
-        abstract_text = paper.snippet.strip()
-        
-        # Sanitize DOI
-        import re as _re
-        clean_doi = (paper.doi or "").strip()
-        clean_doi = clean_doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
-        clean_doi = clean_doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
-        clean_doi = _re.sub(r'[;.,:)\s]+$', '', clean_doi).strip()
-        full_doi = f"https://doi.org/{clean_doi}" if clean_doi and not clean_doi.startswith("http") else clean_doi
-        
-        doc_text = f"# {paper.title} ({paper.year})\n\n"
-        if full_doi:
-            doc_text += f"**DOI:** {full_doi}  \n"
-        if paper.url:
-            doc_text += f"**URL:** {paper.url}  \n\n"
-        doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
-
-        save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
-        has_downloaded_pdf = False
-
-        # 1. Proactively try fetching authentic Open Access PDF during import
-        if clean_doi or paper.pdf_url or paper.url:
-            try:
-                fetched_oa = pdf_exporter.resolve_and_fetch_authentic_pdf(
-                    doi=clean_doi,
-                    title=paper.title,
-                    direct_url=paper.url or "",
-                    candidate_pdf_url=paper.pdf_url or ""
-                )
-                if fetched_oa and len(fetched_oa) >= 40000 and fetched_oa.startswith(b"%PDF-"):
-                    with open(save_path, "wb") as f:
-                        f.write(fetched_oa)
-                    has_downloaded_pdf = True
-            except Exception as e:
-                logger.debug(f"[OA Fetch on Import]: {e}")
-
-        # 2. If OA PDF is paywalled/not downloadable, save structured markdown metadata & abstract (no synthetic PDF)
-        if not has_downloaded_pdf:
-            try:
-                with open(save_path, "w", encoding="utf-8") as f:
-                    f.write(doc_text)
-            except Exception as e:
-                logger.warning(f"[Doc text save Warning]: {e}")
-
-        return (doc_text, filename, chat_id, paper, clean_doi)
-
-    # Disk files prepared in thread pool
-    docs_to_ingest = await asyncio.gather(*(asyncio.to_thread(prepare_paper_file, p) for p in allowed_sources))
+    docs_to_ingest = await asyncio.gather(*(asyncio.to_thread(_prepare_paper_file_sync, chat_id, p) for p in allowed_sources))
 
     # 2. Single batch vector embedding into Qdrant (1 single API call instead of 50 separate calls)
     embedding_tuples = [(d[0], d[1], d[2]) for d in docs_to_ingest]
@@ -276,8 +224,9 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
 
     # 3. Database commit with full metadata
     import json as _json
-    for doc_text, fname, _cid, paper, clean_doi in docs_to_ingest:
-        abstract_text = paper.snippet.strip()
+    created_docs = []
+    for doc_text, fname, _cid, paper, c_doi, _has_pdf in docs_to_ingest:
+        abstract_text = (paper.snippet or "").strip()
         authors_json = _json.dumps(paper.authors or [], ensure_ascii=False)
         db_doc = Document(
             chat_id=chat_id,
@@ -287,7 +236,7 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
             year=str(paper.year or ""),
             journal=paper.venue or "",
             journal_metric=paper.journal_metric or "",
-            doi=clean_doi,
+            doi=c_doi,
             url=paper.url or "",
             pdf_url=paper.pdf_url or "",
             abstract=abstract_text,
@@ -372,7 +321,7 @@ async def import_doi_source(chat_id: str, req: models.ImportDoiRequest, db: Sess
             direct_url=url,
             candidate_pdf_url=pdf_url
         )
-        if fetched_oa and len(fetched_oa) >= 35000 and fetched_oa.startswith(b"%PDF-"):
+        if fetched_oa and is_authentic_pdf_bytes(fetched_oa):
             with open(save_path, "wb") as f:
                 f.write(fetched_oa)
             has_downloaded_pdf = True

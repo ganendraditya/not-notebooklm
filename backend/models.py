@@ -9,19 +9,18 @@ class ChatSessionUpdate(BaseModel):
     title: str
 
 class ChatSessionResponse(BaseModel):
+    model_config = {"from_attributes": True}
     id: str
     title: str
     is_pinned: Optional[bool] = False
     created_at: datetime
     updated_at: Optional[datetime] = None
-    
-    class Config:
-        from_attributes = True
 
 class PinChatRequest(BaseModel):
     is_pinned: bool
 
 class DocumentResponse(BaseModel):
+    model_config = {"from_attributes": True}
     id: int
     filename: str
     title: Optional[str] = None
@@ -29,9 +28,6 @@ class DocumentResponse(BaseModel):
     index: Optional[int] = None
     has_full_pdf: Optional[bool] = True
     is_oa: Optional[bool] = True
-    
-    class Config:
-        from_attributes = True
 
 class AttachmentModel(BaseModel):
     type: str
@@ -39,26 +35,22 @@ class AttachmentModel(BaseModel):
     url: str
 
 class ChatMessageResponse(BaseModel):
+    model_config = {"from_attributes": True}
     role: str
     content: str
     created_at: datetime
     attachments: Optional[List[AttachmentModel]] = None
     variants: Optional[List[str]] = None
     active_variant_index: Optional[int] = 0
-    
-    class Config:
-        from_attributes = True
 
 class ChatQuery(BaseModel):
     message: str
     attachments: Optional[List[AttachmentModel]] = None
 
 class ChatSessionDetailResponse(ChatSessionResponse):
+    model_config = {"from_attributes": True}
     documents: List[DocumentResponse] = []
     messages: List[ChatMessageResponse] = []
-
-    class Config:
-        from_attributes = True
 
 class PaperCandidate(BaseModel):
     title: str
@@ -105,5 +97,10 @@ class StorageSummaryResponse(BaseModel):
 
 class RenameDocumentRequest(BaseModel):
     title: str
+
+class SelectLLMRequest(BaseModel):
+    provider: Optional[str] = None
+    model_name: Optional[str] = None
+    model_id: Optional[str] = None
 
 

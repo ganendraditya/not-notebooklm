@@ -7,7 +7,7 @@ import logging
 from typing import List, Optional, Callable, Any
 import requests
 import pymupdf4llm
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
 logger = logging.getLogger("uvicorn.error")

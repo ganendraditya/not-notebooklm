@@ -345,7 +345,11 @@ def split_markdown_into_academic_sections(markdown_text: str, filename: str = ""
         
     return sections
 
-_PARSED_MARKDOWN_CACHE = {}
+from collections import OrderedDict
+
+# Bounded LRU cache for parsed markdown content (prevents unbounded memory leak)
+_MAX_PARSED_CACHE_SIZE = 200
+_PARSED_MARKDOWN_CACHE: OrderedDict = OrderedDict()
 
 def get_file_cache_key(file_path: str) -> str:
     try:
@@ -356,9 +360,10 @@ def get_file_cache_key(file_path: str) -> str:
         return file_path
 
 def parse_document_to_markdown(file_path: str) -> str:
-    """Parses any supported document format into Markdown text with in-memory caching."""
+    """Parses any supported document format into Markdown text with in-memory bounded LRU caching."""
     cache_key = get_file_cache_key(file_path)
     if cache_key in _PARSED_MARKDOWN_CACHE:
+        _PARSED_MARKDOWN_CACHE.move_to_end(cache_key)
         return _PARSED_MARKDOWN_CACHE[cache_key]
 
     ext = os.path.splitext(file_path)[1].lower()
@@ -384,4 +389,6 @@ def parse_document_to_markdown(file_path: str) -> str:
         raise ValueError(f"Could not extract readable text from {filename}")
         
     _PARSED_MARKDOWN_CACHE[cache_key] = md_text
+    if len(_PARSED_MARKDOWN_CACHE) > _MAX_PARSED_CACHE_SIZE:
+        _PARSED_MARKDOWN_CACHE.popitem(last=False)
     return md_text

@@ -3,8 +3,24 @@ import logging
 from typing import Optional
 from dotenv import load_dotenv
 
-from llama_index.vector_stores.qdrant import QdrantVectorStore
+from llama_index.vector_stores.qdrant import QdrantVectorStore as _BaseQdrantVectorStore
 from qdrant_client import QdrantClient
+
+
+class QdrantVectorStore(_BaseQdrantVectorStore):
+    """Compat shim for llama-index-vector-stores-qdrant 0.1.4 on pydantic v2.
+
+    The upstream class declares `path`/`url`/`api_key` as `Optional[...]`
+    without defaults (which pydantic v2 treats as REQUIRED), but its
+    `__init__` never forwards `path` to `super().__init__()`, so plain
+    instantiation raises `ValidationError: path Field required`.
+    Redeclaring the fields with defaults fixes validation without
+    changing runtime behavior.
+    """
+
+    path: Optional[str] = None
+    url: Optional[str] = None
+    api_key: Optional[str] = None
 
 from llama_index.embeddings.gemini import GeminiEmbedding
 try:
@@ -46,8 +62,7 @@ def init_embedding_and_vector_store():
     if env_provider == "gemini" and gemini_key and not gemini_key.startswith("your_"):
         try:
             embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
-            coll_name = "not_notebooklm_gemini"
-            vstore = QdrantVectorStore(client=qdrant_client, collection_name=coll_name, path=None, url=None, api_key=None)
+            vstore = QdrantVectorStore(collection_name="not_notebooklm_gemini", client=qdrant_client, enable_hybrid=False, batch_size=20)
             return embed_model, vstore
         except Exception as e:
             logger.warning(f"[RAG Engine] Gemini Embedding initialization failed ({e}), falling back to local BGE embeddings.")
@@ -56,15 +71,14 @@ def init_embedding_and_vector_store():
     if HuggingFaceEmbedding is not None:
         try:
             embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
-            coll_name = "not_notebooklm_bge"
-            vstore = QdrantVectorStore(client=qdrant_client, collection_name=coll_name, path=None, url=None, api_key=None)
+            vstore = QdrantVectorStore(collection_name="not_notebooklm_bge", client=qdrant_client, enable_hybrid=False, batch_size=20)
             return embed_model, vstore
         except Exception as e:
             logger.warning(f"[RAG Engine] HuggingFace Embedding loading failed: {e}")
 
     # Ultimate fallback to Gemini
     embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
-    vstore = QdrantVectorStore(client=qdrant_client, collection_name="not_notebooklm", path=None, url=None, api_key=None)
+    vstore = QdrantVectorStore(collection_name="not_notebooklm", client=qdrant_client, enable_hybrid=False, batch_size=20)
     return embed_model, vstore
 
 

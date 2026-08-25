@@ -36,12 +36,12 @@ def sanitize_paper_filename(title: str, max_length: int = 200) -> str:
     return f"{clean}.pdf" if not clean.lower().endswith(".pdf") else clean
 
 def get_doc_file_path(chat_id: str, filename: str) -> str:
-    """Returns absolute file path for a chat document across working directories and legacy fallbacks."""
-    # Sanitize inputs to prevent directory traversal
-    clean_chat_id = os.path.basename((chat_id or "").strip().replace("..", ""))
-    clean_fname = os.path.basename((filename or "").strip().replace("..", ""))
+    """Returns absolute file path for a chat document safely."""
+    import werkzeug.utils
 
-    # 1. Standard per-chat upload path
+    clean_chat_id = werkzeug.utils.secure_filename((chat_id or "").strip())
+    clean_fname = werkzeug.utils.secure_filename((filename or "").strip())
+
     if clean_chat_id:
         p1 = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
         if os.path.exists(p1):
@@ -50,17 +50,29 @@ def get_doc_file_path(chat_id: str, filename: str) -> str:
         if os.path.exists(p1_cwd):
             return p1_cwd
             
-    # 2. Legacy fallback with None_ prefix
     p_none = os.path.join(UPLOAD_DIR, f"None_{clean_fname}")
     if os.path.exists(p_none):
         return p_none
 
-    # 3. Direct filename fallback
     p_direct = os.path.join(UPLOAD_DIR, clean_fname)
     if os.path.exists(p_direct):
         return p_direct
 
     return os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
+
+def clean_doi(raw_doi: Optional[str]) -> str:
+    """Standardizes and cleans DOI string removing markdown, urls, and trailing punctuation."""
+    if not raw_doi or not isinstance(raw_doi, str):
+        return ""
+    doi = raw_doi.strip()
+    doi = doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
+    doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+    doi = re.sub(r'[;.,:)\s]+$', '', doi).strip()
+    return doi
+
+def is_authentic_pdf_bytes(data: bytes, min_size: int = 35000) -> bool:
+    """Checks if raw bytes represent an authentic non-synthetic binary PDF."""
+    return pdf_exporter.is_authentic_pdf_bytes(data, min_size)
 
 def get_authentic_document_pdf(chat_id: str, doc_filename: str) -> tuple:
     """
@@ -75,8 +87,7 @@ def get_authentic_document_pdf(chat_id: str, doc_filename: str) -> tuple:
         try:
             with open(file_path, "rb") as f:
                 data = f.read()
-                # Check that it is not a legacy synthetic template PDF
-                if len(data) >= 35000 and data.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in data and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in data:
+                if is_authentic_pdf_bytes(data):
                     return data, clean_dl_name
         except Exception:
             pass

@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
+import { consumeSSEStream } from "@/lib/sse";
 import { DownloadManager, DownloadTask } from "./DownloadManager";
 import { BulkDeleteModal, RenameModal } from "./sidebar/SidebarModals";
 
@@ -1217,87 +1218,58 @@ export default function RightSidebar({
         body: JSON.stringify({ doc_ids: docIds })
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to start download stream");
-      }
+      await consumeSSEStream(response, (data: any) => {
+        if (data.type === "init") {
+          setDownloadTask({
+            status: "zipping",
+            total: data.total || docIds.length,
+            current: 0,
+            percent: 0,
+            currentFile: t('download.startingParallel')
+          });
+        } else if (data.type === "progress") {
+          const calculatedPercent = typeof data.percent === "number" 
+            ? data.percent 
+            : (data.total > 0 ? Math.round((data.current / data.total) * 100) : 0);
+          setDownloadTask(prev => ({
+            status: "zipping",
+            total: data.total || docIds.length,
+            current: data.current,
+            percent: calculatedPercent,
+            currentFile: data.filename || prev?.currentFile || "",
+            downloadedCount: data.downloaded_count,
+            skippedCount: data.skipped_count
+          }));
+        } else if (data.type === "error") {
+          setDownloadTask({
+            status: "error",
+            total: docIds.length,
+            current: 0,
+            percent: 0,
+            currentFile: "",
+            errorMsg: data.message || t('download.failedZip')
+          });
+        } else if (data.type === "complete") {
+          setDownloadTask({
+            status: "complete",
+            total: data.total || data.total_files || docIds.length,
+            current: data.total || data.total_files || docIds.length,
+            percent: 100,
+            downloadedCount: data.downloaded_count,
+            skippedCount: data.skipped_count,
+            currentFile: t('download.downloadComplete'),
+            totalSizeMb: data.total_size_mb
+          });
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      if (!reader) {
-        throw new Error("No readable stream received");
-      }
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
-
-        for (const block of lines) {
-          const line = block.trim();
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.type === "init") {
-                setDownloadTask({
-                  status: "zipping",
-                  total: data.total || docIds.length,
-                  current: 0,
-                  percent: 0,
-                  currentFile: t('download.startingParallel')
-                });
-              } else if (data.type === "progress") {
-                const calculatedPercent = typeof data.percent === "number" 
-                  ? data.percent 
-                  : (data.total > 0 ? Math.round((data.current / data.total) * 100) : 0);
-                setDownloadTask(prev => ({
-                  status: "zipping",
-                  total: data.total || docIds.length,
-                  current: data.current,
-                  percent: calculatedPercent,
-                  currentFile: data.filename || prev?.currentFile || "",
-                  downloadedCount: data.downloaded_count,
-                  skippedCount: data.skipped_count
-                }));
-              } else if (data.type === "error") {
-                setDownloadTask({
-                  status: "error",
-                  total: docIds.length,
-                  current: 0,
-                  percent: 0,
-                  currentFile: "",
-                  errorMsg: data.message || t('download.failedZip')
-                });
-              } else if (data.type === "complete") {
-                setDownloadTask({
-                  status: "complete",
-                  total: data.total || data.total_files || docIds.length,
-                  current: data.total || data.total_files || docIds.length,
-                  percent: 100,
-                  downloadedCount: data.downloaded_count,
-                  skippedCount: data.skipped_count,
-                  currentFile: t('download.downloadComplete'),
-                  totalSizeMb: data.total_size_mb
-                });
-
-                // Auto-trigger browser download
-                const downloadLink = document.createElement("a");
-                downloadLink.href = `${backendUrl}${data.download_url}`;
-                downloadLink.download = data.filename || `NotbookLM_Sources_${docIds.length}_files.zip`;
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
-              }
-            } catch (pErr) {
-              console.error("Error parsing download progress SSE:", pErr);
-            }
-          }
+          // Auto-trigger browser download
+          const downloadLink = document.createElement("a");
+          downloadLink.href = `${backendUrl}${data.download_url}`;
+          downloadLink.download = data.filename || `NotbookLM_Sources_${docIds.length}_files.zip`;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
         }
-      }
+      });
     } catch (err: any) {
       console.error("Bulk download error:", err);
       setDownloadTask({
@@ -1957,8 +1929,17 @@ export default function RightSidebar({
 
         {/* 5. Interactive Multi-Format Citation Modal */}
         {isCiteModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-            <div className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-[530px] p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-150 text-app-text">
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCiteModalOpen(false);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-[530px] p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-150 text-app-text"
+            >
               {/* Modal Header */}
               <div className="flex items-center justify-between pb-2.5 border-b border-app-divider">
                 <div className="flex items-center gap-2">
@@ -2439,14 +2420,15 @@ export default function RightSidebar({
       </div>
 
       {/* Google NotebookLM Style 'Add Sources' Centered Modal Dialog */}
-      {isAddSourcesModalOpen && (
-        <div 
-          onClick={() => {
-            setIsAddSourcesModalOpen(false);
-            setDoiInput("");
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-        >
+        {isAddSourcesModalOpen && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsAddSourcesModalOpen(false);
+              setDoiInput("");
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          >
           <div 
             onClick={(e) => e.stopPropagation()}
             className="bg-app-modal border border-app-border-strong rounded-3xl w-full max-w-xl p-6 sm:p-7 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 relative text-app-text"

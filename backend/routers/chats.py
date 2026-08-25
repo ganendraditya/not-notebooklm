@@ -50,10 +50,10 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
         has_pdf = False
         if os.path.exists(fp) and os.path.getsize(fp) >= 35000:
             try:
+                from helpers import is_authentic_pdf_bytes
                 with open(fp, "rb") as f:
                     fb = f.read(2048)
-                    if fb.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in fb and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in fb:
-                        has_pdf = True
+                    has_pdf = is_authentic_pdf_bytes(fb)
             except Exception:
                 has_pdf = False
                 
@@ -74,14 +74,14 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
         if hasattr(msg, 'attachments_json') and msg.attachments_json:
             try:
                 attachments = json.loads(msg.attachments_json)
-            except:
-                pass
+            except Exception:
+                attachments = None
         variants = None
         if hasattr(msg, 'variants_json') and msg.variants_json:
             try:
                 variants = json.loads(msg.variants_json)
-            except:
-                pass
+            except Exception:
+                variants = None
         if not variants and msg.content:
             variants = [msg.content]
             
@@ -265,6 +265,8 @@ async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
             "chat_only": is_storage_full
         }
     }
+
+@router.post("/chats/{chat_id}/message", response_model=models.ChatMessageResponse)
 async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depends(get_db)):
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:
@@ -292,7 +294,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
                 atts = json.loads(msg.attachments_json)
                 if atts:
                     item["attachments"] = atts
-            except:
+            except Exception:
                 pass
         chat_history.append(item)
     
@@ -345,7 +347,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                 atts = json.loads(msg.attachments_json)
                 if atts:
                     item["attachments"] = atts
-            except:
+            except Exception:
                 pass
         chat_history.append(item)
     
@@ -414,19 +416,29 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                         "active_variant_index": 0
                     }
                 })
+            except asyncio.CancelledError:
+                logger.debug(f"[Chat Stream Worker Cancelled] chat_id={chat_id}")
+                raise
             except Exception as e:
                 logger.error(f"[Chat Stream Worker Error]: {e}")
                 await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Sorry, an error occurred: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
             finally:
                 await queue.put(None)
                 
-        asyncio.create_task(worker())
+        worker_task = asyncio.create_task(worker())
         
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            yield f"data: {json.dumps(item)}\n\n"
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+        except asyncio.CancelledError:
+            worker_task.cancel()
+            raise
+        finally:
+            if not worker_task.done():
+                worker_task.cancel()
             
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -574,7 +586,7 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
             if m.attachments_json:
                 try:
                     user_attachments = json.loads(m.attachments_json)
-                except:
+                except Exception:
                     pass
             break
             
@@ -585,7 +597,7 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
         if msg.attachments_json:
             try:
                 atts = json.loads(msg.attachments_json)
-            except:
+            except Exception:
                 pass
         truncated_history.append({
             "role": msg.role, 
@@ -618,7 +630,7 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
                         if db_msg.variants_json:
                             try:
                                 existing_variants = json.loads(db_msg.variants_json)
-                            except:
+                            except Exception:
                                 pass
                         if not existing_variants and db_msg.content:
                             existing_variants = [db_msg.content]
@@ -681,8 +693,8 @@ def select_message_variant(chat_id: str, req: models.SelectVariantRequest, db: S
     if target_msg.variants_json:
         try:
             variants = json.loads(target_msg.variants_json)
-        except:
-            pass
+        except Exception:
+            variants = []
     if not variants and target_msg.content:
         variants = [target_msg.content]
         

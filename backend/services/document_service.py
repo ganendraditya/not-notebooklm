@@ -5,7 +5,7 @@ import logging
 import asyncio
 from typing import Dict, Any, Tuple, List, Optional
 from database import Document
-from helpers import get_doc_file_path, UPLOAD_DIR
+from helpers import get_doc_file_path, UPLOAD_DIR, is_authentic_pdf_bytes, clean_doi
 import rag
 import pdf_exporter
 
@@ -20,8 +20,7 @@ def calculate_doc_quality(chat_id: str, d: Document) -> Tuple[int, bool, int]:
         try:
             with open(fp, "rb") as f:
                 fb = f.read(2048)
-                if fb.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in fb and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in fb:
-                    has_full_pdf = True
+                has_full_pdf = is_authentic_pdf_bytes(fb, min_size=512)
         except Exception:
             has_full_pdf = False
             
@@ -66,83 +65,72 @@ async def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dic
             extracted_doi = doi_m.group(0).strip().rstrip(".")
             extracted_doi = re.sub(r'[;.,:)\s]+$', '', extracted_doi).strip()
 
-    resolved_title = clean_fn_title
-    resolved_authors = []
-    resolved_year = ""
-    resolved_journal = ""
-    resolved_metric = "Peer-Reviewed"
-    resolved_abstract = ""
-    resolved_url = ""
-    resolved_doi = extracted_doi
-
-    if extracted_doi or clean_fn_title:
-        try:
-            meta = await asyncio.to_thread(
-                rag.resolve_paper_metadata_by_doi,
-                doi=extracted_doi,
-                title_fallback=clean_fn_title,
-                fast_only=False
-            )
-            if meta:
-                if meta.get("title") and len(meta["title"]) > 5:
-                    resolved_title = meta["title"].strip()
-                resolved_authors = meta.get("authors") or []
-                resolved_year = str(meta.get("year") or "")
-                resolved_journal = meta.get("journal") or meta.get("venue") or ""
-                resolved_metric = meta.get("journal_metric") or "Peer-Reviewed"
-                resolved_abstract = meta.get("abstract") or ""
-                resolved_url = meta.get("url") or (f"https://doi.org/{meta.get('doi')}" if meta.get("doi") else "")
-                resolved_doi = meta.get("doi") or extracted_doi
-        except Exception as e:
-            logger.debug(f"[Upload Metadata Resolution Warning]: {e}")
-
     is_valid_pdf = False
     if os.path.exists(file_path) and os.path.getsize(file_path) >= 35000:
         try:
             with open(file_path, "rb") as f:
-                fb = f.read(2048)
-                if fb.startswith(b"%PDF-"):
-                    is_valid_pdf = True
-        except Exception:
+                first_bytes = f.read(2048)
+                is_valid_pdf = is_authentic_pdf_bytes(first_bytes, min_size=512)
+        except Exception as e:
+            logger.error(f"[Upload PDF Validation Error] Failed to read {file_path}: {e}")
             is_valid_pdf = False
 
-    if raw_header and (not resolved_abstract or resolved_title == clean_fn_title):
+    state = {
+        "title": clean_fn_title,
+        "authors": [],
+        "year": "",
+        "journal": "",
+        "journal_metric": "Peer-Reviewed",
+        "abstract": "",
+        "url": "",
+        "doi": extracted_doi,
+        "is_valid_pdf": is_valid_pdf
+    }
+
+    # 1. Fetch from Academic API
+    if state["doi"] or state["title"]:
+        try:
+            meta = await asyncio.to_thread(
+                rag.resolve_paper_metadata_by_doi,
+                doi=state["doi"],
+                title_fallback=state["title"],
+                fast_only=False
+            )
+            if meta:
+                if meta.get("title") and len(meta["title"]) > 5: state["title"] = meta["title"].strip()
+                if meta.get("authors"): state["authors"] = meta["authors"]
+                if meta.get("year"): state["year"] = str(meta["year"])
+                if meta.get("journal") or meta.get("venue"): state["journal"] = meta.get("journal") or meta.get("venue")
+                if meta.get("journal_metric"): state["journal_metric"] = meta["journal_metric"]
+                if meta.get("abstract"): state["abstract"] = meta["abstract"]
+                if meta.get("doi"): state["doi"] = meta["doi"]
+                if meta.get("url"): state["url"] = meta["url"]
+                elif state["doi"]: state["url"] = f"https://doi.org/{state['doi']}"
+        except Exception as e:
+            logger.error(f"[Upload Metadata Resolution Error]: {e}")
+
+    # 2. Fallback to AI Audit if missing critical info
+    if raw_header and (not state["abstract"] or state["title"] == clean_fn_title):
         try:
             ai_audit = await asyncio.to_thread(
                 rag.audit_paper_metadata_with_ai,
-                paper_title=resolved_title,
-                raw_authors=resolved_authors,
-                raw_journal=resolved_journal,
-                raw_year=resolved_year,
-                raw_doi=resolved_doi,
+                paper_title=state["title"],
+                raw_authors=state["authors"],
+                raw_journal=state["journal"],
+                raw_year=state["year"],
+                raw_doi=state["doi"],
                 raw_citations=0,
                 raw_abstract_or_html=raw_header[:3500],
                 is_oa=is_valid_pdf
             )
             if ai_audit:
-                if ai_audit.get("abstract") and len(ai_audit["abstract"]) > 40:
-                    resolved_abstract = ai_audit["abstract"]
-                if ai_audit.get("title") and len(ai_audit["title"]) > 5:
-                    resolved_title = ai_audit["title"]
-                if ai_audit.get("authors"):
-                    resolved_authors = ai_audit["authors"]
-                if ai_audit.get("year"):
-                    resolved_year = ai_audit["year"]
-                if ai_audit.get("journal"):
-                    resolved_journal = ai_audit["journal"]
-                if ai_audit.get("journal_metric"):
-                    resolved_metric = ai_audit["journal_metric"]
+                if ai_audit.get("abstract") and len(ai_audit["abstract"]) > 40: state["abstract"] = ai_audit["abstract"]
+                if ai_audit.get("title") and len(ai_audit["title"]) > 5: state["title"] = ai_audit["title"]
+                if ai_audit.get("authors"): state["authors"] = ai_audit["authors"]
+                if ai_audit.get("year"): state["year"] = ai_audit["year"]
+                if ai_audit.get("journal"): state["journal"] = ai_audit["journal"]
+                if ai_audit.get("journal_metric"): state["journal_metric"] = ai_audit["journal_metric"]
         except Exception as upload_audit_err:
-            logger.debug(f"[Upload AI Audit Warning]: {upload_audit_err}")
+            logger.error(f"[Upload AI Audit Warning]: {upload_audit_err}")
 
-    return {
-        "title": resolved_title,
-        "authors": resolved_authors,
-        "year": resolved_year,
-        "journal": resolved_journal,
-        "journal_metric": resolved_metric,
-        "doi": resolved_doi,
-        "url": resolved_url,
-        "abstract": resolved_abstract,
-        "is_valid_pdf": is_valid_pdf
-    }
+    return state

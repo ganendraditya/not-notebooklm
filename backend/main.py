@@ -1,21 +1,6 @@
 import os
 import re
 import logging
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from database import engine, Base, SessionLocal, Document
-
-from helpers import UPLOAD_DIR, TEMP_ZIPS_DIR
-from routers import chats_router, documents_router, papers_router, settings_router, storage_router
-
-import pdf_exporter
-
-logger = logging.getLogger("uvicorn.error")
-
-import os
-import re
-import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,7 +23,12 @@ def heal_legacy_upload_files():
     try:
         docs = db.query(Document).all()
         for d in docs:
-            file_path = os.path.join(UPLOAD_DIR, f"{d.chat_id}_{d.filename}")
+            # Use safe path resolution
+            import werkzeug.utils
+            clean_chat_id = werkzeug.utils.secure_filename((str(d.chat_id) or "").strip())
+            clean_fname = werkzeug.utils.secure_filename((str(d.filename) or "").strip())
+            file_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
+            
             needs_repair = False
             
             if not os.path.exists(file_path):
@@ -62,7 +52,7 @@ def heal_legacy_upload_files():
                     with open(file_path, "w", encoding="utf-8") as fp:
                         fp.write(doc_text)
                 except Exception as e:
-                    logger.debug(f"[Heal File Warning]: {e}")
+                    logger.error(f"[Heal File Error] Failed to write repair file {file_path}: {e}")
     except Exception as e:
         logger.warning(f"[Heal Task Warning]: {e}")
     finally:

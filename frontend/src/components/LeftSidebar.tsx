@@ -354,11 +354,14 @@ export default function LeftSidebar({
       </div>
 
       {/* Centered Modal for Rename Chat */}
-      {chatToRename && (
-        <div 
-          onClick={handleCancelRename}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-        >
+        {chatToRename && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCancelRename();
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          >
           <div 
             onClick={(e) => e.stopPropagation()}
             className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
@@ -409,11 +412,14 @@ export default function LeftSidebar({
       )}
 
       {/* Centered Confirmation Modal for Delete Chat */}
-      {chatToDelete && (
-        <div 
-          onClick={() => setChatToDelete(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-        >
+        {chatToDelete && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              setChatToDelete(null);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          >
           <div 
             onClick={(e) => e.stopPropagation()}
             className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"

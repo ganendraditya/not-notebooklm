@@ -148,6 +148,15 @@ def list_files(category: Optional[str] = None, db: Session = Depends(get_db)):
     files_list.sort(key=lambda x: x.uploaded_at, reverse=True)
     return files_list
 
+def is_safe_upload_path(file_path: str) -> bool:
+    """Verifies that resolved absolute path is strictly contained within UPLOAD_DIR."""
+    try:
+        abs_upload_dir = os.path.abspath(UPLOAD_DIR)
+        abs_target = os.path.abspath(file_path)
+        return os.path.commonpath([abs_upload_dir, abs_target]) == abs_upload_dir
+    except Exception:
+        return False
+
 class DeleteRequest(BaseModel):
     file_ids: List[str]
 
@@ -164,6 +173,10 @@ def delete_files(req: DeleteRequest, db: Session = Depends(get_db)):
             continue
             
         file_path = os.path.join(UPLOAD_DIR, safe_id)
+        if not is_safe_upload_path(file_path):
+            failed += 1
+            continue
+
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
@@ -199,6 +212,8 @@ def download_storage_files(req: DownloadRequest):
         if safe_id.startswith('..') or os.path.isabs(safe_id):
             raise HTTPException(status_code=400, detail="Invalid file path")
         file_path = os.path.join(UPLOAD_DIR, safe_id)
+        if not is_safe_upload_path(file_path):
+            raise HTTPException(status_code=400, detail="Invalid file path location")
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found")
         

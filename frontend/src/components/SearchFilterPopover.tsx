@@ -335,11 +335,14 @@ export default function SearchFilterPopover({
       </button>
 
       {/* Centered Modal Overlay (Option 1: Centered Dialog with Backdrop) */}
-      {isOpen && (
-        <div 
-          onClick={onClose}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
-        >
+        {isOpen && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
+          >
           <div 
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-lg max-h-[85vh] rounded-2xl bg-app-modal border border-app-border-strong shadow-2xl overflow-hidden flex flex-col p-4 sm:p-5 backdrop-blur-2xl animate-in zoom-in-95 duration-150 text-app-text"

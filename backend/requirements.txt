@@ -3,8 +3,7 @@ uvicorn
 sqlalchemy
 python-multipart
 qdrant-client
-llama-index
-llama-index-vector-stores-qdrant
+llama-index-core
 llama-index-llms-gemini
 llama-index-embeddings-gemini
 llama-index-embeddings-huggingface
@@ -13,7 +12,7 @@ sentence-transformers
 llama-index-llms-groq
 python-dotenv
 requests
-ddgs
+duckduckgo-search
 pymupdf4llm
 python-docx
 flashrank

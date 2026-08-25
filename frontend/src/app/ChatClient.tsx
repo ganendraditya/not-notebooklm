@@ -9,6 +9,7 @@ import SettingsModal from "@/components/SettingsModal";
 import LibraryView from "@/components/LibraryView";
 import SearchChatsView from "@/components/SearchChatsView";
 import { useTranslation } from "@/lib/i18n";
+import { consumeSSEStream } from "@/lib/sse";
 import { useChatStore, type ChatSession, type ChatMessage } from "@/stores/chatStore";
 import { useDocumentStore, type Document, type PendingSourceItem } from "@/stores/documentStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -228,83 +229,52 @@ export default function ChatClient() {
         signal: controller.signal
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) {
-        throw new Error("No readable stream received from server");
-      }
-
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        while (buffer.includes("\n\n")) {
-          const splitIdx = buffer.indexOf("\n\n");
-          const eventBlock = buffer.slice(0, splitIdx);
-          buffer = buffer.slice(splitIdx + 2);
-
-          const lines = eventBlock.split("\n");
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === "title_update" && data.title) {
-                  const updatedTitle = data.title;
-                  updateSessionsList(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
-                  if (activeChatIdRef.current === targetChatId) {
-                    document.title = `${updatedTitle} - NotbookLM`;
-                  }
-                } else if (data.type === "status") {
-                  const statusText = data.text || data.data;
-                  if (statusText) {
-                    job.status = statusText;
-                    if (activeChatIdRef.current === targetChatId) {
-                      setActiveStatus(statusText);
-                    }
-                  }
-                } else if (data.type === "done") {
-                  const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
-                  if (activeChatIdRef.current === targetChatId) {
-                    updateMessagesList(prev => [...prev, asstMsg]);
-                  }
-
-                  // Check if response contains an action payload like deleting documents
-                  const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
-                  if (actionMatch) {
-                    try {
-                      const actionObj = JSON.parse(actionMatch[1]);
-                      if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
-                        const idSet = new Set(actionObj.deleted_doc_ids);
-                        if (activeChatIdRef.current === targetChatId) {
-                          updateDocumentsList(prev => {
-                            const remaining = prev.filter(d => !idSet.has(d.id));
-                            return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                          });
-                        }
-                      }
-                    } catch (e) {
-                      console.error("Failed to parse sources action:", e);
-                    }
-                  }
-                } else if (data.type === "error") {
-                  const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
-                  if (activeChatIdRef.current === targetChatId) {
-                    updateMessagesList(prev => [...prev, errorMsg]);
-                  }
-                }
-              } catch (e) {
-                console.error("SSE parse error:", e);
-              }
+      await consumeSSEStream(res, (data: any) => {
+        if (data.type === "title_update" && data.title) {
+          const updatedTitle = data.title;
+          updateSessionsList(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
+          if (activeChatIdRef.current === targetChatId) {
+            document.title = `${updatedTitle} - NotbookLM`;
+          }
+        } else if (data.type === "status") {
+          const statusText = data.text || data.data;
+          if (statusText) {
+            job.status = statusText;
+            if (activeChatIdRef.current === targetChatId) {
+              setActiveStatus(statusText);
             }
           }
+        } else if (data.type === "done") {
+          const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
+          if (activeChatIdRef.current === targetChatId) {
+            updateMessagesList(prev => [...prev, asstMsg]);
+          }
+
+          // Check if response contains an action payload like deleting documents
+          const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
+          if (actionMatch) {
+            try {
+              const actionObj = JSON.parse(actionMatch[1]);
+              if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
+                const idSet = new Set(actionObj.deleted_doc_ids);
+                if (activeChatIdRef.current === targetChatId) {
+                  updateDocumentsList(prev => {
+                    const remaining = prev.filter(d => !idSet.has(d.id));
+                    return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Failed to parse sources action:", e);
+            }
+          }
+        } else if (data.type === "error") {
+          const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
+          if (activeChatIdRef.current === targetChatId) {
+            updateMessagesList(prev => [...prev, errorMsg]);
+          }
         }
-      }
+      });
     } catch (err: any) {
       if (err?.name === "AbortError") {
         console.log(`Generation stopped by user for chat ${targetChatId}`);
@@ -416,76 +386,45 @@ export default function ChatClient() {
         signal: controller.signal
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) {
-        throw new Error("No readable stream received from server");
-      }
-
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        while (buffer.includes("\n\n")) {
-          const splitIdx = buffer.indexOf("\n\n");
-          const eventBlock = buffer.slice(0, splitIdx);
-          buffer = buffer.slice(splitIdx + 2);
-
-          const lines = eventBlock.split("\n");
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === "status") {
-                  const statusText = data.text || data.data;
-                  if (statusText) {
-                    job.status = statusText;
-                    if (activeChatIdRef.current === currentChatId) {
-                      setActiveStatus(statusText);
-                    }
-                  }
-                } else if (data.type === "done") {
-                  const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
-                  if (activeChatIdRef.current === currentChatId) {
-                    updateMessagesList(prev => [...prev, asstMsg]);
-                  }
-
-                  const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
-                  if (actionMatch) {
-                    try {
-                      const actionObj = JSON.parse(actionMatch[1]);
-                      if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
-                        const idSet = new Set(actionObj.deleted_doc_ids);
-                        if (activeChatIdRef.current === currentChatId) {
-                          updateDocumentsList(prev => {
-                            const remaining = prev.filter(d => !idSet.has(d.id));
-                            return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                          });
-                        }
-                      }
-                    } catch (e) {
-                      console.error("Failed to parse sources action:", e);
-                    }
-                  }
-                } else if (data.type === "error") {
-                  const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
-                  if (activeChatIdRef.current === currentChatId) {
-                    updateMessagesList(prev => [...prev, errorMsg]);
-                  }
-                }
-              } catch (e) {
-                console.error("SSE parse error:", e);
-              }
+      await consumeSSEStream(res, (data: any) => {
+        if (data.type === "status") {
+          const statusText = data.text || data.data;
+          if (statusText) {
+            job.status = statusText;
+            if (activeChatIdRef.current === currentChatId) {
+              setActiveStatus(statusText);
             }
           }
+        } else if (data.type === "done") {
+          const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
+          if (activeChatIdRef.current === currentChatId) {
+            updateMessagesList(prev => [...prev, asstMsg]);
+          }
+
+          const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
+          if (actionMatch) {
+            try {
+              const actionObj = JSON.parse(actionMatch[1]);
+              if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
+                const idSet = new Set(actionObj.deleted_doc_ids);
+                if (activeChatIdRef.current === currentChatId) {
+                  updateDocumentsList(prev => {
+                    const remaining = prev.filter(d => !idSet.has(d.id));
+                    return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Failed to parse sources action:", e);
+            }
+          }
+        } else if (data.type === "error") {
+          const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
+          if (activeChatIdRef.current === currentChatId) {
+            updateMessagesList(prev => [...prev, errorMsg]);
+          }
         }
-      }
+      });
     } catch (err: any) {
       if (err?.name === "AbortError") {
         console.log(`Edit request aborted for chat ${currentChatId}`);
@@ -540,85 +479,54 @@ export default function ChatClient() {
         signal: controller.signal
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      if (!reader) {
-        throw new Error("No readable stream received from server");
-      }
-
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        while (buffer.includes("\n\n")) {
-          const splitIdx = buffer.indexOf("\n\n");
-          const eventBlock = buffer.slice(0, splitIdx);
-          buffer = buffer.slice(splitIdx + 2);
-
-          const lines = eventBlock.split("\n");
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.type === "status") {
-                  const statusText = data.text || data.data;
-                  if (statusText) {
-                    job.status = statusText;
-                    if (activeChatIdRef.current === currentChatId) {
-                      setActiveStatus(statusText);
-                    }
-                  }
-                } else if (data.type === "done") {
-                  const asstMsg = data.message || {
-                    role: "assistant",
-                    content: data.data || "",
-                    variants: data.variants,
-                    active_variant_index: data.active_variant_index,
-                    created_at: new Date().toISOString()
-                  };
-                  if (activeChatIdRef.current === currentChatId) {
-                    updateMessagesList(prev => {
-                      const next = [...prev];
-                      if (next[messageIndex]) {
-                        next[messageIndex] = asstMsg;
-                      } else {
-                        next.push(asstMsg);
-                      }
-                      return next;
-                    });
-                  }
-
-                  const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
-                  if (actionMatch) {
-                    try {
-                      const actionObj = JSON.parse(actionMatch[1]);
-                      if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
-                        const idSet = new Set(actionObj.deleted_doc_ids);
-                        if (activeChatIdRef.current === currentChatId) {
-                          updateDocumentsList(prev => {
-                            const remaining = prev.filter(d => !idSet.has(d.id));
-                            return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                          });
-                        }
-                      }
-                    } catch (e) {
-                      console.error("Failed to parse SOURCES_ACTION in regenerated response:", e);
-                    }
-                  }
-                }
-              } catch (parseErr) {
-                console.error("Error parsing regenerate SSE data:", parseErr);
+      await consumeSSEStream(res, (data: any) => {
+        if (data.type === "status") {
+          const statusText = data.text || data.data;
+          if (statusText) {
+            job.status = statusText;
+            if (activeChatIdRef.current === currentChatId) {
+              setActiveStatus(statusText);
+            }
+          }
+        } else if (data.type === "done") {
+          const asstMsg = data.message || {
+            role: "assistant",
+            content: data.data || "",
+            variants: data.variants,
+            active_variant_index: data.active_variant_index,
+            created_at: new Date().toISOString()
+          };
+          if (activeChatIdRef.current === currentChatId) {
+            updateMessagesList(prev => {
+              const next = [...prev];
+              if (next[messageIndex]) {
+                next[messageIndex] = asstMsg;
+              } else {
+                next.push(asstMsg);
               }
+              return next;
+            });
+          }
+
+          const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
+          if (actionMatch) {
+            try {
+              const actionObj = JSON.parse(actionMatch[1]);
+              if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
+                const idSet = new Set(actionObj.deleted_doc_ids);
+                if (activeChatIdRef.current === currentChatId) {
+                  updateDocumentsList(prev => {
+                    const remaining = prev.filter(d => !idSet.has(d.id));
+                    return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Failed to parse SOURCES_ACTION in regenerated response:", e);
             }
           }
         }
-      }
+      });
     } catch (err: any) {
       if (err?.name === "AbortError") {
         console.log(`Regenerate request aborted for chat ${currentChatId}`);

@@ -290,12 +290,14 @@ def get_llm_models():
         "models": models_list
     }
 
+ALLOWED_PROVIDERS = {"9router", "freellmapi", "gemini", "groq", "openai", "local"}
+
 @router.post("/llm/select")
 @router.post("/llm/models/select")
-def select_llm_model(payload: dict):
-    """Dynamically switches active LLM provider and model across the application."""
-    provider = payload.get("provider")
-    model_name = payload.get("model_name") or payload.get("model_id")
+def select_llm_model(payload: models.SelectLLMRequest):
+    """Dynamically switches active LLM provider and model across the application with validated inputs."""
+    provider = payload.provider
+    model_name = payload.model_name or payload.model_id
     
     # If model_id passed directly from ModelSelector like "ag/gemini-3.7-flash-high"
     if not provider and model_name:
@@ -307,7 +309,16 @@ def select_llm_model(payload: dict):
             provider = os.getenv("LLM_PROVIDER", "9router")
 
     if not provider:
-        return {"status": "error", "message": "Provider is required"}
+        raise HTTPException(status_code=400, detail="Provider is required")
+        
+    provider = provider.strip().lower()
+    if provider not in ALLOWED_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Invalid provider '{provider}'. Allowed: {sorted(list(ALLOWED_PROVIDERS))}")
+        
+    if model_name:
+        # Sanitize model_name: alphanumeric, slash, colon, hyphen, period, underscore
+        if not re.match(r'^[a-zA-Z0-9_.\-/:@]+$', model_name):
+            raise HTTPException(status_code=400, detail="Invalid characters in model_name")
         
     env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
     
@@ -329,4 +340,4 @@ def select_llm_model(payload: dict):
             "model_name": model_name
         }
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))

@@ -66,12 +66,13 @@ export default function SettingsModal({
   const { t, language, setLanguage } = useTranslation();
   const [activeTab, setActiveTab] = useState<"general" | "storage" | "notifications">("general");
   
-  // Storage State
-  const [storageSummary, setStorageSummary] = useState<StorageSummary | null>(null);
-  const [isLoadingStorage, setIsLoadingStorage] = useState(false);
-  const [selectedChatIds, setSelectedChatIds] = useState<string[]>([]);
-  const [isDeletingChats, setIsDeletingChats] = useState(false);
-  const [isCleaningOrphans, setIsCleaningOrphans] = useState(false);
+    // Storage State
+    const [storageSummary, setStorageSummary] = useState<StorageSummary | null>(null);
+    const [isLoadingStorage, setIsLoadingStorage] = useState(false);
+    const [selectedChatIds, setSelectedChatIds] = useState<string[]>([]);
+    const [isDeletingChats, setIsDeletingChats] = useState(false);
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [isCleaningOrphans, setIsCleaningOrphans] = useState(false);
   const [cleanReport, setCleanReport] = useState<string | null>(null);
   
   // General Tab Settings State from ThemeContext
@@ -82,12 +83,17 @@ export default function SettingsModal({
   const [notifyTasks, setNotifyTasks] = useState<string>("push");
   const [notifyDownloads, setNotifyDownloads] = useState<string>("push");
 
-  // Reset to 'general' tab whenever the modal is reopened
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab("general");
-    }
-  }, [isOpen]);
+    // Reset state in the background when the modal is closed to prevent flickering on reopen
+    useEffect(() => {
+      if (!isOpen) {
+        setActiveTab("general");
+        setSelectedChatIds([]);
+        setCleanReport(null);
+        setIsDeleteConfirmOpen(false);
+        setIsResetConfirmOpen(false);
+        setResetConfirmInput("");
+      }
+    }, [isOpen]);
 
   // Load preferences from localStorage
   useEffect(() => {
@@ -185,17 +191,18 @@ export default function SettingsModal({
     if (selectedChatIds.length === 0 || isDeletingChats) return;
     setIsDeletingChats(true);
     try {
-      const res = await fetch(`${backendUrl}/chats/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_ids: selectedChatIds })
-      });
-      if (res.ok) {
-        onChatsDeleted(selectedChatIds);
-        setSelectedChatIds([]);
-        fetchStorage();
-      }
-    } catch (e) {
+        const res = await fetch(`${backendUrl}/chats/bulk-delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_ids: selectedChatIds })
+        });
+        if (res.ok) {
+          onChatsDeleted(selectedChatIds);
+          setSelectedChatIds([]);
+          setIsDeleteConfirmOpen(false);
+          fetchStorage();
+        }
+      } catch (e) {
       console.error("Failed to bulk delete chats:", e);
     } finally {
       setIsDeletingChats(false);
@@ -224,13 +231,13 @@ export default function SettingsModal({
     }
   };
 
-  const toggleSelectAllChats = () => {
-    if (selectedChatIds.length === sessions.length) {
-      setSelectedChatIds([]);
-    } else {
-      setSelectedChatIds(sessions.map(s => s.id));
-    }
-  };
+    const toggleSelectAllChats = () => {
+      if (selectedChatIds.length > 0) {
+        setSelectedChatIds([]);
+      } else {
+        setSelectedChatIds(sessions.map(s => s.id));
+      }
+    };
 
   const toggleChatSelection = (id: string) => {
     setSelectedChatIds(prev => 
@@ -238,11 +245,14 @@ export default function SettingsModal({
     );
   };
 
-  return (
-    <div 
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
-    >
+    return (
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
+      >
       <div 
         onClick={(e) => e.stopPropagation()}
         className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-2xl h-[580px] max-h-[85vh] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150"
@@ -523,17 +533,17 @@ export default function SettingsModal({
                             {t('settings.batchDeleteDesc')}
                           </div>
                         </div>
-                        <div className="w-36 shrink-0 flex justify-end">
-                          <Button
-                            size="sm"
-                            onClick={handleBulkDeleteChats}
-                            disabled={selectedChatIds.length === 0 || isDeletingChats}
-                            className={`w-full text-xs h-8 justify-center whitespace-nowrap px-3 transition-colors ${
-                              selectedChatIds.length > 0
-                                ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm"
-                                : "bg-app-item-hover border border-app-border text-app-text-dim cursor-not-allowed opacity-50"
-                            }`}
-                          >
+                          <div className="w-36 shrink-0 flex justify-end">
+                            <Button
+                              size="sm"
+                              onClick={() => setIsDeleteConfirmOpen(true)}
+                              disabled={selectedChatIds.length === 0 || isDeletingChats}
+                              className={`w-full text-xs h-8 justify-center whitespace-nowrap px-3 transition-colors ${
+                                selectedChatIds.length > 0
+                                  ? "bg-red-600 hover:bg-red-500 text-white cursor-pointer shadow-sm"
+                                  : "bg-app-item-hover border border-app-border text-app-text-dim cursor-not-allowed opacity-50"
+                              }`}
+                            >
                             {isDeletingChats
                               ? t('settings.deleting')
                               : selectedChatIds.length > 0
@@ -545,18 +555,23 @@ export default function SettingsModal({
 
                       {sessions.length > 0 ? (
                         <div className="border border-app-border rounded-xl overflow-hidden divide-y divide-app-divider bg-transparent">
-                          <div className="flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted">
-                            <span>Conversations</span>
-                            <div className="flex items-center shrink-0 pr-[8px]">
-                              <input 
-                                type="checkbox"
-                                checked={selectedChatIds.length === sessions.length && sessions.length > 0}
-                                onChange={toggleSelectAllChats}
-                                className="rounded cursor-pointer accent-blue-500 shrink-0"
-                              />
+                            <div className="flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted">
+                              <span>Conversations</span>
+                              <div className="flex items-center shrink-0 pr-[8px]">
+                                <input 
+                                  type="checkbox"
+                                  checked={selectedChatIds.length === sessions.length && sessions.length > 0}
+                                  ref={input => {
+                                    if (input) {
+                                      input.indeterminate = selectedChatIds.length > 0 && selectedChatIds.length < sessions.length;
+                                    }
+                                  }}
+                                  onChange={toggleSelectAllChats}
+                                  className="rounded cursor-pointer accent-blue-500 shrink-0"
+                                />
+                              </div>
                             </div>
-                          </div>
-                          <div className="max-h-40 overflow-y-auto custom-scrollbar divide-y divide-app-divider">
+                            <div className="max-h-40 overflow-y-auto custom-scrollbar divide-y divide-app-divider">
                             {sessions.map((s) => (
                               <label 
                                 key={s.id} 
@@ -604,16 +619,68 @@ export default function SettingsModal({
               </div>
             )}
           </div>
+          </div>
         </div>
-      </div>
+  
+        {/* Confirmation Modal for Bulk Delete */}
+        {isDeleteConfirmOpen && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDeleteConfirmOpen(false);
+            }}
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-100"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 text-app-text"
+            >
+              <div className="flex items-center gap-2.5 font-semibold text-sm">
+                <AlertTriangle size={18} className="text-red-500" />
+                <span>Confirm Deletion</span>
+              </div>
+              <p className="text-xs text-app-text-muted leading-relaxed">
+                Are you sure you want to permanently delete {selectedChatIds.length} selected conversation{selectedChatIds.length > 1 ? 's' : ''}? 
+                This will also remove all associated files and vector data.
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer h-8"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={isDeletingChats}
+                  onClick={handleBulkDeleteChats}
+                  className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium cursor-pointer h-8"
+                >
+                  {isDeletingChats ? t('settings.deleting') : t('settings.deleteSelected')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* Confirmation Modal for Factory Reset */}
-      {isResetConfirmOpen && (
-        <div 
-          onClick={(e) => e.stopPropagation()}
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-100"
-        >
-          <div className="bg-app-modal border border-red-500/30 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 text-app-text">
+        {/* Confirmation Modal for Factory Reset */}
+        {isResetConfirmOpen && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isResetting) {
+                setIsResetConfirmOpen(false);
+                setResetConfirmInput("");
+              }
+            }}
+            className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-100"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-app-modal border border-red-500/30 rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 text-app-text"
+            >
             <div className="flex items-center gap-2.5 text-red-500 font-semibold text-sm">
               <AlertTriangle size={18} />
               <span>Confirm Factory Reset</span>

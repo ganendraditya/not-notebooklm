@@ -7,9 +7,11 @@ import urllib.request
 import urllib.parse
 from typing import List, Optional, Dict, Any
 import requests
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole, LLM
 import journal_indexer
+
+from helpers import clean_doi as _clean_doi
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -1091,11 +1093,7 @@ def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper
         title_fallback = paper_title
     if not doi and not title_fallback:
         return None
-    clean_doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip() if doi else ""
-    if clean_doi:
-        # Strip markdown artifacts and trailing punctuation
-        clean_doi = clean_doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
-        clean_doi = re.sub(r'[;.,:)\s]+$', '', clean_doi).strip()
+    clean_doi = _clean_doi(doi) if doi else ""
     cache_key = (clean_doi or title_fallback).strip().lower()
     if cache_key in _PAPER_METADATA_CACHE:
         return _PAPER_METADATA_CACHE[cache_key]

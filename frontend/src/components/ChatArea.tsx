@@ -283,11 +283,13 @@ export default function ChatArea({
 
       <div 
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto pt-12 lg:pt-14 pb-36 w-full min-h-0 scroll-smooth custom-scrollbar overflow-x-hidden"
+        className={`flex-1 overflow-y-auto w-full min-h-0 scroll-smooth custom-scrollbar overflow-x-hidden ${
+          isChatEmpty ? "flex items-center justify-center pt-0 pb-0" : "pt-12 lg:pt-14 pb-36"
+        }`}
       >
         <div className="w-full max-w-3xl mx-auto pl-[19px] pr-[13px] sm:pl-[27px] sm:pr-[21px] md:pl-[35px] md:pr-[29px] space-y-6">
           {isChatEmpty ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center px-4 w-full max-w-2xl mx-auto my-auto">
+            <div className="flex flex-col items-center justify-center py-6 text-center px-4 w-full max-w-2xl mx-auto">
               <div className="p-3.5 rounded-full bg-app-surface border border-app-border mb-4 shadow-sm">
                 <Sparkles size={28} className="text-blue-500" />
               </div>
@@ -531,11 +533,14 @@ export default function ChatArea({
       )}
 
       {/* Modal for Rename Chat */}
-      {isRenameOpen && activeChatId && (
-        <div 
-          onClick={() => setIsRenameOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-        >
+        {isRenameOpen && activeChatId && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsRenameOpen(false);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          >
           <div 
             onClick={(e) => e.stopPropagation()}
             className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
@@ -595,11 +600,14 @@ export default function ChatArea({
       )}
 
       {/* Confirmation Modal for Delete Chat */}
-      {isDeleteConfirmOpen && activeChatId && (
-        <div 
-          onClick={() => setIsDeleteConfirmOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-        >
+        {isDeleteConfirmOpen && activeChatId && (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDeleteConfirmOpen(false);
+            }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          >
           <div 
             onClick={(e) => e.stopPropagation()}
             className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"

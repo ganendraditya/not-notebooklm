@@ -23,11 +23,14 @@ export function BulkDeleteModal({
 
   if (!isOpen) return null;
 
-  return (
-    <div 
-      onClick={() => !isBulkDeleting && onClose()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-    >
+    return (
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isBulkDeleting) onClose();
+        }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+      >
       <div 
         onClick={(e) => e.stopPropagation()}
         className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
@@ -96,11 +99,14 @@ export function RenameModal({
 
   if (!isOpen || !renamingDoc) return null;
 
-  return (
-    <div 
-      onClick={() => !isSavingRename && onClose()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-    >
+    return (
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isSavingRename) onClose();
+        }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+      >
       <div 
         onClick={(e) => e.stopPropagation()}
         className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"

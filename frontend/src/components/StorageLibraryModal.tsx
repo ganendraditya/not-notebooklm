@@ -61,7 +61,10 @@ export default function StorageLibraryModal({
   useEffect(() => {
     if (isOpen) {
       setCategory(initialCategory);
-      fetchItems(initialCategory, search, sort, sortOrder);
+    } else {
+      // Reset search and selection when closed
+      setSearch("");
+      setSelectedIds(new Set());
     }
   }, [isOpen, initialCategory]);
 
