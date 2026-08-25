@@ -30,7 +30,11 @@ router = APIRouter(tags=["documents"])
 logger = logging.getLogger("uvicorn.error")
 
 @router.post("/chats/{chat_id}/upload", response_model=models.DocumentResponse)
-async def upload_document(chat_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_document(
+    chat_id: str, 
+    file: UploadFile = File(...), 
+    db: Session = Depends(get_db)
+):
     SUPPORTED_EXTS = {".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris", ".csv", ".tsv"}
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in SUPPORTED_EXTS:
@@ -52,6 +56,7 @@ async def upload_document(chat_id: str, file: UploadFile = File(...), db: Sessio
         shutil.copyfileobj(file.file, buffer)
         
     try:
+        # Fast non-blocking async thread pool for heavy document parsing
         await asyncio.to_thread(rag.ingest_document, file_path, chat_id)
     except Exception as e:
         logger.error(f"[Upload Ingest Error]: {e}")

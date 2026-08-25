@@ -52,23 +52,19 @@ load_dotenv()
 # Setup variables
 Settings.embed_model = embed_model
 
-ninerouter_llm = None
-freellm_llm = None
-gemini_llm = None
-groq_llm = None
-
-def create_llm_instances():
-    """Initializes LLM instances dynamically."""
-    global ninerouter_llm, freellm_llm, gemini_llm, groq_llm
-    
+def get_llm_factory(provider_override: Optional[str] = None):
+    """
+    Thread-safe factory function that builds and returns configured LLM instances
+    without mutating global shared variables.
+    """
     ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:3000/v1")
     ninerouter_key = os.getenv("NINEROUTER_API_KEY")
     ninerouter_model = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
     
-    ninerouter_llm = None
+    n_llm = None
     if ninerouter_key and not ninerouter_key.startswith("your_"):
         try:
-            ninerouter_llm = OpenAILike(
+            n_llm = OpenAILike(
                 api_base=ninerouter_url,
                 api_key=ninerouter_key,
                 model=ninerouter_model,
@@ -86,10 +82,10 @@ def create_llm_instances():
     freellm_key = os.getenv("FREELLMAPI_API_KEY", "dummy")
     freellm_model = os.getenv("FREELLMAPI_MODEL", "gpt-oss-120b")
     
-    freellm_llm = None
+    fl_llm = None
     if freellm_key and not freellm_key.startswith("your_") and freellm_key != "dummy":
         try:
-            freellm_llm = OpenAILike(
+            fl_llm = OpenAILike(
                 api_base=freellm_url,
                 api_key=freellm_key,
                 model=freellm_model or "gpt-4o-mini",
@@ -101,17 +97,17 @@ def create_llm_instances():
         except Exception as e:
             logger.warning(f"[RAG Engine] FreeLLMAPI not configured: {e}")
     
-    gemini_llm = None
+    gm_llm = None
     if gemini_key and not gemini_key.startswith("your_"):
         try:
-            gemini_llm = Gemini(
+            gm_llm = Gemini(
                 model="models/gemini-2.0-flash", 
                 api_key=gemini_key,
                 max_tokens=8192
             )
         except Exception as e:
             try:
-                gemini_llm = Gemini(
+                gm_llm = Gemini(
                     model="models/gemini-2.5-flash", 
                     api_key=gemini_key,
                     max_tokens=8192
@@ -119,17 +115,17 @@ def create_llm_instances():
             except Exception:
                 logger.warning(f"[RAG Engine] Gemini initialization failed: {e}")
             
-    groq_llm = None
+    gq_llm = None
     if groq_key and not groq_key.startswith("your_"):
         try:
-            groq_llm = Groq(
+            gq_llm = Groq(
                 model="llama-3.3-70b-versatile", 
                 api_key=groq_key,
                 max_tokens=8192
             )
         except Exception as e:
             try:
-                groq_llm = Groq(
+                gq_llm = Groq(
                     model="llama-3.1-8b-instant", 
                     api_key=groq_key,
                     max_tokens=8192
@@ -137,10 +133,17 @@ def create_llm_instances():
             except Exception:
                 logger.warning(f"[RAG Engine] Groq initialization failed: {e}")
             
-    return ninerouter_llm, freellm_llm, gemini_llm, groq_llm
+    return n_llm, fl_llm, gm_llm, gq_llm
 
-ninerouter_llm, freellm_llm, gemini_llm, groq_llm = create_llm_instances()
-Settings.llm = ninerouter_llm or freellm_llm or gemini_llm or groq_llm
+def create_llm_instances():
+    """Backward compatibility wrapper."""
+    return get_llm_factory()
+
+# Module-level aliases for backward compatibility
+ninerouter_llm = None
+freellm_llm = None
+gemini_llm = None
+groq_llm = None
 
 def ingest_document_text(text: str, filename: str, chat_id: str):
     """Ingests text into the vector database under a specific chat_id with section-aware chunking."""
@@ -307,11 +310,9 @@ async def generate_chat_title(first_user_message: str) -> str:
         fallback_title = clean_prompt[:35]
     fallback_title = fallback_title.title()[:45].strip()
 
-    candidate_llms = []
-    if ninerouter_llm: candidate_llms.append(ninerouter_llm)
-    if gemini_llm: candidate_llms.append(gemini_llm)
-    if groq_llm: candidate_llms.append(groq_llm)
-    if freellm_llm: candidate_llms.append(freellm_llm)
+    # Dynamic per-request LLM instance creation (Thread-safe)
+    n_llm, fl_llm, gm_llm, gq_llm = get_llm_factory()
+    candidate_llms = [cand for cand in [n_llm, gm_llm, gq_llm, fl_llm] if cand is not None]
 
     if not candidate_llms:
         return fallback_title or "New Research"

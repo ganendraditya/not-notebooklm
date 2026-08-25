@@ -9,23 +9,31 @@ import sqlite3
 logger = logging.getLogger("uvicorn.error")
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "not_notebooklm.db"))
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 30}
-)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False, "timeout": 30}
+    )
 
-# Enable WAL mode and synchronous=NORMAL on every new SQLite connection
-# WAL (Write-Ahead Logging) allows concurrent reads while writes are in progress
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    if isinstance(dbapi_connection, sqlite3.Connection):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL;")
-        cursor.execute("PRAGMA synchronous=NORMAL;")
-        cursor.execute("PRAGMA busy_timeout=30000;")  # 30-second lock wait timeout
-        cursor.close()
+    # Enable WAL mode and synchronous=NORMAL on every new SQLite connection
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        if isinstance(dbapi_connection, sqlite3.Connection):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA synchronous=NORMAL;")
+            cursor.execute("PRAGMA busy_timeout=30000;")  # 30-second lock wait timeout
+            cursor.close()
+else:
+    # PostgreSQL / MySQL enterprise connection pool
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=10,
+        max_overflow=20,
+        pool_pre_ping=True
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

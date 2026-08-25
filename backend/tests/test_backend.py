@@ -94,3 +94,19 @@ The treatment group demonstrated a 34% decrease in muscular reinjury rates.
     assert "| Sample Size (n) |" in demo_sec["text"]
     assert "Section: AI in Sports Medicine (2024) > 2. Methods > 2.1 Participant Demographics" in demo_sec["text"]
 
+def test_lru_cache_eviction():
+    """Verify LRUMetadataCache bounded capacity works and evicts oldest items."""
+    from rag.search import LRUMetadataCache
+    cache = LRUMetadataCache(capacity=3)
+    cache.set("a", {"title": "Paper A"})
+    cache.set("b", {"title": "Paper B"})
+    cache.set("c", {"title": "Paper C"})
+    assert "a" in cache
+    
+    # Add 4th item to trigger eviction of oldest (a)
+    cache.set("d", {"title": "Paper D"})
+    assert "d" in cache
+    assert "b" in cache
+    assert "c" in cache
+    assert "a" not in cache
+
