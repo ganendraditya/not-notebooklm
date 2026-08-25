@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
 import { DownloadManager, DownloadTask } from "./DownloadManager";
+import { BulkDeleteModal, RenameModal } from "./sidebar/SidebarModals";
 
 interface RightSidebarProps {
   activeChatId: string | null;
@@ -2559,115 +2560,24 @@ export default function RightSidebar({
       )}
 
       {/* Centered Modal for Bulk Delete Confirmation */}
-      {showBulkDeleteConfirm && (
-        <div 
-          onClick={() => !isBulkDeleting && setShowBulkDeleteConfirm(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
-          >
-            <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-app-text">
-                {t('right.deleteConfirmTitle', { count: selectedCount.toString() })}
-              </h3>
-              <p className="text-xs text-app-text-muted leading-relaxed">
-                {t('right.deleteConfirmDesc')}
-              </p>
-            </div>
+      <BulkDeleteModal
+        isOpen={showBulkDeleteConfirm}
+        selectedCount={selectedCount}
+        isBulkDeleting={isBulkDeleting}
+        onClose={() => setShowBulkDeleteConfirm(false)}
+        onConfirm={handleConfirmBulkDelete}
+      />
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowBulkDeleteConfirm(false)}
-                disabled={isBulkDeleting}
-                className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
-              >
-                {t('action.cancel')}
-              </Button>
-
-              <Button
-                size="sm"
-                onClick={handleConfirmBulkDelete}
-                disabled={isBulkDeleting}
-                className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow flex items-center gap-1.5"
-              >
-                {isBulkDeleting ? (
-                  <>
-                    <Loader2 size={12} className="animate-spin" />
-                    <span>{t('right.deleting')}</span>
-                  </>
-                ) : (
-                  <span>{t('right.deleteButton', { count: selectedCount.toString() })}</span>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
       {/* Centered Modal for Renaming Single Document */}
-      {isRenameModalOpen && renamingDoc && (
-        <div 
-          onClick={() => !isSavingRename && setIsRenameModalOpen(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
-          >
-            <div className="space-y-1">
-              <h3 className="text-base font-semibold text-app-text">{t('right.renameSource')}</h3>
-              <p className="text-xs text-app-text-muted truncate" title={renamingDoc.filename}>
-                {t('right.filePrefix')}{renamingDoc.filename}
-              </p>
-            </div>
-
-            <form onSubmit={handleSaveRename} className="space-y-3">
-              <div>
-                <input
-                  type="text"
-                  value={renameTitleInput}
-                  onChange={(e) => setRenameTitleInput(e.target.value)}
-                  placeholder={t('right.renamePlaceholder')}
-                  className="w-full h-10 px-3.5 rounded-xl bg-app-input-surface border border-app-border focus:border-blue-500 text-xs text-app-text placeholder:text-app-text-dim focus:outline-none transition-all"
-                  autoFocus
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-1 border-t border-app-divider">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsRenameModalOpen(false)}
-                  disabled={isSavingRename}
-                  className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
-                >
-                  {t('action.cancel')}
-                </Button>
-
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={!renameTitleInput.trim() || isSavingRename}
-                  className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow flex items-center gap-1.5"
-                >
-                  {isSavingRename ? (
-                    <>
-                      <Loader2 size={12} className="animate-spin" />
-                      <span>Saving...</span>
-                    </>
-                  ) : (
-                    <span>{t('action.save')}</span>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <RenameModal
+        isOpen={isRenameModalOpen}
+        renamingDoc={renamingDoc}
+        renameTitleInput={renameTitleInput}
+        isSavingRename={isSavingRename}
+        onInputChange={setRenameTitleInput}
+        onClose={() => setIsRenameModalOpen(false)}
+        onSave={handleSaveRename}
+      />
     </aside>
   );
 }

@@ -110,3 +110,47 @@ def test_lru_cache_eviction():
     assert "c" in cache
     assert "a" not in cache
 
+def test_document_service_quality_calculator(tmp_path):
+    """Verify document quality calculator prioritizes full PDFs with DOI and high citations."""
+    from services.document_service import calculate_doc_quality
+    from database import Document
+    
+    doc_stub = Document(
+        id=1,
+        chat_id="test_chat",
+        filename="test_stub.pdf",
+        title="Stub Paper",
+        doi="10.1234/test",
+        authors='["Author A"]',
+        journal="Journal of AI",
+        abstract="Brief abstract about machine learning..."
+    )
+    
+    score, has_full_pdf, doc_id = calculate_doc_quality("test_chat", doc_stub)
+    assert doc_id == 1
+    assert score > 0
+    assert not has_full_pdf
+
+def test_network_failure_fallback_graceful(monkeypatch):
+    """Verify external journal API timeouts/errors are gracefully caught without crashing."""
+    import requests
+    from rag.search import search_academic_papers_planned
+    
+    def mock_get_fail(*args, **kwargs):
+        raise requests.exceptions.ConnectTimeout("Mocked network timeout")
+        
+    monkeypatch.setattr(requests, "get", mock_get_fail)
+    
+    plan = {
+        "en_query": "machine learning",
+        "id_query": "machine learning",
+        "target_count": 5,
+        "language_preference": "en"
+    }
+    
+    # Should not raise exception and return empty list gracefully
+    results = search_academic_papers_planned(plan)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+

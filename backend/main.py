@@ -13,46 +13,24 @@ import pdf_exporter
 
 logger = logging.getLogger("uvicorn.error")
 
+import os
+import re
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from database import engine, Base, SessionLocal, Document
+
+from helpers import UPLOAD_DIR, TEMP_ZIPS_DIR
+from routers import chats_router, documents_router, papers_router, settings_router, storage_router
+
+import pdf_exporter
+
+logger = logging.getLogger("uvicorn.error")
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
-
-app = FastAPI(title="Not-NotebookLM API")
-
-# Mount uploads directory for static file access
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
-
-# Setup dynamic CORS for local dev and cloud deployment
-allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
-if allowed_origins_env:
-    allowed_origins = [orig.strip() for orig in allowed_origins_env.split(",") if orig.strip()]
-else:
-    allowed_origins = [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins if allowed_origins != ["*"] else ["*"],
-    allow_credentials=True if allowed_origins != ["*"] else False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Include Routers
-app.include_router(chats_router)
-app.include_router(documents_router)
-app.include_router(papers_router)
-app.include_router(settings_router)
-app.include_router(storage_router)
-
-@app.get("/")
-def root():
-    return {"status": "ok", "app": "Not-NotebookLM API"}
-
 
 def heal_legacy_upload_files():
     """Validates and heals zero-byte or corrupt files on startup."""
@@ -90,6 +68,44 @@ def heal_legacy_upload_files():
     finally:
         db.close()
 
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     heal_legacy_upload_files()
+    yield
+
+app = FastAPI(title="Not-NotebookLM API", lifespan=lifespan)
+
+# Mount uploads directory for static file access
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+# Setup dynamic CORS for local dev and cloud deployment
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
+if allowed_origins_env:
+    allowed_origins = [orig.strip() for orig in allowed_origins_env.split(",") if orig.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins if allowed_origins != ["*"] else ["*"],
+    allow_credentials=True if allowed_origins != ["*"] else False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include Routers
+app.include_router(chats_router)
+app.include_router(documents_router)
+app.include_router(papers_router)
+app.include_router(settings_router)
+app.include_router(storage_router)
+
+@app.get("/")
+def root():
+    return {"status": "ok", "app": "Not-NotebookLM API"}

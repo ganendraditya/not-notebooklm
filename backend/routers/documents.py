@@ -15,6 +15,7 @@ from database import get_db, ChatSession, Document
 import models
 import rag
 import pdf_exporter
+from services.document_service import extract_and_enrich_uploaded_file, calculate_doc_quality
 from helpers import (
     UPLOAD_DIR,
     TEMP_ZIPS_DIR,
@@ -62,120 +63,24 @@ async def upload_document(
         logger.error(f"[Upload Ingest Error]: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to parse document: {str(e)}")
 
-    # Auto-extract & enrich metadata from uploaded PDF / document
-    clean_fn_title = re.sub(r'<[^>]+>', '', os.path.splitext(file.filename)[0]).replace("_", " ").strip()
-    # Normalize ALL CAPS title to readable Title Case if applicable
-    if clean_fn_title.isupper() and len(clean_fn_title) > 8:
-        clean_fn_title = clean_fn_title.title()
-        
-    extracted_doi = ""
-    raw_header = ""
-    try:
-        if file.filename.lower().endswith(".pdf"):
-            import pymupdf
-            pdoc = pymupdf.open(file_path)
-            if len(pdoc) > 0:
-                raw_header = pdoc[0].get_text()[:3000]
-            pdoc.close()
-        else:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                raw_header = f.read(3000)
-    except Exception:
-        raw_header = ""
+    # Delegate metadata extraction and enrichment to service layer
+    enriched = await extract_and_enrich_uploaded_file(file_path, file.filename)
 
-    if raw_header:
-        doi_m = re.search(r'10\.\d{4,9}/[^\s\n<>\"\'{}|\\^`]+', raw_header)
-        if doi_m:
-            extracted_doi = doi_m.group(0).strip().rstrip(".")
-            extracted_doi = re.sub(r'[;.,:)\s]+$', '', extracted_doi).strip()
-
-    # Query academic APIs for verified metadata (Crossref / OpenAlex)
-    resolved_title = clean_fn_title
-    resolved_authors = []
-    resolved_year = ""
-    resolved_journal = ""
-    resolved_metric = "Peer-Reviewed"
-    resolved_abstract = ""
-    resolved_url = ""
-    resolved_doi = extracted_doi
-
-    if extracted_doi or clean_fn_title:
-        try:
-            meta = await asyncio.to_thread(
-                rag.resolve_paper_metadata_by_doi,
-                doi=extracted_doi,
-                title_fallback=clean_fn_title,
-                fast_only=False
-            )
-            if meta:
-                if meta.get("title") and len(meta["title"]) > 5:
-                    resolved_title = meta["title"].strip()
-                resolved_authors = meta.get("authors") or []
-                resolved_year = str(meta.get("year") or "")
-                resolved_journal = meta.get("journal") or meta.get("venue") or ""
-                resolved_metric = meta.get("journal_metric") or "Peer-Reviewed"
-                resolved_abstract = meta.get("abstract") or ""
-                resolved_url = meta.get("url") or (f"https://doi.org/{meta.get('doi')}" if meta.get("doi") else "")
-                resolved_doi = meta.get("doi") or extracted_doi
-        except Exception as e:
-            logger.debug(f"[Upload Metadata Resolution Warning]: {e}")
-
-    # Check if authentic binary PDF
-    is_valid_pdf = False
-    if os.path.exists(file_path) and os.path.getsize(file_path) >= 35000:
-        try:
-            with open(file_path, "rb") as f:
-                fb = f.read(2048)
-                if fb.startswith(b"%PDF-"):
-                    is_valid_pdf = True
-        except Exception:
-            is_valid_pdf = False
-
-    # AI Metadata Auditor on upload if abstract/title still missing
-    if raw_header and (not resolved_abstract or resolved_title == clean_fn_title):
-        try:
-            ai_audit = await asyncio.to_thread(
-                rag.audit_paper_metadata_with_ai,
-                paper_title=resolved_title,
-                raw_authors=resolved_authors,
-                raw_journal=resolved_journal,
-                raw_year=resolved_year,
-                raw_doi=resolved_doi,
-                raw_citations=0,
-                raw_abstract_or_html=raw_header[:3500],
-                is_oa=is_valid_pdf
-            )
-            if ai_audit:
-                if ai_audit.get("abstract") and len(ai_audit["abstract"]) > 40:
-                    resolved_abstract = ai_audit["abstract"]
-                if ai_audit.get("title") and len(ai_audit["title"]) > 5:
-                    resolved_title = ai_audit["title"]
-                if ai_audit.get("authors"):
-                    resolved_authors = ai_audit["authors"]
-                if ai_audit.get("year"):
-                    resolved_year = ai_audit["year"]
-                if ai_audit.get("journal"):
-                    resolved_journal = ai_audit["journal"]
-                if ai_audit.get("journal_metric"):
-                    resolved_metric = ai_audit["journal_metric"]
-        except Exception as upload_audit_err:
-            logger.debug(f"[Upload AI Audit Warning]: {upload_audit_err}")
-
-    authors_json = json.dumps(resolved_authors, ensure_ascii=False) if resolved_authors else None
+    authors_json = json.dumps(enriched["authors"], ensure_ascii=False) if enriched["authors"] else None
     db_doc = Document(
         chat_id=chat_id,
         filename=file.filename,
-        title=resolved_title,
+        title=enriched["title"],
         authors=authors_json,
-        year=resolved_year,
-        journal=resolved_journal,
-        journal_metric=resolved_metric,
-        doi=resolved_doi,
-        url=resolved_url,
-        abstract=resolved_abstract,
-        abstract_type="official" if resolved_abstract and len(resolved_abstract) > 80 else "ai_summary",
-        is_oa=True if is_valid_pdf else False,
-        access_status="Open Access (Full PDF Available)" if is_valid_pdf else "Uploaded Document",
+        year=enriched["year"],
+        journal=enriched["journal"],
+        journal_metric=enriched["journal_metric"],
+        doi=enriched["doi"],
+        url=enriched["url"],
+        abstract=enriched["abstract"],
+        abstract_type="official" if enriched["abstract"] and len(enriched["abstract"]) > 80 else "ai_summary",
+        is_oa=True if enriched["is_valid_pdf"] else False,
+        access_status="Open Access (Full PDF Available)" if enriched["is_valid_pdf"] else "Uploaded Document",
         quality_tier=4
     )
     db.add(db_doc)
@@ -189,8 +94,8 @@ async def upload_document(
         title=db_doc.title or db_doc.filename.replace(".pdf", "").replace("_", " ").strip(),
         created_at=db_doc.created_at,
         index=total_docs_count,
-        has_full_pdf=is_valid_pdf,
-        is_oa=True if is_valid_pdf else False
+        has_full_pdf=enriched["is_valid_pdf"],
+        is_oa=True if enriched["is_valid_pdf"] else False
     )
 
 @router.delete("/chats/{chat_id}/documents/{doc_id}")
@@ -271,33 +176,6 @@ async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db))
         return {"status": "success", "cleaned_count": 0, "remaining_count": len(docs), "cleaned_doc_ids": []}
 
     # Helper to calculate quality score for each document (prefer authentic full PDF > metadata brief)
-    def calculate_doc_quality(d: Document) -> tuple:
-        fp = get_doc_file_path(chat_id, d.filename)
-        sz = os.path.getsize(fp) if os.path.exists(fp) else 0
-        has_full_pdf = False
-        if os.path.exists(fp) and sz >= 35000:
-            try:
-                with open(fp, "rb") as f:
-                    fb = f.read(2048)
-                    if fb.startswith(b"%PDF-") and b"NOTBOOKLM SCHOLARLY ARCHIVE" not in fb and b"OFFICIAL PUBLICATION ARCHIVE RECORD" not in fb:
-                        has_full_pdf = True
-            except Exception:
-                has_full_pdf = False
-                
-        score = 0
-        if has_full_pdf:
-            score += 10000 + min(sz // 1024, 5000) # Full manuscript gets highest tier
-        if d.doi:
-            score += 500
-        if d.authors and d.authors != "[]" and "Academic Researchers" not in d.authors:
-            score += 300
-        if d.journal and "Academic Publication" not in d.journal:
-            score += 200
-        if d.abstract and len(d.abstract) > 100:
-            score += min(len(d.abstract), 500)
-            
-        return (score, has_full_pdf, d.id)
-
     # Group documents by DOI and Normalized Title
     groups = [] # list of lists: [[doc1, doc2], [doc3]]
 
@@ -360,7 +238,7 @@ async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db))
     for grp in groups:
         if len(grp) > 1:
             # Sort descending by quality score
-            sorted_grp = sorted(grp, key=lambda d: calculate_doc_quality(d), reverse=True)
+            sorted_grp = sorted(grp, key=lambda d: calculate_doc_quality(chat_id, d), reverse=True)
             keeper = sorted_grp[0]
             duplicates = sorted_grp[1:]
 

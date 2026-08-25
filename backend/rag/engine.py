@@ -597,15 +597,6 @@ async def query_chat(
 
         return text.strip()
 
-    def is_simple_conversational(text: str) -> bool:
-        pass
-
-    def is_technical_discussion(text: str) -> bool:
-        pass
-
-    def is_sources_meta_query(text: str) -> bool:
-        pass
-
     async def execute_agent(target_llm, timeout_sec=60.0):
         intent = await classify_user_intent(query, has_local_docs, len(local_docs), target_llm)
         print(f"[RAG Engine] LLM Semantic Intent: {intent}")
