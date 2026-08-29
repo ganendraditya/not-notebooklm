@@ -1137,111 +1137,7 @@ export default function RightSidebar({
         </div>
 
         {/* 5. Interactive Multi-Format Citation Modal */}
-        {isCiteModalOpen && (
-          <div 
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsCiteModalOpen(false);
-            }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-          >
-            <div 
-              onClick={(e) => e.stopPropagation()}
-              className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-[530px] p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-150 text-app-text"
-            >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between pb-2.5 border-b border-app-divider">
-                <div className="flex items-center gap-2">
-                  <Quote size={16} className="text-blue-500" />
-                  <h3 className="text-sm font-semibold text-app-text">Cite this Paper</h3>
-                </div>
-                <button
-                  onClick={() => setIsCiteModalOpen(false)}
-                  className="w-7 h-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
-                >
-                  <X size={14} />
-                </button>
-              </div>
 
-              {/* Citation Format Tabs (Clean, Scrollable & Compact) */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar text-xs font-medium">
-                {[
-                  { id: "apa", label: "APA 7th" },
-                  { id: "ieee", label: "IEEE" },
-                  { id: "harvard", label: "Harvard" },
-                  { id: "mla", label: "MLA 9th" },
-                  { id: "chicago", label: "Chicago" },
-                  { id: "bibtex", label: "BibTeX" },
-                  { id: "ris", label: "RIS" },
-                ].map((st) => (
-                  <button
-                    key={st.id}
-                    onClick={() => setSelectedCitationStyle(st.id as any)}
-                    className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer text-xs ${
-                      selectedCitationStyle === st.id
-                        ? "bg-blue-600 text-white font-semibold shadow-sm"
-                        : "bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text"
-                    }`}
-                  >
-                    {st.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Fixed-Height Scrollable Citation Content Box */}
-              <div className="h-[140px] p-3.5 rounded-xl bg-app-input-surface border border-app-border font-sans text-xs leading-relaxed select-text text-app-text break-words whitespace-pre-wrap overflow-y-auto custom-scrollbar">
-                {citations[selectedCitationStyle]}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between pt-1 border-t border-app-divider">
-                <div className="flex items-center gap-2">
-                  {selectedCitationStyle === "bibtex" && (
-                    <button
-                      onClick={() => downloadFileText(citations.bibtex, `${doiStr ? doiStr.replace(/[^a-z0-9]/gi, "_") : "paper"}.bib`)}
-                      className="px-2.5 py-1.5 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-xs text-app-text-muted hover:text-app-text transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Download size={13} />
-                      <span>Download .bib</span>
-                    </button>
-                  )}
-                  {selectedCitationStyle === "ris" && (
-                    <button
-                      onClick={() => downloadFileText(citations.ris, `${doiStr ? doiStr.replace(/[^a-z0-9]/gi, "_") : "paper"}.ris`)}
-                      className="px-2.5 py-1.5 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-xs text-app-text-muted hover:text-app-text transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
-                    >
-                      <Download size={13} />
-                      <span>Download .ris</span>
-                    </button>
-                  )}
-                </div>
-
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    const text = citations[selectedCitationStyle];
-                    navigator.clipboard.writeText(text);
-                    setCopiedCitationKey(selectedCitationStyle);
-                    setTimeout(() => setCopiedCitationKey(null), 2000);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded-lg px-4 h-8 cursor-pointer flex items-center gap-1.5 shadow-sm transition-colors"
-                >
-                  {copiedCitationKey === selectedCitationStyle ? (
-                    <>
-                      <Check size={13} className="text-white" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={13} />
-                      <span>Copy Citation</span>
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
       </aside>
     );
   }
@@ -1856,6 +1752,20 @@ export default function RightSidebar({
         </div>
       )}
 
+      <CitationModal
+        isOpen={isCiteModalOpen}
+        onClose={() => setIsCiteModalOpen(false)}
+        citations={generateCitations(
+            paperDetails?.title || ((viewingDoc as any)?.filename || "paper") || "",
+            paperDetails?.authors || [],
+            paperDetails?.year || "2024",
+            paperDetails?.journal || "",
+            paperDetails?.doi || "",
+            paperDetails?.url || (paperDetails?.doi ? "https://doi.org/$" : "")
+        )}
+        doiStr={paperDetails?.doi || ""}
+      />
+
       {/* Centered Modal for Bulk Delete Confirmation */}
       <BulkDeleteModal
         isOpen={showBulkDeleteConfirm}
@@ -1881,6 +1791,13 @@ export default function RightSidebar({
     </aside>
   );
 }
+
+
+
+
+
+
+
 
 
 
