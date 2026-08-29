@@ -533,6 +533,19 @@ def search_academic_papers_planned(
                 
             return has_rain and has_predict
 
+        # Road Damage Detection domain topic validation
+        if any(k in en_query.lower() or k in id_query.lower() for k in ["road damage", "kerusakan jalan", "pothole", "lubang jalan", "retak jalan", "pavement"]):
+            road_terms = ["road", "jalan", "pavement", "perkerasan", "asphalt", "aspal", "highway", "pothole", "crack", "retak"]
+            has_road = any(r in full for r in road_terms)
+            
+            damage_ai_terms = [
+                "damage", "kerusakan", "defect", "distress", "pothole", "crack", "retak", "lubang",
+                "detection", "deteksi", "segmentation", "segmentasi", "yolo", "cnn", "deep learning",
+                "machine learning", "computer vision", "pengolahan citra", "image processing", "u-net"
+            ]
+            has_damage_ai = any(d in full for d in damage_ai_terms)
+            return has_road and has_damage_ai
+
         if any(k in en_query.lower() or k in id_query.lower() for k in ["sentiment", "sentimen", "opinion", "opini"]):
             sentiment_keys = [
                 "sentiment", "sentimen", "opinion", "opini", "ulasan", 
