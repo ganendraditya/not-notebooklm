@@ -750,8 +750,8 @@ async def query_chat(
                                 is_full_paper = False
                             else:
                                 is_full_paper = True
-                            # Dynamic allocation: keep rich content without blowing context limits
-                            max_chars = 4000 if len(local_docs) > 20 else 12000
+                            # Keep generous content so LLM sees full sections, methods, and results
+                            max_chars = 14000 if len(local_docs) > 20 else 24000
                             content_snippet = parsed_text[:max_chars]
                     except Exception as parse_err:
                         logger.debug(f"[Doc Parse Error for {fname}]: {parse_err}")

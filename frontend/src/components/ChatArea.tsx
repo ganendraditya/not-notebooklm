@@ -423,71 +423,80 @@ export default function ChatArea({
                   ) : (
                     <div className="flex items-start">
                       <div className="flex-1 min-w-0">
-                        <InChatMessageComponent 
-                          msg={msg}
-                          activeChatId={activeChatId}
-                          backendUrl={backendUrl}
-                          documents={documents}
-                          onDocumentAdded={onDocumentAdded}
-                          onAddPendingSources={onAddPendingSources}
-                          onResolvePendingSource={onResolvePendingSource}
-                          onOpenDocument={onOpenDocument}
-                          onEnsureChatSession={onEnsureChatSession}
-                          activeCitationKey={activeCitationKey}
-                        />
-                        <div className="mt-1 flex items-center gap-1.5">
-                          {/* Pagination for response variants (e.g. 1/2, 2/2) */}
-                          {msg.variants && msg.variants.length > 1 && (
-                            <div className="flex items-center gap-0.5 text-xs text-gray-400 font-mono select-none bg-white/5 px-2 py-0.5 rounded-lg border border-white/5 mr-1">
-                              <button
-                                type="button"
-                                onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) - 1)}
-                                disabled={(msg.active_variant_index || 0) <= 0 || isLoading}
-                                className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                                title={t('chat.previousResponse')}
-                              >
-                                <ChevronLeft size={14} />
-                              </button>
-                              <span className="px-1 text-app-text text-xs">
-                                {(msg.active_variant_index || 0) + 1}/{msg.variants.length}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) + 1)}
-                                disabled={(msg.active_variant_index || 0) >= msg.variants.length - 1 || isLoading}
-                                className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                                title={t('chat.nextResponse')}
-                              >
-                                <ChevronRight size={14} />
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Copy Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "").trim(), idx)}
-                            className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
-                            title={t('chat.copyResponse')}
-                          >
-                            {copiedMessageIdx === idx ? (
-                              <Check size={15} className="text-emerald-500" />
-                            ) : (
-                              <Copy size={15} />
+                        {msg.content ? (
+                          <InChatMessageComponent 
+                            msg={msg}
+                            activeChatId={activeChatId}
+                            backendUrl={backendUrl}
+                            documents={documents}
+                            onDocumentAdded={onDocumentAdded}
+                            onAddPendingSources={onAddPendingSources}
+                            onResolvePendingSource={onResolvePendingSource}
+                            onOpenDocument={onOpenDocument}
+                            onEnsureChatSession={onEnsureChatSession}
+                            activeCitationKey={activeCitationKey}
+                          />
+                        ) : isLoading && (
+                          <div className="flex items-center gap-2.5 text-app-text-muted text-sm py-2 animate-in fade-in duration-200">
+                            <Loader2 size={16} className="text-blue-500 animate-spin shrink-0" />
+                            <span>{activeStatus || "Analyzing and regenerating response..."}</span>
+                          </div>
+                        )}
+                        {msg.content && (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            {/* Pagination for response variants (e.g. 1/2, 2/2) */}
+                            {msg.variants && msg.variants.length > 1 && (
+                              <div className="flex items-center gap-0.5 text-xs text-gray-400 font-mono select-none bg-white/5 px-2 py-0.5 rounded-lg border border-white/5 mr-1">
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) - 1)}
+                                  disabled={(msg.active_variant_index || 0) <= 0 || isLoading}
+                                  className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                  title={t('chat.previousResponse')}
+                                >
+                                  <ChevronLeft size={14} />
+                                </button>
+                                <span className="px-1 text-app-text text-xs">
+                                  {(msg.active_variant_index || 0) + 1}/{msg.variants.length}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) + 1)}
+                                  disabled={(msg.active_variant_index || 0) >= msg.variants.length - 1 || isLoading}
+                                  className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                  title={t('chat.nextResponse')}
+                                >
+                                  <ChevronRight size={14} />
+                                </button>
+                              </div>
                             )}
-                          </button>
 
-                          {/* Retry / Regenerate Button */}
-                          <button
-                            type="button"
-                            onClick={() => onRegenerateMessage?.(idx)}
-                            disabled={isLoading}
-                            className="p-1.5 text-app-text-muted hover:text-app-text disabled:opacity-30 rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
-                            title={t('chat.regenerateResponse')}
-                          >
-                            <RotateCw size={15} />
-                          </button>
-                        </div>
+                            {/* Copy Button */}
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "").trim(), idx)}
+                              className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
+                              title={t('chat.copyResponse')}
+                            >
+                              {copiedMessageIdx === idx ? (
+                                <Check size={15} className="text-emerald-500" />
+                              ) : (
+                                <Copy size={15} />
+                              )}
+                            </button>
+
+                            {/* Retry / Regenerate Button */}
+                            <button
+                              type="button"
+                              onClick={() => onRegenerateMessage?.(idx)}
+                              disabled={isLoading}
+                              className="p-1.5 text-app-text-muted hover:text-app-text disabled:opacity-30 rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
+                              title={t('chat.regenerateResponse')}
+                            >
+                              <RotateCw size={15} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

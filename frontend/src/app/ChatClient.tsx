@@ -462,6 +462,17 @@ export default function ChatClient() {
     if (activeChatIdRef.current === currentChatId) {
       setIsLoading(true);
       setActiveStatus(job.status);
+      // Temporarily blank out the assistant message content so the old text disappears while regenerating
+      updateMessagesList(prev => {
+        const next = [...prev];
+        if (next[messageIndex]) {
+          next[messageIndex] = {
+            ...next[messageIndex],
+            content: ""
+          };
+        }
+        return next;
+      });
     }
 
     const controller = new AbortController();
