@@ -1,4 +1,5 @@
-﻿import { usePaperDetails } from "@/hooks/usePaperDetails";
+﻿import { CitationModal } from "./RightSidebar/CitationModal";
+import { usePaperDetails } from "@/hooks/usePaperDetails";
 import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
 import { generateCitations, CitationFormats } from "@/hooks/useCitationGenerator";
 "use client";
@@ -1880,6 +1881,7 @@ export default function RightSidebar({
     </aside>
   );
 }
+
 
 
 
