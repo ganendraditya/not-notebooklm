@@ -918,7 +918,7 @@ export default function RightSidebar({
   };
 
   const SUPPORTED_EXTENSIONS = new Set([
-    ".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris", ".csv", ".tsv"
+    ".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris"
   ]);
 
   const handleUploadBatch = async (files: File[]) => {
@@ -931,7 +931,7 @@ export default function RightSidebar({
     });
 
     if (validFiles.length === 0) {
-      alert(t('alert.unsupportedFormat') || "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv");
+      alert(t('alert.unsupportedFormat') || "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris");
       return;
     }
 
@@ -1116,8 +1116,6 @@ export default function RightSidebar({
       return { label: "BIB", bg: "bg-amber-600/15 border-amber-500/40 text-amber-500" };
     } else if (ext === "ris") {
       return { label: "RIS", bg: "bg-orange-600/15 border-orange-500/40 text-orange-500" };
-    } else if (ext === "csv" || ext === "tsv") {
-      return { label: "CSV", bg: "bg-emerald-600/15 border-emerald-500/40 text-emerald-500" };
     } else if (ext === "md") {
       return { label: "MD", bg: "bg-purple-600/15 border-purple-500/40 text-purple-500" };
     } else {
@@ -1921,7 +1919,7 @@ export default function RightSidebar({
         type="file"
         id="sources-file-upload"
         className="hidden"
-        accept=".pdf,.docx,.doc,.txt,.md,.bib,.bibtex,.ris,.csv,.tsv"
+        accept=".pdf,.docx,.doc,.txt,.md,.bib,.bibtex,.ris"
         multiple
         onChange={(e) => {
           if (e.target.files && e.target.files.length > 0) {

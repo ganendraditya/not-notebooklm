@@ -332,7 +332,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
@@ -668,7 +668,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "Tidak ada teks abstrak tambahan yang disediakan.",
     "right.pdf": "PDF",
     "right.find": "Cari",
-    "alert.unsupportedFormat": "Format berkas tidak didukung. Format yang didukung: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Format berkas tidak didukung. Format yang didukung: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Batas kapasitas sumber tercapai! Maksimal 300 sumber per notebook.",
     "alert.capacityWarning": "Hanya mengunggah {n} dari {m} berkas yang valid untuk mematuhi batas 300 sumber."
   },
@@ -997,7 +997,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No se proporciona texto de resumen adicional.",
     "right.pdf": "PDF",
     "right.find": "Buscar",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Â¡LÃ­mite de fuente alcanzado! La capacidad mÃ¡xima es de 300 fuentes por portÃ¡til.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -1006,7 +1006,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Solo cargando {n} de {m} archivos vÃ¡lidos para respetar el lÃ­mite de 300 fuentes."
   },
   "fr": {
@@ -1334,7 +1334,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "Aucun texte de rÃ©sumÃ© supplÃ©mentaire fourni.",
     "right.pdf": "PDF",
     "right.find": "Rechercher",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Limite de source atteinteÂ ! La capacitÃ© maximale est de 300 sources par ordinateur portable.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -1343,7 +1343,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Ne tÃ©lÃ©chargez que {n} fichiers valides sur {m} pour respecter la limite de 300Â sources."
   },
   "de": {
@@ -1671,7 +1671,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "Kein zusÃ¤tzlicher Abstract-Text bereitgestellt.",
     "right.pdf": "PDF",
     "right.find": "Suchen",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Quelllimit erreicht! Die maximale KapazitÃ¤t betrÃ¤gt 300 Quellen pro Notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -1680,7 +1680,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Es werden nur {n} von {m} gÃ¼ltigen Dateien hochgeladen, um die Obergrenze von 300 Quellen einzuhalten."
   },
   "zh": {
@@ -2009,7 +2009,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
@@ -2339,7 +2339,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
@@ -2668,7 +2668,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "è¿½å ã®è¦ç´ãã­ã¹ãã¯æä¾ããã¾ããã",
     "right.pdf": "PDF",
     "right.find": "æ¤ç´¢",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "ã½ã¼ã¹ã®å¶éã«éãã¾ãããæå¤§å®¹éã¯ãã¼ãããã¯ããã 300 ã½ã¼ã¹ã§ãã",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -2677,7 +2677,6 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdfã.docxã.docã.txtã.mdã.bibã.risã.csvã.tsv",
     "alert.capacityWarning': 'Capacity limit warning": "ã½ã¼ã¹ã®ä¸é 300 ãå°éããããã{m} åã®æå¹ãªãã¡ã¤ã«ã®ãã¡ {n} åã®ã¿ãã¢ããã­ã¼ããã¾ãã"
   },
   "ko": {
@@ -3005,7 +3004,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "ì¶ê° ì¶ì íì¤í¸ê° ì ê³µëì§ ìììµëë¤.",
     "right.pdf": "PDF",
     "right.find": "ì°¾ê¸°",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "ìì¤ ì íì ëë¬íìµëë¤! ìµë ì©ëì ë¸í¸ë¶ë¹ ìì¤ 300ê°ìëë¤.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -3014,7 +3013,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "300ê°ì ìì¤ íëë¥¼ ì¤ìíê¸° ìí´ ì í¨í íì¼ {m}ê° ì¤ {n}ê°ë§ ìë¡ëí©ëë¤."
   },
   "pt": {
@@ -3342,7 +3341,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "Nenhum texto abstrato adicional fornecido.",
     "right.pdf": "PDF",
     "right.find": "Localizar",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Limite de fontes atingido! A capacidade mÃ¡xima Ã© de 300 fontes por notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -3351,7 +3350,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Fazendo upload apenas de {n} de {m} arquivos vÃ¡lidos para respeitar o limite de 300 fontes."
   },
   "ru": {
@@ -3679,7 +3678,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "ÐÐ¸ÐºÐ°ÐºÐ¾Ð³Ð¾ Ð´Ð¾Ð¿Ð¾Ð»Ð½Ð¸ÑÐµÐ»ÑÐ½Ð¾Ð³Ð¾ Ð°Ð±ÑÑÑÐ°ÐºÑÐ½Ð¾Ð³Ð¾ ÑÐµÐºÑÑÐ° Ð½Ðµ Ð¿ÑÐµÐ´Ð¾ÑÑÐ°Ð²Ð»ÐµÐ½Ð¾.",
     "right.pdf": "PDF",
     "right.find": "ÐÐ°Ð¹ÑÐ¸",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "ÐÐ¾ÑÑÐ¸Ð³Ð½ÑÑ Ð»Ð¸Ð¼Ð¸Ñ Ð¸ÑÑÐ¾Ð´Ð½Ð¾Ð³Ð¾ ÐºÐ¾Ð´Ð°! ÐÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑÐ½Ð°Ñ ÐµÐ¼ÐºÐ¾ÑÑÑ â 300 Ð¸ÑÑÐ¾ÑÐ½Ð¸ÐºÐ¾Ð² Ð½Ð° Ð¾Ð´Ð¸Ð½ Ð½Ð¾ÑÑÐ±ÑÐº.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -3688,7 +3687,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "ÐÐ°Ð³ÑÑÐ¶Ð°ÐµÑÑÑ ÑÐ¾Ð»ÑÐºÐ¾ {n} Ð¸Ð· {m} Ð´ÐµÐ¹ÑÑÐ²Ð¸ÑÐµÐ»ÑÐ½ÑÑ ÑÐ°Ð¹Ð»Ð¾Ð², ÑÑÐ¾Ð±Ñ ÑÐ¾Ð±Ð»ÑÐ´Ð°ÑÑ Ð¾Ð³ÑÐ°Ð½Ð¸ÑÐµÐ½Ð¸Ðµ Ð² 300 Ð¸ÑÑÐ¾ÑÐ½Ð¸ÐºÐ¾Ð²."
   },
   "it": {
@@ -4016,7 +4015,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "Nessun testo astratto aggiuntivo fornito.",
     "right.pdf": "PDF",
     "right.find": "Trova",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Limite sorgente raggiunto! La capacitÃ  massima Ã¨ di 300 sorgenti per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -4025,7 +4024,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Caricando solo {n} su {m} file validi per rispettare il limite di 300 sorgenti."
   },
   "ar": {
@@ -4354,7 +4353,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -4363,7 +4362,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "nl": {
@@ -4691,7 +4690,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "Er is geen aanvullende abstracte tekst opgegeven.",
     "right.pdf": "PDF",
     "right.find": "Vind",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Bronlimiet bereikt! De maximale capaciteit is 300 bronnen per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -4700,7 +4699,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Er worden slechts {n} van de {m} geldige bestanden geÃ¼pload om de limiet van 300 bronnen te respecteren."
   },
   "tr": {
@@ -5028,7 +5027,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "Ek Ã¶zet metni saÄlanmadÄ±.",
     "right.pdf": "PDF",
     "right.find": "Bul",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Kaynak sÄ±nÄ±rÄ±na ulaÅÄ±ldÄ±! Maksimum kapasite dizÃ¼stÃ¼ bilgisayar baÅÄ±na 300 kaynaktÄ±r.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -5037,7 +5036,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "300 kaynak sÄ±nÄ±rÄ±na uymak iÃ§in {m} geÃ§erli dosyadan yalnÄ±zca {n} tanesi yÃ¼kleniyor."
   },
   "pl": {
@@ -5365,7 +5364,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "Nie podano dodatkowego tekstu streszczenia.",
     "right.pdf": "PDF",
     "right.find": "ZnajdÅº",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Limit ÅºrÃ³deÅ osiÄgniÄty! Maksymalna pojemnoÅÄ wynosi 300 ÅºrÃ³deÅ na notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -5374,7 +5373,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "PrzesyÅaj tylko {n} z {m} prawidÅowych plikÃ³w, aby przestrzegaÄ limitu 300 ÅºrÃ³deÅ."
   },
   "vi": {
@@ -5702,7 +5701,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "KhÃ´ng cÃ³ vÄn báº£n tÃ³m táº¯t bá» sung ÄÆ°á»£c cung cáº¥p.",
     "right.pdf": "PDF",
     "right.find": "TÃ¬m",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "ÄÃ£ Äáº¡t Äáº¿n giá»i háº¡n nguá»n! Dung lÆ°á»£ng tá»i Äa lÃ  300 nguá»n trÃªn má»i notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -5711,7 +5710,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Chá» táº£i lÃªn {n} trong sá» {m} tá»p há»£p lá» Äá» Äáº£m báº£o giá»i háº¡n 300 nguá»n."
   },
   "th": {
@@ -6040,7 +6039,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -6049,7 +6048,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "hi": {
@@ -6377,7 +6376,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "à¤à¥à¤ à¤à¤¤à¤¿à¤°à¤¿à¤à¥à¤¤ à¤¸à¤¾à¤° à¤ªà¤¾à¤  à¤ªà¥à¤°à¤¦à¤¾à¤¨ à¤¨à¤¹à¥à¤ à¤à¤¿à¤¯à¤¾ à¤à¤¯à¤¾à¥¤",
     "right.pdf": "à¤ªà¥à¤¡à¥à¤à¤«",
     "right.find": "à¤à¥à¤à¥à¤",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "à¤¸à¥à¤°à¥à¤¤ à¤¸à¥à¤®à¤¾ à¤ªà¥à¤°à¥ à¤¹à¥ à¤à¤! à¤ªà¥à¤°à¤¤à¤¿ à¤¨à¥à¤à¤¬à¥à¤ à¤à¤§à¤¿à¤à¤¤à¤® à¤à¥à¤·à¤®à¤¤à¤¾ 300 à¤¸à¥à¤°à¥à¤¤ à¤¹à¥à¥¤",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -6386,7 +6385,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "300 à¤¸à¥à¤°à¥à¤¤ à¤¸à¥à¤®à¤¾ à¤à¤¾ à¤¸à¤®à¥à¤®à¤¾à¤¨ à¤à¤°à¤¨à¥ à¤à¥ à¤²à¤¿à¤ à¤à¥à¤µà¤² {m} à¤µà¥à¤§ à¤«à¤¼à¤¾à¤à¤²à¥à¤ à¤®à¥à¤ à¤¸à¥ {n} à¤à¤ªà¤²à¥à¤¡ à¤à¤°à¤¨à¤¾à¥¤"
   },
   "uk": {
@@ -6714,7 +6713,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "ÐÐ¾Ð´Ð°ÑÐºÐ¾Ð²Ð¸Ð¹ ÑÐµÐºÑÑ Ð°Ð½Ð¾ÑÐ°ÑÑÑ Ð½Ðµ Ð½Ð°Ð´Ð°Ð½Ð¾.",
     "right.pdf": "PDF",
     "right.find": "ÐÐ½Ð°Ð¹ÑÐ¸",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "ÐÑÐ¼ÑÑ Ð²Ð¸ÑÑÐ´Ð½Ð¾Ð³Ð¾ ÐºÐ¾Ð´Ñ Ð´Ð¾ÑÑÐ³Ð½ÑÑÐ¾! ÐÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑÐ½Ð° Ð¼ÑÑÑÐºÑÑÑÑ ÑÑÐ°Ð½Ð¾Ð²Ð¸ÑÑ 300 Ð´Ð¶ÐµÑÐµÐ» Ð½Ð° Ð½Ð¾ÑÑÐ±ÑÐº.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -6723,7 +6722,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "ÐÐ°Ð²Ð°Ð½ÑÐ°Ð¶ÐµÐ½Ð½Ñ Ð»Ð¸ÑÐµ {n} ÑÐ· {m} Ð´ÑÐ¹ÑÐ½Ð¸Ñ ÑÐ°Ð¹Ð»ÑÐ² Ð´Ð»Ñ Ð´Ð¾ÑÑÐ¸Ð¼Ð°Ð½Ð½Ñ Ð¾Ð±Ð¼ÐµÐ¶ÐµÐ½Ð½Ñ Ð½Ð° 300 Ð´Ð¶ÐµÑÐµÐ»."
   },
   "cs": {
@@ -7052,7 +7051,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -7061,7 +7060,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "sv": {
@@ -7390,7 +7389,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -7399,7 +7398,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "el": {
@@ -7728,7 +7727,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -7737,7 +7736,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "da": {
@@ -8066,7 +8065,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -8075,7 +8074,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "fi": {
@@ -8404,7 +8403,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -8413,7 +8412,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "no": {
@@ -8742,7 +8741,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -8751,7 +8750,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "hu": {
@@ -9080,7 +9079,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -9089,7 +9088,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "ro": {
@@ -9418,7 +9417,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -9427,7 +9426,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "ms": {
@@ -9756,7 +9755,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -9765,7 +9764,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "he": {
@@ -10094,7 +10093,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
@@ -10424,7 +10423,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -10433,7 +10432,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "bn": {
@@ -10762,7 +10761,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -10771,7 +10770,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "tl": {
@@ -11100,7 +11099,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -11109,7 +11108,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "ur": {
@@ -11438,7 +11437,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -11447,7 +11446,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   },
   "sk": {
@@ -11776,7 +11775,7 @@ export const generatedTranslations: TranslationDictionary = {
     "right.noAddAbstract": "No additional abstract text provided.",
     "right.pdf": "PDF",
     "right.find": "Find",
-    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
     "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap.",
     "right.filePrefix': 'File": "",
@@ -11785,7 +11784,7 @@ export const generatedTranslations: TranslationDictionary = {
     "filter.customMin': 'Custom min": "",
     "filter.scopusQuartile': 'Scopus Quartile": "",
     "filter.sintaTier': 'SINTA Tier (Indonesia)": "",
-    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris, .csv, .tsv",
+    "alert.unsupportedFormat': 'Unsupported file format. Supported formats": ".pdf, .docx, .doc, .txt, .md, .bib, .ris",
     "alert.capacityWarning': 'Capacity limit warning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."
   }
 };

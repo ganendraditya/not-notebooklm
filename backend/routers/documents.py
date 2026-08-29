@@ -40,7 +40,7 @@ async def upload_document(
     db: Session = Depends(get_db)
 ):
     import werkzeug.utils
-    SUPPORTED_EXTS = {".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris", ".csv", ".tsv"}
+    SUPPORTED_EXTS = {".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris"}
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in SUPPORTED_EXTS:
         raise HTTPException(
