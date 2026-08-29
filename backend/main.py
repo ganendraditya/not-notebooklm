@@ -18,29 +18,20 @@ logger = logging.getLogger("uvicorn.error")
 Base.metadata.create_all(bind=engine)
 
 def heal_legacy_upload_files():
-    """Validates and heals zero-byte or corrupt files on startup."""
+    """Validates and heals missing or zero-byte metadata files on startup without overwriting valid PDFs."""
+    from helpers import get_doc_file_path
     db = SessionLocal()
     try:
         docs = db.query(Document).all()
         for d in docs:
-            # Use safe path resolution
-            import werkzeug.utils
-            clean_chat_id = werkzeug.utils.secure_filename((str(d.chat_id) or "").strip())
-            clean_fname = werkzeug.utils.secure_filename((str(d.filename) or "").strip())
-            file_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
+            existing_path = get_doc_file_path(d.chat_id, d.filename)
             
-            needs_repair = False
-            
-            if not os.path.exists(file_path):
-                needs_repair = True
-            else:
-                sz = os.path.getsize(file_path)
-                if sz < 100:
-                    needs_repair = True
-                elif d.filename.lower().endswith(".pdf") and not pdf_exporter.is_binary_pdf(file_path):
-                    needs_repair = True
-                    
-            if needs_repair:
+            # If valid binary PDF exists anywhere on disk, keep it intact
+            if os.path.exists(existing_path) and (pdf_exporter.is_binary_pdf(existing_path) or os.path.getsize(existing_path) >= 35000):
+                continue
+
+            # If file doesn't exist or is completely empty (0-byte), write overview metadata fallback
+            if not os.path.exists(existing_path) or os.path.getsize(existing_path) == 0:
                 clean_title = re.sub(r'<[^>]+>', '', os.path.splitext(d.filename)[0]).replace("_", " ").strip()
                 doc_text = f"# {d.title or clean_title} ({d.year or 'N/A'})\n\n"
                 if d.doi:
@@ -49,10 +40,10 @@ def heal_legacy_upload_files():
                     doc_text += f"**URL:** {d.url}  \n\n"
                 doc_text += f"## Abstract & Overview\n\n{d.abstract or d.snippet or 'Metadata & abstract indexed in workspace.'}\n"
                 try:
-                    with open(file_path, "w", encoding="utf-8") as fp:
+                    with open(existing_path, "w", encoding="utf-8") as fp:
                         fp.write(doc_text)
                 except Exception as e:
-                    logger.error(f"[Heal File Error] Failed to write repair file {file_path}: {e}")
+                    logger.error(f"[Heal File Error] Failed to write repair file {existing_path}: {e}")
     except Exception as e:
         logger.warning(f"[Heal Task Warning]: {e}")
     finally:

@@ -36,28 +36,38 @@ def sanitize_paper_filename(title: str, max_length: int = 200) -> str:
     return f"{clean}.pdf" if not clean.lower().endswith(".pdf") else clean
 
 def get_doc_file_path(chat_id: str, filename: str) -> str:
-    """Returns absolute file path for a chat document safely."""
+    """Returns absolute file path for a chat document safely with dual unescaped/secure fallback."""
     import werkzeug.utils
 
-    clean_chat_id = werkzeug.utils.secure_filename((chat_id or "").strip())
-    clean_fname = werkzeug.utils.secure_filename((filename or "").strip())
+    raw_chat_id = (chat_id or "").strip()
+    raw_fname = (filename or "").strip()
+    clean_chat_id = werkzeug.utils.secure_filename(raw_chat_id)
+    clean_fname = werkzeug.utils.secure_filename(raw_fname)
 
-    if clean_chat_id:
-        p1 = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
-        if os.path.exists(p1):
-            return p1
-        p1_cwd = os.path.abspath(os.path.join(os.getcwd(), "uploads", f"{clean_chat_id}_{clean_fname}"))
-        if os.path.exists(p1_cwd):
-            return p1_cwd
-            
-    p_none = os.path.join(UPLOAD_DIR, f"None_{clean_fname}")
-    if os.path.exists(p_none):
-        return p_none
+    # 1. Candidate paths to inspect (prefer authentic binary PDF on disk if available)
+    candidate_paths = [
+        # Direct raw path with spaces (how paper files are saved)
+        os.path.join(UPLOAD_DIR, f"{raw_chat_id}_{raw_fname}"),
+        os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{raw_fname}"),
+        # Sanitized secure filename path
+        os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}"),
+        os.path.join(UPLOAD_DIR, f"None_{raw_fname}"),
+        os.path.join(UPLOAD_DIR, f"None_{clean_fname}"),
+        os.path.join(UPLOAD_DIR, raw_fname),
+        os.path.join(UPLOAD_DIR, clean_fname),
+    ]
 
-    p_direct = os.path.join(UPLOAD_DIR, clean_fname)
-    if os.path.exists(p_direct):
-        return p_direct
+    # Return first existing file that is an authentic binary PDF (>=35KB)
+    for p in candidate_paths:
+        if os.path.exists(p) and os.path.getsize(p) >= 35000:
+            return p
 
+    # If no binary PDF found, return first existing text/markdown fallback file
+    for p in candidate_paths:
+        if os.path.exists(p):
+            return p
+
+    # Default fallback
     return os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
 
 def clean_doi(raw_doi: Optional[str]) -> str:

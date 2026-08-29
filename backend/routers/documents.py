@@ -487,7 +487,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         else:
             res_data["content"] = f"# {doc.title}\n\n*Document file is registered as a reference source.*"
         
-        # Check if local file is authentic full paper PDF or abstract-only metadata
+        # Check if local file is authentic full paper PDF or needs on-demand retrieval
         file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
         is_authentic_pdf = False
         if os.path.exists(file_path) and file_size >= 35000:
@@ -498,6 +498,29 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
             except Exception:
                 is_authentic_pdf = False
 
+        # On-demand fallback: if doc is OA or has PDF link but local file is not PDF, try fast download
+        if not is_authentic_pdf and (doc.is_oa or doc.pdf_url or doc.doi):
+            try:
+                fetched_oa = await asyncio.to_thread(
+                    pdf_exporter.resolve_and_fetch_authentic_pdf,
+                    doi=db_doi,
+                    title=doc.title,
+                    direct_url=doc.url or "",
+                    candidate_pdf_url=doc.pdf_url or ""
+                )
+                if fetched_oa and is_authentic_pdf_bytes(fetched_oa, min_size=35000):
+                    with open(file_path, "wb") as f:
+                        f.write(fetched_oa)
+                    is_authentic_pdf = True
+                    # Re-extract markdown content from new PDF
+                    try:
+                        import pymupdf4llm
+                        res_data["content"] = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.debug(f"[On-demand OA Fetch Warning]: {e}")
+
         if is_authentic_pdf:
             res_data["is_oa"] = True
             res_data["access_status"] = "Open Access (Full PDF Available)"
@@ -506,7 +529,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         else:
             res_data["has_full_pdf"] = False
             res_data["is_abstract_only"] = True
-            res_data["access_status"] = "Closed Access (Paywalled / Metadata Brief)" if not doc.is_oa else "Publication Brief & Abstract (Direct Download Restricted / HTTP 403)"
+            res_data["access_status"] = "Publication Brief & Abstract (Direct Download Restricted)" if doc.is_oa else "Closed Access (Paywalled)"
             # For abstract-only documents, ensure content does not render legacy synthetic PDF markup
             if res_data["content"].startswith("%PDF-") or "NOTBOOKLM SCHOLARLY ARCHIVE" in res_data["content"] or "OFFICIAL PUBLICATION ARCHIVE RECORD" in res_data["content"]:
                 res_data["content"] = f"# {doc.title} ({doc.year or 'N/A'})\n\n"
@@ -762,7 +785,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         res_data["has_full_pdf"] = False
         res_data["is_abstract_only"] = True
         res_data["is_oa"] = bool(res_data.get("pdf_url"))
-        res_data["access_status"] = "Closed Access (Paywalled / Metadata Brief)" if not res_data["is_oa"] else "Publication Brief & Abstract (Direct Download Restricted / HTTP 403)"
+        res_data["access_status"] = "Publication Brief & Abstract (Direct Download Restricted)" if res_data["is_oa"] else "Closed Access (Paywalled)"
 
     if res_data["abstract"]:
         if rag.is_ai_synthesized_overview(res_data["abstract"]):
