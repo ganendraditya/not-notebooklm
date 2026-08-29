@@ -422,11 +422,8 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
         raise HTTPException(status_code=404, detail="Document not found")
         
     file_path = get_doc_file_path(chat_id, doc.filename)
-    clean_filename_title = re.sub(r'<[^>]+>', '', os.path.splitext(doc.filename)[0]).replace("_", " ").strip()
     
     # ---------- DB metadata path (imported papers) ----------
-    # If title is persisted in DB, this doc was imported via search pipeline.
-    # Use DB as single source of truth for all metadata; never re-extract title.
     has_db_metadata = bool(doc.title)
     
     if has_db_metadata:
@@ -437,16 +434,15 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
             db_authors = []
         
         # Sanitize DOI from DB
-        db_doi = (doc.doi or "").strip()
-        db_doi = db_doi.replace("**", "").replace("*", "").replace("__", "")
-        db_doi = re.sub(r'[;.,:)\s]+$', '', db_doi).strip()
+        from helpers import clean_doi
+        db_doi = clean_doi(doc.doi)
         
         res_data = {
             "id": doc.id,
             "filename": doc.filename,
             "created_at": doc.created_at,
             "type": os.path.splitext(doc.filename)[1].lower().replace(".", "") or "pdf",
-            "title": doc.title,  # ponytail: title locked from import, never re-extracted
+            "title": doc.title,
             "authors": db_authors,
             "publication_date": doc.year or "",
             "year": doc.year or "",
@@ -464,14 +460,17 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
             "access_status": doc.access_status or "Open Access",
         }
         
-        # Read file content for Full Paper tab (read-only, no metadata mutation)
-        if os.path.exists(file_path):
+        # Check if local file is authentic full paper PDF or needs on-demand retrieval
+        from services.document_service import check_and_fetch_authentic_pdf_on_demand
+        is_authentic_pdf, new_md_content = await check_and_fetch_authentic_pdf_on_demand(doc, file_path)
+
+        if new_md_content:
+            res_data["content"] = new_md_content
+        elif os.path.exists(file_path):
             ext = os.path.splitext(doc.filename)[1].lower()
             try:
                 if ext == ".pdf":
-                    with open(file_path, "rb") as f:
-                        header = f.read(5)
-                    if header.startswith(b"%PDF"):
+                    if is_authentic_pdf:
                         import pymupdf4llm
                         res_data["content"] = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
                     else:
@@ -486,40 +485,6 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
                 res_data["content"] = f"Error reading document: {str(e)}"
         else:
             res_data["content"] = f"# {doc.title}\n\n*Document file is registered as a reference source.*"
-        
-        # Check if local file is authentic full paper PDF or needs on-demand retrieval
-        file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-        is_authentic_pdf = False
-        if os.path.exists(file_path) and file_size >= 35000:
-            try:
-                with open(file_path, "rb") as f:
-                    first_bytes = f.read(2048)
-                    is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=512)
-            except Exception:
-                is_authentic_pdf = False
-
-        # On-demand fallback: if doc is OA or has PDF link but local file is not PDF, try fast download
-        if not is_authentic_pdf and (doc.is_oa or doc.pdf_url or doc.doi):
-            try:
-                fetched_oa = await asyncio.to_thread(
-                    pdf_exporter.resolve_and_fetch_authentic_pdf,
-                    doi=db_doi,
-                    title=doc.title,
-                    direct_url=doc.url or "",
-                    candidate_pdf_url=doc.pdf_url or ""
-                )
-                if fetched_oa and is_authentic_pdf_bytes(fetched_oa, min_size=35000):
-                    with open(file_path, "wb") as f:
-                        f.write(fetched_oa)
-                    is_authentic_pdf = True
-                    # Re-extract markdown content from new PDF
-                    try:
-                        import pymupdf4llm
-                        res_data["content"] = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
-                    except Exception:
-                        pass
-            except Exception as e:
-                logger.debug(f"[On-demand OA Fetch Warning]: {e}")
 
         if is_authentic_pdf:
             res_data["is_oa"] = True
@@ -530,7 +495,6 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
             res_data["has_full_pdf"] = False
             res_data["is_abstract_only"] = True
             res_data["access_status"] = "Publication Brief & Abstract (Direct Download Restricted)" if doc.is_oa else "Closed Access (Paywalled)"
-            # For abstract-only documents, ensure content does not render legacy synthetic PDF markup
             if res_data["content"].startswith("%PDF-") or "NOTBOOKLM SCHOLARLY ARCHIVE" in res_data["content"] or "OFFICIAL PUBLICATION ARCHIVE RECORD" in res_data["content"]:
                 res_data["content"] = f"# {doc.title} ({doc.year or 'N/A'})\n\n"
                 if db_doi:
@@ -538,7 +502,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
                 if res_data["url"]:
                     res_data["content"] += f"**URL:** {res_data['url']}  \n\n"
                 res_data["content"] += f"## Abstract & Overview\n\n{res_data['abstract']}\n"
-        
+                
         return res_data
     
     # ---------- Legacy path: manually uploaded docs (no DB metadata) ----------
