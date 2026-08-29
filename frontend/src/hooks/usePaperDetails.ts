@@ -1,0 +1,112 @@
+﻿import { useState, useRef, useEffect } from "react";
+import { Document, CitationGroundingHighlight } from "@/stores/documentStore";
+
+export interface PaperDetailData {
+  id: number;
+  filename: string;
+  created_at?: string;
+  type: string;
+  title: string;
+  authors: string[];
+  publication_date: string;
+  year: string;
+  journal: string;
+  journal_metric: string;
+  quality_tier?: number;
+  citations: number;
+  doi: string;
+  url: string;
+  pdf_url: string;
+  abstract: string;
+  abstract_type?: "official" | "ai_summary";
+  is_oa?: boolean;
+  access_status?: string;
+  has_full_pdf?: boolean;
+  is_abstract_only?: boolean;
+  content: string;
+}
+
+interface UsePaperDetailsProps {
+  activeChatId: string | null;
+  backendUrl: string;
+  externalViewingDoc?: Document | null;
+  groundingHighlight?: CitationGroundingHighlight | null;
+}
+
+export function usePaperDetails({
+  activeChatId,
+  backendUrl,
+  externalViewingDoc,
+  groundingHighlight,
+}: UsePaperDetailsProps) {
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(externalViewingDoc || null);
+  const [paperDetails, setPaperDetails] = useState<PaperDetailData | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<"preview" | "pdf">("preview");
+
+  const paperDetailsCacheRef = useRef<Map<number, PaperDetailData>>(new Map());
+
+  useEffect(() => {
+    setViewingDoc(externalViewingDoc || null);
+  }, [externalViewingDoc]);
+
+  useEffect(() => {
+    if (!viewingDoc || !activeChatId) {
+      setPaperDetails(null);
+      return;
+    }
+
+    if (paperDetailsCacheRef.current.has(viewingDoc.id)) {
+      const cached = paperDetailsCacheRef.current.get(viewingDoc.id)!;
+      if (cached && (cached.id === viewingDoc.id || cached.filename === viewingDoc.filename)) {
+        setPaperDetails(cached);
+        setIsLoadingDetails(false);
+        return;
+      }
+    }
+
+    setPaperDetails(null);
+    setIsLoadingDetails(true);
+    
+    let isMounted = true;
+
+    fetch("{backendUrl}/chats/{activeChatId}/documents/{viewingDoc.id}/content")
+      .then(res => res.json())
+      .then(data => {
+        if (!isMounted) return;
+        if (data && !data.error) {
+          paperDetailsCacheRef.current.set(viewingDoc.id, data);
+          setPaperDetails(data);
+        } else {
+          setPaperDetails(null);
+        }
+      })
+      .catch(err => {
+        if (!isMounted) return;
+        console.error("Failed to load paper details:", err);
+        setPaperDetails(null);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingDetails(false);
+      });
+      
+    return () => {
+      isMounted = false;
+    };
+  }, [viewingDoc?.id, viewingDoc?.filename, activeChatId, backendUrl]);
+
+  useEffect(() => {
+    if (groundingHighlight?.sentence) {
+      setActiveTab("preview");
+    }
+  }, [groundingHighlight?.clickId, groundingHighlight?.sentence]);
+
+  return {
+    viewingDoc,
+    setViewingDoc,
+    paperDetails,
+    isLoadingDetails,
+    activeTab,
+    setActiveTab
+  };
+}

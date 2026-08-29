@@ -1,4 +1,5 @@
-﻿import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
+﻿import { usePaperDetails } from "@/hooks/usePaperDetails";
+import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
 import { generateCitations, CitationFormats } from "@/hooks/useCitationGenerator";
 "use client";
 
@@ -117,16 +118,8 @@ export default function RightSidebar({
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
-  // Detail / Reader View State (Consensus.app style)
-  const [viewingDoc, setViewingDoc] = useState<Document | null>(externalViewingDoc || null);
 
-  useEffect(() => {
-    setViewingDoc(externalViewingDoc || null);
-  }, [externalViewingDoc]);
-  const [paperDetails, setPaperDetails] = useState<PaperDetailData | null>(null);
-  const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"preview" | "pdf">("preview");
-  
+  const { viewingDoc, setViewingDoc, paperDetails, isLoadingDetails, activeTab, setActiveTab } = usePaperDetails({ activeChatId, backendUrl, externalViewingDoc, groundingHighlight });
   // Citation Modal State
   const [isCiteModalOpen, setIsCiteModalOpen] = useState<boolean>(false);
   const [selectedCitationStyle, setSelectedCitationStyle] = useState<"apa" | "ieee" | "harvard" | "mla" | "chicago" | "bibtex" | "ris">("apa");
@@ -161,57 +154,6 @@ export default function RightSidebar({
   }, [isLoadingDetails, activeMatchIndex, groundingHighlight, activeTab, paperDetails?.content]);
 
   // Local memory cache for instant viewer loading without repeated network/parsing overhead
-  const paperDetailsCacheRef = useRef<Map<number, PaperDetailData>>(new Map());
-
-  // Fetch document details when viewingDoc is set
-  useEffect(() => {
-    if (!viewingDoc || !activeChatId) {
-      setPaperDetails(null);
-      return;
-    }
-
-    // Check client-side memory cache for zero-latency instant rendering
-    if (paperDetailsCacheRef.current.has(viewingDoc.id)) {
-      const cached = paperDetailsCacheRef.current.get(viewingDoc.id)!;
-      // Sanity check: ensure cached data matches current viewingDoc
-      if (cached && (cached.id === viewingDoc.id || cached.filename === viewingDoc.filename)) {
-        setPaperDetails(cached);
-        setIsLoadingDetails(false);
-        setIsCiteModalOpen(false);
-        return;
-      }
-    }
-
-    // Clear previous details immediately so stale paper content isn't visible while loading new doc
-    setPaperDetails(null);
-    setIsLoadingDetails(true);
-    setIsCiteModalOpen(false);
-    fetch(`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/content`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && !data.error) {
-          paperDetailsCacheRef.current.set(viewingDoc.id, data);
-          setPaperDetails(data);
-        } else {
-          setPaperDetails(null);
-        }
-      })
-      .catch(err => {
-        console.error("Failed to load paper details:", err);
-        setPaperDetails(null);
-      })
-      .finally(() => {
-        setIsLoadingDetails(false);
-      });
-  }, [viewingDoc?.id, viewingDoc?.filename, activeChatId, backendUrl]);
-
-  // Switch to preview tab when citation grounding highlight is active
-  useEffect(() => {
-    if (groundingHighlight?.sentence) {
-      setActiveTab("preview");
-    }
-  }, [groundingHighlight?.clickId, groundingHighlight?.sentence]);
-
   // Close sort menu on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -283,7 +225,7 @@ export default function RightSidebar({
         onDocumentUpdated?.(updatedDoc);
         if (viewingDoc && viewingDoc.id === renamingDoc.id) {
           setViewingDoc(prev => prev ? { ...prev, title: updatedDoc.title } : null);
-          setPaperDetails(prev => prev ? { ...prev, title: updatedDoc.title } : null);
+          /* handled by usePaperDetails cache or next fetch */
         }
         setIsRenameModalOpen(false);
         setRenamingDoc(null);
@@ -1938,6 +1880,8 @@ export default function RightSidebar({
     </aside>
   );
 }
+
+
 
 
 
