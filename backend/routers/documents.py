@@ -115,7 +115,7 @@ def delete_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
         except Exception as e:
             logger.error(f"[Delete Document Error] Failed to delete file {file_path}: {e}")
     try:
-        rag.delete_qdrant_vectors(chat_id, doc.filename)
+        rag.delete_document_vectors(chat_id, doc.filename)
     except Exception as e:
         logger.error(f"[Delete Vector Error] Failed to delete vectors for {doc.filename}: {e}")
     db.delete(doc)

@@ -49,7 +49,7 @@ from .vector_store import (
     embed_model,
     vector_store,
     qdrant_client,
-    delete_qdrant_vectors,
+    delete_document_vectors,
 )
 
 from .streamer import (

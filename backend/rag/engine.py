@@ -46,7 +46,7 @@ from .prompts import (
     get_workspace_analysis_system_prompt,
     get_agentic_system_prompt
 )
-from .vector_store import embed_model, vector_store, qdrant_client, delete_qdrant_vectors
+from .vector_store import embed_model, vector_store, qdrant_client, delete_document_vectors
 
 load_dotenv()
 
