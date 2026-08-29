@@ -7,7 +7,7 @@ import zipfile
 import asyncio
 import logging
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,7 @@ logger = logging.getLogger("uvicorn.error")
 @router.post("/chats/{chat_id}/upload", response_model=models.DocumentResponse)
 async def upload_document(
     chat_id: str, 
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
 ):
@@ -58,21 +59,15 @@ async def upload_document(
     clean_chat_id = werkzeug.utils.secure_filename(chat_id)
     clean_fname = werkzeug.utils.secure_filename(file.filename)
     file_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
+    
+    # 1. Save physical file to disk
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-        
-    try:
-        # Fast non-blocking async thread pool for heavy document parsing
-        await asyncio.to_thread(rag.ingest_document, file_path, chat_id)
-    except Exception as e:
-        logger.error(f"[Upload Ingest Error]: {e}")
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        raise HTTPException(status_code=500, detail=f"Failed to parse document: {str(e)}")
 
-    # Delegate metadata extraction and enrichment to service layer
-    enriched = await extract_and_enrich_uploaded_file(file_path, file.filename)
+    # 2. Pure local instant metadata extraction
+    enriched = extract_and_enrich_uploaded_file(file_path, file.filename)
 
+    # 3. Save to database immediately
     authors_json = json.dumps(enriched.get("authors", []), ensure_ascii=False) if enriched.get("authors") else None
     db_doc = Document(
         chat_id=chat_id,
@@ -81,7 +76,7 @@ async def upload_document(
         authors=authors_json,
         year=enriched.get("year", ""),
         journal=enriched.get("journal", ""),
-        journal_metric=enriched.get("journal_metric", "Peer-Reviewed"),
+        journal_metric=enriched.get("journal_metric", "Uploaded Document"),
         doi=enriched.get("doi", ""),
         url=enriched.get("url", ""),
         abstract=enriched.get("abstract", ""),
@@ -93,6 +88,9 @@ async def upload_document(
     db.add(db_doc)
     db.commit()
     db.refresh(db_doc)
+
+    # 4. Schedule vector store indexing in background
+    background_tasks.add_task(rag.ingest_document, file_path, chat_id)
     
     total_docs_count = db.query(Document).filter(Document.chat_id == chat_id).count()
     return models.DocumentResponse(

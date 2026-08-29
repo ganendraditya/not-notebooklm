@@ -1296,11 +1296,20 @@ export default function RightSidebar({
     }
   };
 
+  const [docToDelete, setDocToDelete] = useState<number | null>(null);
+
   const handleConfirmBulkDelete = async () => {
-    if (!activeChatId || selectedCount === 0 || isBulkDeleting) return;
+    if (!activeChatId || isBulkDeleting) return;
     setIsBulkDeleting(true);
     try {
-      const docIds = selectedDocList.map(d => d.id);
+      // If docToDelete is set, it means we clicked delete from 3-dots on a specific doc
+      const docIds = docToDelete !== null ? [docToDelete] : selectedDocList.map(d => d.id);
+      
+      if (docIds.length === 0) {
+        setIsBulkDeleting(false);
+        return;
+      }
+      
       const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk_delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1313,6 +1322,7 @@ export default function RightSidebar({
           docIds.forEach(id => onDocumentDeleted(id));
         }
         setShowBulkDeleteConfirm(false);
+        setDocToDelete(null); // Reset after success
         if (viewingDoc && docIds.includes(viewingDoc.id)) {
           setViewingDoc(null);
         }
@@ -1888,10 +1898,13 @@ export default function RightSidebar({
   // ==========================================
   return (
     <aside className="w-full lg:w-80 h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 select-none z-10 transition-all relative text-app-text">
-      {/* Top Header Bar with Close/Hide Button */}
-      <div className="px-4 py-3 flex items-center justify-between border-b border-app-divider">
+      {/* 1. Header Bar: Top Fixed Header */}
+      <div className="px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm text-app-text tracking-tight">{t('ui.sources') || "Sources"}</span>
+          <span className="px-1.5 py-0.5 rounded-full text-[10.5px] font-mono font-medium bg-app-item-hover text-app-text-muted">
+            {documents.length}
+          </span>
         </div>
         <button 
           onClick={onClose}
@@ -1918,8 +1931,9 @@ export default function RightSidebar({
         }}
       />
 
-      <div className="p-3.5 space-y-2.5 flex-1 flex flex-col overflow-y-auto custom-scrollbar min-h-0">
-        {/* 2. Prominent '+ Add sources' Button (NotebookLM Style) */}
+      {/* 2 & 3. Fixed Controls Area (Add Sources + Toolbar) */}
+      <div className="p-3.5 pb-2.5 space-y-2.5 shrink-0 bg-app-sidebar z-10 border-b border-app-divider shadow-sm">
+        {/* Prominent '+ Add sources' Button (NotebookLM Style) */}
         <div className="w-full">
           <Button
             variant="outline"
@@ -1939,8 +1953,7 @@ export default function RightSidebar({
           </div>
         )}
 
-        {/* 3. Controls Row: Sort (3 descending bars), Contextual Actions (Clean Dupes, Rename, Download, Delete), and Select All */}
-        {/* 3. Action Toolbar (Always-rendered icons with dynamic disabled states) */}
+        {/* Action Toolbar (Always-rendered icons with dynamic disabled states) */}
         <div className="w-full flex items-center justify-between pt-1 px-0 text-xs text-app-text-muted relative">
           <div className="flex items-center gap-1">
             {/* Sort Button & Dropdown (Disabled if <= 1 document) */}
@@ -2089,7 +2102,10 @@ export default function RightSidebar({
 
               {/* Delete Button */}
               <button
-                onClick={() => setShowBulkDeleteConfirm(true)}
+                onClick={() => {
+                  setDocToDelete(null); // Ensure bulk delete mode uses selected checkboxes
+                  setShowBulkDeleteConfirm(true);
+                }}
                 disabled={selectedCount === 0 || isBulkDeleting}
                 className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
                   selectedCount > 0
@@ -2129,7 +2145,10 @@ export default function RightSidebar({
             </button>
           </div>
         </div>
+      </div>
 
+      {/* 4. Scrollable Document List Area ONLY */}
+      <div className="px-3.5 pb-3.5 flex-1 flex flex-col overflow-y-auto custom-scrollbar min-h-0 relative">
         {/* 4. Saved Documents / Sources List (Compact height per item, flush left & right align) */}
         <div className="w-full flex-1 space-y-0.5 pt-0.5">
           {sortedDocuments.length === 0 && pendingSources.length === 0 ? (
@@ -2267,7 +2286,7 @@ export default function RightSidebar({
                             onClick={(e) => {
                               e.stopPropagation();
                               setActiveMenuId(null);
-                              setSelectedDocs({[doc.id]: true});
+                              setDocToDelete(doc.id);
                               setShowBulkDeleteConfirm(true);
                             }}
                             className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors flex items-center gap-2"
@@ -2487,9 +2506,12 @@ export default function RightSidebar({
       {/* Centered Modal for Bulk Delete Confirmation */}
       <BulkDeleteModal
         isOpen={showBulkDeleteConfirm}
-        selectedCount={selectedCount}
+        selectedCount={docToDelete !== null ? 1 : selectedCount}
         isBulkDeleting={isBulkDeleting}
-        onClose={() => setShowBulkDeleteConfirm(false)}
+        onClose={() => {
+          setShowBulkDeleteConfirm(false);
+          setDocToDelete(null);
+        }}
         onConfirm={handleConfirmBulkDelete}
       />
 

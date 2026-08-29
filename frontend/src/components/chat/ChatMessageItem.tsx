@@ -157,9 +157,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       }
       if (!currentChatId) return;
 
-      // Client-side granular batch ingestion (Chunked by 4 items)
-      // Guarantees real-time progress update (1/44 -> 4/44 -> 8/44) and instant sidebar append
-      const CHUNK_SIZE = 4;
+      // Client-side sequential 1-by-1 ingestion
+      // Guarantees real-time progress update (1/10 -> 2/10 -> 3/10) and instant sidebar append per finished paper
+      const CHUNK_SIZE = 1;
       let totalSuccessfullyAdded = 0;
 
       for (let i = 0; i < toImport.length; i += CHUNK_SIZE) {

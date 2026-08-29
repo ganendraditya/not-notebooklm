@@ -38,22 +38,35 @@ def calculate_doc_quality(chat_id: str, d: Document) -> Tuple[int, bool, int]:
         
     return (score, has_full_pdf, d.id)
 
-async def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dict[str, Any]:
-    """Extracts raw headers, resolves metadata from registries, and audits content for uploads."""
+def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dict[str, Any]:
+    """Purely local and instant metadata extraction using the exact filename as title."""
     clean_fn_title = re.sub(r'<[^>]+>', '', os.path.splitext(filename)[0]).replace("_", " ").strip()
-    if clean_fn_title.isupper() and len(clean_fn_title) > 8:
-        clean_fn_title = clean_fn_title.title()
         
     extracted_doi = ""
     raw_header = ""
+    
+    # Check PDF magic bytes locally
+    is_valid_pdf = False
+    if os.path.exists(file_path):
+        sz = os.path.getsize(file_path)
+        if filename.lower().endswith(".pdf") and sz >= 100:
+            try:
+                with open(file_path, "rb") as f:
+                    first_bytes = f.read(2048)
+                    is_valid_pdf = is_authentic_pdf_bytes(first_bytes, min_size=100)
+            except Exception as e:
+                logger.error(f"[Upload PDF Validation Error] Failed to read {file_path}: {e}")
+                is_valid_pdf = False
+
+    # Extract basic text header to find DOI if present
     try:
-        if filename.lower().endswith(".pdf"):
+        if filename.lower().endswith(".pdf") and is_valid_pdf:
             import pymupdf
             pdoc = pymupdf.open(file_path)
             if len(pdoc) > 0:
                 raw_header = pdoc[0].get_text()[:3000]
             pdoc.close()
-        else:
+        elif not filename.lower().endswith(".pdf"):
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 raw_header = f.read(3000)
     except Exception:
@@ -65,72 +78,14 @@ async def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dic
             extracted_doi = doi_m.group(0).strip().rstrip(".")
             extracted_doi = re.sub(r'[;.,:)\s]+$', '', extracted_doi).strip()
 
-    is_valid_pdf = False
-    if os.path.exists(file_path) and os.path.getsize(file_path) >= 35000:
-        try:
-            with open(file_path, "rb") as f:
-                first_bytes = f.read(2048)
-                is_valid_pdf = is_authentic_pdf_bytes(first_bytes, min_size=512)
-        except Exception as e:
-            logger.error(f"[Upload PDF Validation Error] Failed to read {file_path}: {e}")
-            is_valid_pdf = False
-
-    state = {
+    return {
         "title": clean_fn_title,
         "authors": [],
         "year": "",
         "journal": "",
-        "journal_metric": "Peer-Reviewed",
+        "journal_metric": "Uploaded Document",
         "abstract": "",
-        "url": "",
+        "url": f"https://doi.org/{extracted_doi}" if extracted_doi else "",
         "doi": extracted_doi,
         "is_valid_pdf": is_valid_pdf
     }
-
-    # 1. Fetch from Academic API
-    if state["doi"] or state["title"]:
-        try:
-            meta = await asyncio.to_thread(
-                rag.resolve_paper_metadata_by_doi,
-                doi=state["doi"],
-                title_fallback=state["title"],
-                fast_only=False
-            )
-            if meta:
-                if meta.get("title") and len(meta["title"]) > 5: state["title"] = meta["title"].strip()
-                if meta.get("authors"): state["authors"] = meta["authors"]
-                if meta.get("year"): state["year"] = str(meta["year"])
-                if meta.get("journal") or meta.get("venue"): state["journal"] = meta.get("journal") or meta.get("venue")
-                if meta.get("journal_metric"): state["journal_metric"] = meta["journal_metric"]
-                if meta.get("abstract"): state["abstract"] = meta["abstract"]
-                if meta.get("doi"): state["doi"] = meta["doi"]
-                if meta.get("url"): state["url"] = meta["url"]
-                elif state["doi"]: state["url"] = f"https://doi.org/{state['doi']}"
-        except Exception as e:
-            logger.error(f"[Upload Metadata Resolution Error]: {e}")
-
-    # 2. Fallback to AI Audit if missing critical info
-    if raw_header and (not state["abstract"] or state["title"] == clean_fn_title):
-        try:
-            ai_audit = await asyncio.to_thread(
-                rag.audit_paper_metadata_with_ai,
-                paper_title=state["title"],
-                raw_authors=state["authors"],
-                raw_journal=state["journal"],
-                raw_year=state["year"],
-                raw_doi=state["doi"],
-                raw_citations=0,
-                raw_abstract_or_html=raw_header[:3500],
-                is_oa=is_valid_pdf
-            )
-            if ai_audit:
-                if ai_audit.get("abstract") and len(ai_audit["abstract"]) > 40: state["abstract"] = ai_audit["abstract"]
-                if ai_audit.get("title") and len(ai_audit["title"]) > 5: state["title"] = ai_audit["title"]
-                if ai_audit.get("authors"): state["authors"] = ai_audit["authors"]
-                if ai_audit.get("year"): state["year"] = ai_audit["year"]
-                if ai_audit.get("journal"): state["journal"] = ai_audit["journal"]
-                if ai_audit.get("journal_metric"): state["journal_metric"] = ai_audit["journal_metric"]
-        except Exception as upload_audit_err:
-            logger.error(f"[Upload AI Audit Warning]: {upload_audit_err}")
-
-    return state

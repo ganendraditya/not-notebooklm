@@ -32,7 +32,7 @@ def is_binary_pdf(file_path: str) -> bool:
     except Exception:
         return False
 
-def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: int = 12) -> Optional[bytes]:
+def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 3.0) -> Optional[bytes]:
     """
     Attempts to download an authentic Open Access PDF from publisher or repository.
     Includes browser headers, redirect handling, SSL fallback, and %PDF- verification.
@@ -41,25 +41,21 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: int = 12) -> Optional[b
         return None
         
     import os
-    user_agent = os.getenv("SCRAPER_USER_AGENT", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
+    user_agent = os.getenv("SCRAPER_USER_AGENT", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
     
     headers = {
         "User-Agent": user_agent,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,application/octet-stream,*/*;q=0.8",
         "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Sec-Ch-Ua": '"Chromium";v="123", "Not:A-Brand";v="8"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
         "Upgrade-Insecure-Requests": "1"
     }
     
-    # 1. Direct request with SSL verification
+    # 1. Single fast request with verify=False fallback built-in
     try:
-        resp = requests.get(pdf_url, headers=headers, timeout=timeout_sec, allow_redirects=True)
+        resp = requests.get(pdf_url, headers=headers, timeout=timeout_sec, allow_redirects=True, verify=False)
         if resp.status_code == 200:
             data = resp.content
             if is_authentic_pdf_bytes(data):
@@ -73,23 +69,10 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: int = 12) -> Optional[b
     except Exception:
         pass
 
-    # 2. Fallback request without SSL verification (many institutional / OJS repositories have self-signed certs)
-    try:
-        if any(domain in pdf_url.lower() for domain in [".edu", ".ac.", "ojs.", "repository."]):
-            resp = requests.get(pdf_url, headers=headers, timeout=timeout_sec, allow_redirects=True, verify=False)
-            if resp.status_code == 200:
-                data = resp.content
-                if is_authentic_pdf_bytes(data):
-                    return data
-                if b"<html" in data[:500].lower():
-                    html_text = data[:5000].decode("utf-8", errors="ignore")
-                    meta_pdf = re.search(r'<meta\s+[^>]*?name=["\'](?:citation_pdf_url|eprints\.document_url)["\'][^>]*?content=["\'](.*?)["\']', html_text, re.I)
-                    if meta_pdf and meta_pdf.group(1).startswith("http") and meta_pdf.group(1) != pdf_url:
-                        return try_fetch_open_access_pdf(meta_pdf.group(1), timeout_sec=timeout_sec)
-    except Exception:
-        pass
-
     return None
+
+import concurrent.futures
+import threading
 
 def resolve_and_fetch_authentic_pdf(
     doi: str = "",
@@ -98,219 +81,188 @@ def resolve_and_fetch_authentic_pdf(
     candidate_pdf_url: str = ""
 ) -> Optional[bytes]:
     """
-    Multi-source resolver for authentic academic full-text PDFs:
-    1. Candidate PDF URL
-    2. arXiv PDF direct resolution
-    3. Unpaywall API (Gold Standard Open Access PDF Discovery)
-    4. Europe PMC Full Text REST API
-    5. OpenAlex API Works location
-    6. Semantic Scholar OpenAccessPdf
-    7. Crossref Title Resolution (if DOI was missing/truncated)
-    8. Publisher landing page HTML meta tags (<meta name="citation_pdf_url">)
+    Universal High-Speed Parallel Racing Resolver for Authentic Academic Full-Text PDFs.
+    Fires all discovery channels concurrently and returns the FIRST authentic binary PDF bytes
+    immediately, terminating/ignoring slower trailing requests.
     """
     clean_doi = doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip() if doi else ""
     
-    # 1. Candidate URL
-    if candidate_pdf_url:
-        pdf_bytes = try_fetch_open_access_pdf(candidate_pdf_url, timeout_sec=10)
+    # 0. Fast-path: Check candidate_pdf_url directly if provided (under 3.0s)
+    if candidate_pdf_url and candidate_pdf_url.startswith("http"):
+        # Auto-convert OJS view links to download links
+        fast_url = candidate_pdf_url
+        if "/article/view/" in fast_url:
+            fast_url = re.sub(r'/article/view/(\d+)(?:/(\d+))?', r'/article/download/\1/\2', fast_url).rstrip('/')
+        pdf_bytes = try_fetch_open_access_pdf(fast_url, timeout_sec=4)
         if pdf_bytes:
             return pdf_bytes
 
-    # 2. arXiv Direct Resolution
-    arxiv_id = None
-    all_text = f"{clean_doi} {title} {direct_url} {candidate_pdf_url}".lower()
-    arxiv_match = re.search(r'(?:arxiv[:\s/]|abs/|pdf/)(\d{4}\.\d{4,5}(?:v\d+)?)', all_text)
-    if arxiv_match:
-        arxiv_id = arxiv_match.group(1)
-    elif "arxiv." in clean_doi:
-        m = re.search(r'(\d{4}\.\d{4,5})', clean_doi)
+    # Shared stopping event and result container for parallel racing
+    stop_event = threading.Event()
+    winning_result: List[bytes] = []
+    lock = threading.Lock()
+
+    def set_winner(data: bytes):
+        if not data or not is_authentic_pdf_bytes(data):
+            return
+        with lock:
+            if not winning_result:
+                winning_result.append(data)
+                stop_event.set()
+
+    # --- Worker 1: arXiv Direct Formula ---
+    def worker_arxiv():
+        if stop_event.is_set(): return
+        arxiv_id = None
+        all_text = f"{clean_doi} {title} {direct_url} {candidate_pdf_url}".lower()
+        m = re.search(r'(?:arxiv[:\s/]|abs/|pdf/)(\d{4}\.\d{4,5}(?:v\d+)?)', all_text)
         if m: arxiv_id = m.group(1)
-        
-    if arxiv_id:
-        arxiv_pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
-        pdf_bytes = try_fetch_open_access_pdf(arxiv_pdf_url, timeout_sec=12)
-        if pdf_bytes:
-            return pdf_bytes
+        elif "arxiv." in clean_doi:
+            m2 = re.search(r'(\d{4}\.\d{4,5})', clean_doi)
+            if m2: arxiv_id = m2.group(1)
+        if arxiv_id:
+            data = try_fetch_open_access_pdf(f"https://arxiv.org/pdf/{arxiv_id}.pdf", timeout_sec=4)
+            if data: set_winner(data)
 
-    # 3. Crossref Title Lookup (if DOI is missing or looks incomplete)
-    if (not clean_doi or len(clean_doi) < 7) and title and len(title) > 8:
-        try:
-            cr_url = f"https://api.crossref.org/works?query.title={urllib.parse.quote(title.strip())}&rows=1"
-            cr_resp = requests.get(cr_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=4)
-            if cr_resp.status_code == 200:
-                items = cr_resp.json().get("message", {}).get("items", [])
-                if items:
-                    resolved_doi = items[0].get("DOI", "")
-                    if resolved_doi:
-                        clean_doi = resolved_doi.lower().strip()
-        except Exception:
-            pass
-
-    # 4. Unpaywall API (Gold Standard Open Access PDF Discovery)
-    if clean_doi:
+    # --- Worker 2: Unpaywall API ---
+    def worker_unpaywall():
+        if stop_event.is_set() or not clean_doi: return
         try:
             upw_url = f"https://api.unpaywall.org/v2/{urllib.parse.quote(clean_doi)}?email=research@notbooklm.app"
-            upw_resp = requests.get(upw_url, timeout=5)
-            if upw_resp.status_code == 200:
-                upw_data = upw_resp.json()
-                upw_title = upw_data.get("title") or ""
-                # Prevent downloading unpaywall PDF if title mismatches target paper
-                if title and upw_title and not (title.lower() in upw_title.lower() or upw_title.lower() in title.lower()):
-                    import difflib
-                    ratio = difflib.SequenceMatcher(None, title.lower(), upw_title.lower()).ratio()
-                    if ratio < 0.6:
-                        upw_data = {}
+            resp = requests.get(upw_url, timeout=3.5)
+            if resp.status_code == 200 and not stop_event.is_set():
+                upw_data = resp.json()
                 best_oa = upw_data.get("best_oa_location") or {}
                 oa_pdf_url = best_oa.get("url_for_pdf") or best_oa.get("url")
                 if oa_pdf_url:
-                    pdf_bytes = try_fetch_open_access_pdf(oa_pdf_url, timeout_sec=10)
-                    if pdf_bytes:
-                        return pdf_bytes
-                # Check other OA locations
-                for loc in upw_data.get("oa_locations", []):
-                    loc_pdf = loc.get("url_for_pdf") or loc.get("url")
-                    if loc_pdf and loc_pdf != oa_pdf_url:
-                        pdf_bytes = try_fetch_open_access_pdf(loc_pdf, timeout_sec=8)
-                        if pdf_bytes:
-                            return pdf_bytes
+                    data = try_fetch_open_access_pdf(oa_pdf_url, timeout_sec=4)
+                    if data: set_winner(data)
         except Exception:
             pass
 
-    # 5. Europe PMC Full Text REST API
-    if clean_doi or title:
+    # --- Worker 3: OpenAlex Global Registry API ---
+    def worker_openalex():
+        if stop_event.is_set() or not clean_doi: return
+        try:
+            oa_url = f"https://api.openalex.org/works/https://doi.org/{clean_doi}"
+            resp = requests.get(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=3.5)
+            if resp.status_code == 200 and not stop_event.is_set():
+                wdata = resp.json()
+                best_loc = wdata.get("best_oa_location") or wdata.get("primary_location") or {}
+                p_url = best_loc.get("pdf_url") or best_loc.get("landing_page_url")
+                if p_url:
+                    data = try_fetch_open_access_pdf(p_url, timeout_sec=4)
+                    if data: set_winner(data)
+        except Exception:
+            pass
+
+    # --- Worker 4: Europe PMC REST API ---
+    def worker_europe_pmc():
+        if stop_event.is_set() or (not clean_doi and not title): return
         try:
             q = f"DOI:{urllib.parse.quote(clean_doi)}" if clean_doi else f'TITLE:"{urllib.parse.quote(title)}"'
             epmc_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={q}&format=json&resultType=core&pageSize=1"
-            epmc_resp = requests.get(epmc_url, timeout=5)
-            if epmc_resp.status_code == 200:
-                epmc_data = epmc_resp.json()
+            resp = requests.get(epmc_url, timeout=3.5)
+            if resp.status_code == 200 and not stop_event.is_set():
+                epmc_data = resp.json()
                 results = epmc_data.get("resultList", {}).get("result", [])
                 if results:
                     ft_urls = results[0].get("fullTextUrlList", {}).get("fullTextUrl", [])
                     for ft in ft_urls:
                         if ft.get("documentStyle") == "pdf" and ft.get("url"):
-                            pdf_bytes = try_fetch_open_access_pdf(ft.get("url"), timeout_sec=10)
-                            if pdf_bytes:
-                                return pdf_bytes
+                            data = try_fetch_open_access_pdf(ft.get("url"), timeout_sec=4)
+                            if data:
+                                set_winner(data)
+                                break
         except Exception:
             pass
 
-    # 6. OpenAlex API Works location
-    if clean_doi:
-        try:
-            oa_api_url = f"https://api.openalex.org/works/https://doi.org/{clean_doi}"
-            oa_resp = requests.get(oa_api_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=5)
-            if oa_resp.status_code == 200:
-                work_data = oa_resp.json()
-                oa_work_title = work_data.get("title") or ""
-                if title and oa_work_title and not (title.lower() in oa_work_title.lower() or oa_work_title.lower() in title.lower()):
-                    import difflib
-                    ratio = difflib.SequenceMatcher(None, title.lower(), oa_work_title.lower()).ratio()
-                    if ratio < 0.6:
-                        work_data = {}
-                best_oa = work_data.get("best_oa_location") or {}
-                prim_oa = work_data.get("primary_location") or {}
-                for target_loc in [best_oa, prim_oa]:
-                    p_url = target_loc.get("pdf_url") or target_loc.get("landing_page_url")
-                    if p_url:
-                        pdf_bytes = try_fetch_open_access_pdf(p_url, timeout_sec=10)
-                        if pdf_bytes:
-                            return pdf_bytes
-        except Exception:
-            pass
-
-    # 7. Semantic Scholar Graph API
-    if clean_doi:
+    # --- Worker 5: Semantic Scholar Graph API ---
+    def worker_semantic_scholar():
+        if stop_event.is_set() or not clean_doi: return
         try:
             s2_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean_doi}?fields=openAccessPdf"
-            s2_resp = requests.get(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=4)
-            if s2_resp.status_code == 200:
-                s2_data = s2_resp.json()
-                oa_pdf = s2_data.get("openAccessPdf", {}).get("url")
+            resp = requests.get(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=3.5)
+            if resp.status_code == 200 and not stop_event.is_set():
+                oa_pdf = resp.json().get("openAccessPdf", {}).get("url")
                 if oa_pdf:
-                    pdf_bytes = try_fetch_open_access_pdf(oa_pdf, timeout_sec=8)
-                    if pdf_bytes:
-                        return pdf_bytes
+                    data = try_fetch_open_access_pdf(oa_pdf, timeout_sec=4)
+                    if data: set_winner(data)
         except Exception:
             pass
 
-    # 8. Landing Page HTML Meta & OJS / Garuda / SINTA Scraper
-    landing_target = direct_url or (f"https://doi.org/{clean_doi}" if clean_doi else "")
-    if landing_target and landing_target.startswith("http"):
+    # --- Worker 6: Universal Landing Page HTML & OJS / Publisher Inspector ---
+    def worker_landing_page_scraper():
+        if stop_event.is_set(): return
+        landing_target = direct_url or (f"https://doi.org/{clean_doi}" if clean_doi else "")
+        if not landing_target or not landing_target.startswith("http"):
+            return
         try:
-            scrape_resp = requests.get(landing_target, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            resp = requests.get(landing_target, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-            }, timeout=8, allow_redirects=True, verify=False)
-            if scrape_resp.status_code == 200:
-                html = scrape_resp.text
-                final_landing_url = scrape_resp.url
-                
-                # A. Standard Citation PDF Meta Tags
+            }, timeout=4.0, allow_redirects=True, verify=False)
+            if resp.status_code == 200 and not stop_event.is_set():
+                html = resp.text
+                final_url = resp.url
+
+                # A. Universal Citation Meta Tag (<meta name="citation_pdf_url">)
                 meta_matches = re.findall(r'<meta\s+[^>]*?name=["\'](?:citation_pdf_url|eprints\.document_url|DC\.Identifier\.URI)["\'][^>]*?content=["\'](.*?)["\']', html, re.I)
                 for m_pdf in meta_matches:
                     m_pdf = m_pdf.strip()
                     if m_pdf.startswith("http"):
-                        pdf_bytes = try_fetch_open_access_pdf(m_pdf, timeout_sec=10)
-                        if pdf_bytes:
-                            return pdf_bytes
-                
-                # B. OJS 2 & OJS 3 Galley / Download Links (Universal Indonesian Sinta & Garuda support)
+                        data = try_fetch_open_access_pdf(m_pdf, timeout_sec=4)
+                        if data:
+                            set_winner(data)
+                            return
+
+                # B. Universal OJS / Galley / Download Link patterns
                 candidate_urls = []
-                # Direct download link
+                seen_cand = set()
                 for m in re.findall(r'href=["\']([^"\']+/article/download/[^"\']+)["\']', html, re.I):
-                    candidate_urls.append(urllib.parse.urljoin(final_landing_url, m))
-                # OJS 3 Galley viewer link (/article/view/{article_id}/{galley_id}) -> convert to /article/download/
+                    u = urllib.parse.urljoin(final_url, m)
+                    if u not in seen_cand:
+                        seen_cand.add(u)
+                        candidate_urls.append(u)
                 for m in re.findall(r'href=["\']([^"\']+/article/view/(\d+)/(\d+)[^"\']*)["\']', html, re.I):
-                    full_view = urllib.parse.urljoin(final_landing_url, m[0])
-                    cand_dl = re.sub(r'/article/view/(\d+)/(\d+)', r'/article/download/\1/\2', full_view)
-                    candidate_urls.append(cand_dl)
-                    candidate_urls.append(full_view)
-                # Any link containing 'pdf' in href or anchor
+                    cand_dl = re.sub(r'/article/view/(\d+)/(\d+)', r'/article/download/\1/\2', urllib.parse.urljoin(final_url, m[0]))
+                    if cand_dl not in seen_cand:
+                        seen_cand.add(cand_dl)
+                        candidate_urls.append(cand_dl)
                 for m in re.findall(r'href=["\']([^"\']+\.pdf(?:\?[^"\']*)?)["\']', html, re.I):
-                    candidate_urls.append(urllib.parse.urljoin(final_landing_url, m))
+                    u = urllib.parse.urljoin(final_url, m)
+                    if u not in seen_cand:
+                        seen_cand.add(u)
+                        candidate_urls.append(u)
 
-                for cand in candidate_urls:
-                    pdf_bytes = try_fetch_open_access_pdf(cand, timeout_sec=10)
-                    if pdf_bytes:
-                        return pdf_bytes
-                    # If HTML viewer page, inspect for inner download link
-                    try:
-                        sub_resp = requests.get(cand, headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                        }, timeout=6, verify=False)
-                        if sub_resp.status_code == 200 and "text/html" in sub_resp.headers.get("content-type", "").lower():
-                            sub_dl_matches = re.findall(r'href=["\']([^"\']+(?:/article/download/|\.pdf)[^"\']*)["\']', sub_resp.text, re.I)
-                            for sub_url in sub_dl_matches:
-                                full_sub = urllib.parse.urljoin(sub_resp.url, sub_url)
-                                sub_pdf = try_fetch_open_access_pdf(full_sub, timeout_sec=10)
-                                if sub_pdf:
-                                    return sub_pdf
-                    except Exception:
-                        pass
+                for cand in candidate_urls[:2]:
+                    if stop_event.is_set(): return
+                    data = try_fetch_open_access_pdf(cand, timeout_sec=2.5)
+                    if data:
+                        set_winner(data)
+                        return
         except Exception:
             pass
 
-    # 9. Garuda Kemdiktisaintek Fallback (for Indonesian journals blocked by Cloudflare/WAF)
-    if clean_doi and not title:
-        title = clean_doi  # use DOI as fallback search query
-    if title:
-        try:
-            garuda_search = f"https://garuda.kemdiktisaintek.go.id/documents?q={urllib.parse.quote(title)}"
-            g_resp = requests.get(garuda_search, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            }, timeout=8)
-            if g_resp.status_code == 200:
-                # Look for "Download Original" links pointing to /article/download/
-                garuda_dl_matches = re.findall(
-                    r'href=["\']([^"\']+/article/download/[^"\']+)["\']', g_resp.text, re.I
-                )
-                for gurl in garuda_dl_matches[:3]:
-                    pdf_bytes = try_fetch_open_access_pdf(gurl.strip(), timeout_sec=10)
-                    if pdf_bytes:
-                        return pdf_bytes
-        except Exception:
-            pass
+    # Execute all workers concurrently in a ThreadPool
+    workers = [
+        worker_arxiv,
+        worker_landing_page_scraper,
+        worker_unpaywall,
+        worker_openalex,
+        worker_europe_pmc,
+        worker_semantic_scholar
+    ]
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(workers)) as executor:
+        futures = [executor.submit(w) for w in workers]
+        # Wait until stop_event is set by the first winner OR timeout reached (max 4.5s)
+        stop_event.wait(timeout=3.5)
+        # Note: trailing futures are left to terminate as daemon/safe calls
+
+    with lock:
+        if winning_result:
+            return winning_result[0]
 
     return None
 

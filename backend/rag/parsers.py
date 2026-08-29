@@ -370,7 +370,18 @@ def parse_document_to_markdown(file_path: str) -> str:
     filename = os.path.basename(file_path)
     
     if ext == ".pdf":
-        md_text = pymupdf4llm.to_markdown(file_path)
+        try:
+            md_text = pymupdf4llm.to_markdown(file_path)
+        except Exception:
+            # Fallback to plain PyMuPDF text extraction if pymupdf4llm layout parser fails
+            try:
+                import pymupdf
+                doc = pymupdf.open(file_path)
+                pages_text = [page.get_text() for page in doc]
+                doc.close()
+                md_text = "\n\n".join(pages_text)
+            except Exception as e:
+                md_text = ""
     elif ext in (".docx", ".doc"):
         md_text = parse_docx_file(file_path)
     elif ext in (".bib", ".bibtex"):
