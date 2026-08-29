@@ -30,6 +30,7 @@ from .search import (
     search_academic_papers,
     plan_academic_search,
     search_academic_papers_planned,
+    judge_and_filter_papers_with_llm,
     get_existing_notebook_sources_signatures,
 )
 from .intent import (
@@ -675,12 +676,23 @@ async def query_chat(
             await report_status("Planning academic query parameters & search terms...")
             plan = await plan_academic_search(query, formatted_history, target_llm)
             
-            await report_status(f"Searching verified academic repositories for {plan.get('target_count', 15)} papers...")
+            target_count = plan.get('target_count', 15)
+            # Request 2x candidate pool so AI Judge has plenty of candidates to audit & filter
+            search_plan = dict(plan)
+            search_plan['target_count'] = max(target_count * 2, 20)
+
+            await report_status(f"Searching verified academic repositories for candidate papers...")
             existing_sigs = get_existing_notebook_sources_signatures(chat_id)
-            papers = await asyncio.to_thread(search_academic_papers_planned, plan, existing_sigs)
+            raw_papers = await asyncio.to_thread(search_academic_papers_planned, search_plan, existing_sigs)
             
-            if not papers:
+            if not raw_papers:
                 return f"Maaf, tidak ditemukan paper ilmiah yang cocok dengan kriteria pencarian untuk topik: '{query}'."
+
+            # AI Relevance Judge: Evaluate paper summaries, audit domain relevance, and discard any irrelevant papers
+            await report_status("AI Auditor evaluating paper relevance & filtering noise...")
+            papers = await judge_and_filter_papers_with_llm(query, raw_papers, target_count, target_llm)
+            if not papers:
+                papers = raw_papers[:target_count]
 
             await report_status("Synthesizing research landscape and structuring sources...")
             

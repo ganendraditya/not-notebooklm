@@ -898,6 +898,69 @@ def search_academic_papers_planned(
 
     return results[:limit]
 
+async def judge_and_filter_papers_with_llm(
+    query: str,
+    candidates: List[dict],
+    target_count: int,
+    llm: Optional[LLM] = None
+) -> List[dict]:
+    """
+    Stage 3.5: AI Judge & Relevance Auditor (Vector / LLM-grade evaluation)
+    Inspects candidate papers retrieved from registries, evaluates their real domain relevance against user query,
+    and strictly discards irrelevant or tangentially related papers.
+    """
+    if not candidates:
+        return []
+    
+    if llm is None:
+        return candidates[:target_count]
+
+    try:
+        # Prepare concise evaluation list for the LLM Judge
+        eval_items = []
+        for idx, c in enumerate(candidates):
+            title = c.get("title", "").strip()
+            snippet = c.get("snippet", "").strip()[:400]
+            eval_items.append(f"[{idx}] Title: {title}\nSummary: {snippet}")
+
+        eval_context = "\n\n".join(eval_items)
+
+        judge_prompt = (
+            "You are an expert Academic Relevance Auditor & Scientific Literature Judge.\n"
+            "Your objective: Strictly evaluate whether each retrieved research paper directly and substantially matches the user's core research topic.\n\n"
+            f"User Research Query:\n\"{query}\"\n\n"
+            f"Candidate Papers to Audit:\n{eval_context}\n\n"
+            "EVALUATION CRITERIA:\n"
+            "1. STRICT DOMAIN RELEVANCE: Keep ONLY papers that directly investigate the requested topic.\n"
+            "   - Example: If the user asked for 'road damage detection with AI', ACCEPT papers detecting asphalt cracks, potholes, pavement distress, rutting on roads. REJECT papers about wall/building cracks, train/railway tracking, trash collection, or vehicle counting/toll gates.\n"
+            "   - Example: If the user asked for 'rainfall prediction', ACCEPT precipitation/rainfall forecasting. REJECT wildfire, purely general floods without rainfall models, or disease/COVID.\n"
+            "2. Rank the relevant papers by highest relevance and quality.\n"
+            f"3. Select UP TO {target_count} best matching paper indices.\n\n"
+            "OUTPUT FORMAT:\n"
+            "Return ONLY a JSON list of integer indices of accepted papers, in order of relevance.\n"
+            "Example format: [0, 3, 4, 7]"
+        )
+
+        resp = await llm.acomplete(judge_prompt)
+        raw_out = resp.text.strip()
+        raw_out = re.sub(r'^```(?:json)?\s*', '', raw_out, flags=re.I)
+        raw_out = re.sub(r'\s*```$', '', raw_out)
+
+        valid_indices = json.loads(raw_out)
+        if isinstance(valid_indices, list):
+            filtered_papers = []
+            for idx in valid_indices:
+                if isinstance(idx, int) and 0 <= idx < len(candidates):
+                    filtered_papers.append(candidates[idx])
+            
+            if filtered_papers:
+                print(f"[AI Judge Auditor] Filtered {len(candidates)} candidates down to {len(filtered_papers)} highly relevant papers.")
+                return filtered_papers[:target_count]
+    except Exception as e:
+        print(f"[AI Judge Auditor Warning]: {e} -> fallback to candidates")
+
+    return candidates[:target_count]
+
 def clean_academic_abstract(text: str) -> str:
     """Cleans HTML tags, JATS XML tags, HTML entities, and formatting artifacts from academic abstracts."""
     if not text:
