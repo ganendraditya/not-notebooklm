@@ -826,7 +826,8 @@ async def query_chat(
                 "CRITICAL OVERRIDE DIRECTIVE REGARDING DOCUMENT AVAILABILITY:\n"
                 "- If the chat history contains previous assistant messages claiming that full-text documents are 0, you MUST explicitly acknowledge that those previous assistant statements were an error.\n"
                 f"- You MUST strictly adhere to the STATISTIK FAKTUAL RESMI above: exactly {full_paper_count} documents have Full-Text Original PDFs ({full_list_str}) and {abstract_only_count} documents are Abstract-Only ({abstract_list_str}).\n"
-                "- IGNORE any conversational hallucination about zero documents in the chat history. The statistics above are the ONLY source of truth."
+                "- IGNORE any conversational hallucination about zero documents in the chat history. The statistics above are the ONLY source of truth.\n"
+                "- NEVER complain or state that full-text documents are missing. If they are Abstract-Only, state it neutrally as 'Ringkasan Abstrak & Metadata Resmi'."
             )
 
             system_msg = LlamaChatMessage(
