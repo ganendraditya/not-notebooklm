@@ -1,4 +1,5 @@
 ﻿import { CitationModal } from "./RightSidebar/CitationModal";
+import { DocumentReader } from "./RightSidebar/DocumentReader";
 import { usePaperDetails } from "@/hooks/usePaperDetails";
 import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
 import { generateCitations, CitationFormats } from "@/hooks/useCitationGenerator";
@@ -224,7 +225,7 @@ export default function RightSidebar({
       if (res.ok) {
         const updatedDoc = await res.json();
         onDocumentUpdated?.(updatedDoc);
-        if (viewingDoc && viewingDoc.id === renamingDoc.id) {
+        if (viewingDoc && ((viewingDoc as any)?.id || "undefined") === renamingDoc.id) {
           setViewingDoc(prev => prev ? { ...prev, title: updatedDoc.title } : null);
           /* handled by usePaperDetails cache or next fetch */
         }
@@ -676,7 +677,7 @@ export default function RightSidebar({
         }
         setShowBulkDeleteConfirm(false);
         setDocToDelete(null); // Reset after success
-        if (viewingDoc && docIds.includes(viewingDoc.id)) {
+        if (viewingDoc && docIds.includes(((viewingDoc as any)?.id || "undefined"))) {
           setViewingDoc(null);
         }
       }
@@ -711,11 +712,71 @@ export default function RightSidebar({
     window.URL.revokeObjectURL(url);
   };
 
+  if (viewingDoc) {
+    const filenameFallback = ((viewingDoc as any)?.filename || "paper").replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+    const GENERIC_HEADERS = new Set([
+      "abstract", "abstrak", "overview", "paper", "document", "introduction", "keywords",
+      "article in press", "in press", "journal pre-proof", "uncorrected proof",
+      "corrected proof", "original article", "research article", "full length article",
+      "short communication", "review article", "full paper", "research paper",
+      "accepted manuscript", "author's copy",
+    ]);
+    let title = (paperDetails?.title || filenameFallback).replace(/<[^>]+>/g, "");
+    if (!title || GENERIC_HEADERS.has(title.trim().toLowerCase())) {
+      title = filenameFallback;
+    }
+    const authorsStr = paperDetails?.authors && paperDetails.authors.length > 0
+      ? paperDetails.authors.join(", ")
+      : t('right.academicResearchers');
+    const pubDateStr = formatReadableDate(paperDetails?.publication_date, paperDetails?.year);
+    const journalName = paperDetails?.journal || t('right.scholarlyPublication');
+    const citationsCount = paperDetails?.citations !== undefined ? paperDetails.citations : 0;
+    const doiStr = paperDetails?.doi || "";
+    const cleanAbstract = cleanHtmlAbstract(paperDetails?.abstract) || (isLoadingDetails ? "" : t('right.noAbstractProvided'));
+    const landingUrl = paperDetails?.url || (doiStr ? "https://doi.org/$" : "");
+
+    return (
+      <DocumentReader
+        viewingDoc={viewingDoc}
+        paperDetails={paperDetails}
+        isLoadingDetails={isLoadingDetails}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onClose={onClose}
+        setViewingDoc={setViewingDoc}
+        onClearViewingDoc={onClearViewingDoc}
+        onAskAboutDocument={onAskAboutDocument}
+        backendUrl={backendUrl}
+        activeChatId={activeChatId}
+        totalMatches={totalMatches}
+        activeMatchIndex={activeMatchIndex}
+        navigateMatch={(dir) => {
+          if (dir === "next") {
+            setActiveMatchIndex(prev => prev < totalMatches - 1 ? prev + 1 : 0);
+          } else {
+            setActiveMatchIndex(prev => prev > 0 ? prev - 1 : totalMatches - 1);
+          }
+        }}
+        getHighlightedContent={() => getHighlightedContent((paperDetails?.content || ""), (groundingHighlight?.sentence || ""), highlightRefsMap, activeMatchIndex, groundingHighlight?.aiQuotes).nodes}
+        cleanAbstract={cleanAbstract}
+        authorsStr={authorsStr}
+        pubDateStr={pubDateStr}
+        journalName={journalName}
+        citationsCount={citationsCount}
+        landingUrl={landingUrl}
+        title={title}
+        copiedLink={copiedLink}
+        copyToClipboard={copyToClipboard}
+        setIsCiteModalOpen={setIsCiteModalOpen}
+      />
+    );
+  }
+
   // =========================================================================
   // VIEW MODE: CONSENSUS.AI STYLE ACADEMIC PAPER READER VIEW (Overview & Full Paper)
   // =========================================================================
   if (viewingDoc) {
-    const filenameFallback = viewingDoc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+    const filenameFallback = ((viewingDoc as any)?.filename || "paper").replace(/\.[^/.]+$/, "").replace(/_/g, " ");
     
     // Generic publisher headers that should never be displayed as paper title
     const GENERIC_HEADERS = new Set([
@@ -802,7 +863,7 @@ export default function RightSidebar({
               <div className="flex items-center gap-2 min-w-0">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${paperDetails?.has_full_pdf ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
                 <span className="truncate max-w-[170px] font-mono text-[11px] text-app-text-muted">
-                  {viewingDoc.filename}
+                  {((viewingDoc as any)?.filename || "paper")}
                 </span>
               </div>
 
@@ -1002,7 +1063,7 @@ export default function RightSidebar({
           <div className="flex-1 w-full h-full bg-app-surface overflow-hidden relative">
             {activeChatId && viewingDoc && paperDetails?.has_full_pdf !== false ? (
               <object
-                data={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/stream#toolbar=1&navpanes=0`}
+                data={`${backendUrl}/chats/${activeChatId}/documents/${((viewingDoc as any)?.id || "undefined")}/stream#toolbar=1&navpanes=0`}
                 type="application/pdf"
                 className="w-full h-full"
               >
@@ -1010,7 +1071,7 @@ export default function RightSidebar({
                   <FileText size={36} className="text-blue-500 mx-auto stroke-[1.5]" />
                   <p className="text-xs text-app-text font-medium">{t('right.openInNewTab')}</p>
                   <a
-                    href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/stream`}
+                    href={`${backendUrl}/chats/${activeChatId}/documents/${((viewingDoc as any)?.id || "undefined")}/stream`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors"
@@ -1054,7 +1115,7 @@ export default function RightSidebar({
               disabled={isLoadingDetails}
               onClick={() => {
                 if (viewingDoc && onAskAboutDocument) {
-                  onAskAboutDocument(viewingDoc, paperDetails?.title || viewingDoc.filename);
+                  onAskAboutDocument(viewingDoc, paperDetails?.title || ((viewingDoc as any)?.filename || "paper"));
                 }
                 const chatInput = document.getElementById("chat-input-textarea");
                 if (chatInput) {
@@ -1105,8 +1166,8 @@ export default function RightSidebar({
               }
               return (
                 <a
-                  href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
-                  download={viewingDoc.filename}
+                  href={`${backendUrl}/chats/${activeChatId}/documents/${((viewingDoc as any)?.id || "undefined")}/download`}
+                  download={((viewingDoc as any)?.filename || "paper")}
                   className="w-8 h-8 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer shadow-sm"
                   title="Download original manuscript PDF"
                 >
@@ -1791,6 +1852,11 @@ export default function RightSidebar({
     </aside>
   );
 }
+
+
+
+
+
 
 
 
