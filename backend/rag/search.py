@@ -544,6 +544,12 @@ def search_academic_papers_planned(
                 "machine learning", "computer vision", "pengolahan citra", "image processing", "u-net"
             ]
             has_damage_ai = any(d in full for d in damage_ai_terms)
+            
+            # Reject clear irrelevant targets (e.g. mobil, kendaraan, car, penerangan, lampu, avanza, solar, lora, smart lighting)
+            unrelated_road = ["avanza", "mobil", "toyota", "penerangan", "lampu", "solar", "lora", "buku ajar", "sistem pakar mobil"]
+            if any(u in full for u in unrelated_road):
+                return False
+
             return has_road and has_damage_ai
 
         if any(k in en_query.lower() or k in id_query.lower() for k in ["sentiment", "sentimen", "opinion", "opini"]):
