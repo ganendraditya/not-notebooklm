@@ -780,24 +780,38 @@ async def query_chat(
                 if doc_display_title.isupper() and len(doc_display_title) > 8:
                     doc_display_title = doc_display_title.title()
 
-                status_header = "VERIFIED WORKSPACE SOURCE"
+                status_header = "NASKAH LENGKAP TERSEDIA (Full-Text Original Paper)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Overview)"
 
                 return (
-                    f"--- DOKUMEN [{i+1}] ---\n"
-                    f"Nomor Dokumen: [{i+1}]\n"
-                    f"Judul Publikasi: {doc_display_title}\n"
-                    f"Nama File: {fname}\n"
-                    f"Status Naskah: {status_header}\n"
-                    f"Teks Dokumen:\n{content_snippet}\n"
+                    is_full_paper,
+                    (
+                        f"--- DOKUMEN [{i+1}] ---\n"
+                        f"Nomor Dokumen: [{i+1}]\n"
+                        f"Judul Publikasi: {doc_display_title}\n"
+                        f"Nama File: {fname}\n"
+                        f"Status Dokumen: {status_header}\n"
+                        f"Teks Dokumen:\n{content_snippet}\n"
+                    )
                 )
 
             # Load all documents concurrently in thread pool without blocking event loop
             # Maintain deterministic ordering matching DOKUMEN [1], [2], ... [N]
-            full_docs_context_parts = await asyncio.gather(
+            loaded_results = await asyncio.gather(
                 *(asyncio.to_thread(load_single_doc_snippet, (i, fname)) for i, fname in enumerate(local_docs))
             )
             
-            full_docs_context = "\n\n".join(full_docs_context_parts)
+            full_paper_count = sum(1 for is_full, _ in loaded_results if is_full)
+            abstract_only_count = len(loaded_results) - full_paper_count
+            full_docs_context_parts = [snippet for _, snippet in loaded_results]
+            
+            summary_stats_header = (
+                f"STATISTIK WORKSPACE SAAT INI:\n"
+                f"- Total Dokumen: {len(local_docs)} dokumen (Nomor [1] sampai [{len(local_docs)}])\n"
+                f"- Naskah Lengkap Asli (Full-Text Original PDF): {full_paper_count} dokumen\n"
+                f"- Ringkasan Abstrak & Metadata Resmi: {abstract_only_count} dokumen\n\n"
+            )
+            
+            full_docs_context = summary_stats_header + "\n\n".join(full_docs_context_parts)
             
             system_msg = LlamaChatMessage(
                 role=MessageRole.SYSTEM,
