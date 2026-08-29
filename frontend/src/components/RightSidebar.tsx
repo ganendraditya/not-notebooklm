@@ -716,9 +716,7 @@ export default function RightSidebar({
   const [viewingDoc, setViewingDoc] = useState<Document | null>(externalViewingDoc || null);
 
   useEffect(() => {
-    if (externalViewingDoc) {
-      setViewingDoc(externalViewingDoc);
-    }
+    setViewingDoc(externalViewingDoc || null);
   }, [externalViewingDoc]);
   const [paperDetails, setPaperDetails] = useState<PaperDetailData | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
@@ -769,12 +767,18 @@ export default function RightSidebar({
 
     // Check client-side memory cache for zero-latency instant rendering
     if (paperDetailsCacheRef.current.has(viewingDoc.id)) {
-      setPaperDetails(paperDetailsCacheRef.current.get(viewingDoc.id)!);
-      setIsLoadingDetails(false);
-      setIsCiteModalOpen(false);
-      return;
+      const cached = paperDetailsCacheRef.current.get(viewingDoc.id)!;
+      // Sanity check: ensure cached data matches current viewingDoc
+      if (cached && (cached.id === viewingDoc.id || cached.filename === viewingDoc.filename)) {
+        setPaperDetails(cached);
+        setIsLoadingDetails(false);
+        setIsCiteModalOpen(false);
+        return;
+      }
     }
 
+    // Clear previous details immediately so stale paper content isn't visible while loading new doc
+    setPaperDetails(null);
     setIsLoadingDetails(true);
     setIsCiteModalOpen(false);
     fetch(`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/content`)
@@ -782,16 +786,19 @@ export default function RightSidebar({
       .then(data => {
         if (data && !data.error) {
           paperDetailsCacheRef.current.set(viewingDoc.id, data);
+          setPaperDetails(data);
+        } else {
+          setPaperDetails(null);
         }
-        setPaperDetails(data);
       })
       .catch(err => {
         console.error("Failed to load paper details:", err);
+        setPaperDetails(null);
       })
       .finally(() => {
         setIsLoadingDetails(false);
       });
-  }, [viewingDoc, activeChatId, backendUrl]);
+  }, [viewingDoc?.id, viewingDoc?.filename, activeChatId, backendUrl]);
 
   // Switch to preview tab when citation grounding highlight is active
   useEffect(() => {
