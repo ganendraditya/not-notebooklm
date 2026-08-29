@@ -792,7 +792,6 @@ async def query_chat(
                         f"Nomor Dokumen: [{i+1}]\n"
                         f"Judul Publikasi: {doc_display_title}\n"
                         f"Nama File: {fname}\n"
-                        f"Status Dokumen: {status_header}\n"
                         f"Teks Dokumen:\n{content_snippet}\n"
                     )
                 )
@@ -812,22 +811,13 @@ async def query_chat(
             full_list_str = ", ".join([f"[{idx}]" for idx in full_paper_indices]) if full_paper_indices else "0 dokumen (Tidak ada)"
             abstract_list_str = ", ".join([f"[{idx}]" for idx in abstract_only_indices]) if abstract_only_indices else "0 dokumen (Tidak ada)"
             
-            summary_stats_header = (
-                f"STATISTIK FAKTUAL RESMI WORKSPACE SAAT INI (GUNAKAN ANGKA DAN DAFTAR INI SECARA MUTLAK):\n"
-                f"- Total Dokumen Tersimpan (Database + File): {len(local_docs)} dokumen (Nomor [1] sampai [{len(local_docs)}])\n"
-                f"- Naskah Lengkap Asli (Full-Text Original PDF berhasil di-parse): {full_paper_count} dokumen -> Dokumen {full_list_str}\n"
-                f"- Ringkasan Abstrak & Metadata Resmi: {abstract_only_count} dokumen -> Dokumen {abstract_list_str}\n\n"
-            )
-            
-            full_docs_context = summary_stats_header + "\n\n".join(full_docs_context_parts)
+            full_docs_context = "\n\n".join(full_docs_context_parts)
             
             system_prompt_text = (
                 f"{get_workspace_analysis_system_prompt(len(local_docs))}\n\n"
-                "CRITICAL OVERRIDE DIRECTIVE REGARDING DOCUMENT AVAILABILITY:\n"
-                "- If the chat history contains previous assistant messages claiming that full-text documents are 0, you MUST explicitly acknowledge that those previous assistant statements were an error.\n"
-                f"- You MUST strictly adhere to the STATISTIK FAKTUAL RESMI above: exactly {full_paper_count} documents have Full-Text Original PDFs ({full_list_str}) and {abstract_only_count} documents are Abstract-Only ({abstract_list_str}).\n"
-                "- IGNORE any conversational hallucination about zero documents in the chat history. The statistics above are the ONLY source of truth.\n"
-                "- NEVER complain or state that full-text documents are missing. If they are Abstract-Only, state it neutrally as 'Ringkasan Abstrak & Metadata Resmi'."
+                "CRITICAL INSTRUCTIONS FOR SYNTHESIS & ANALYSIS:\n"
+                "- When the user asks to summarize, analyze, compare, or generate chapters/sections (like Bab 3, Metodologi, Hasil, dll.), write a rich, detailed, and comprehensive academic text synthesizing the data.\n"
+                "- DO NOT refuse with excuses about copyright or partial text. Leverage the available document text fully."
             )
 
             system_msg = LlamaChatMessage(

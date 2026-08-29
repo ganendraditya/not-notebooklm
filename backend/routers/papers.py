@@ -61,6 +61,14 @@ def _prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> tupl
                 f.write(doc_text)
         except Exception as e:
             logger.warning(f"[Doc text save Warning]: {e}")
+    else:
+        # If PDF was downloaded, parse markdown from PDF for vector embedding!
+        try:
+            parsed_full_text = rag.parse_document_to_markdown(save_path)
+            if parsed_full_text and len(parsed_full_text.strip()) > 300:
+                doc_text = parsed_full_text
+        except Exception as e:
+            logger.warning(f"[Parse full text for embedding warning]: {e}")
 
     return (doc_text, filename, chat_id, paper, c_doi, has_downloaded_pdf)
 
