@@ -626,6 +626,12 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
                 try:
                     db_msg = bg_db.query(ChatMessage).filter(ChatMessage.id == target_msg_id).first()
                     if db_msg:
+                        # 1. Delete all descendant messages below this message (Truncate future history)
+                        bg_db.query(ChatMessage).filter(
+                            ChatMessage.chat_id == chat_id,
+                            ChatMessage.created_at > db_msg.created_at
+                        ).delete(synchronize_session=False)
+
                         existing_variants = []
                         if db_msg.variants_json:
                             try:

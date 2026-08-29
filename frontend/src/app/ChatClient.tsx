@@ -462,9 +462,9 @@ export default function ChatClient() {
     if (activeChatIdRef.current === currentChatId) {
       setIsLoading(true);
       setActiveStatus(job.status);
-      // Temporarily blank out the assistant message content so the old text disappears while regenerating
+      // Truncate all messages below the regenerating message and blank out target slot
       updateMessagesList(prev => {
-        const next = [...prev];
+        const next = prev.slice(0, messageIndex + 1);
         if (next[messageIndex]) {
           next[messageIndex] = {
             ...next[messageIndex],
@@ -509,7 +509,7 @@ export default function ChatClient() {
           };
           if (activeChatIdRef.current === currentChatId) {
             updateMessagesList(prev => {
-              const next = [...prev];
+              const next = prev.slice(0, messageIndex + 1);
               if (next[messageIndex]) {
                 next[messageIndex] = asstMsg;
               } else {
