@@ -88,13 +88,13 @@ async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessa
     clean_text = ' '.join(clean_text.split()).strip()
 
     # Determine default language preference from prompt
-    # If English words dominate prompt -> "en", if Indonesian words dominate -> "id"
+    # If explicit Indonesian prompt without non-ID language request, prefer "mixed" so users get both top global English papers + reputable local Indonesian papers
     id_indicators = [
         "cari", "cariin", "carikan", "tolong", "tentang", "jurnal", "makalah", "terbaru", 
         "tahun", "terakhir", "dong", "deh", "nih", "gw", "gua", "gue", "bisa", "buat", "kalo", "yg", "yang"
     ]
     is_mostly_id = any(re.search(rf'\b{re.escape(w)}\b', query, re.I) for w in id_indicators)
-    default_lang = "id" if is_mostly_id else "en"
+    default_lang = "mixed" if is_mostly_id else "en"
 
     # Extract languages filter intent from prompt or [Filter Preferences: ...]
     default_languages: List[str] = []
@@ -534,23 +534,40 @@ def search_academic_papers_planned(
             return has_rain and has_predict
 
         # Road Damage Detection domain topic validation
-        if any(k in en_query.lower() or k in id_query.lower() for k in ["road damage", "kerusakan jalan", "pothole", "lubang jalan", "retak jalan", "pavement"]):
-            road_terms = ["road", "jalan", "pavement", "perkerasan", "asphalt", "aspal", "highway", "pothole", "crack", "retak"]
+        if any(k in en_query.lower() or k in id_query.lower() for k in ["road damage", "kerusakan jalan", "pothole", "lubang jalan", "retak jalan", "pavement distress", "pavement damage"]):
+            road_terms = ["road", "jalan", "pavement", "perkerasan", "asphalt", "aspal", "highway"]
             has_road = any(r in full for r in road_terms)
             
-            damage_ai_terms = [
-                "damage", "kerusakan", "defect", "distress", "pothole", "crack", "retak", "lubang",
-                "detection", "deteksi", "segmentation", "segmentasi", "yolo", "cnn", "deep learning",
-                "machine learning", "computer vision", "pengolahan citra", "image processing", "u-net"
+            damage_terms = [
+                "damage", "kerusakan", "defect", "distress", "pothole", "lubang", 
+                "crack", "retak", "retakan", "alligator", "rutting", "ravelling", "bleeding", "pavement condition"
             ]
-            has_damage_ai = any(d in full for d in damage_ai_terms)
+            has_damage = any(d in full for d in damage_terms)
+
+            ai_vision_terms = [
+                "detection", "deteksi", "segmentation", "segmentasi", "classification", "klasifikasi",
+                "yolo", "cnn", "deep learning", "machine learning", "computer vision", "pengolahan citra",
+                "image processing", "u-net", "resnet", "object detection", "mask r-cnn", "vision transformer", "vit"
+            ]
+            has_ai_vision = any(a in full for a in ai_vision_terms)
             
-            # Reject clear irrelevant targets (e.g. mobil, kendaraan, car, penerangan, lampu, avanza, solar, lora, smart lighting)
-            unrelated_road = ["avanza", "mobil", "toyota", "penerangan", "lampu", "solar", "lora", "buku ajar", "sistem pakar mobil"]
+            # Reject clear irrelevant targets that mention "jalan" or "crack" or "yolo" in unrelated contexts:
+            # - Dinding / Tembok / Bangunan gedung (structural wall cracks)
+            # - Kereta api / Perkeretaapian / JPL / Lintasan rel kereta
+            # - Sampah / Kebersihan lingkungan (trash on roads)
+            # - Kendaraan / Mobil / Tol / Golongan kendaraan (vehicle counting, toll classification)
+            # - Jembatan non-jalan (pure bridge cable / pier)
+            unrelated_road = [
+                "dinding", "tembok", "bangunan gedung", "perumahan", "cracksafe",
+                "kereta", "perkeretaapian", "rel kereta", "jpl", "gerbong", "lokomotif",
+                "sampah", "tumpukan sampah", "sungai", "kebersihan",
+                "golongan kendaraan", "beban kendaraan", "volume kendaraan", "gerbang tol", "kemacetan", "esal",
+                "avanza", "toyota", "penerangan", "lampu", "solar", "lora", "buku ajar", "sistem pakar mobil"
+            ]
             if any(u in full for u in unrelated_road):
                 return False
 
-            return has_road and has_damage_ai
+            return has_road and has_damage and has_ai_vision
 
         if any(k in en_query.lower() or k in id_query.lower() for k in ["sentiment", "sentimen", "opinion", "opini"]):
             sentiment_keys = [
