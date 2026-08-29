@@ -800,15 +800,20 @@ async def query_chat(
                 *(asyncio.to_thread(load_single_doc_snippet, (i, fname)) for i, fname in enumerate(local_docs))
             )
             
-            full_paper_count = sum(1 for is_full, _ in loaded_results if is_full)
-            abstract_only_count = len(loaded_results) - full_paper_count
+            full_paper_indices = [i + 1 for i, (is_full, _) in enumerate(loaded_results) if is_full]
+            abstract_only_indices = [i + 1 for i, (is_full, _) in enumerate(loaded_results) if not is_full]
+            full_paper_count = len(full_paper_indices)
+            abstract_only_count = len(abstract_only_indices)
             full_docs_context_parts = [snippet for _, snippet in loaded_results]
             
+            full_list_str = ", ".join([f"[{idx}]" for idx in full_paper_indices]) if full_paper_indices else "Tidak ada"
+            abstract_list_str = ", ".join([f"[{idx}]" for idx in abstract_only_indices]) if abstract_only_indices else "Tidak ada"
+            
             summary_stats_header = (
-                f"STATISTIK WORKSPACE SAAT INI:\n"
+                f"STATISTIK FAKTUAL RESMI WORKSPACE SAAT INI (GUNAKAN ANGKA DAN DAFTAR INI SECARA MUTLAK):\n"
                 f"- Total Dokumen: {len(local_docs)} dokumen (Nomor [1] sampai [{len(local_docs)}])\n"
-                f"- Naskah Lengkap Asli (Full-Text Original PDF): {full_paper_count} dokumen\n"
-                f"- Ringkasan Abstrak & Metadata Resmi: {abstract_only_count} dokumen\n\n"
+                f"- Naskah Lengkap Asli (Full-Text Original PDF): {full_paper_count} dokumen -> Dokumen {full_list_str}\n"
+                f"- Ringkasan Abstrak & Metadata Resmi: {abstract_only_count} dokumen -> Dokumen {abstract_list_str}\n\n"
             )
             
             full_docs_context = summary_stats_header + "\n\n".join(full_docs_context_parts)
