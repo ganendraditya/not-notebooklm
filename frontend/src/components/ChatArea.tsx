@@ -436,12 +436,7 @@ export default function ChatArea({
                             onEnsureChatSession={onEnsureChatSession}
                             activeCitationKey={activeCitationKey}
                           />
-                        ) : isLoading && (
-                          <div className="flex items-center gap-2.5 text-app-text-muted text-sm py-2 animate-in fade-in duration-200">
-                            <Loader2 size={16} className="text-blue-500 animate-spin shrink-0" />
-                            <span>{activeStatus || "Analyzing and regenerating response..."}</span>
-                          </div>
-                        )}
+                        ) : null}
                         {msg.content && (
                           <div className="mt-1 flex items-center gap-1.5">
                             {/* Pagination for response variants (e.g. 1/2, 2/2) */}

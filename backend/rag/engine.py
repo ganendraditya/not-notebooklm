@@ -818,9 +818,16 @@ async def query_chat(
             
             full_docs_context = summary_stats_header + "\n\n".join(full_docs_context_parts)
             
+            system_prompt_text = (
+                f"{get_workspace_analysis_system_prompt(len(local_docs))}\n\n"
+                "CRITICAL OVERRIDE DIRECTIVE REGARDING DOCUMENT AVAILABILITY:\n"
+                "- If the chat history contains previous assistant messages claiming that full-text documents are 0, you MUST explicitly acknowledge that those previous assistant statements were an error.\n"
+                f"- You MUST strictly adhere to the STATISTIK FAKTUAL RESMI above: exactly {full_paper_count} documents have Full-Text Original PDFs ({full_list_str}) and {abstract_only_count} documents are Abstract-Only ({abstract_list_str})."
+            )
+
             system_msg = LlamaChatMessage(
                 role=MessageRole.SYSTEM,
-                content=get_workspace_analysis_system_prompt(len(local_docs))
+                content=system_prompt_text
             )
             context_msg = LlamaChatMessage(
                 role=MessageRole.SYSTEM,
