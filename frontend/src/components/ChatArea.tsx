@@ -98,11 +98,19 @@ export default function ChatArea({
   const { t } = useTranslation();
   const [copiedMessageIdx, setCopiedMessageIdx] = useState<number | null>(null);
   const [editingMessageIdx, setEditingMessageIdx] = useState<number | null>(null);
+  const [regeneratingMessageIdx, setRegeneratingMessageIdx] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
   const [isTopMenuOpen, setIsTopMenuOpen] = useState(false);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [renameInput, setRenameInput] = useState("");
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+
+  // Clear regenerating indicator once global loading stops
+  useEffect(() => {
+    if (!isLoading) {
+      setRegeneratingMessageIdx(null);
+    }
+  }, [isLoading]);
 
   const topMenuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -423,7 +431,12 @@ export default function ChatArea({
                   ) : (
                     <div className="flex items-start">
                       <div className="flex-1 min-w-0">
-                        {msg.content ? (
+                        {isLoading && regeneratingMessageIdx === idx ? (
+                          <div className="flex items-center gap-2.5 text-app-text-muted text-sm py-2 px-1 animate-in fade-in duration-200">
+                            <Loader2 size={16} className="text-blue-500 animate-spin shrink-0" />
+                            <span>{activeStatus || "Regenerating response..."}</span>
+                          </div>
+                        ) : msg.content ? (
                           <InChatMessageComponent 
                             msg={msg}
                             activeChatId={activeChatId}
@@ -483,7 +496,10 @@ export default function ChatArea({
                             {/* Retry / Regenerate Button */}
                             <button
                               type="button"
-                              onClick={() => onRegenerateMessage?.(idx)}
+                              onClick={() => {
+                                setRegeneratingMessageIdx(idx);
+                                onRegenerateMessage?.(idx);
+                              }}
                               disabled={isLoading}
                               className="p-1.5 text-app-text-muted hover:text-app-text disabled:opacity-30 rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
                               title={t('chat.regenerateResponse')}
@@ -498,7 +514,7 @@ export default function ChatArea({
                 </div>
               ))}
 
-              {isLoading && (
+              {isLoading && regeneratingMessageIdx === null && (
                 <div className="flex items-center gap-2.5 text-app-text-muted text-sm py-1.5 animate-in fade-in duration-200">
                   <Loader2 size={16} className="text-blue-500 animate-spin shrink-0" />
                   <span>{activeStatus || "Analyzing and generating response..."}</span>
