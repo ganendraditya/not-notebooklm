@@ -26,6 +26,7 @@ import {
   UploadCloud,
   AlertCircle,
   Pencil,
+  MoreHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
@@ -708,6 +709,7 @@ export default function RightSidebar({
   const [sortBy, setSortBy] = useState<"date" | "title">("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
   // Detail / Reader View State (Consensus.app style)
@@ -720,7 +722,7 @@ export default function RightSidebar({
   }, [externalViewingDoc]);
   const [paperDetails, setPaperDetails] = useState<PaperDetailData | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "preview" | "pdf">("overview");
+  const [activeTab, setActiveTab] = useState<"preview" | "pdf">("preview");
   
   // Citation Modal State
   const [isCiteModalOpen, setIsCiteModalOpen] = useState<boolean>(false);
@@ -801,17 +803,26 @@ export default function RightSidebar({
   // Close sort menu on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
+      // Logic for main sort menu
+      if (isSortMenuOpen && sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
         setIsSortMenuOpen(false);
       }
+      
+      // Logic for 3 dots menu
+      // Check if click is outside of any document action menu (which we assume has a specific data attribute to avoid conflicts)
+      const target = event.target as HTMLElement;
+      if (activeMenuId !== null && !target.closest('.document-action-menu-container')) {
+        setActiveMenuId(null);
+      }
     };
-    if (isSortMenuOpen) {
+    
+    if (isSortMenuOpen || activeMenuId !== null) {
       window.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
       window.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isSortMenuOpen]);
+  }, [isSortMenuOpen, activeMenuId]);
 
   const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
   const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
@@ -1399,23 +1410,15 @@ export default function RightSidebar({
           </button>
         </div>
 
-        {/* 2. Simplified 3 Navigation Tabs: Overview, Full Text & PDF */}
+        {/* 2. Clean 2 Navigation Tabs: Full Text & Original Document */}
         <div className="flex items-center px-4 border-b border-app-divider text-xs font-medium text-app-text-muted gap-5 shrink-0">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`py-2.5 transition-colors cursor-pointer border-b-2 font-semibold ${
-              activeTab === "overview" ? "text-app-text border-blue-500" : "text-app-text-muted hover:text-app-text border-transparent"
-            }`}
-          >
-            {t('right.overviewTab')}
-          </button>
           <button
             onClick={() => setActiveTab("preview")}
             className={`py-2.5 transition-colors cursor-pointer border-b-2 font-medium flex items-center gap-1.5 ${
               activeTab === "preview" ? "text-app-text border-blue-500 font-semibold" : "text-app-text-muted hover:text-app-text border-transparent"
             }`}
           >
-            <span>{t('right.fullPaper')}</span>
+            <span>{t('right.fullText')}</span>
           </button>
           <button
             onClick={() => setActiveTab("pdf")}
@@ -1423,173 +1426,12 @@ export default function RightSidebar({
               activeTab === "pdf" ? "text-app-text border-blue-500 font-semibold" : "text-app-text-muted hover:text-app-text border-transparent"
             }`}
           >
-            <span>PDF View</span>
+            <span>{t('right.originalDoc')}</span>
           </button>
         </div>
 
         {/* 3. Main Body */}
-        {activeTab === "overview" ? (
-          <div className="flex-1 p-4 sm:p-5 overflow-y-auto custom-scrollbar space-y-4 min-h-0">
-            {/* Paper Title with Global Reference Badge */}
-            <div className="space-y-1.5">
-              <div className="flex items-start gap-2">
-                <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-blue-500/15 text-blue-500 border border-blue-500/30 shrink-0 mt-0.5 select-none" title="Permanent Global Reference Index">
-                  [{viewingDoc.index || (documents.findIndex(d => d.id === viewingDoc.id) + 1)}]
-                </span>
-                <h1 className="text-[15px] sm:text-[16px] font-bold text-app-text leading-snug tracking-tight">
-                  {title}
-                </h1>
-              </div>
-
-              {/* Authors & Publication Date (Textual format e.g. Oct 9, 2024) */}
-              {isLoadingDetails ? (
-                <div className="flex items-center gap-2 pt-0.5 animate-pulse">
-                  <div className="h-3 w-24 bg-app-item-hover rounded" />
-                  <div className="h-3 w-40 bg-app-item-hover rounded" />
-                </div>
-              ) : (
-                <p className="text-xs text-app-text-dim font-normal">
-                  <span>{pubDateStr}</span>
-                  {authorsStr && (
-                    <>
-                      <span className="mx-1.5 text-app-text-dim">·</span>
-                      <span className="text-app-text-muted">{authorsStr}</span>
-                    </>
-                  )}
-                </p>
-              )}
-            </div>
-
-            {/* Journal / Venue & Quality Metrics */}
-            {isLoadingDetails ? (
-              <div className="flex items-center justify-between pt-1 text-xs animate-pulse">
-                <div className="space-y-1.5">
-                  <div className="h-3.5 w-32 bg-white/10 rounded" />
-                  <div className="h-3 w-20 bg-white/5 rounded" />
-                </div>
-                <div className="space-y-1.5 text-right flex flex-col items-end">
-                  <div className="h-3.5 w-10 bg-white/10 rounded" />
-                  <div className="h-3 w-12 bg-white/5 rounded" />
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between pt-1 text-xs">
-                <div>
-                  <p className="font-semibold text-app-text text-[12px]">{journalName}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[11px] text-app-text-muted font-medium">{paperDetails?.journal_metric || t('right.peerReviewed')}</span>
-                  </div>
-                </div>
-
-                {/* Citations Count */}
-                <div className="text-right">
-                  <span className="text-xs font-semibold text-app-text">{citationsCount}</span>
-                  <p className="text-[10.5px] text-app-text-dim">{t('right.citations')}</p>
-                </div>
-              </div>
-            )}
-
-            {/* DOI Row with Copy Button */}
-            {isLoadingDetails ? (
-              <div className="flex items-center gap-2 pt-0.5 animate-pulse">
-                <div className="h-3 w-7 bg-app-item-hover rounded" />
-                <div className="h-3 w-36 bg-app-item-active rounded" />
-              </div>
-            ) : doiStr ? (
-              <div className="flex items-center gap-1.5 text-[11px] text-app-text-dim pt-0.5">
-                <span className="font-medium text-app-text-dim">DOI</span>
-                <span className="font-mono text-app-text-muted truncate">{doiStr}</span>
-                <button
-                  onClick={() => copyToClipboard(doiStr, "doi")}
-                  className="p-1 rounded hover:bg-app-item-hover text-app-text-dim hover:text-app-text transition-colors cursor-pointer shrink-0"
-                  title="Copy DOI"
-                >
-                  {copiedDoi ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                </button>
-              </div>
-            ) : null}
-
-            {/* Access & Discovery Badge (Positive-Neutral Model) */}
-            <div className="pt-1">
-              {isLoadingDetails ? (
-                <div className="h-6 w-28 rounded-lg bg-app-item-hover animate-pulse" />
-              ) : paperDetails?.is_oa || paperDetails?.pdf_url ? (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span>{t('right.openAccess')}</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-app-card border border-app-border text-app-text-muted text-xs font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-app-text-dim shrink-0" />
-                  <span>{t('right.publisherSource')}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-app-divider pt-2" />
-
-            {/* Abstract / Overview Section */}
-            {isLoadingDetails ? (
-              <div className="space-y-3 pt-1 animate-pulse">
-                <div className="flex items-center justify-between">
-                  <div className="h-3.5 w-24 bg-white/10 rounded" />
-                  <div className="h-3.5 w-20 bg-white/5 rounded" />
-                </div>
-                <div className="space-y-2 pt-1">
-                  <div className="h-3.5 bg-white/10 rounded w-full" />
-                  <div className="h-3.5 bg-white/10 rounded w-11/12" />
-                  <div className="h-3.5 bg-white/10 rounded w-full" />
-                  <div className="h-3.5 bg-white/10 rounded w-4/5" />
-                  <div className="h-3.5 bg-white/10 rounded w-3/4" />
-                </div>
-              </div>
-            ) : paperDetails?.abstract_type === "ai_summary" ? (
-              /* AI Synthesis / Executive Summary Card with Disclaimer */
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-300">
-                    <Sparkles size={13} className="text-purple-500" />
-                    <span>{t('right.aiOverview')}</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/10 border border-purple-500/30 text-purple-600 dark:text-purple-300">
-                    {t('right.publisherMetadata')}
-                  </span>
-                </div>
-
-                {/* Clarification Alert Box */}
-                <div className="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-900 dark:text-purple-200 leading-relaxed flex items-start gap-2">
-                  <Info size={13} className="text-purple-500 shrink-0 mt-0.5" />
-                  <p>
-                    <span className="font-semibold text-purple-800 dark:text-purple-200">{t('right.aiNote')}</span> {t('right.executiveDesc')}
-                  </p>
-                </div>
-
-                <p className="text-[12.5px] sm:text-[13px] text-app-text leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
-                  {cleanAbstract}
-                </p>
-              </div>
-            ) : (
-              /* Official Authentic Abstract */
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-app-text tracking-wider uppercase">
-                    <FileText size={13} className="text-blue-500" />
-                    <span>{t('right.abstract')}</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-300 flex items-center gap-1">
-                    <Check size={10} />
-                    <span>{t('right.officialAbstract')}</span>
-                  </span>
-                </div>
-
-                <p className="text-[12.5px] sm:text-[13px] text-app-text leading-relaxed font-sans select-text whitespace-pre-line break-words text-justify">
-                  {cleanAbstract}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : activeTab === "preview" ? (
+        {activeTab === "preview" ? (
           /* TAB 2: FULL PAPER / IN-APP NATIVE SCROLLABLE DOCUMENT READER */
           <div className="flex-1 flex flex-col min-h-0 bg-app-bg relative overflow-hidden">
             {/* Top Preview Controls Bar */}
@@ -1633,18 +1475,6 @@ export default function RightSidebar({
                       </button>
                     </div>
                   </div>
-                )}
-
-                {activeChatId && (
-                  <a
-                    href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
-                    download={viewingDoc.filename}
-                    className="px-2 py-1 rounded bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text transition-colors cursor-pointer flex items-center gap-1 text-[11px] shadow-sm"
-                    title={t('right.downloadFile')}
-                  >
-                    <Download size={12} />
-                    <span>{t('right.download')}</span>
-                  </a>
                 )}
               </div>
             </div>
@@ -1807,7 +1637,7 @@ export default function RightSidebar({
           </div>
         ) : activeTab === "pdf" ? (
           <div className="flex-1 w-full h-full bg-app-surface overflow-hidden relative">
-            {activeChatId && viewingDoc ? (
+            {activeChatId && viewingDoc && paperDetails?.has_full_pdf !== false ? (
               <object
                 data={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/stream#toolbar=1&navpanes=0`}
                 type="application/pdf"
@@ -1815,21 +1645,37 @@ export default function RightSidebar({
               >
                 <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3">
                   <FileText size={36} className="text-blue-500 mx-auto stroke-[1.5]" />
-                  <p className="text-xs text-app-text font-medium">Pratinjau PDF di-intercept oleh ekstensi browser / IDM</p>
+                  <p className="text-xs text-app-text font-medium">{t('right.openInNewTab')}</p>
                   <a
-                    href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
-                    download={viewingDoc.filename}
+                    href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/stream`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors"
                   >
-                    <Download size={13} />
-                    <span>Buka / Unduh File PDF</span>
+                    <ExternalLink size={13} />
+                    <span>{t('right.openInNewTab')}</span>
                   </a>
                 </div>
               </object>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-2">
-                <FileText size={32} className="text-app-text-dim mx-auto stroke-[1.5]" />
-                <p className="text-xs text-app-text font-medium">Naskah PDF tidak ditemukan</p>
+              <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-3">
+                <FileText size={36} className="text-amber-500 mx-auto stroke-[1.5]" />
+                <div className="space-y-1 max-w-sm">
+                  <p className="text-xs text-app-text font-medium">
+                    {t('right.originalDocNotAvail')}
+                  </p>
+                </div>
+                {landingUrl && (
+                  <a
+                    href={landingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium inline-flex items-center gap-1.5 shadow-sm transition-colors mt-2"
+                  >
+                    <ExternalLink size={13} />
+                    <span>{t('right.openOfficialPublisher')}</span>
+                  </a>
+                )}
               </div>
             )}
           </div>
@@ -2333,6 +2179,103 @@ export default function RightSidebar({
                           </span>
                         );
                       })()}
+                    </div>
+
+                    {/* 3 dots action menu */}
+                    <div className="shrink-0 flex items-center relative mr-1 document-action-menu-container">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (activeMenuId === doc.id) {
+                            setActiveMenuId(null);
+                          } else {
+                            setActiveMenuId(doc.id);
+                          }
+                        }}
+                        className={`p-1 rounded-md transition-colors z-20 hover:bg-app-item-active group-hover:opacity-100 ${
+                          activeMenuId === doc.id ? "opacity-100 text-app-text bg-app-item-active" : "opacity-0 text-app-text-muted"
+                        }`}
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
+                      {/* Dropdown Menu */}
+                      {activeMenuId === doc.id && (
+                        <div 
+                          className="absolute right-0 mt-1 w-36 bg-app-dropdown border border-app-border-strong rounded-xl shadow-xl z-[60] overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-100"
+                          ref={(el) => {
+                            if (el) {
+                                const rect = el.getBoundingClientRect();
+                                const windowHeight = window.innerHeight;
+                                // If the element is in the bottom half of the screen
+                                if (rect.top > windowHeight / 2) {
+                                  el.style.top = 'auto';
+                                  el.style.bottom = '100%';
+                                  el.style.marginBottom = '4px';
+                                  el.style.marginTop = '0px';
+                                } else {
+                                  // If the element is in the top half of the screen
+                                  el.style.top = '100%';
+                                  el.style.bottom = 'auto';
+                                  el.style.marginBottom = '0px';
+                                  el.style.marginTop = '4px';
+                                }
+                            }
+                          }}
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(null);
+                              setRenamingDoc(doc);
+                              setRenameTitleInput(doc.title || doc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " "));
+                              setRenameError(null);
+                              setIsRenameModalOpen(true);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-app-text hover:bg-app-item-hover transition-colors flex items-center gap-2"
+                          >
+                            <Pencil size={13} className="shrink-0" /> {t('action.rename')}
+                          </button>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(null);
+                              if (!activeChatId) return;
+                              try {
+                                const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/${doc.id}/download`);
+                                if (res.ok) {
+                                  const blob = await res.blob();
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement("a");
+                                  link.href = url;
+                                  link.download = doc.filename.endsWith(".pdf") ? doc.filename : `${doc.filename}.pdf`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(url);
+                                } else {
+                                  alert("Failed to download document");
+                                }
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-app-text hover:bg-app-item-hover transition-colors flex items-center gap-2"
+                          >
+                            <Download size={13} className="shrink-0" /> {t('action.download') || "Download"}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(null);
+                              setSelectedDocs({[doc.id]: true});
+                              setShowBulkDeleteConfirm(true);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-500/10 transition-colors flex items-center gap-2"
+                          >
+                            <Trash2 size={13} className="shrink-0" /> {t('action.delete')}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Right: Checkbox ONLY toggles selection */}
