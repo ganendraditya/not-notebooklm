@@ -746,7 +746,7 @@ async def query_chat(
                         if parsed_text and len(parsed_text.strip()) >= 150:
                             if "NOTBOOKLM SCHOLARLY ARCHIVE" in parsed_text:
                                 is_full_paper = False
-                            elif fpath.lower().endswith(".pdf") and fsize < 35000:
+                            elif fpath.lower().endswith(".pdf") and fsize < 50000: # increased from 35000 to be safer
                                 is_full_paper = False
                             else:
                                 is_full_paper = True
@@ -757,8 +757,7 @@ async def query_chat(
                         logger.debug(f"[Doc Parse Error for {fname}]: {parse_err}")
                         
                 # 2. If physical file parse failed or short stub: read from DB metadata
-                if (not content_snippet or len(content_snippet.strip()) < 150) and db_record:
-                    is_full_paper = False
+                if (not is_full_paper) and db_record:
                     meta_parts = []
                     d_title = db_record.title or fname.replace(".pdf", "").replace("_", " ")
                     d_year = db_record.year or ""
@@ -771,6 +770,10 @@ async def query_chat(
                     if d_doi: meta_parts.append(f"**DOI:** {d_doi}")
                     if d_abstract: meta_parts.append(f"## Abstract & Overview\n{d_abstract}")
                     
+                    # If we parsed *some* text but it was small, append it just in case
+                    if content_snippet:
+                        meta_parts.append(f"## Parsed Text Snippet\n{content_snippet}")
+                        
                     content_snippet = "\n\n".join(meta_parts)
                     
                 if not content_snippet:
@@ -806,13 +809,13 @@ async def query_chat(
             abstract_only_count = len(abstract_only_indices)
             full_docs_context_parts = [snippet for _, snippet in loaded_results]
             
-            full_list_str = ", ".join([f"[{idx}]" for idx in full_paper_indices]) if full_paper_indices else "Tidak ada"
-            abstract_list_str = ", ".join([f"[{idx}]" for idx in abstract_only_indices]) if abstract_only_indices else "Tidak ada"
+            full_list_str = ", ".join([f"[{idx}]" for idx in full_paper_indices]) if full_paper_indices else "0 dokumen (Tidak ada)"
+            abstract_list_str = ", ".join([f"[{idx}]" for idx in abstract_only_indices]) if abstract_only_indices else "0 dokumen (Tidak ada)"
             
             summary_stats_header = (
                 f"STATISTIK FAKTUAL RESMI WORKSPACE SAAT INI (GUNAKAN ANGKA DAN DAFTAR INI SECARA MUTLAK):\n"
-                f"- Total Dokumen: {len(local_docs)} dokumen (Nomor [1] sampai [{len(local_docs)}])\n"
-                f"- Naskah Lengkap Asli (Full-Text Original PDF): {full_paper_count} dokumen -> Dokumen {full_list_str}\n"
+                f"- Total Dokumen Tersimpan (Database + File): {len(local_docs)} dokumen (Nomor [1] sampai [{len(local_docs)}])\n"
+                f"- Naskah Lengkap Asli (Full-Text Original PDF berhasil di-parse): {full_paper_count} dokumen -> Dokumen {full_list_str}\n"
                 f"- Ringkasan Abstrak & Metadata Resmi: {abstract_only_count} dokumen -> Dokumen {abstract_list_str}\n\n"
             )
             
@@ -822,7 +825,8 @@ async def query_chat(
                 f"{get_workspace_analysis_system_prompt(len(local_docs))}\n\n"
                 "CRITICAL OVERRIDE DIRECTIVE REGARDING DOCUMENT AVAILABILITY:\n"
                 "- If the chat history contains previous assistant messages claiming that full-text documents are 0, you MUST explicitly acknowledge that those previous assistant statements were an error.\n"
-                f"- You MUST strictly adhere to the STATISTIK FAKTUAL RESMI above: exactly {full_paper_count} documents have Full-Text Original PDFs ({full_list_str}) and {abstract_only_count} documents are Abstract-Only ({abstract_list_str})."
+                f"- You MUST strictly adhere to the STATISTIK FAKTUAL RESMI above: exactly {full_paper_count} documents have Full-Text Original PDFs ({full_list_str}) and {abstract_only_count} documents are Abstract-Only ({abstract_list_str}).\n"
+                "- IGNORE any conversational hallucination about zero documents in the chat history. The statistics above are the ONLY source of truth."
             )
 
             system_msg = LlamaChatMessage(
