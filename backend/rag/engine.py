@@ -795,7 +795,8 @@ async def query_chat(
                 if doc_display_title.isupper() and len(doc_display_title) > 8:
                     doc_display_title = doc_display_title.title()
 
-                status_header = "NASKAH LENGKAP TERSEDIA (Full-Text Original Paper)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Overview)"
+                status_label = "NASKAH LENGKAP TERSEDIA (Full-Text Original PDF Downloaded)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Only - Direct PDF Download Restricted/Unavailable)"
+                has_doi_label = f"DOI Resmi: {db_record.doi}" if (db_record and db_record.doi) else "DOI Resmi: Tidak Ada / Repositori Kampus"
 
                 return (
                     is_full_paper,
@@ -804,6 +805,8 @@ async def query_chat(
                         f"Nomor Dokumen: [{i+1}]\n"
                         f"Judul Publikasi: {doc_display_title}\n"
                         f"Nama File: {fname}\n"
+                        f"Status File Dokumen: {status_label}\n"
+                        f"{has_doi_label}\n"
                         f"Teks Dokumen:\n{content_snippet}\n"
                     )
                 )
