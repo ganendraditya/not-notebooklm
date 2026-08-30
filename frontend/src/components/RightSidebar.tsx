@@ -1497,9 +1497,39 @@ export default function RightSidebar({
             {/* In-App Paper Document Reader Canvas (Fully Scrollable) */}
             <div className="flex-1 p-4 overflow-y-auto custom-scrollbar space-y-4 select-text">
               {isLoadingDetails ? (
-                <div className="py-24 flex flex-col items-center justify-center text-center space-y-3">
-                  <Loader2 size={24} className="animate-spin text-blue-500" />
-                  <p className="text-xs text-app-text-dim">{t('right.loading')}</p>
+                <div className="space-y-4 animate-pulse">
+                  {/* Skeleton Paper Card */}
+                  <div className="p-4 sm:p-5 rounded-xl bg-app-card border border-app-border space-y-4">
+                    {/* Skeleton Banner */}
+                    <div className="p-3.5 rounded-lg bg-app-item-hover/50 space-y-2">
+                      <div className="h-4 w-40 rounded bg-app-divider/60" />
+                      <div className="h-3 w-5/6 rounded bg-app-divider/40" />
+                    </div>
+
+                    {/* Paper Title & Badges */}
+                    <div className="pb-3 border-b border-app-divider space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-10 rounded bg-app-divider/60" />
+                        <div className="h-3.5 w-16 rounded bg-app-divider/40" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="h-5 w-11/12 rounded bg-app-divider/70" />
+                        <div className="h-5 w-3/4 rounded bg-app-divider/60" />
+                      </div>
+                      <div className="h-3.5 w-1/2 rounded bg-app-divider/40 pt-1" />
+                    </div>
+
+                    {/* Clean Formatted Document Body Skeleton */}
+                    <div className="space-y-2.5 pt-2">
+                      <div className="h-3.5 w-full rounded bg-app-divider/40" />
+                      <div className="h-3.5 w-full rounded bg-app-divider/40" />
+                      <div className="h-3.5 w-4/5 rounded bg-app-divider/40" />
+                      <div className="h-3.5 w-full rounded bg-app-divider/40 pt-2" />
+                      <div className="h-3.5 w-full rounded bg-app-divider/40" />
+                      <div className="h-3.5 w-3/4 rounded bg-app-divider/40" />
+                      <div className="h-3.5 w-5/6 rounded bg-app-divider/40" />
+                    </div>
+                  </div>
                 </div>
               ) : (paperDetails?.has_full_pdf === false || paperDetails?.is_abstract_only || (paperDetails?.content && (paperDetails.content.length < 3500 || paperDetails.content.includes("NOTBOOKLM SCHOLARLY ARCHIVE") || paperDetails.content.includes("OFFICIAL PUBLICATION ARCHIVE RECORD")))) ? (
                 <div className="p-4 sm:p-5 rounded-xl bg-app-card border border-app-border shadow-lg space-y-4">
