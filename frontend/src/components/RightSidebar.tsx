@@ -1,48 +1,15 @@
-﻿import { CitationModal } from "./RightSidebar/CitationModal";
-import { DocumentReader } from "./RightSidebar/DocumentReader";
-import { AddSourcesModal } from "./RightSidebar/AddSourcesModal";
+﻿import { DocumentReader } from "./RightSidebar/DocumentReader";
 import { DocumentListPanel } from "./RightSidebar/DocumentListPanel";
 import { usePaperDetails } from "@/hooks/usePaperDetails";
 import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
-import { generateCitations, CitationFormats } from "@/hooks/useCitationGenerator";
 "use client";
 import { useDocumentManager } from "@/hooks/useDocumentManager";
 
-import { useState, useRef, useEffect, useMemo } from "react";
-import { 
-  Plus, 
-  Check, 
-  Minus,
-  Trash2, 
-  Download,
-  Sidebar, 
-  FileText, 
-  Loader2,
-  ArrowLeft,
-  X,
-  Copy,
-  MessageSquare,
-  Quote,
-  Link as LinkIcon,
-  ExternalLink,
-  ChevronDown,
-  ChevronUp,
-  BookOpen,
-  Sparkles,
-  Info,
-  Search,
-  UploadCloud,
-  AlertCircle,
-  Pencil,
-  MoreHorizontal
-} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Plus, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
-import { consumeSSEStream } from "@/lib/sse";
-import { DownloadManager, DownloadTask } from "./DownloadManager";
-import { BulkDeleteModal, RenameModal } from "./sidebar/SidebarModals";
-
 import { SourcesToolbar } from "./RightSidebar/SourcesToolbar";
 import { RightSidebarModals } from "./RightSidebar/RightSidebarModals";
 
@@ -64,39 +31,8 @@ interface RightSidebarProps {
   onClose: () => void;
 }
 
-// export interface PendingSourceItem {
-//   id: string;
-//   filename: string;
-//   type: "file" | "doi";
-//   doi?: string;
-//   status: "uploading" | "error";
-//   error?: string;
-// }
 
-interface PaperDetailData {
-  id: number;
-  filename: string;
-  created_at?: string;
-  type: string;
-  title: string;
-  authors: string[];
-  publication_date: string;
-  year: string;
-  journal: string;
-  journal_metric: string;
-  quality_tier?: number;
-  citations: number;
-  doi: string;
-  url: string;
-  pdf_url: string;
-  abstract: string;
-  abstract_type?: "official" | "ai_summary";
-  is_oa?: boolean;
-  access_status?: string;
-  has_full_pdf?: boolean;
-  is_abstract_only?: boolean;
-  content: string;
-}
+
 
 export default function RightSidebar({ 
   activeChatId, 
