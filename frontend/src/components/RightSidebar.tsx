@@ -43,6 +43,8 @@ import { consumeSSEStream } from "@/lib/sse";
 import { DownloadManager, DownloadTask } from "./DownloadManager";
 import { BulkDeleteModal, RenameModal } from "./sidebar/SidebarModals";
 
+import { SourcesToolbar } from "./RightSidebar/SourcesToolbar";
+
 interface RightSidebarProps {
   activeChatId: string | null;
   documents: Document[];
@@ -371,198 +373,29 @@ export default function RightSidebar({
           </div>
         )}
 
-        {/* Action Toolbar (Always-rendered icons with dynamic disabled states) */}
-        <div className="w-full flex items-center justify-between pt-1 px-0 text-xs text-app-text-muted relative">
-          <div className="flex items-center gap-1">
-            {/* Sort Button & Dropdown (Disabled if <= 1 document) */}
-            <div className="relative" ref={sortMenuRef}>
-              <button 
-                onClick={() => {
-                  if (documents.length > 1) {
-                    setIsSortMenuOpen(prev => !prev);
-                  }
-                }}
-                disabled={documents.length <= 1}
-                className={`w-6 h-6 -ml-1 rounded transition-colors flex items-center justify-center ${
-                  documents.length > 1
-                    ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
-                    : "text-app-text-dim opacity-30 cursor-not-allowed"
-                }`}
-                title={documents.length > 1 ? t('right.sortSources') : t('right.addMoreSort')}
-              >
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" className="opacity-90">
-                  <rect x="2" y="3" width="12" height="1.6" rx="0.8" />
-                  <rect x="2" y="7.2" width="8" height="1.6" rx="0.8" />
-                  <rect x="2" y="11.4" width="4.5" height="1.6" rx="0.8" />
-                </svg>
-              </button>
-
-              {/* Sort Dropdown Menu (2 Sections with Divider: Criteria & Direction) */}
-              {isSortMenuOpen && (
-                <div className="absolute left-0 top-7 z-30 w-36 rounded-xl bg-app-dropdown border border-app-border-strong shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-app-text">
-                  {/* Section 1: Sort Criteria */}
-                  <div className="space-y-0.5 pb-0.5">
-                    <button
-                      onClick={() => { setSortBy("title"); setIsSortMenuOpen(false); }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
-                    >
-                      <span className={sortBy === "title" ? "text-app-text font-medium" : "text-app-text-muted"}>Title</span>
-                      {sortBy === "title" && <Check size={13} className="text-blue-500" strokeWidth={2.5} />}
-                    </button>
-                    <button
-                      onClick={() => { setSortBy("date"); setIsSortMenuOpen(false); }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
-                    >
-                      <span className={sortBy === "date" ? "text-app-text font-medium" : "text-app-text-muted"}>Date added</span>
-                      {sortBy === "date" && <Check size={13} className="text-blue-500" strokeWidth={2.5} />}
-                    </button>
-                  </div>
-
-                  {/* Section Divider Line */}
-                  <div className="border-t border-app-divider my-1" />
-
-                  {/* Section 2: Sort Direction (Ascending / Descending) */}
-                  <div className="space-y-0.5 pt-0.5">
-                    <button
-                      onClick={() => { setSortDirection("asc"); setIsSortMenuOpen(false); }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
-                    >
-                      <span className={sortDirection === "asc" ? "text-app-text font-medium" : "text-app-text-muted"}>Ascending</span>
-                      {sortDirection === "asc" && <Check size={13} className="text-blue-500" strokeWidth={2.5} />}
-                    </button>
-                    <button
-                      onClick={() => { setSortDirection("desc"); setIsSortMenuOpen(false); }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center justify-between transition-colors cursor-pointer text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
-                    >
-                      <span className={sortDirection === "desc" ? "text-app-text font-medium" : "text-app-text-muted"}>Descending</span>
-                      {sortDirection === "desc" && <Check size={13} className="text-blue-500" strokeWidth={2.5} />}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Always Rendered Action Icon Buttons with Clean Disabled State */}
-            <div className="flex items-center gap-1">
-              {/* Clean Duplicates Button */}
-              <button
-                onClick={handleCleanDuplicates}
-                disabled={documents.length <= 1 || isCleaningDuplicates}
-                className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-                  documents.length > 1 && !isCleaningDuplicates
-                    ? "text-app-text-muted hover:text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
-                    : "text-app-text-dim opacity-30 cursor-not-allowed"
-                }`}
-                title={t('right.cleanDup')}
-              >
-                {isCleaningDuplicates ? (
-                  <Loader2 size={14} className="animate-spin text-emerald-500" />
-                ) : (
-                  <Sparkles size={14} />
-                )}
-              </button>
-
-              {/* Rename Button (Enabled strictly when exactly 1 source is selected) */}
-              <button
-                onClick={handleOpenRename}
-                disabled={selectedCount !== 1}
-                className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-                  selectedCount === 1
-                    ? "text-app-text-muted hover:text-blue-500 hover:bg-blue-500/10 cursor-pointer"
-                    : selectedCount > 1
-                    ? "text-app-text-dim opacity-25 cursor-not-allowed"
-                    : "text-app-text-dim opacity-30 cursor-not-allowed"
-                }`}
-                title={
-                  selectedCount === 1
-                    ? t('right.renameSelected')
-                    : selectedCount > 1
-                    ? t('right.renameMultiError').replace('{n}', selectedCount.toString())
-                    : t('right.renameSelectOne')
-                }
-              >
-                <Pencil size={14} />
-              </button>
-
-              {/* Download Button */}
-              {(() => {
-                const downloadableSelectedCount = selectedDocList.filter(d => d.has_full_pdf !== false).length;
-                const canDownload = selectedCount > 0 && downloadableSelectedCount > 0 && !isBulkDownloading;
-                const tooltipText = selectedCount === 0 
-                  ? t('right.selectToDownload')
-                  : downloadableSelectedCount === 0
-                  ? t('right.downloadNotAvail')
-                  : selectedCount === 1
-                  ? t('right.downloadPdf')
-                  : downloadableSelectedCount === selectedCount
-                  ? t('right.downloadSelected').replace('{n}', selectedCount.toString())
-                  : t('right.downloadSelectedSkip').replace('{n}', downloadableSelectedCount.toString()).replace('{m}', (selectedCount - downloadableSelectedCount).toString());
-
-                return (
-                  <button
-                    onClick={handleBulkDownload}
-                    disabled={!canDownload}
-                    className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-                      canDownload
-                        ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
-                        : "text-app-text-dim opacity-30 cursor-not-allowed"
-                    }`}
-                    title={tooltipText}
-                  >
-                    {isBulkDownloading ? (
-                      <Loader2 size={15} className="animate-spin text-blue-500" />
-                    ) : (
-                      <Download size={15} />
-                    )}
-                  </button>
-                );
-              })()}
-
-              {/* Delete Button */}
-              <button
-                onClick={() => {
-                  setDocToDelete(null); // Ensure bulk delete mode uses selected checkboxes
-                  setShowBulkDeleteConfirm(true);
-                }}
-                disabled={selectedCount === 0 || isBulkDeleting}
-                className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-                  selectedCount > 0
-                    ? "text-app-text-muted hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
-                    : "text-app-text-dim opacity-30 cursor-not-allowed"
-                }`}
-                title={selectedCount > 0 ? t('right.deleteSelected').replace('{n}', selectedCount.toString()) : t('right.selectToDelete')}
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-          </div>
-
-          {/* Select all label and checkbox (Disabled when 0 documents) */}
-          <div className={`flex items-center gap-2 pr-0.5 whitespace-nowrap select-none ${
-            documents.length === 0 ? "opacity-30 pointer-events-none" : ""
-          }`}>
-            <span className="text-[11px] font-medium text-app-text-muted select-none">{t('right.selectAll')}</span>
-            <button
-              type="button"
-              onClick={handleToggleSelectAll}
-              disabled={documents.length === 0}
-              className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
-                documents.length === 0 
-                  ? "border-app-border-strong bg-transparent cursor-not-allowed"
-                  : isAllSelected || isPartiallySelected 
-                  ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:border-gray-300" 
-                  : "border-app-border-strong bg-transparent cursor-pointer hover:border-blue-500"
-              }`}
-              title={documents.length === 0 ? t('right.noSourcesAvail') : isAllSelected ? t('right.unselectAll') : t('right.selectAll')}
-            >
-              {isAllSelected && documents.length > 0 ? (
-                <Check size={10} strokeWidth={3} />
-              ) : isPartiallySelected ? (
-                <Minus size={10} strokeWidth={3} />
-              ) : null}
-            </button>
-          </div>
-        </div>
+        <SourcesToolbar
+          documents={documents}
+          selectedCount={selectedCount}
+          isSortMenuOpen={isSortMenuOpen}
+          setIsSortMenuOpen={setIsSortMenuOpen}
+          sortMenuRef={sortMenuRef}
+          sortBy={sortBy}
+          setSortBy={setSortBy}
+          sortDirection={sortDirection}
+          setSortDirection={setSortDirection}
+          isCleaningDuplicates={isCleaningDuplicates}
+          handleCleanDuplicates={handleCleanDuplicates}
+          handleOpenRename={handleOpenRename}
+          handleBulkDownload={handleBulkDownload}
+          isBulkDownloading={isBulkDownloading}
+          isBulkDeleting={isBulkDeleting}
+          setDocToDelete={setDocToDelete}
+          setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
+          handleToggleSelectAll={handleToggleSelectAll}
+          isAllSelected={isAllSelected}
+          isPartiallySelected={isPartiallySelected}
+          selectedDocList={selectedDocList}
+        />
       </div>
 
       {/* 4. Scrollable Document List Area ONLY */}
@@ -641,27 +474,3 @@ export default function RightSidebar({
     </aside>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
