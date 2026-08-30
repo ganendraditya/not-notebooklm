@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { TargetedSource } from "@/stores/documentStore";
 import ModelSelector from "@/components/ModelSelector";
-import SearchFilterPopover, { SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/components/SearchFilterPopover";
+import SearchFilterPopover from "@/components/SearchFilterPopover";
+import { type SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/lib/constants/academicFilters";
 import { useTranslation } from "@/lib/i18n";
 
 const ALLOWED_ATTACHMENT_EXTS = new Set([

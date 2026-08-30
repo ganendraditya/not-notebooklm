@@ -6,82 +6,21 @@ import {
   X, 
   SlidersHorizontal, 
   RotateCcw, 
-  Check, 
-  Calendar, 
-  Globe, 
-  GraduationCap, 
   Award, 
-  Search,
-  BookOpen,
-  Filter
+  BookOpen
 } from "lucide-react";
 
-export interface SearchFilterState {
-  yearFrom: string;
-  yearTo: string;
-  minCitations: string; // "" (default: 0 / any), or "10", "25", "50", "100"
-  languages: string[]; // empty [] or ["all"] means any/all world languages
-  fieldsOfStudy: string[];
-  scopusQuartiles: string[]; // ["Q1", "Q2", "Q3", "Q4"]
-  sintaTiers: string[]; // ["S1", "S2", "S3", "S4", "S5", "S6"]
-  excludePreprints: boolean;
-  openAccessOnly: boolean;
-}
+import {
+  type SearchFilterState,
+  DEFAULT_SEARCH_FILTER,
+  SCOPUS_QUARTILES,
+  SINTA_TIERS
+} from "@/lib/constants/academicFilters";
 
-export const DEFAULT_SEARCH_FILTER: SearchFilterState = {
-  yearFrom: "",
-  yearTo: "",
-  minCitations: "",
-  languages: [],
-  fieldsOfStudy: [],
-  scopusQuartiles: [],
-  sintaTiers: [],
-  excludePreprints: false,
-  openAccessOnly: false,
-};
-
-// 19 Official Level-0 Top-Level Domains from OpenAlex Taxonomy
-const OPENALEX_DOMAINS = [
-  { id: "Computer Science", label: "Computer Science & AI", icon: "💻" },
-  { id: "Engineering", label: "Engineering & Technology", icon: "⚙️" },
-  { id: "Medicine", label: "Medicine & Health", icon: "🩺" },
-  { id: "Mathematics", label: "Mathematics & Statistics", icon: "📐" },
-  { id: "Physics", label: "Physics", icon: "⚛️" },
-  { id: "Chemistry", label: "Chemistry", icon: "🧪" },
-  { id: "Biology", label: "Biology & Life Sciences", icon: "🧬" },
-  { id: "Materials Science", label: "Materials Science", icon: "🔬" },
-  { id: "Environmental Science", label: "Environmental Science", icon: "🌿" },
-  { id: "Geology", label: "Geology & Earth Sciences", icon: "🌍" },
-  { id: "Geography", label: "Geography & GIS", icon: "🗺️" },
-  { id: "Economics", label: "Economics & Econometrics", icon: "📈" },
-  { id: "Business", label: "Business & Management", icon: "💼" },
-  { id: "Psychology", label: "Psychology & Cognitive", icon: "🧠" },
-  { id: "Sociology", label: "Sociology & Social Science", icon: "👥" },
-  { id: "Political Science", label: "Political Science & Law", icon: "⚖️" },
-  { id: "Philosophy", label: "Philosophy & Ethics", icon: "📜" },
-  { id: "History", label: "History & Archaeology", icon: "🏛️" },
-  { id: "Art", label: "Art & Humanities", icon: "🎨" },
-];
-
-import { ALL_WORLD_LANGUAGES, LanguageItem } from "@/lib/languages";
-
-const ALL_LANGUAGES = ALL_WORLD_LANGUAGES;
-
-const SCOPUS_QUARTILES = [
-  { id: "Q1", label: "Q1", desc: "Top 25%" },
-  { id: "Q2", label: "Q2", desc: "Top 50%" },
-  { id: "Q3", label: "Q3", desc: "Top 75%" },
-  { id: "Q4", label: "Q4", desc: "Bottom 25%" },
-];
-
-const SINTA_TIERS = [
-  { id: "S1", label: "SINTA 1" },
-  { id: "S2", label: "SINTA 2" },
-  { id: "S3", label: "SINTA 3" },
-  { id: "S4", label: "SINTA 4" },
-  { id: "S5", label: "SINTA 5" },
-  { id: "S6", label: "SINTA 6" },
-];
+import YearRangeFilter from "./SearchFilter/YearRangeFilter";
+import DomainSelectFilter from "./SearchFilter/DomainSelectFilter";
+import LanguageSelectFilter from "./SearchFilter/LanguageSelectFilter";
+import { useSearchFilter, calculateCount } from "@/hooks/search/useSearchFilter";
 
 interface SearchFilterPopoverProps {
   filter: SearchFilterState;
@@ -91,29 +30,6 @@ interface SearchFilterPopoverProps {
   onToggle: () => void;
 }
 
-const sanitizeFilter = (raw: Partial<SearchFilterState> | undefined): SearchFilterState => ({
-  yearFrom: raw?.yearFrom || "",
-  yearTo: raw?.yearTo || "",
-  minCitations: raw?.minCitations || "",
-  languages: Array.isArray(raw?.languages) 
-    ? raw.languages 
-    : (raw as any)?.language && (raw as any).language !== "all" 
-      ? [(raw as any).language] 
-      : [],
-  fieldsOfStudy: Array.isArray(raw?.fieldsOfStudy) ? raw.fieldsOfStudy : [],
-  scopusQuartiles: Array.isArray(raw?.scopusQuartiles) ? raw.scopusQuartiles : [],
-  sintaTiers: Array.isArray(raw?.sintaTiers) ? raw.sintaTiers : [],
-  excludePreprints: !!raw?.excludePreprints,
-  openAccessOnly: !!raw?.openAccessOnly,
-});
-
-const formatPaperCount = (count?: number) => {
-  if (!count) return "";
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(0)}k`;
-  return count.toString();
-};
-
 export default function SearchFilterPopover({
   filter,
   onApplyFilter,
@@ -122,15 +38,20 @@ export default function SearchFilterPopover({
   onToggle,
 }: SearchFilterPopoverProps) {
   const { t } = useTranslation();
-  const [localFilter, setLocalFilter] = useState<SearchFilterState>(() => sanitizeFilter(filter));
+  
+  const {
+    localFilter,
+    setLocalFilter,
+    toggleField,
+    toggleLanguage,
+    toggleScopus,
+    toggleSinta,
+    setYearPreset
+  } = useSearchFilter(filter);
+
   const [domainSearch, setDomainSearch] = useState<string>("");
   const [languageSearch, setLanguageSearch] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Sync local state on prop change
-  useEffect(() => {
-    setLocalFilter(sanitizeFilter(filter));
-  }, [filter]);
 
   // Click outside & Escape key listeners
   useEffect(() => {
@@ -156,21 +77,6 @@ export default function SearchFilterPopover({
     };
   }, [isOpen, onClose]);
 
-  // Calculate applied filter badge count
-  const calculateCount = (f: SearchFilterState | undefined) => {
-    if (!f) return 0;
-    return (
-      (f.yearFrom || f.yearTo ? 1 : 0) +
-      (f.minCitations && Number(f.minCitations) > 0 ? 1 : 0) +
-      (f.languages?.length || 0) +
-      (f.fieldsOfStudy?.length || 0) +
-      (f.scopusQuartiles?.length || 0) +
-      (f.sintaTiers?.length || 0) +
-      (f.excludePreprints ? 1 : 0) +
-      (f.openAccessOnly ? 1 : 0)
-    );
-  };
-
   const appliedCount = calculateCount(filter);
   const activeLocalCount = calculateCount(localFilter);
 
@@ -183,134 +89,12 @@ export default function SearchFilterPopover({
     onClose();
   };
 
-  const toggleField = (fieldId: string) => {
-    if (fieldId === "all") {
-      setLocalFilter(prev => ({
-        ...prev,
-        fieldsOfStudy: []
-      }));
-      return;
-    }
-
-    setLocalFilter(prev => {
-      const current = prev?.fieldsOfStudy || [];
-      const exists = current.includes(fieldId);
-      const next = exists 
-        ? current.filter(f => f !== fieldId)
-        : [...current.filter(f => f !== "all"), fieldId];
-      return {
-        ...prev,
-        fieldsOfStudy: next
-      };
-    });
+  const formatPaperCount = (count?: number) => {
+    if (!count) return "";
+    if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+    if (count >= 1_000) return `${(count / 1_000).toFixed(0)}k`;
+    return count.toString();
   };
-
-  const toggleLanguage = (langId: string) => {
-    if (langId === "all") {
-      setLocalFilter(prev => ({
-        ...prev,
-        languages: []
-      }));
-      return;
-    }
-
-    setLocalFilter(prev => {
-      const current = prev?.languages || [];
-      const exists = current.includes(langId);
-      const next = exists 
-        ? current.filter(l => l !== langId)
-        : [...current.filter(l => l !== "all"), langId];
-      return {
-        ...prev,
-        languages: next
-      };
-    });
-  };
-
-  const toggleScopus = (qId: string) => {
-    if (qId === "all") {
-      setLocalFilter(prev => ({
-        ...prev,
-        scopusQuartiles: []
-      }));
-      return;
-    }
-
-    const scopusOrder = ["Q1", "Q2", "Q3", "Q4"];
-    const targetIdx = scopusOrder.indexOf(qId);
-    if (targetIdx === -1) return;
-
-    setLocalFilter(prev => {
-      const current = prev?.scopusQuartiles || [];
-      const isExactSetSelected = 
-        current.length === targetIdx + 1 && 
-        scopusOrder.slice(0, targetIdx + 1).every(id => current.includes(id));
-
-      if (isExactSetSelected) {
-        return {
-          ...prev,
-          scopusQuartiles: []
-        };
-      }
-
-      return {
-        ...prev,
-        scopusQuartiles: scopusOrder.slice(0, targetIdx + 1)
-      };
-    });
-  };
-
-  const toggleSinta = (sId: string) => {
-    if (sId === "all") {
-      setLocalFilter(prev => ({
-        ...prev,
-        sintaTiers: []
-      }));
-      return;
-    }
-
-    const sintaOrder = ["S1", "S2", "S3", "S4", "S5", "S6"];
-    const targetIdx = sintaOrder.indexOf(sId);
-    if (targetIdx === -1) return;
-
-    setLocalFilter(prev => {
-      const current = prev?.sintaTiers || [];
-      const isExactSetSelected = 
-        current.length === targetIdx + 1 && 
-        sintaOrder.slice(0, targetIdx + 1).every(id => current.includes(id));
-
-      if (isExactSetSelected) {
-        return {
-          ...prev,
-          sintaTiers: []
-        };
-      }
-
-      return {
-        ...prev,
-        sintaTiers: sintaOrder.slice(0, targetIdx + 1)
-      };
-    });
-  };
-
-  const setYearPreset = (from: string, to: string) => {
-    setLocalFilter(prev => ({
-      ...prev,
-      yearFrom: from,
-      yearTo: to
-    }));
-  };
-
-  const filteredDomains = OPENALEX_DOMAINS.filter(d => 
-    d.label.toLowerCase().includes(domainSearch.toLowerCase()) ||
-    d.id.toLowerCase().includes(domainSearch.toLowerCase())
-  );
-
-  const filteredLanguages = ALL_LANGUAGES.filter(lang => 
-    lang.label.toLowerCase().includes(languageSearch.toLowerCase()) ||
-    lang.id.toLowerCase().includes(languageSearch.toLowerCase()) ||
-    lang.countries.toLowerCase().includes(languageSearch.toLowerCase())
-  );
 
   return (
     <div className="relative inline-block text-left select-none text-app-text" ref={containerRef}>
@@ -377,66 +161,12 @@ export default function SearchFilterPopover({
             <div className="py-3 space-y-4 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
             
             {/* 1. Year Range Filter */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold text-app-text flex items-center gap-1.5">
-                <Calendar size={13} className="text-blue-500" />
-                {t('filter.year')}
-              </span>
-
-              <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => setYearPreset(localFilter.yearFrom === "2023" && localFilter.yearTo === "2026" ? "" : "2023", localFilter.yearFrom === "2023" && localFilter.yearTo === "2026" ? "" : "2026")}
-                  className={
-                    localFilter.yearFrom === "2023" && localFilter.yearTo === "2026"
-                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
-                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
-                  }
-                >
-                  {t('filter.past3years')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setYearPreset(localFilter.yearFrom === "2020" && localFilter.yearTo === "2026" ? "" : "2020", localFilter.yearFrom === "2020" && localFilter.yearTo === "2026" ? "" : "2026")}
-                  className={
-                    localFilter.yearFrom === "2020" && localFilter.yearTo === "2026"
-                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
-                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
-                  }
-                >
-                  {t('filter.past5years')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setYearPreset(localFilter.yearFrom === "2015" && localFilter.yearTo === "2026" ? "" : "2015", localFilter.yearFrom === "2015" && localFilter.yearTo === "2026" ? "" : "2026")}
-                  className={
-                    localFilter.yearFrom === "2015" && localFilter.yearTo === "2026"
-                      ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
-                      : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
-                  }
-                >
-                  {t('filter.past10years')}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="number"
-                  placeholder={t('filter.from')}
-                  value={localFilter.yearFrom}
-                  onChange={(e) => setLocalFilter(prev => ({ ...prev, yearFrom: e.target.value }))}
-                  className="w-full bg-app-input-surface border border-app-border rounded-lg px-2.5 py-1.5 text-xs text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500"
-                />
-                <span className="text-app-text-dim text-xs">-</span>
-                <input
-                  type="number"
-                  placeholder={t('filter.to')}
-                  value={localFilter.yearTo}
-                  onChange={(e) => setLocalFilter(prev => ({ ...prev, yearTo: e.target.value }))}
-                  className="w-full bg-app-input-surface border border-app-border rounded-lg px-2.5 py-1.5 text-xs text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
+            <YearRangeFilter 
+              localFilter={localFilter} 
+              setLocalFilter={setLocalFilter} 
+              setYearPreset={setYearPreset} 
+              t={t} 
+            />
 
             {/* 2. Minimum Citations Filter */}
             <div className="space-y-2 pt-2 border-t border-app-divider">
@@ -619,128 +349,23 @@ export default function SearchFilterPopover({
             </div>
 
             {/* 5. Language Selector (Multi-select Checkboxes) */}
-            <div className="space-y-2 pt-2 border-t border-app-divider">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-app-text flex items-center gap-1.5 truncate">
-                  <Globe size={13} className="text-blue-500 shrink-0" />
-                  <span className="truncate">
-                    {localFilter.languages.length ? t('filter.languagesCount').replace('{count}', localFilter.languages.length.toString()) : t('filter.languagesAll')}
-                  </span>
-                </span>
-              </div>
-
-              {/* Search Language or Country Input */}
-              <div className="relative">
-                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-app-text-dim" />
-                <input
-                  type="text"
-                  placeholder={t('filter.searchLangPlaceholder')}
-                  value={languageSearch}
-                  onChange={(e) => setLanguageSearch(e.target.value)}
-                  className="w-full bg-app-input-surface border border-app-border rounded-lg pl-7 pr-2.5 py-1.5 text-[11.5px] text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Scrollable Language Grid */}
-              <div className="grid grid-cols-2 gap-1.5 max-h-[160px] overflow-y-auto pr-0.5 custom-scrollbar">
-                {filteredLanguages.filter(l => l.id !== "all").length === 0 ? (
-                  <div className="col-span-2 text-center text-xs text-app-text-dim py-3">
-                    {t('filter.noLangFound')}
-                  </div>
-                ) : (
-                  filteredLanguages
-                    .filter(lang => lang.id !== "all")
-                    .map((lang) => {
-                      const isChecked = localFilter.languages.includes(lang.id);
-                      return (
-                        <button
-                          key={lang.id}
-                          type="button"
-                          onClick={() => toggleLanguage(lang.id)}
-                          className={
-                            isChecked
-                              ? "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-blue-600/20 border-blue-500/70 text-app-text font-medium shadow-sm"
-                              : "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
-                          }
-                        >
-                          <div className="flex items-center gap-1.5 truncate min-w-0">
-                            <span className="text-xs shrink-0">{lang.flag}</span>
-                            <div className="truncate min-w-0 flex-1">
-                              <div className="flex items-center gap-1 truncate">
-                                <span className="truncate">{lang.label}</span>
-                                {lang.papersCount !== undefined && (
-                                  <span className="text-[9.5px] text-app-text-dim font-mono shrink-0">
-                                    ({formatPaperCount(lang.papersCount)})
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                            isChecked ? "bg-blue-600 border-blue-500 text-white" : "border-app-border-strong bg-transparent"
-                          }`}>
-                            {isChecked && <Check size={10} strokeWidth={3} />}
-                          </div>
-                        </button>
-                      );
-                    })
-                )}
-              </div>
-            </div>
+            <LanguageSelectFilter
+              localFilter={localFilter}
+              languageSearch={languageSearch}
+              setLanguageSearch={setLanguageSearch}
+              toggleLanguage={toggleLanguage}
+              formatPaperCount={formatPaperCount}
+              t={t}
+            />
 
             {/* 6. Fields of Study (Multi-select Checkboxes) */}
-            <div className="space-y-2 pt-2 border-t border-app-divider">
-              <span className="text-xs font-semibold text-app-text flex items-center gap-1.5">
-                <GraduationCap size={13} className="text-blue-500" />
-                {localFilter.fieldsOfStudy.length ? t('filter.fieldsCount').replace('{count}', localFilter.fieldsOfStudy.length.toString()) : t('filter.fieldsAll')}
-              </span>
-
-              {/* Search Domain Input */}
-              <div className="relative">
-                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-app-text-dim" />
-                <input
-                  type="text"
-                  placeholder={t('filter.searchFieldPlaceholder')}
-                  value={domainSearch}
-                  onChange={(e) => setDomainSearch(e.target.value)}
-                  className="w-full bg-app-input-surface border border-app-border rounded-lg pl-7 pr-2.5 py-1.5 text-[11.5px] text-app-text placeholder:text-app-text-dim focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5 max-h-[160px] overflow-y-auto pr-0.5 custom-scrollbar">
-                {filteredDomains.length === 0 ? (
-                  <div className="col-span-2 text-center text-xs text-app-text-dim py-3">
-                    {t('filter.noFieldFound')}
-                  </div>
-                ) : (
-                  filteredDomains.map((f) => {
-                    const isChecked = localFilter.fieldsOfStudy.includes(f.id);
-                    return (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => toggleField(f.id)}
-                        className={
-                          isChecked 
-                            ? "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-blue-600/20 border-blue-500/70 text-app-text font-medium shadow-sm"
-                            : "p-2 rounded-xl border text-left text-[11px] transition-all cursor-pointer flex items-center justify-between gap-1.5 bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
-                        }
-                      >
-                        <div className="flex items-center gap-1.5 truncate">
-                          <span className="text-xs">{f.icon}</span>
-                          <span className="truncate">{t(`filter.field.${f.id}`) || f.label}</span>
-                        </div>
-                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                          isChecked ? "bg-blue-600 border-blue-500 text-white" : "border-app-border-strong bg-transparent"
-                        }`}>
-                          {isChecked && <Check size={10} strokeWidth={3} />}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+            <DomainSelectFilter 
+              localFilter={localFilter}
+              domainSearch={domainSearch}
+              setDomainSearch={setDomainSearch}
+              toggleField={toggleField}
+              t={t}
+            />
 
           </div>
 
