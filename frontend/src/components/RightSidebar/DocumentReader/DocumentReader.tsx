@@ -167,64 +167,67 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
               </div>
             ) : null}
 
-            <div className="max-w-2xl mx-auto bg-app-surface min-h-full">
+            <div className="max-w-2xl mx-auto min-h-full p-4">
               {/* Top Meta Section */}
-              <div className="px-5 py-6 border-b border-app-divider space-y-4">
-                <h1 className="text-xl font-bold text-app-text leading-tight tracking-tight break-words">
-                  {title}
-                </h1>
-
-                <div className="space-y-3.5">
-                  <div className="flex items-start gap-2 text-[13px] leading-relaxed">
-                    <span className="font-semibold text-app-text shrink-0">{t('right.authors')}</span>
-                    <span className="text-blue-400 break-words line-clamp-3 hover:line-clamp-none transition-all cursor-text">{authorsStr}</span>
+              <div className="bg-app-surface border border-app-border rounded-xl mb-4 overflow-hidden shadow-sm">
+                
+                {/* Full Manuscript Verified Header */}
+                <div className="px-5 py-4 border-b border-app-border bg-emerald-500/10">
+                  <div className="flex items-center gap-2 text-emerald-500 font-medium text-sm">
+                    <Check size={16} className="stroke-[2.5]" />
+                    <span>Full Manuscript Verified</span>
                   </div>
+                </div>
 
-                  <div className="flex flex-wrap items-center gap-3 text-xs">
-                    <div className="flex items-center gap-1.5 bg-app-sidebar border border-app-border px-2 py-1 rounded-md text-app-text">
-                      <span className="text-app-text-muted font-medium">{t('right.date')}</span>
-                      <span>{pubDateStr}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-app-sidebar border border-app-border px-2 py-1 rounded-md text-app-text max-w-[200px]">
-                      <span className="text-app-text-muted font-medium">{t('right.journal')}</span>
-                      <span className="truncate" title={journalName}>{journalName}</span>
-                    </div>
-                    {citationsCount > 0 && (
-                      <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-1 rounded-md font-medium">
-                        <Quote size={12} className="text-blue-500" />
-                        <span>{citationsCount} {t('right.citations')}</span>
+                <div className="px-5 py-6 space-y-4">
+                  <div className="flex flex-wrap items-center gap-3 text-xs mb-3">
+                    {pubDateStr && (
+                      <div className="flex items-center gap-1.5 text-app-text-muted">
+                        <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">PDF</span>
+                        <span>{pubDateStr}</span>
                       </div>
                     )}
                   </div>
-                </div>
-
-                <div className="space-y-1.5 pt-1">
-                  <h3 className="text-sm font-bold text-app-text">{t('right.abstract')}</h3>
-                  <div className="text-[13px] leading-relaxed text-app-text-muted break-words">
-                    {cleanAbstract ? (
-                      <p>{cleanAbstract}</p>
-                    ) : (
-                      <p className="italic text-app-text-dim">{t('right.noAbstractProvided')}</p>
-                    )}
-                  </div>
+                  
+                  <h1 className="text-xl font-bold text-app-text leading-tight tracking-tight break-words">
+                    {title}
+                  </h1>
+                  
+                  {authorsStr && (
+                    <p className="text-sm text-app-text-muted mt-2">
+                      By {authorsStr}
+                    </p>
+                  )}
+                  
+                  {/* Document Text Body Section */}
+                  {paperDetails?.content || viewingDoc?.content ? (
+                    <div className="pt-6 mt-6 border-t border-app-border text-[14px] leading-[1.75] text-app-text break-words whitespace-pre-wrap document-content-view">
+                      {(() => {
+                        let contentToRender = paperDetails?.content || viewingDoc?.content;
+                        if (!contentToRender) return null;
+                        
+                        if (getHighlightedContent) {
+                          const highlighted = getHighlightedContent();
+                          if (highlighted && (!Array.isArray(highlighted) || highlighted.length > 0)) {
+                            return highlighted;
+                          }
+                        }
+                        return contentToRender;
+                      })()}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
-              {/* Document Text Body Section */}
-              {paperDetails?.content ? (
+              {!paperDetails?.content && !viewingDoc?.content && (
                 <div className="px-5 py-6">
-                  <h3 className="text-sm font-bold text-app-text mb-4 uppercase tracking-wider text-app-text-muted">{t('right.fullTextBody')}</h3>
-                  <div className="text-[14px] leading-[1.75] text-app-text break-words">
-                    {getHighlightedContent()}
+                  <div className="p-4 rounded-xl bg-app-card border border-app-border text-center py-10 space-y-2">
+                    <Check size={28} className="text-emerald-500 mx-auto stroke-[2]" />
+                    <p className="text-xs text-app-text font-medium">{t('right.docIndexed')}</p>
+                    <p className="text-[11px] text-app-text-dim max-w-[240px] mx-auto">
+                      {t('right.docIndexedDesc')}
+                    </p>
                   </div>
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl bg-app-card border border-app-border text-center py-10 space-y-2">
-                  <FileText size={28} className="text-app-text-dim mx-auto stroke-[1.5]" />
-                  <p className="text-xs text-app-text font-medium">{t('right.docIndexed')}</p>
-                  <p className="text-[11px] text-app-text-dim max-w-[240px] mx-auto">
-                    {t('right.docIndexedDesc')}
-                  </p>
                 </div>
               )}
             </div>
@@ -357,7 +360,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
               title={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"}
             >
               <ExternalLink size={12} />
-              <span>{landingUrl ? "PDF ???" : "Find ???"}</span>
+              <span>{landingUrl ? "PDF \u2197" : "PDF \u2197"}</span>
             </a>
           );
         })()}

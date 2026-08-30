@@ -296,7 +296,7 @@ export default function RightSidebar({
             setActiveMatchIndex(prev => prev > 0 ? prev - 1 : totalMatches - 1);
           }
         }}
-        getHighlightedContent={() => getHighlightedContent((paperDetails?.content || ""), (groundingHighlight?.sentence || ""), highlightRefsMap, activeMatchIndex, groundingHighlight?.aiQuotes).nodes}
+        getHighlightedContent={() => getHighlightedContent((paperDetails?.content || (viewingDoc as any)?.content || ""), (groundingHighlight?.sentence || ""), highlightRefsMap, activeMatchIndex, groundingHighlight?.aiQuotes).nodes}
         cleanAbstract={cleanAbstract}
         authorsStr={authorsStr}
         pubDateStr={pubDateStr}

@@ -70,7 +70,7 @@ export function usePaperDetails({
     
     let isMounted = true;
 
-    fetch("{backendUrl}/chats/{activeChatId}/documents/{viewingDoc.id}/content")
+    fetch(`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/content`)
       .then(res => res.json())
       .then(data => {
         if (!isMounted) return;
