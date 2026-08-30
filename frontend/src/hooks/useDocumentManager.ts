@@ -10,6 +10,7 @@ export function useDocumentManager({
   backendUrl,
   onDocumentAdded,
   onDocumentUpdated,
+  onDocumentDeleted,
   onBulkDocumentsDeleted,
   onEnsureChatSession,
   viewingDoc,
@@ -22,6 +23,7 @@ export function useDocumentManager({
   backendUrl: string;
   onDocumentAdded?: (doc: Document, targetChatId?: string) => void;
   onDocumentUpdated?: (doc: Document) => void;
+  onDocumentDeleted?: (id: number) => void;
   onBulkDocumentsDeleted?: (ids: number[]) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   viewingDoc?: any;
@@ -82,16 +84,13 @@ export function useDocumentManager({
     return docs;
   }, [documents, sortBy, sortDirection]);
 
-  const toggleDocSelection = (id: number, forceState?: boolean) => {
+  const toggleDocSelection = (docId: number) => {
     setSelectedDocs(prev => {
-      const isSelected = forceState !== undefined ? forceState : !prev[id];
-      if (isSelected) {
-        return { ...prev, [id]: true };
-      } else {
-        const newObj = { ...prev };
-        delete newObj[id];
-        return newObj;
-      }
+      const current = prev[docId] !== undefined ? prev[docId] : true;
+      return {
+        ...prev,
+        [docId]: !current
+      };
     });
   };
 
@@ -107,12 +106,23 @@ export function useDocumentManager({
   };
 
   const getFileBadgeInfo = (filename: string) => {
-    const ext = filename.split(".").pop()?.toLowerCase();
-    if (ext === "pdf") return { label: "PDF", bg: "bg-red-500/10", text: "text-red-500", border: "border-red-500/20" };
-    if (ext === "txt" || ext === "md") return { label: "TXT", bg: "bg-gray-500/10", text: "text-gray-500", border: "border-gray-500/20" };
-    if (ext === "docx" || ext === "doc") return { label: "DOC", bg: "bg-blue-500/10", text: "text-blue-500", border: "border-blue-500/20" };
-    if (ext === "bib" || ext === "bibtex" || ext === "ris") return { label: "BIB", bg: "bg-amber-500/10", text: "text-amber-500", border: "border-amber-500/20" };
-    return { label: "FILE", bg: "bg-app-item-hover", text: "text-app-text-muted", border: "border-transparent" };
+    if (filename.startsWith("10.") || filename.startsWith("DOI:") || filename.includes("doi.org")) {
+      return { label: "DOI", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
+    }
+    const ext = filename.split(".").pop()?.toLowerCase() || "doc";
+    if (ext === "pdf") {
+      return { label: "PDF", bg: "bg-red-600/15 border-red-500/40 text-red-500" };
+    } else if (ext === "docx" || ext === "doc") {
+      return { label: "DOC", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
+    } else if (ext === "bib" || ext === "bibtex") {
+      return { label: "BIB", bg: "bg-amber-600/15 border-amber-500/40 text-amber-500" };
+    } else if (ext === "ris") {
+      return { label: "RIS", bg: "bg-orange-600/15 border-orange-500/40 text-orange-500" };
+    } else if (ext === "md") {
+      return { label: "MD", bg: "bg-purple-600/15 border-purple-500/40 text-purple-500" };
+    } else {
+      return { label: "TXT", bg: "bg-app-item-hover border-app-border text-app-text-muted" };
+    }
   };
 
   const handleOpenRename = () => {
@@ -318,27 +328,30 @@ export function useDocumentManager({
   };
 
   const handleConfirmBulkDelete = async () => {
-    if (!activeChatId) return;
+    if (!activeChatId || isBulkDeleting) return;
     setIsBulkDeleting(true);
-    
-    const idsToDelete = docToDelete !== null ? [docToDelete] : Object.keys(selectedDocs).map(Number);
-    if (idsToDelete.length === 0) {
-      setIsBulkDeleting(false);
-      return;
-    }
-
     try {
-      const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk`, {
-        method: "DELETE",
+      const docIds = docToDelete !== null ? [docToDelete] : selectedDocList.map(d => d.id);
+      
+      if (docIds.length === 0) {
+        setIsBulkDeleting(false);
+        return;
+      }
+      
+      const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk_delete`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ document_ids: idsToDelete })
+        body: JSON.stringify({ doc_ids: docIds })
       });
       if (res.ok) {
-        onBulkDocumentsDeleted?.(idsToDelete);
-        
-        if (docToDelete === null) setSelectedDocs({});
-        
-        if (viewingDoc && idsToDelete.includes((viewingDoc as any)?.id) && setViewingDoc) {
+        if (onBulkDocumentsDeleted) {
+          onBulkDocumentsDeleted(docIds);
+        } else if (onDocumentDeleted) {
+          docIds.forEach(id => onDocumentDeleted(id));
+        }
+        setShowBulkDeleteConfirm(false);
+        setDocToDelete(null); // Reset after success
+        if (viewingDoc && docIds.includes(((viewingDoc as any)?.id || "undefined"))) {
           setViewingDoc(null);
         }
       } else {
@@ -349,8 +362,6 @@ export function useDocumentManager({
       alert(t("right.deleteError") || "Error deleting documents");
     } finally {
       setIsBulkDeleting(false);
-      setShowBulkDeleteConfirm(false);
-      setDocToDelete(null);
     }
   };
 

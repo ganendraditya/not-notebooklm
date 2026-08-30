@@ -6,6 +6,7 @@ import { usePaperDetails } from "@/hooks/usePaperDetails";
 import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
 import { generateCitations, CitationFormats } from "@/hooks/useCitationGenerator";
 "use client";
+import { useDocumentManager } from "@/hooks/useDocumentManager";
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { 
@@ -112,18 +113,53 @@ export default function RightSidebar({
   onClose 
 }: RightSidebarProps) {
   const { t } = useTranslation();
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedDocs, setSelectedDocs] = useState<Record<number, boolean>>({});
-  
-  // Sorting state & dropdown
-  const [sortBy, setSortBy] = useState<"date" | "title">("date");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
-  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
+  const { viewingDoc, setViewingDoc, paperDetails, isLoadingDetails, activeTab, setActiveTab } = usePaperDetails({ activeChatId, backendUrl, externalViewingDoc, groundingHighlight });
+  const {
+    selectedDocs, setSelectedDocs,
+    sortBy, setSortBy,
+    sortDirection, setSortDirection,
+    isSortMenuOpen, setIsSortMenuOpen,
+    activeMenuId, setActiveMenuId,
+    isCleaningDuplicates, setIsCleaningDuplicates,
+    cleanFeedback, setCleanFeedback,
+    isAddSourcesModalOpen, setIsAddSourcesModalOpen,
+    doiInput, setDoiInput,
+    internalPendingSources, setInternalPendingSources,
+    pendingSources,
+    isDraggingOver, setIsDraggingOver,
+    isRenameModalOpen, setIsRenameModalOpen,
+    renamingDoc, setRenamingDoc,
+    renameTitleInput, setRenameTitleInput,
+    isSavingRename, setIsSavingRename,
+    renameError, setRenameError,
+    docToDelete, setDocToDelete,
+    showBulkDeleteConfirm, setShowBulkDeleteConfirm,
+    isBulkDeleting, setIsBulkDeleting,
+    isBulkDownloading, setIsBulkDownloading,
+    downloadTask, setDownloadTask,
+    selectedDocList, selectedCount,
+    isAllSelected, isPartiallySelected,
+    sortedDocuments,
+    toggleDocSelection, handleToggleSelectAll,
+    getFileBadgeInfo, handleOpenRename, handleSaveRename,
+    handleCleanDuplicates, handleBulkDownload, handleConfirmBulkDelete,
+    handleUploadBatch, handleImportDoi, downloadFileText
+  } = useDocumentManager({
+    documents,
+    externalPendingSources,
+    activeChatId,
+    backendUrl,
+    onDocumentAdded,
+    onDocumentUpdated,
+    onBulkDocumentsDeleted,
+    onEnsureChatSession,
+    viewingDoc,
+    setViewingDoc,
+    t
+  });
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
 
-  const { viewingDoc, setViewingDoc, paperDetails, isLoadingDetails, activeTab, setActiveTab } = usePaperDetails({ activeChatId, backendUrl, externalViewingDoc, groundingHighlight });
   // Citation Modal State
   const [isCiteModalOpen, setIsCiteModalOpen] = useState<boolean>(false);
   const [selectedCitationStyle, setSelectedCitationStyle] = useState<"apa" | "ieee" | "harvard" | "mla" | "chicago" | "bibtex" | "ris">("apa");
@@ -182,513 +218,25 @@ export default function RightSidebar({
     };
   }, [isSortMenuOpen, activeMenuId]);
 
-  const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
-  const [cleanFeedback, setCleanFeedback] = useState<string | null>(null);
-  const [isAddSourcesModalOpen, setIsAddSourcesModalOpen] = useState(false);
-  const [doiInput, setDoiInput] = useState("");
-  const [internalPendingSources, setInternalPendingSources] = useState<PendingSourceItem[]>([]);
-  const pendingSources = useMemo(() => {
-    return [...internalPendingSources, ...externalPendingSources];
-  }, [internalPendingSources, externalPendingSources]);
-  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  // Rename source state
-  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
-  const [renamingDoc, setRenamingDoc] = useState<Document | null>(null);
-  const [renameTitleInput, setRenameTitleInput] = useState("");
-  const [isSavingRename, setIsSavingRename] = useState(false);
-  const [renameError, setRenameError] = useState<string | null>(null);
 
-  const handleOpenRename = () => {
-    if (selectedCount !== 1) return;
-    const targetDoc = selectedDocList[0];
-    setRenamingDoc(targetDoc);
-    setRenameTitleInput(targetDoc.title || targetDoc.filename.replace(/\.[^/.]+$/, "").replace(/_/g, " "));
-    setRenameError(null);
-    setIsRenameModalOpen(true);
-  };
 
-  const handleSaveRename = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!activeChatId || !renamingDoc || isSavingRename) return;
-    const cleanTitle = renameTitleInput.trim();
-    if (!cleanTitle) {
-      setRenameError("Document title cannot be empty.");
-      return;
-    }
-    setIsSavingRename(true);
-    setRenameError(null);
-    try {
-      const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/${renamingDoc.id}/rename`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: cleanTitle })
-      });
-      if (res.ok) {
-        const updatedDoc = await res.json();
-        onDocumentUpdated?.(updatedDoc);
-        if (viewingDoc && ((viewingDoc as any)?.id || "undefined") === renamingDoc.id) {
-          setViewingDoc(prev => prev ? { ...prev, title: updatedDoc.title } : null);
-          /* handled by usePaperDetails cache or next fetch */
-        }
-        setIsRenameModalOpen(false);
-        setRenamingDoc(null);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setRenameError(err.detail || "Failed to rename document.");
-      }
-    } catch (err: any) {
-      setRenameError(err?.message || "Network error while renaming document.");
-    } finally {
-      setIsSavingRename(false);
-    }
-  };
 
-  const handleCleanDuplicates = async () => {
-    if (!activeChatId || isCleaningDuplicates || documents.length === 0) return;
-    setIsCleaningDuplicates(true);
-    setCleanFeedback(null);
-    try {
-      const res = await fetch(`${backendUrl}/chats/${activeChatId}/clean_duplicates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.cleaned_doc_ids && data.cleaned_doc_ids.length > 0) {
-          onBulkDocumentsDeleted?.(data.cleaned_doc_ids);
-          setCleanFeedback(`Removed ${data.cleaned_count} duplicate(s)`);
-        } else {
-          setCleanFeedback("No duplicates found");
-        }
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setCleanFeedback(err.detail || "Failed to clean duplicates");
-      }
-      setTimeout(() => setCleanFeedback(null), 3500);
-    } catch (e: any) {
-      console.error("Clean duplicates failed:", e);
-      setCleanFeedback("Network error connecting to server");
-      setTimeout(() => setCleanFeedback(null), 3500);
-    } finally {
-      setIsCleaningDuplicates(false);
-    }
-  };
 
-  const SUPPORTED_EXTENSIONS = new Set([
-    ".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris"
-  ]);
 
-  const handleUploadBatch = async (files: File[]) => {
-    if (!files || files.length === 0) return;
 
-    // Filter out unsupported files (e.g. .exe, .zip, etc.)
-    const validFiles = files.filter(f => {
-      const ext = f.name.toLowerCase().slice(f.name.lastIndexOf("."));
-      return SUPPORTED_EXTENSIONS.has(ext);
-    });
 
-    if (validFiles.length === 0) {
-      alert(t('alert.unsupportedFormat') || "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris");
-      return;
-    }
 
-    if (validFiles.length < files.length) {
-      const skippedCount = files.length - validFiles.length;
-      console.warn(`[Upload] Skipped ${skippedCount} unsupported file(s).`);
-    }
 
-    // Check capacity limit of 300
-    const availableSlots = Math.max(0, 300 - (documents.length + pendingSources.length));
-    if (availableSlots <= 0) {
-      alert(t('alert.limitReached') || "Source limit reached! Maximum capacity is 300 sources per notebook.");
-      return;
-    }
 
-    const filesToUpload = validFiles.slice(0, availableSlots);
-    if (validFiles.length > availableSlots) {
-      alert((t('alert.capacityWarning') || `Capacity limit warning: Only uploading {n} out of {m} valid files to respect the 300 source cap.`)
-        .replace('{n}', availableSlots.toString())
-        .replace('{m}', validFiles.length.toString()));
-    }
 
-    const newPendingItems: { item: PendingSourceItem; file: File }[] = filesToUpload.map((f) => ({
-      item: {
-        id: `pending-file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        filename: f.name,
-        type: "file",
-        status: "uploading",
-      },
-      file: f,
-    }));
 
-    // Instantly append pending items to sidebar & close modal dialog immediately (NotebookLM UX)
-    setInternalPendingSources(prev => [...prev, ...newPendingItems.map(n => n.item)]);
-    setIsAddSourcesModalOpen(false);
 
-    try {
-      let currentChatId = activeChatId;
-      if (!currentChatId && onEnsureChatSession) {
-        const firstTitle = filesToUpload[0].name.replace(/\.[^/.]+$/, "");
-        currentChatId = await onEnsureChatSession(firstTitle);
-      }
 
-      if (!currentChatId) {
-        const targetIds = new Set(newPendingItems.map(n => n.item.id));
-        setInternalPendingSources(prev => prev.map(p => targetIds.has(p.id) ? {
-          ...p,
-          status: "error",
-          error: "Failed to initialize notebook chat session."
-        } : p));
-        return;
-      }
 
-      // Concurrency Pool Worker: upload up to 3 files simultaneously
-      const queue = [...newPendingItems];
-      const CONCURRENCY_LIMIT = 3;
 
-      const worker = async () => {
-        while (queue.length > 0) {
-          const task = queue.shift();
-          if (!task) break;
-          const { item, file } = task;
-          const formData = new FormData();
-          formData.append("file", file);
 
-          try {
-            const res = await fetch(`${backendUrl}/chats/${currentChatId}/upload`, {
-              method: "POST",
-              body: formData,
-            });
-            if (res.ok) {
-              const newDoc = await res.json();
-              onDocumentAdded(newDoc, currentChatId);
-              // Successfully indexed, remove from pending list
-              setInternalPendingSources(prev => prev.filter(p => p.id !== item.id));
-            } else {
-              const err = await res.json().catch(() => ({}));
-              setInternalPendingSources(prev => prev.map(p => p.id === item.id ? {
-                ...p,
-                status: "error",
-                error: err.detail || "Failed to upload and parse document."
-              } : p));
-            }
-          } catch (err: any) {
-            setInternalPendingSources(prev => prev.map(p => p.id === item.id ? {
-              ...p,
-              status: "error",
-              error: err?.message || "Failed to connect to server."
-            } : p));
-          }
-        }
-      };
 
-      const pool = Array.from({ length: Math.min(CONCURRENCY_LIMIT, newPendingItems.length) }, () => worker());
-      await Promise.all(pool);
-    } catch (e) {
-      console.error("Batch upload failed:", e);
-    }
-  };
-
-  const handleImportDoi = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    const cleanDoi = doiInput.trim();
-    if (!cleanDoi) return;
-
-    // Check capacity
-    if (documents.length + pendingSources.length >= 300) {
-      alert(t('alert.limitReached') || "Source limit reached! Maximum capacity is 300 sources per notebook.");
-      return;
-    }
-
-    const tempId = `pending-doi-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-    const pendingItem: PendingSourceItem = {
-      id: tempId,
-      filename: cleanDoi.startsWith("10.") || cleanDoi.includes("doi.org") ? `DOI: ${cleanDoi}` : cleanDoi,
-      type: "doi",
-      doi: cleanDoi,
-      status: "uploading",
-    };
-
-    // Instantly append to sources list and close modal dialog immediately
-    setInternalPendingSources(prev => [...prev, pendingItem]);
-    setDoiInput("");
-    setIsAddSourcesModalOpen(false);
-
-    try {
-      let currentChatId = activeChatId;
-      if (!currentChatId && onEnsureChatSession) {
-        currentChatId = await onEnsureChatSession("Research Paper");
-      }
-      if (!currentChatId) {
-        setInternalPendingSources(prev => prev.map(p => p.id === tempId ? {
-          ...p,
-          status: "error",
-          error: "Failed to initialize notebook chat session."
-        } : p));
-        return;
-      }
-
-      const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_doi`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doi: cleanDoi })
-      });
-
-      if (res.ok) {
-        const newDoc = await res.json();
-        onDocumentAdded(newDoc, currentChatId);
-        setInternalPendingSources(prev => prev.filter(p => p.id !== tempId));
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setInternalPendingSources(prev => prev.map(p => p.id === tempId ? {
-          ...p,
-          status: "error",
-          error: err.detail || "Publication not found for the provided DOI."
-        } : p));
-      }
-    } catch (err: any) {
-      setInternalPendingSources(prev => prev.map(p => p.id === tempId ? {
-        ...p,
-        status: "error",
-        error: err?.message || "Failed to resolve DOI from academic registries."
-      } : p));
-    }
-  };
-
-  // Selection logic
-  const isAllSelected = documents.length > 0 && documents.every(d => selectedDocs[d.id] !== false);
-  const isSomeSelected = documents.some(d => selectedDocs[d.id] !== false);
-  const isPartiallySelected = isSomeSelected && !isAllSelected;
-
-  const getFileBadgeInfo = (filename: string) => {
-    if (filename.startsWith("10.") || filename.startsWith("DOI:") || filename.includes("doi.org")) {
-      return { label: "DOI", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
-    }
-    const ext = filename.split(".").pop()?.toLowerCase() || "doc";
-    if (ext === "pdf") {
-      return { label: "PDF", bg: "bg-red-600/15 border-red-500/40 text-red-500" };
-    } else if (ext === "docx" || ext === "doc") {
-      return { label: "DOC", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
-    } else if (ext === "bib" || ext === "bibtex") {
-      return { label: "BIB", bg: "bg-amber-600/15 border-amber-500/40 text-amber-500" };
-    } else if (ext === "ris") {
-      return { label: "RIS", bg: "bg-orange-600/15 border-orange-500/40 text-orange-500" };
-    } else if (ext === "md") {
-      return { label: "MD", bg: "bg-purple-600/15 border-purple-500/40 text-purple-500" };
-    } else {
-      return { label: "TXT", bg: "bg-app-item-hover border-app-border text-app-text-muted" };
-    }
-  };
-
-  const toggleDocSelection = (docId: number) => {
-    setSelectedDocs(prev => {
-      const current = prev[docId] !== undefined ? prev[docId] : true;
-      return {
-        ...prev,
-        [docId]: !current
-      };
-    });
-  };
-
-  const handleToggleSelectAll = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const nextState = !isAllSelected;
-    const updated: Record<number, boolean> = {};
-    documents.forEach(d => {
-      updated[d.id] = nextState;
-    });
-    setSelectedDocs(updated);
-  };
-
-  // Sort documents based on sortBy and sortDirection (asc/desc)
-  const sortedDocuments = [...documents].sort((a, b) => {
-    let cmp = 0;
-    if (sortBy === "title") {
-      cmp = a.filename.localeCompare(b.filename);
-    } else {
-      const dateA = new Date(a.created_at || 0).getTime() || a.id;
-      const dateB = new Date(b.created_at || 0).getTime() || b.id;
-      cmp = dateA - dateB;
-    }
-    return sortDirection === "asc" ? cmp : -cmp;
-  });
-
-  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-  const [isBulkDownloading, setIsBulkDownloading] = useState(false);
-  const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
-
-  const selectedDocList = sortedDocuments.filter(d => selectedDocs[d.id] !== false);
-  const selectedCount = selectedDocList.length;
-
-  const handleBulkDownload = async () => {
-    if (!activeChatId || selectedCount === 0 || isBulkDownloading) return;
-    setIsBulkDownloading(true);
-    const docIds = selectedDocList.map(d => d.id);
-
-    // If only 1 document is selected, trigger single PDF download with proper error handling
-    if (docIds.length === 1) {
-      try {
-        const doc = selectedDocList[0];
-        const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/${doc.id}/download`);
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          setDownloadTask({
-            status: "error",
-            total: 1,
-            current: 0,
-            percent: 0,
-            currentFile: doc.filename,
-            errorMsg: errJson.detail || "Naskah lengkap PDF tidak tersedia untuk diunduh (hanya abstrak/paywalled)."
-          });
-          return;
-        }
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = doc.filename.endsWith(".pdf") ? doc.filename : `${doc.filename}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } catch (err: any) {
-        console.error("Single download error:", err);
-        setDownloadTask({
-          status: "error",
-          total: 1,
-          current: 0,
-          percent: 0,
-          currentFile: "",
-          errorMsg: err?.message || "Gagal mengunduh dokumen."
-        });
-      } finally {
-        setIsBulkDownloading(false);
-      }
-      return;
-    }
-
-    // Multiple documents: Launch Google Drive style floating progress stream
-    setDownloadTask({
-      status: "preparing",
-      total: docIds.length,
-      current: 0,
-      percent: 0,
-      currentFile: t('download.connecting')
-    });
-
-    try {
-      const response = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk_download_stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doc_ids: docIds })
-      });
-
-      await consumeSSEStream(response, (data: any) => {
-        if (data.type === "init") {
-          setDownloadTask({
-            status: "zipping",
-            total: data.total || docIds.length,
-            current: 0,
-            percent: 0,
-            currentFile: t('download.startingParallel')
-          });
-        } else if (data.type === "progress") {
-          const calculatedPercent = typeof data.percent === "number" 
-            ? data.percent 
-            : (data.total > 0 ? Math.round((data.current / data.total) * 100) : 0);
-          setDownloadTask(prev => ({
-            status: "zipping",
-            total: data.total || docIds.length,
-            current: data.current,
-            percent: calculatedPercent,
-            currentFile: data.filename || prev?.currentFile || "",
-            downloadedCount: data.downloaded_count,
-            skippedCount: data.skipped_count
-          }));
-        } else if (data.type === "error") {
-          setDownloadTask({
-            status: "error",
-            total: docIds.length,
-            current: 0,
-            percent: 0,
-            currentFile: "",
-            errorMsg: data.message || t('download.failedZip')
-          });
-        } else if (data.type === "complete") {
-          setDownloadTask({
-            status: "complete",
-            total: data.total || data.total_files || docIds.length,
-            current: data.total || data.total_files || docIds.length,
-            percent: 100,
-            downloadedCount: data.downloaded_count,
-            skippedCount: data.skipped_count,
-            currentFile: t('download.downloadComplete'),
-            totalSizeMb: data.total_size_mb
-          });
-
-          // Auto-trigger browser download
-          const downloadLink = document.createElement("a");
-          downloadLink.href = `${backendUrl}${data.download_url}`;
-          downloadLink.download = data.filename || `NotbookLM_Sources_${docIds.length}_files.zip`;
-          document.body.appendChild(downloadLink);
-          downloadLink.click();
-          document.body.removeChild(downloadLink);
-        }
-      });
-    } catch (err: any) {
-      console.error("Bulk download error:", err);
-      setDownloadTask({
-        status: "error",
-        total: docIds.length,
-        current: 0,
-        percent: 0,
-        currentFile: "",
-        errorMsg: err?.message || t('download.failedZip')
-      });
-    } finally {
-      setIsBulkDownloading(false);
-    }
-  };
-
-  const [docToDelete, setDocToDelete] = useState<number | null>(null);
-
-  const handleConfirmBulkDelete = async () => {
-    if (!activeChatId || isBulkDeleting) return;
-    setIsBulkDeleting(true);
-    try {
-      // If docToDelete is set, it means we clicked delete from 3-dots on a specific doc
-      const docIds = docToDelete !== null ? [docToDelete] : selectedDocList.map(d => d.id);
-      
-      if (docIds.length === 0) {
-        setIsBulkDeleting(false);
-        return;
-      }
-      
-      const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk_delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doc_ids: docIds })
-      });
-      if (res.ok) {
-        if (onBulkDocumentsDeleted) {
-          onBulkDocumentsDeleted(docIds);
-        } else if (onDocumentDeleted) {
-          docIds.forEach(id => onDocumentDeleted(id));
-        }
-        setShowBulkDeleteConfirm(false);
-        setDocToDelete(null); // Reset after success
-        if (viewingDoc && docIds.includes(((viewingDoc as any)?.id || "undefined"))) {
-          setViewingDoc(null);
-        }
-      }
-    } catch (err) {
-      console.error("Bulk delete error:", err);
-    } finally {
-      setIsBulkDeleting(false);
-    }
-  };
 
   const copyToClipboard = (text: string, type: "doi" | "link" | "citation") => {
     if (!text) return;
@@ -702,17 +250,6 @@ export default function RightSidebar({
     }
   };
 
-  const downloadFileText = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  };
 
   if (viewingDoc) {
     const filenameFallback = ((viewingDoc as any)?.filename || "paper").replace(/\.[^/.]+$/, "").replace(/_/g, " ");
