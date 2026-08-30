@@ -44,6 +44,7 @@ import { DownloadManager, DownloadTask } from "./DownloadManager";
 import { BulkDeleteModal, RenameModal } from "./sidebar/SidebarModals";
 
 import { SourcesToolbar } from "./RightSidebar/SourcesToolbar";
+import { RightSidebarModals } from "./RightSidebar/RightSidebarModals";
 
 interface RightSidebarProps {
   activeChatId: string | null;
@@ -420,10 +421,10 @@ export default function RightSidebar({
         backendUrl={backendUrl}
       />
 
-      {/* Google NotebookLM Style 'Add Sources' Centered Modal Dialog */}
-      <AddSourcesModal
-        isOpen={isAddSourcesModalOpen}
-        onClose={() => setIsAddSourcesModalOpen(false)}
+      {/* Modals Composition */}
+      <RightSidebarModals
+        isAddSourcesModalOpen={isAddSourcesModalOpen}
+        setIsAddSourcesModalOpen={setIsAddSourcesModalOpen}
         doiInput={doiInput}
         setDoiInput={setDoiInput}
         handleImportDoi={handleImportDoi}
@@ -433,43 +434,24 @@ export default function RightSidebar({
         handleUploadBatch={handleUploadBatch}
         documentsLength={documents.length}
         pendingSourcesLength={pendingSources.length}
-      />
-
-      <CitationModal
-        isOpen={isCiteModalOpen}
-        onClose={() => setIsCiteModalOpen(false)}
-        citations={generateCitations(
-            paperDetails?.title || ((viewingDoc as any)?.filename || "paper") || "",
-            paperDetails?.authors || [],
-            paperDetails?.year || "2024",
-            paperDetails?.journal || "",
-            paperDetails?.doi || "",
-            paperDetails?.url || (paperDetails?.doi ? "https://doi.org/$" : "")
-        )}
-        doiStr={paperDetails?.doi || ""}
-      />
-
-      {/* Centered Modal for Bulk Delete Confirmation */}
-      <BulkDeleteModal
-        isOpen={showBulkDeleteConfirm}
-        selectedCount={docToDelete !== null ? 1 : selectedCount}
+        isCiteModalOpen={isCiteModalOpen}
+        setIsCiteModalOpen={setIsCiteModalOpen}
+        paperDetails={paperDetails}
+        viewingDoc={viewingDoc}
+        showBulkDeleteConfirm={showBulkDeleteConfirm}
+        docToDelete={docToDelete}
+        selectedCount={selectedCount}
         isBulkDeleting={isBulkDeleting}
-        onClose={() => {
-          setShowBulkDeleteConfirm(false);
-          setDocToDelete(null);
-        }}
-        onConfirm={handleConfirmBulkDelete}
-      />
-
-      {/* Centered Modal for Renaming Single Document */}
-      <RenameModal
-        isOpen={isRenameModalOpen}
+        setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
+        setDocToDelete={setDocToDelete}
+        handleConfirmBulkDelete={handleConfirmBulkDelete}
+        isRenameModalOpen={isRenameModalOpen}
         renamingDoc={renamingDoc}
         renameTitleInput={renameTitleInput}
         isSavingRename={isSavingRename}
-        onInputChange={setRenameTitleInput}
-        onClose={() => setIsRenameModalOpen(false)}
-        onSave={handleSaveRename}
+        setRenameTitleInput={setRenameTitleInput}
+        setIsRenameModalOpen={setIsRenameModalOpen}
+        handleSaveRename={handleSaveRename}
       />
     </aside>
   );
