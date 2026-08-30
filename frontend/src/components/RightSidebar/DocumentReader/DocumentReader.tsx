@@ -10,7 +10,6 @@ import {
   ExternalLink,
   ChevronUp,
   ChevronDown,
-  Loader2,
   FileText,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
@@ -160,13 +159,41 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
           {/* Academic Paper Metadata Header (Scrollable) */}
           <div className="flex-1 overflow-y-auto w-full relative group">
             {isLoadingDetails ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-app-bg/50 backdrop-blur-sm z-20">
-                <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-3" />
-                <p className="text-xs text-app-text font-medium">{t('right.fetchingDetails')}</p>
-                <p className="text-[11px] text-app-text-dim mt-1">{t('right.fetchingDetailsDesc')}</p>
-              </div>
-            ) : null}
+              <div className="max-w-2xl mx-auto min-h-full p-4 space-y-4 animate-pulse">
+                {/* Skeleton Paper Card */}
+                <div className="p-4 sm:p-5 rounded-xl bg-app-card border border-app-border space-y-4">
+                  {/* Skeleton Top Status Banner */}
+                  <div className="p-3.5 rounded-lg bg-app-item-hover/50 space-y-2">
+                    <div className="h-4 w-40 rounded bg-app-divider/60" />
+                    <div className="h-3 w-5/6 rounded bg-app-divider/40" />
+                  </div>
 
+                  {/* Paper Title & Badges */}
+                  <div className="pb-3 border-b border-app-divider space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-10 rounded bg-app-divider/60" />
+                      <div className="h-3.5 w-16 rounded bg-app-divider/40" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-5 w-11/12 rounded bg-app-divider/70" />
+                      <div className="h-5 w-3/4 rounded bg-app-divider/60" />
+                    </div>
+                    <div className="h-3.5 w-1/2 rounded bg-app-divider/40 pt-1" />
+                  </div>
+
+                  {/* Clean Formatted Document Body Skeleton */}
+                  <div className="space-y-2.5 pt-2">
+                    <div className="h-3.5 w-full rounded bg-app-divider/40" />
+                    <div className="h-3.5 w-full rounded bg-app-divider/40" />
+                    <div className="h-3.5 w-4/5 rounded bg-app-divider/40" />
+                    <div className="h-3.5 w-full rounded bg-app-divider/40 pt-2" />
+                    <div className="h-3.5 w-full rounded bg-app-divider/40" />
+                    <div className="h-3.5 w-3/4 rounded bg-app-divider/40" />
+                    <div className="h-3.5 w-5/6 rounded bg-app-divider/40" />
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div className="max-w-2xl mx-auto min-h-full p-4">
               {/* Top Meta Section */}
               <div className="bg-app-surface border border-app-border rounded-xl mb-4 overflow-hidden shadow-sm">
@@ -231,6 +258,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       ) : activeTab === "pdf" ? (
