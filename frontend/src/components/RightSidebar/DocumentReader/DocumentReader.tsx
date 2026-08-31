@@ -198,13 +198,21 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
               {/* Top Meta Section */}
               <div className="bg-app-surface border border-app-border rounded-xl mb-4 overflow-hidden shadow-sm">
                 
-                {/* Full Manuscript Verified Header */}
-                <div className="px-5 py-4 border-b border-app-border bg-emerald-500/10">
-                  <div className="flex items-center gap-2 text-emerald-500 font-medium text-sm">
-                    <Check size={16} className="stroke-[2.5]" />
-                    <span>Full Manuscript Verified</span>
+                {paperDetails?.has_full_pdf ? (
+                  <div className="px-5 py-4 border-b border-app-border bg-emerald-500/10">
+                    <div className="flex items-center gap-2 text-emerald-500 font-medium text-sm">
+                      <Check size={16} className="stroke-[2.5]" />
+                      <span>Full Manuscript Verified</span>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="px-5 py-4 border-b border-app-border bg-amber-500/10">
+                    <div className="flex items-center gap-2 text-amber-500 font-medium text-sm">
+                      <FileText size={16} className="stroke-[2.5]" />
+                      <span>Abstract & Metadata Only</span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="px-5 py-6 space-y-4">
                   <div className="flex flex-wrap items-center gap-3 text-xs mb-3">
