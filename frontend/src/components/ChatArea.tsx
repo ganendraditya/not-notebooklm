@@ -529,7 +529,7 @@ export default function ChatArea({
 
       {/* Floating Gradient Backdrop for Input (width capped to input box width only, zero side overflow) */}
       {!isChatEmpty && (
-        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-20">
+        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-10">
           <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pointer-events-auto min-w-0 relative">
             <div className="absolute inset-x-0 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             <ChatInputBox 
@@ -559,7 +559,7 @@ export default function ChatArea({
               e.stopPropagation();
               setIsRenameOpen(false);
             }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
           >
           <div 
             onClick={(e) => e.stopPropagation()}
@@ -626,7 +626,7 @@ export default function ChatArea({
               e.stopPropagation();
               setIsDeleteConfirmOpen(false);
             }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
           >
           <div 
             onClick={(e) => e.stopPropagation()}
