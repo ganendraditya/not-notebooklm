@@ -48,7 +48,7 @@ def _prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> tupl
                 direct_url=paper.url or "",
                 candidate_pdf_url=paper.pdf_url or ""
             )
-            if is_authentic_pdf_bytes(fetched_oa, min_size=40000):
+            if is_authentic_pdf_bytes(fetched_oa, min_size=5000):
                 with open(save_path, "wb") as f:
                     f.write(fetched_oa)
                 has_downloaded_pdf = True
