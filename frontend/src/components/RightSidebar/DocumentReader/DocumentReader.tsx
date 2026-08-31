@@ -72,7 +72,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
   const { t } = useTranslation();
 
   return (
-    <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 select-none z-10 transition-all relative text-app-text">
+    <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 z-10 transition-all relative text-app-text">
       {/* 1. Header Bar */}
       <div className="px-4 py-3 flex items-center justify-between border-b border-app-divider">
         <button
