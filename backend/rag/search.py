@@ -10,12 +10,27 @@ import requests
 from duckduckgo_search import DDGS
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole, LLM
 import journal_indexer
+from collections import OrderedDict
+import concurrent.futures
 
 from helpers import clean_doi as _clean_doi
+from utils.text_processing import (
+    normalize_title_str,
+    is_valid_academic_title,
+    clean_academic_abstract,
+    is_valid_abstract_content,
+    extract_abstract_from_html,
+    is_title_match,
+    is_ai_synthesized_overview
+)
+from providers.academic import fetch_europe_pmc, fetch_openalex, fetch_crossref
+from services.search import (
+    plan_academic_search,
+    judge_and_filter_papers_with_llm,
+    audit_paper_metadata_with_ai
+)
 
 logger = logging.getLogger("uvicorn.error")
-
-from collections import OrderedDict
 
 class LRUMetadataCache:
     """Thread-safe bounded in-memory cache to avoid unbounded RAM leak."""
@@ -451,7 +466,7 @@ def search_academic_papers_planned(
     sinta_tiers = [s.upper() for s in (plan.get("sinta_tiers") or [])]
     exclude_preprints = bool(plan.get("exclude_preprints", False))
     
-    def is_candidate_duplicate(title: str, doi: str) -> bool:
+    def is_candidate_duplicate_local(title: str, doi: str) -> bool:
         c_norm = normalize_title_str(title)
         if not c_norm:
             return True
@@ -471,7 +486,7 @@ def search_academic_papers_planned(
                 return True
         return False
 
-    def mark_candidate_seen(title: str, doi: str):
+    def mark_candidate_seen_local(title: str, doi: str):
         c_norm = normalize_title_str(title)
         if c_norm:
             seen_token_signatures.append((c_norm, set(c_norm.split())))
@@ -479,7 +494,7 @@ def search_academic_papers_planned(
             c_doi = doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
             seen_dois.add(c_doi)
 
-    def is_matching_topic(title: str, snippet: str) -> bool:
+    def is_matching_topic_local(title: str, snippet: str) -> bool:
         t_low = title.lower()
         full = f"{title} {snippet}".lower()
         
@@ -593,216 +608,6 @@ def search_academic_papers_planned(
             
         return True
 
-    # 1. Europe PMC Search
-    def fetch_europe_pmc(term: str, target_count: int):
-        fetched = []
-        if not term.strip(): return fetched
-        try:
-            query_term = term.strip()
-            if open_access_only:
-                query_term += " OPEN_ACCESS:y"
-            url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={urllib.parse.quote(query_term)}&format=json&pageSize={min(target_count + 10, 50)}&resultType=core"
-            resp = requests.get(url, timeout=6)
-            if resp.status_code == 200:
-                for p in resp.json().get("resultList", {}).get("result", []):
-                    if len(fetched) >= target_count: break
-                    title = p.get("title", "").strip().rstrip(".")
-                    doi = p.get("doi", "")
-                    if not title or not is_valid_academic_title(title) or is_candidate_duplicate(title, doi): continue
-                    
-                    year = str(p.get("pubYear", ""))
-                    if min_year and year.isdigit() and int(year) < min_year: continue
-                    
-                    author_str = p.get("authorString", "")
-                    authors = [a.strip() for a in author_str.split(",") if a.strip()]
-                    venue = p.get("journalTitle", "")
-                    abstract = p.get("abstractText", "")
-                    ft_urls = p.get("fullTextUrlList", {}).get("fullTextUrl", [])
-                    pdf_urls = [f.get("url") for f in ft_urls if f.get("documentStyle") == "pdf" and f.get("url")]
-                    pdf_url = pdf_urls[0] if pdf_urls else ""
-                    
-                    # Filter OA if requested
-                    is_oa_pmc = p.get("isOpenAccess") == "Y" or bool(pdf_url)
-                    if open_access_only and not is_oa_pmc:
-                        continue
-
-                    # Filter preprint
-                    is_preprint_pmc = p.get("pubType") == "preprint" or "preprint" in (venue or "").lower()
-                    if exclude_preprints and is_preprint_pmc:
-                        continue
-                    
-                    snippet = abstract if abstract else f"Scholarly research publication in {venue} ({year}). DOI: {doi}"
-                    if not is_matching_topic(title, snippet): continue
-                    
-                    mark_candidate_seen(title, doi)
-                    fetched.append({
-                        "title": title,
-                        "year": str(year),
-                        "doi": f"https://doi.org/{doi}" if doi and not doi.startswith("http") else doi,
-                        "url": f"https://doi.org/{doi}" if doi else f"https://europepmc.org/article/MED/{p.get('id')}",
-                        "snippet": snippet,
-                        "authors": authors,
-                        "venue": venue,
-                        "pdf_url": pdf_url,
-                        "is_oa": is_oa_pmc
-                    })
-        except Exception as e:
-            print(f"[Europe PMC Search Error]: {e}")
-        return fetched
-
-    # 2. OpenAlex Search with deep pagination
-    def fetch_openalex(term: str, target_count: int, lang_codes: Optional[List[str]] = None):
-        fetched = []
-        if not term.strip(): return fetched
-        page = 1
-        max_pages = max(15, (target_count // 20) + 5)
-        while len(fetched) < target_count and page <= max_pages:
-            try:
-                per_page = min(max(target_count - len(fetched) + 20, 50), 100)
-                url = "https://api.openalex.org/works"
-                params = {"search": term.strip(), "per_page": per_page, "page": page}
-                filter_parts = []
-                if min_year: filter_parts.append(f"publication_year:{min_year}-2026")
-                if min_citations > 0: filter_parts.append(f"cited_by_count:>{min_citations - 1}")
-                if open_access_only: filter_parts.append("is_oa:true")
-                if lang_codes and len(lang_codes) > 0:
-                    clean_codes = [c.lower().strip() for c in lang_codes if c.lower().strip() != "all"]
-                    if clean_codes:
-                        filter_parts.append(f"language:{'|'.join(clean_codes)}")
-                if filter_parts: params["filter"] = ",".join(filter_parts)
-                    
-                resp = requests.get(url, params=params, headers=headers, timeout=8)
-                if resp.status_code == 200:
-                    results_list = resp.json().get("results", [])
-                    if not results_list: break
-                    for work in results_list:
-                        if len(fetched) >= target_count: break
-                        raw_t = work.get("title", "") or ""
-                        title = html.unescape(raw_t).strip()
-                        title = re.sub(r'<[^>]+>', '', title).strip()
-                        doi = work.get("doi", "")
-                        if not title or not is_valid_academic_title(title) or is_candidate_duplicate(title, doi): continue
-                            
-                        year = str(work.get("publication_year", "N/A"))
-                        if min_year and year.isdigit() and int(year) < min_year: continue
-                                
-                        citations_count = work.get("cited_by_count", 0)
-                        if min_citations > 0 and citations_count < min_citations: continue
-                                
-                        loc = work.get("primary_location") or {}
-                        is_oa_work = work.get("open_access", {}).get("is_oa", False) or loc.get("is_oa", False)
-                        if open_access_only and not is_oa_work:
-                            continue
-
-                        work_type = (loc.get("source") or {}).get("type") or work.get("type", "")
-                        is_preprint_work = work_type == "preprint" or "preprint" in ((loc.get("source") or {}).get("display_name") or "").lower()
-                        if exclude_preprints and is_preprint_work:
-                            continue
-
-                        landing_url = loc.get("landing_page_url") or doi or f"https://openalex.org/{work.get('id')}"
-                        oa_pdf = (work.get("best_oa_location") or {}).get("pdf_url") or loc.get("pdf_url") or ""
-                        venue = (loc.get("source") or {}).get("display_name") if loc.get("source") else ""
-                        authors = [a.get("author", {}).get("display_name", "") for a in work.get("authorships", [])]
-                        
-                        abstract = ""
-                        inv = work.get("abstract_inverted_index")
-                        if inv:
-                            wp = []
-                            for word, pos in inv.items():
-                                for p in pos: wp.append((p, word))
-                            wp.sort()
-                            abstract = " ".join([w[1] for w in wp]).strip()
-                            
-                        snippet = abstract or f"Scholarly publication in {venue} ({year}). DOI: {doi}"
-                        if not is_matching_topic(title, snippet): continue
-                            
-                        mark_candidate_seen(title, doi)
-                        fetched.append({
-                            "title": title,
-                            "year": str(year),
-                            "doi": doi,
-                            "url": landing_url,
-                            "snippet": snippet,
-                            "authors": authors,
-                            "venue": venue,
-                            "pdf_url": oa_pdf,
-                            "is_oa": is_oa_work
-                        })
-                    page += 1
-                else:
-                    break
-            except Exception as e:
-                print(f"[OpenAlex Search Error]: {e}")
-                break
-        return fetched
-
-    # 3. Crossref Search with deep pagination
-    def fetch_crossref(term: str, target_count: int):
-        fetched = []
-        if not term.strip(): return fetched
-        offset = 0
-        while len(fetched) < target_count and offset <= (target_count * 3):
-            try:
-                url = "https://api.crossref.org/works"
-                rows = min(target_count - len(fetched) + 30, 100)
-                params = {"query": term.strip(), "rows": rows, "offset": offset}
-                if min_year: params["filter"] = f"from-pub-date:{min_year}-01-01"
-                resp = requests.get(url, params=params, headers=headers, timeout=8)
-                if resp.status_code == 200:
-                    items = resp.json().get("message", {}).get("items", [])
-                    if not items: break
-                    for item in items:
-                        if len(fetched) >= target_count: break
-                        title_list = item.get("title", [])
-                        if not title_list: continue
-                        title = title_list[0].strip()
-                        doi = item.get("DOI", "")
-                        if not title or not is_valid_academic_title(title) or is_candidate_duplicate(title, doi): continue
-                            
-                        year = "N/A"
-                        created = item.get("created", {}).get("date-parts", [[]])[0]
-                        if created: year = str(created[0])
-                        if min_year and year.isdigit() and int(year) < min_year: continue
-
-                        # Open access link check for Crossref
-                        link_list = item.get("link", [])
-                        oa_pdf_link = ""
-                        for l_entry in link_list:
-                            if l_entry.get("content-type") == "application/pdf":
-                                oa_pdf_link = l_entry.get("URL", "")
-                                break
-                        is_oa_cr = bool(oa_pdf_link) or any("open-access" in str(lic.get("URL", "")).lower() for lic in item.get("license", []))
-                        if open_access_only and not is_oa_cr:
-                            continue
-                            
-                        authors = [f"{a.get('given', '')} {a.get('family', '')}".strip() for a in item.get("author", [])]
-                        venue = item.get("container-title", [""])[0] if item.get("container-title") else ""
-                        raw_abs = item.get("abstract", "")
-                        clean_abs = re.sub(r"<[^>]+>", " ", raw_abs) if raw_abs else ""
-                        snippet = re.sub(r"\s+", " ", clean_abs).strip() if clean_abs else f"Scholarly contribution published in {venue} ({year}). DOI: {doi}"
-                        
-                        if not is_matching_topic(title, snippet): continue
-                            
-                        mark_candidate_seen(title, doi)
-                        fetched.append({
-                            "title": title,
-                            "year": str(year),
-                            "doi": f"https://doi.org/{doi}" if doi and not doi.startswith("http") else doi,
-                            "url": f"https://doi.org/{doi}" if doi else item.get("URL", ""),
-                            "snippet": snippet,
-                            "authors": authors,
-                            "venue": venue,
-                            "pdf_url": oa_pdf_link,
-                            "is_oa": is_oa_cr
-                        })
-                    offset += rows
-                else:
-                    break
-            except Exception as e:
-                print(f"[Crossref Search Error]: {e}")
-                break
-        return fetched
-
     target_languages = plan.get("languages") or []
     native_query = plan.get("native_query") or plan.get("id_query") or en_query
 
@@ -812,15 +617,15 @@ def search_academic_papers_planned(
     if non_en_langs:
         # Search OpenAlex filtered by exact ISO language codes (e.g. language:ja or language:zh|ja)
         # Search with native translated query first, then en_query as fallback
-        lang_oa_papers = fetch_openalex(native_query, limit, lang_codes=non_en_langs)
+        lang_oa_papers = fetch_openalex(native_query, limit, min_year, min_citations, open_access_only, exclude_preprints, non_en_langs, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(lang_oa_papers)
         
         if len(results) < limit:
-            oa_en_terms_with_lang = fetch_openalex(en_query, limit - len(results), lang_codes=non_en_langs)
+            oa_en_terms_with_lang = fetch_openalex(en_query, limit - len(results), min_year, min_citations, open_access_only, exclude_preprints, non_en_langs, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
             results.extend(oa_en_terms_with_lang)
             
         if len(results) < limit:
-            cr_native = fetch_crossref(native_query, limit - len(results))
+            cr_native = fetch_crossref(native_query, limit - len(results), min_year, open_access_only, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
             results.extend(cr_native)
 
         # STRICT LANGUAGE COMPLIANCE:
@@ -831,43 +636,43 @@ def search_academic_papers_planned(
         en_quota = limit // 2
         
         # 1. Fetch International English papers
-        epmc_papers = fetch_europe_pmc(en_query, en_quota // 2 + 2)
+        epmc_papers = fetch_europe_pmc(en_query, en_quota // 2 + 2, min_year, open_access_only, exclude_preprints, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(epmc_papers)
-        oa_papers = fetch_openalex(en_query, en_quota - len(results))
+        oa_papers = fetch_openalex(en_query, en_quota - len(results), min_year, min_citations, open_access_only, exclude_preprints, None, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(oa_papers)
         
         # 2. Fetch Indonesian / Local papers
         actual_id_quota = limit - len(results)
-        id_papers = fetch_openalex(id_query, actual_id_quota, lang_codes=["id"])
+        id_papers = fetch_openalex(id_query, actual_id_quota, min_year, min_citations, open_access_only, exclude_preprints, ["id"], headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(id_papers)
         if len(results) < limit:
-            cr_id = fetch_crossref(id_query, limit - len(results))
+            cr_id = fetch_crossref(id_query, limit - len(results), min_year, open_access_only, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
             results.extend(cr_id)
 
         # 3. Dynamic Quota Spillover
         if len(results) < limit:
             remaining_needed = limit - len(results)
-            spillover_oa = fetch_openalex(en_query, remaining_needed)
+            spillover_oa = fetch_openalex(en_query, remaining_needed, min_year, min_citations, open_access_only, exclude_preprints, None, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
             results.extend(spillover_oa)
     elif lang_pref == "id":
-        id_papers = fetch_openalex(id_query, limit, lang_codes=["id"])
+        id_papers = fetch_openalex(id_query, limit, min_year, min_citations, open_access_only, exclude_preprints, ["id"], headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(id_papers)
         if len(results) < limit:
-            cr_id = fetch_crossref(id_query, limit - len(results))
+            cr_id = fetch_crossref(id_query, limit - len(results), min_year, open_access_only, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
             results.extend(cr_id)
         if len(results) < limit:
-            spillover_oa = fetch_openalex(en_query, limit - len(results))
+            spillover_oa = fetch_openalex(en_query, limit - len(results), min_year, min_citations, open_access_only, exclude_preprints, None, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
             results.extend(spillover_oa)
     else: # "en"
-        epmc_papers = fetch_europe_pmc(en_query, limit // 2 + 2)
+        epmc_papers = fetch_europe_pmc(en_query, limit // 2 + 2, min_year, open_access_only, exclude_preprints, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(epmc_papers)
         if len(results) < limit:
-            oa_papers = fetch_openalex(en_query, limit - len(results), lang_codes=["en"] if "en" in target_languages else None)
+            oa_papers = fetch_openalex(en_query, limit - len(results), min_year, min_citations, open_access_only, exclude_preprints, ["en"] if "en" in target_languages else None, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
             results.extend(oa_papers)
             
     # Final Fallback to Crossref if still under limit
     if len(results) < limit:
-        extra_cr = fetch_crossref(en_query or id_query, limit - len(results))
+        extra_cr = fetch_crossref(en_query or id_query, limit - len(results), min_year, open_access_only, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(extra_cr)
 
     # 4. Semantic Reranking with FlashRank (Cross-Encoder)
@@ -882,7 +687,7 @@ def search_academic_papers_planned(
                 }
                 for idx, p in enumerate(results)
             ]
-            rerank_q = en_query or query_term or "academic research"
+            rerank_q = en_query or "academic research"
             rerank_req = RerankRequest(query=rerank_q, passages=passages)
             ranked_passages = ranker.rerank(rerank_req)
             
@@ -961,620 +766,7 @@ async def judge_and_filter_papers_with_llm(
 
     return candidates[:target_count]
 
-def clean_academic_abstract(text: str) -> str:
-    """Cleans HTML tags, JATS XML tags, HTML entities, and formatting artifacts from academic abstracts."""
-    if not text:
-        return ""
-    cleaned = html.unescape(text)
-    cleaned = html.unescape(cleaned)
-    
-    cleaned = re.sub(r'<\s*br\s*/?\s*>', '\n\n', cleaned, flags=re.I)
-    cleaned = re.sub(r'<\s*/\s*p\s*>', '\n\n', cleaned, flags=re.I)
-    cleaned = re.sub(r'<\s*p\s*>', '', cleaned, flags=re.I)
-    cleaned = re.sub(r'<[^>]+>', '', cleaned)
-    
-    cleaned = re.sub(r'\*\*_([^_*]+)_\*\*', r'\1', cleaned)
-    cleaned = re.sub(r'\*\*([^*]+)\*\*', r'\1', cleaned)
-    cleaned = re.sub(r'__([^_]+)__', r'\1', cleaned)
-    cleaned = re.sub(r'(?<!\w)\*([^*]+)\*(?!\w)', r'\1', cleaned)
-    cleaned = re.sub(r'(?<!\w)_([^_\s][^_]*)_(?!\w)', r'\1', cleaned)
-    cleaned = re.sub(r'\*{2,}', '', cleaned)
-    cleaned = re.sub(r'(?<!\w)_+(?!\w)', '', cleaned)
-    cleaned = re.sub(r'^#{1,6}\s*', '', cleaned, flags=re.MULTILINE)
-    
-    section_headers = [
-        "Research question", "Research methods", "Methods and materials", "Methodology",
-        "Results and findings", "Results", "Findings", "Discussion", "Conclusion", "Conclusions",
-        "Implications", "Background", "Objective", "Objectives", "Purpose", "Design",
-        "Setting", "Participants", "Interventions", "Main outcomes", "Significance"
-    ]
-    pattern = r'(?:\n+|\s+)\b(' + '|'.join(re.escape(h) for h in section_headers) + r')\s*:\s*'
-    cleaned = re.sub(pattern, r'\n\n\1: ', cleaned, flags=re.I)
-    
-    cleaned = re.sub(r'[ \t]+', ' ', cleaned)
-    cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)
-    cleaned = re.sub(r'^\s*(?:abstract|abstract\s*&\s*overview|overview)\s*[:\-\.]?\s*', '', cleaned, flags=re.I)
-    return cleaned.strip()
 
-def is_valid_abstract_content(text: str) -> bool:
-    """Validates whether a candidate string is an authentic academic abstract or just taxonomy/boilerplate."""
-    if not text or not isinstance(text, str):
-        return False
-    t = text.strip()
-    if len(t) < 50:
-        return False
-        
-    t_low = t.lower()
-    invalid_exact = {
-        "social and behavioral sciences", "social sciences", "behavioral sciences",
-        "medicine and health", "medical sciences", "engineering and computer science",
-        "computer science", "physical sciences", "humanities", "arts and humanities",
-        "business and economics", "life sciences", "biological sciences", "decision sciences"
-    }
-    if t_low in invalid_exact:
-        return False
-        
-    boilerplate_phrases = [
-        "publikasi ilmiah", "terindeks crossref", "scholarly publication", 
-        "indexed in international", "no abstract available", "abstract not available",
-        "preview this article", "full text is available", "an abstract is not available"
-    ]
-    if any(b in t_low for b in boilerplate_phrases) and len(t) < 250:
-        return False
-        
-    return True
-
-def extract_abstract_from_html(html_text: str) -> str:
-    """Extracts authentic academic abstract from HTML meta tags and semantic container elements across scholarly publishers."""
-    if not html_text:
-        return ""
-        
-    meta_patterns = [
-        r'<meta\s+[^>]*?(?:name|property)=["\'](?:citation_abstract|dc\.description)["\'][^>]*?content=["\'](.*?)["\']',
-        r'<meta\s+[^>]*?content=["\'](.*?)["\'][^>]*?(?:name|property)=["\'](?:citation_abstract|dc\.description)["\']',
-        r'<meta\s+[^>]*?(?:name|property)=["\'](?:og:description|description)["\'][^>]*?content=["\'](.*?)["\']'
-    ]
-    for pattern in meta_patterns:
-        for m in re.findall(pattern, html_text, re.I | re.DOTALL):
-            candidate = clean_academic_abstract(m)
-            if is_valid_abstract_content(candidate) and "cookie" not in candidate.lower() and "javascript" not in candidate.lower():
-                return candidate
-                
-    semantic_patterns = [
-        r'<section[^>]*?class=["\'][^"\']*\babstract\b[^"\']*["\'][^>]*>([\s\S]*?)</section>',
-        r'<div[^>]*?(?:class|id)=["\'][^"\']*\b(?:item\s+abstract|abstract-content|article-abstract|abstractText|abstract_content|abstract)\b[^"\']*["\'][^>]*>([\s\S]*?)</div>',
-        r'<blockquote[^>]*?class=["\'][^"\']*\babstract\b[^"\']*["\'][^>]*>([\s\S]*?)</blockquote>',
-        r'<section[^>]*?id=["\']abstract["\'][^>]*>([\s\S]*?)</section>',
-        r'<div[^>]*?id=["\']abstract["\'][^>]*>([\s\S]*?)</div>'
-    ]
-    for pattern in semantic_patterns:
-        for m in re.findall(pattern, html_text, re.I):
-            candidate = clean_academic_abstract(m)
-            if is_valid_abstract_content(candidate):
-                return candidate
-                
-    return ""
-
-def is_title_match(t1: str, t2: str) -> bool:
-    """Checks if two academic paper titles match with high fuzzy similarity (>= 65%)."""
-    if not t1 or not t2:
-        return False
-    c1 = re.sub(r'[^a-zA-Z0-9\s]', '', t1).lower().strip()
-    c2 = re.sub(r'[^a-zA-Z0-9\s]', '', t2).lower().strip()
-    if c1 == c2 or c1 in c2 or c2 in c1:
-        return True
-    import difflib
-    ratio = difflib.SequenceMatcher(None, c1, c2).ratio()
-    return ratio >= 0.65
-
-def is_ai_synthesized_overview(text: str) -> bool:
-    """Detects if an abstract text is an AI-generated fallback summary template rather than authentic author text."""
-    if not text:
-        return False
-    t_low = text.lower()
-    return any(p in t_low for p in [
-        "this scholarly publication investigates",
-        "this scholarly article investigates",
-        "the research presents methodology, analytical framework",
-        "the research presents methodology, computational framework",
-        "indexed in international academic databases",
-        "indexed in international academic indexing services"
-    ])
-
-def audit_paper_metadata_with_ai(
-    paper_title: str,
-    raw_authors: List[str],
-    raw_journal: str,
-    raw_year: str,
-    raw_doi: str,
-    raw_citations: int,
-    raw_abstract_or_html: str,
-    is_oa: bool = False
-) -> dict:
-    """
-    AI Research Auditor & Quality Judge:
-    Uses Gemini / active LLM to audit candidate metadata, extract the true abstract,
-    filter out garbage category names, and determine Scopus/SINTA quartile and quality_tier.
-    """
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key and not gemini_key.startswith("your_"):
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("models/gemini-flash-latest")
-            
-            prompt = f"""
-You are an expert Senior Academic Research Indexer and Metadata Auditor (like Scopus, Web of Science, Consensus.app, and SINTA).
-
-Audit and extract the most authentic, precise academic metadata for this scientific paper:
-- Candidate Title: {paper_title}
-- Candidate Authors: {raw_authors}
-- Candidate Venue/Journal: {raw_journal}
-- Publication Year: {raw_year}
-- DOI: {raw_doi}
-- Citations: {raw_citations}
-- Raw Page Content / Snippet / Abstract text:
-{raw_abstract_or_html[:2500]}
-
-Rigorous Global Academic Indexing Rules:
-1. TITLE: Exact official title.
-2. AUTHORS: List of real author names (clean full names only).
-3. YEAR: 4-digit publication year.
-4. JOURNAL: Exact journal, conference proceedings, or preprint server name.
-5. INDEXING & REPUTATION (journal_metric):
-   - CONFERENCE PROCEEDINGS (Any IEEE, ACM, Springer, or international conference/symposium/workshop): MUST be labeled as Conference Proceedings (e.g. "IEEE Conference Proceedings", "ACM Conference Proceedings", "Conference Proceedings (Indexed)"). Conferences DO NOT have Q1/Q2/Q3/Q4.
-   - PREPRINT REPOSITORIES (arXiv, SportRxiv, bioRxiv, medRxiv, SSRN, Research Square, OSF, RePEc): "Preprint (Non-Peer-Reviewed)".
-   - INDONESIAN NATIONAL JOURNALS (SINTA): Identify if accredited (e.g. "SINTA 2 Accredited" or "SINTA Accredited").
-   - INTERNATIONAL PEER-REVIEWED JOURNALS: Use your scholarly knowledge base of world journals. If it is a top-quartile journal in its domain, use "Scopus Q1 (SJR)". If high-tier, use "Scopus Q2 (SJR)". If mid-tier, use "Scopus Q3 (SJR)". If regular indexed or open access, use "Scopus Q4 / Indexed" or "DOAJ Open Access".
-6. ABSTRACT:
-   - Extract authentic original abstract paragraph written by the authors.
-   - REJECT any subject taxonomy categories (like "Social and Behavioral Sciences", "Medicine", "Engineering"), cookie disclaimers, or license notices.
-   - If genuine authentic abstract found: set abstract_type = "official".
-   - If strictly paywalled or missing and you synthesize a summary: set abstract_type = "ai_summary".
-
-Output ONLY valid JSON matching:
-{{
-  "title": "...",
-  "authors": ["..."],
-  "year": "...",
-  "journal": "...",
-  "journal_metric": "...",
-  "abstract": "...",
-  "abstract_type": "official" or "ai_summary"
-}}
-"""
-            res = model.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"},
-                request_options={"timeout": 5}
-            )
-            if res.text:
-                parsed = json.loads(res.text)
-                if parsed.get("abstract"):
-                    if is_ai_synthesized_overview(parsed.get("abstract")):
-                        parsed["abstract_type"] = "ai_summary"
-                    elif is_valid_abstract_content(parsed.get("abstract")):
-                        if not parsed.get("abstract_type"):
-                            parsed["abstract_type"] = "official"
-                    return parsed
-        except Exception as e:
-            logger.debug(f"[AI Auditor] Audit failed for '{paper_title}': {e}")
-
-    # Deterministic Fallback if Offline / LLM Unavailable
-    j_low = (raw_journal or "").lower()
-    if any(p in j_low for p in ["sportrxiv", "arxiv", "biorxiv", "medrxiv", "ssrn", "osf", "repec", "research square", "preprint"]):
-        metric = "Preprint (Non-Peer-Reviewed)"
-    elif any(c in j_low for c in ["conference", "proceedings", "symposium", "workshop", "congress"]):
-        metric = "Conference Proceedings (Indexed)"
-    elif any(s in j_low for s in ["sinta", "garuda"]):
-        metric = "SINTA Accredited"
-    elif is_oa:
-        metric = "Open Access Journal"
-    else:
-        metric = "Peer-Reviewed Publication"
-
-    return {
-        "title": paper_title,
-        "authors": raw_authors,
-        "year": raw_year,
-        "journal": raw_journal or "Peer-reviewed Publication",
-        "journal_metric": metric,
-        "abstract": clean_academic_abstract(raw_abstract_or_html),
-        "abstract_type": "official" if is_valid_abstract_content(raw_abstract_or_html) else "ai_summary"
-    }
-
-def resolve_paper_metadata_by_doi(doi: str = "", title_fallback: str = "", paper_title: str = "", fast_only: bool = False) -> Optional[dict]:
-    """
-    Fetches complete Consensus-style academic metadata from OpenAlex, Crossref, HTML meta/semantic tags,
-    Semantic Scholar, SCImago Master DB, and AI Academic Auditor with a multi-tier fallback engine and caching.
-    """
-    if paper_title and not title_fallback:
-        title_fallback = paper_title
-    if not doi and not title_fallback:
-        return None
-    clean_doi = _clean_doi(doi) if doi else ""
-    cache_key = (clean_doi or title_fallback).strip().lower()
-    if cache_key in _PAPER_METADATA_CACHE:
-        return _PAPER_METADATA_CACHE[cache_key]
-    if fast_only:
-        t_low = (title_fallback or "").lower()
-        d_low = clean_doi.lower()
-        metric = "Peer-Reviewed"
-        journal_name = title_fallback
-
-        if "10.1109/access" in d_low or "ieee access" in t_low:
-            metric = "Scopus Q2 (SJR)"
-            journal_name = "IEEE Access"
-        elif any(c in t_low or c in d_low for c in ["proceedings", "conference", "symposium", "workshop", "10.1609/aaai", "10.1109/ic", "10.1145"]):
-            metric = "Conference Proceedings (Indexed)"
-        elif any(p in t_low or p in d_low for p in ["sportrxiv", "arxiv", "biorxiv", "medrxiv", "ssrn", "osf", "preprint"]):
-            metric = "Preprint (Non-Peer-Reviewed)"
-        elif any(s in t_low or s in d_low for s in ["sinta", "indonesia", "edumatic", "multilateral"]):
-            metric = "SINTA Accredited"
-        elif "procs" in d_low or "procedia" in t_low:
-            metric = "Scopus Q2 (SJR)"
-            journal_name = "Procedia Computer Science"
-        elif "10.1007/s10994" in d_low or "machine learning (springer)" in t_low:
-            metric = "Scopus Q1 (SJR)"
-            journal_name = "Machine Learning (Springer)"
-        elif "10.1249/mss" in d_low:
-            metric = "Scopus Q1 (SJR)"
-            journal_name = "Medicine & Science in Sports & Exercise"
-        elif "10.1016/j.aci" in d_low:
-            metric = "Scopus Q1 (SJR)"
-            journal_name = "Applied Computing and Informatics"
-        elif "10.1177/17479541" in d_low:
-            metric = "Scopus Q2 (SJR)"
-            journal_name = "International Journal of Sports Science & Coaching"
-        elif "10.1186/s40634" in d_low:
-            metric = "Scopus Q2 (SJR)"
-            journal_name = "Journal of Experimental Orthopaedics"
-        elif any(k in d_low for k in ["10.1016", "10.1007", "10.1038", "10.1111"]):
-            metric = "Scopus Indexed Journal"
-
-        fast_result = {
-            "title": title_fallback,
-            "authors": [],
-            "publication_date": "",
-            "year": "",
-            "journal": journal_name,
-            "journal_metric": metric,
-            "quality_tier": 1 if "q1" in metric.lower() else (2 if "q2" in metric.lower() else 3),
-            "citations": 0,
-            "doi": clean_doi,
-            "url": f"https://doi.org/{clean_doi}" if clean_doi else "",
-            "pdf_url": "",
-            "abstract": "",
-            "abstract_type": "official"
-        }
-        _PAPER_METADATA_CACHE[cache_key] = fast_result
-        return fast_result
-    
-    title = title_fallback.strip()
-    authors = []
-    pub_date = ""
-    pub_year = ""
-    journal = "Peer-reviewed Publication"
-    landing = f"https://doi.org/{clean_doi}" if clean_doi else ""
-    pdf_url = ""
-    abstract = ""
-    abstract_type = "official"
-    is_oa = False
-    issns = []
-    src_type = "journal"
-    host_org = ""
-    citations = 0
-    
-    # 1. OpenAlex by DOI
-    if clean_doi:
-        try:
-            oa_url = f"https://api.openalex.org/works/https://doi.org/{clean_doi}"
-            req = urllib.request.Request(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                cand_title = data.get("title") or ""
-                
-                # Check if resolved paper matches the target title (prevent bibliography DOI hijacking)
-                if (title or title_fallback) and cand_title and not is_title_match(cand_title, (title or title_fallback)):
-                    logger.debug(f"[OpenAlex DOI] Rejecting mismatched DOI {clean_doi}: '{cand_title}' vs '{title or title_fallback}'")
-                else:
-                    title = cand_title or title
-                    pub_date = data.get("publication_date") or ""
-                    pub_year = str(data.get("publication_year") or "")
-                    authors = [a.get("author", {}).get("display_name") for a in data.get("authorships", []) if a.get("author", {}).get("display_name")]
-                    loc = data.get("primary_location") or {}
-                    src = loc.get("source") or {}
-                    if src.get("display_name"):
-                        journal = src.get("display_name")
-                    if src.get("issn_l"):
-                        issns.append(src.get("issn_l"))
-                    if src.get("issn"):
-                        if isinstance(src.get("issn"), list): issns.extend(src.get("issn"))
-                        else: issns.append(str(src.get("issn")))
-                    src_type = src.get("type") or data.get("type", "journal")
-                    host_org = src.get("host_organization_name", "")
-                    
-                    citations = data.get("cited_by_count", 0)
-                    landing = loc.get("landing_page_url") or data.get("doi") or landing
-                    pdf_url = loc.get("pdf_url") or (landing if landing and ".pdf" in landing else "")
-                    is_oa = loc.get("is_oa", False)
-                        
-                    idx = data.get("abstract_inverted_index")
-                    if idx:
-                        pos = []
-                        for w, p in idx.items():
-                            for x in p: pos.append((x, w))
-                        pos.sort()
-                        cand_abs = clean_academic_abstract(" ".join([w[1] for w in pos]).strip())
-                        if is_valid_abstract_content(cand_abs):
-                            abstract = cand_abs
-                            abstract_type = "official"
-        except Exception as e:
-            logger.debug(f"[OpenAlex DOI] Failed fetching {clean_doi}: {e}")
-
-    # 2. OpenAlex by Title Search
-    if not authors and (title or title_fallback):
-        try:
-            clean_search_title = re.sub(r'[^a-zA-Z0-9\s]', ' ', (title or title_fallback))[:120].strip()
-            oa_search_url = f"https://api.openalex.org/works?search={urllib.parse.quote(clean_search_title)}&per_page=5"
-            req = urllib.request.Request(oa_search_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                for w in data.get("results", []):
-                    cand_title = w.get("title", "")
-                    if is_title_match(cand_title, (title or title_fallback)):
-                        if not title:
-                            title = cand_title
-                        if not authors and w.get("authorships"):
-                            authors = [a.get("author", {}).get("display_name") for a in w.get("authorships", []) if a.get("author", {}).get("display_name")]
-                        if (not journal or journal == "Peer-reviewed Publication") and w.get("primary_location", {}).get("source", {}).get("display_name"):
-                            journal = w.get("primary_location", {}).get("source", {}).get("display_name")
-                        if not pub_year and w.get("publication_year"):
-                            pub_year = str(w.get("publication_year"))
-                        if not citations and w.get("cited_by_count"):
-                            citations = w.get("cited_by_count", 0)
-                        if not landing and w.get("doi"):
-                            landing = w.get("doi")
-                            
-                        idx = w.get("abstract_inverted_index")
-                        if idx and not abstract:
-                            pos = []
-                            for k, v in idx.items():
-                                for p in v: pos.append((p, k))
-                            pos.sort()
-                            cand_abs = clean_academic_abstract(" ".join([x[1] for x in pos]).strip())
-                            if is_valid_abstract_content(cand_abs):
-                                abstract = cand_abs
-                                abstract_type = "official"
-                        break
-        except Exception as e:
-            logger.debug(f"[OpenAlex Title Search] Error searching for '{title}': {e}")
-
-    # 3. Crossref Fallback
-    if clean_doi and (not authors or not journal or journal == "Peer-reviewed Publication" or not abstract):
-        try:
-            cr_url = f"https://api.crossref.org/works/{clean_doi}"
-            req = urllib.request.Request(cr_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                c_data = json.loads(resp.read().decode("utf-8"))
-                msg = c_data.get("message", {})
-                title_list = msg.get("title", [])
-                cr_cand_title = title_list[0] if title_list else ""
-                
-                # Check title match for Crossref DOI resolution
-                if (title or title_fallback) and cr_cand_title and not is_title_match(cr_cand_title, (title or title_fallback)):
-                    logger.debug(f"[Crossref DOI] Rejecting mismatched DOI {clean_doi}: '{cr_cand_title}' vs '{title or title_fallback}'")
-                else:
-                    if not title and cr_cand_title:
-                        title = cr_cand_title
-                    if not authors:
-                        authors = [f"{a.get('given', '')} {a.get('family', '')}".strip() for a in msg.get("author", []) if a.get("family") or a.get("given")]
-                    container = msg.get("container-title", [])
-                    if container and (not journal or journal == "Peer-reviewed Publication"):
-                        journal = container[0]
-                    if not pub_year:
-                        created = msg.get("created", {}).get("date-parts", [[]])[0]
-                        if created: pub_year = str(created[0])
-                    if not citations:
-                        citations = msg.get("is-referenced-by-count", 0)
-                    if not landing:
-                        landing = msg.get("URL", f"https://doi.org/{clean_doi}")
-                    if not abstract:
-                        raw_abstract = msg.get("abstract", "")
-                        if raw_abstract:
-                            cand_abs = clean_academic_abstract(raw_abstract)
-                            if is_valid_abstract_content(cand_abs):
-                                abstract = cand_abs
-                                abstract_type = "official"
-        except Exception as e:
-            logger.debug(f"[Crossref Fallback] Error resolving DOI {clean_doi}: {e}")
-
-    # 4. Semantic Scholar API Fallback
-    if clean_doi and not abstract:
-        try:
-            s2_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean_doi}?fields=abstract,authors,title,venue,year,citationCount,openAccessPdf"
-            req = urllib.request.Request(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                s2_data = json.loads(resp.read().decode("utf-8"))
-                s2_title = s2_data.get("title") or ""
-                if (title or title_fallback) and s2_title and not is_title_match(s2_title, (title or title_fallback)):
-                    logger.debug(f"[S2 DOI] Rejecting mismatched DOI {clean_doi}: '{s2_title}' vs '{title or title_fallback}'")
-                else:
-                    if not authors and s2_data.get("authors"):
-                        authors = [a.get("name") for a in s2_data.get("authors", []) if a.get("name")]
-                    if not pub_year and s2_data.get("year"):
-                        pub_year = str(s2_data.get("year"))
-                    if not citations and s2_data.get("citationCount"):
-                        citations = s2_data.get("citationCount", 0)
-                    if not pdf_url and s2_data.get("openAccessPdf", {}).get("url"):
-                        pdf_url = s2_data.get("openAccessPdf", {}).get("url")
-                    s2_abs = s2_data.get("abstract")
-                    if s2_abs and not abstract:
-                        cand_abs = clean_academic_abstract(s2_abs)
-                        if is_valid_abstract_content(cand_abs):
-                            abstract = cand_abs
-                            abstract_type = "official"
-        except Exception as e:
-            logger.debug(f"[Semantic Scholar] Error resolving DOI {clean_doi}: {e}")
-
-    # 5. DOI Landing Page HTML Scraper
-    raw_html_content = ""
-    if clean_doi and (not abstract or not authors or not journal or journal == "Peer-reviewed Publication"):
-        try:
-            doi_landing_url = f"https://doi.org/{clean_doi}"
-            req = urllib.request.Request(doi_landing_url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-            })
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                raw_html_content = resp.read().decode("utf-8", errors="ignore")
-                if not abstract:
-                    extracted = extract_abstract_from_html(raw_html_content)
-                    if extracted and is_valid_abstract_content(extracted):
-                        abstract = extracted
-                        abstract_type = "official"
-                if not authors:
-                    author_tags = re.findall(r'<meta\s+[^>]*?name=["\'](?:citation_author|dc\.creator)["\'][^>]*?content=["\'](.*?)["\']', raw_html_content, re.I)
-                    if author_tags:
-                        authors = [a.strip() for a in author_tags if a.strip()]
-                if not journal or journal == "Peer-reviewed Publication":
-                    j_match = re.search(r'<meta\s+[^>]*?name=["\'](?:citation_journal_title|citation_conference_title|dc\.source)["\'][^>]*?content=["\'](.*?)["\']', raw_html_content, re.I)
-                    if j_match:
-                        journal = j_match.group(1).strip()
-        except Exception as e:
-            logger.debug(f"[DOI Scraper] Error scraping landing page for {clean_doi}: {e}")
-
-    # 6. Empirical SCImago / Scopus Database Indexing Resolution
-    empirical_idx = journal_indexer.lookup_journal_index(issns, journal, venue_type=src_type, publisher=host_org)
-
-    # 7. AI Academic Research Auditor
-    audit_input_content = abstract or raw_html_content or ""
-    audited = audit_paper_metadata_with_ai(
-        paper_title=title or clean_doi,
-        raw_authors=authors,
-        raw_journal=journal,
-        raw_year=pub_year,
-        raw_doi=clean_doi,
-        raw_citations=citations,
-        raw_abstract_or_html=audit_input_content,
-        is_oa=is_oa
-    )
-
-    final_title = audited.get("title") or title or title_fallback or clean_doi
-    _GENERIC_TITLE_BLACKLIST = {
-        "abstract", "abstrak", "overview", "paper", "document",
-        "article in press", "in press", "journal pre-proof", "uncorrected proof",
-        "corrected proof", "original article", "research article", "full length article",
-        "short communication", "review article", "full paper", "research paper",
-        "accepted manuscript", "author's copy", "analytical index", "index",
-    }
-    if final_title and final_title.lower().strip() in _GENERIC_TITLE_BLACKLIST:
-        final_title = title_fallback or clean_doi
-    final_authors = audited.get("authors") or authors
-    final_year = audited.get("year") or pub_year
-    final_journal = audited.get("journal") or journal
-    
-    if empirical_idx and empirical_idx.get("journal_metric") and empirical_idx.get("journal_metric") != "Peer-Reviewed Journal":
-        final_metric = empirical_idx["journal_metric"]
-        final_tier = empirical_idx.get("quality_tier", 4)
-    else:
-        final_metric = audited.get("journal_metric") or "Peer-Reviewed"
-        final_tier = audited.get("quality_tier", 4)
-
-    final_abstract = clean_academic_abstract(audited.get("abstract") or abstract)
-    if is_ai_synthesized_overview(final_abstract):
-        final_abstract_type = "ai_summary"
-    else:
-        final_abstract_type = audited.get("abstract_type") or abstract_type or "official"
-
-    result = {
-        "title": final_title,
-        "authors": final_authors,
-        "publication_date": pub_date or final_year,
-        "year": final_year,
-        "journal": final_journal,
-        "journal_metric": final_metric,
-        "quality_tier": final_tier,
-        "citations": citations,
-        "doi": clean_doi,
-        "url": landing,
-        "pdf_url": pdf_url,
-        "abstract": final_abstract,
-        "abstract_type": final_abstract_type
-    }
-    _PAPER_METADATA_CACHE[cache_key] = result
-    return result
-
-def fetch_full_abstract_by_doi(doi: str) -> str:
-    """Fetches the full, authentic academic abstract from OpenAlex / Crossref / Semantic Scholar / Landing HTML using DOI."""
-    if not doi:
-        return ""
-    clean_doi = doi.replace("https://doi.org/", "").strip()
-    
-    # 1. Try OpenAlex by DOI
-    try:
-        oa_url = f"https://api.openalex.org/works/https://doi.org/{clean_doi}"
-        req = urllib.request.Request(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            inverted_index = data.get("abstract_inverted_index")
-            if inverted_index:
-                word_positions = []
-                for word, positions in inverted_index.items():
-                    for pos in positions:
-                        word_positions.append((pos, word))
-                word_positions.sort()
-                cand = " ".join([w[1] for w in word_positions]).strip()
-                if is_valid_abstract_content(cand):
-                    return cand
-    except Exception as e:
-        logger.debug(f"[Abstract by DOI - OpenAlex] Error for {clean_doi}: {e}")
-        
-    # 2. Try Crossref by DOI
-    try:
-        cr_url = f"https://api.crossref.org/works/{clean_doi}"
-        req = urllib.request.Request(cr_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            c_data = json.loads(resp.read().decode("utf-8"))
-            msg = c_data.get("message", {})
-            raw_abstract = msg.get("abstract", "")
-            if raw_abstract:
-                clean_abs = clean_academic_abstract(raw_abstract)
-                if is_valid_abstract_content(clean_abs):
-                    return clean_abs
-    except Exception as e:
-        logger.debug(f"[Abstract by DOI - Crossref] Error for {clean_doi}: {e}")
-
-    # 3. Try Semantic Scholar
-    try:
-        s2_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean_doi}?fields=abstract"
-        req = urllib.request.Request(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            s2_data = json.loads(resp.read().decode("utf-8"))
-            s2_abs = s2_data.get("abstract")
-            if s2_abs:
-                cand = clean_academic_abstract(s2_abs)
-                if is_valid_abstract_content(cand):
-                    return cand
-    except Exception as e:
-        logger.debug(f"[Abstract by DOI - S2] Error for {clean_doi}: {e}")
-
-    # 4. Try DOI Landing Page HTML Scraper
-    try:
-        doi_landing_url = f"https://doi.org/{clean_doi}"
-        req = urllib.request.Request(doi_landing_url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        })
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            html_text = resp.read().decode("utf-8", errors="ignore")
-            extracted = extract_abstract_from_html(html_text)
-            if extracted and is_valid_abstract_content(extracted):
-                return extracted
-    except Exception as e:
-        logger.debug(f"[Abstract by DOI - HTML] Error for {clean_doi}: {e}")
-        
-    return ""
 
 def search_academic_papers(query: str, limit: int = 10) -> List[dict]:
     """Standard entrypoint for academic paper search with synchronous fallback planning."""

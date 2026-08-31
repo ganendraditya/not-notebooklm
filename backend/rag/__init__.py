@@ -12,22 +12,31 @@ from .parsers import (
 )
 
 from .search import (
-    is_valid_academic_title,
-    plan_academic_search,
-    normalize_title_str,
     get_existing_notebook_sources_signatures,
-    is_paper_duplicate,
     search_academic_papers_planned,
+    search_academic_papers,
+    is_paper_duplicate,
+)
+
+from services.search.metadata_resolver_service import (
+    resolve_paper_metadata_by_doi,
+    fetch_full_abstract_by_doi
+)
+
+from services.search.llm_evaluator_service import (
+    plan_academic_search,
     judge_and_filter_papers_with_llm,
+    audit_paper_metadata_with_ai
+)
+
+from utils.text_processing import (
+    is_valid_academic_title,
+    normalize_title_str,
     clean_academic_abstract,
     is_valid_abstract_content,
     extract_abstract_from_html,
     is_title_match,
-    is_ai_synthesized_overview,
-    audit_paper_metadata_with_ai,
-    resolve_paper_metadata_by_doi,
-    fetch_full_abstract_by_doi,
-    search_academic_papers,
+    is_ai_synthesized_overview
 )
 
 from .prompts import (
