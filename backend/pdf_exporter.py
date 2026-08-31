@@ -32,7 +32,7 @@ def is_binary_pdf(file_path: str) -> bool:
     except Exception:
         return False
 
-def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 3.0) -> Optional[bytes]:
+def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0) -> Optional[bytes]:
     """
     Attempts to download an authentic Open Access PDF from publisher or repository.
     Includes browser headers, redirect handling, SSL fallback, and %PDF- verification.

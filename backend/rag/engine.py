@@ -758,7 +758,7 @@ async def query_chat(
                         if parsed_text and len(parsed_text.strip()) >= 150:
                             if "NOTBOOKLM SCHOLARLY ARCHIVE" in parsed_text:
                                 is_full_paper = False
-                            elif fpath.lower().endswith(".pdf") and fsize < 50000: # increased from 35000 to be safer
+                            elif fpath.lower().endswith(".pdf") and fsize < 5000: # Below 5KB is definitely an empty stub/error page
                                 is_full_paper = False
                             else:
                                 is_full_paper = True

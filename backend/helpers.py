@@ -57,9 +57,9 @@ def get_doc_file_path(chat_id: str, filename: str) -> str:
         os.path.join(UPLOAD_DIR, clean_fname),
     ]
 
-    # Return first existing file that is an authentic binary PDF (>=35KB)
+    # Return first existing file that is an authentic binary PDF (>=5KB)
     for p in candidate_paths:
-        if os.path.exists(p) and os.path.getsize(p) >= 35000:
+        if os.path.exists(p) and os.path.getsize(p) >= 5000:
             return p
 
     # If no binary PDF found, return first existing text/markdown fallback file
