@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n";
 
@@ -34,15 +34,15 @@ export const BulkDeleteModal: React.FC<BulkDeleteModalProps> = ({
         onClick={(e) => e.stopPropagation()}
         className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
       >
-        <div className="space-y-1.5">
-          <h3 className="text-base font-semibold text-app-text">
-            {t('right.deleteConfirmTitle')?.replace('{count}', selectedCount.toString()) || `Delete ${selectedCount} selected source(s)?`}
-          </h3>
-          <p className="text-xs text-app-text-muted leading-relaxed">
-            {t('right.deleteConfirmDesc') || 
-              `Deleted documents will no longer be used by the AI to answer questions in this chat session.`}
-          </p>
+        <div className="flex items-center gap-2.5 font-semibold text-sm">
+          <AlertTriangle size={18} className="text-red-500" />
+          <span>{t('right.deleteConfirmTitle')?.replace('{count}', selectedCount.toString()) || `Delete ${selectedCount} selected source(s)?`}</span>
         </div>
+        
+        <p className="text-xs text-app-text-muted leading-relaxed">
+          {t('right.deleteConfirmDesc') || 
+            `Deleted documents will no longer be used by the AI to answer questions in this chat session.`}
+        </p>
 
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
           <Button
