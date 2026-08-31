@@ -25,6 +25,58 @@ export function useChatSession(
     activeChatIdRef.current = activeChatId;
   }, [activeChatId]);
 
+  const handleSelectChatRef = useRef<(id: string) => void>(() => {});
+
+  const handleSelectChat = (id: string) => {
+    setCurrentView("chat");
+    if (activeChatId === id) return;
+
+    setActiveChatId(id);
+    setViewingDoc(null);
+    setPendingSources([]);
+
+    // Sync loading & queue state for the selected chat
+    const job = getChatJob(id);
+    setIsLoading(job.isProcessing);
+    setActiveStatus(job.status);
+    setQueuedPrompts(job.queue.map((q: any) => q.text));
+
+    fetch(`${backendUrl}/chats/${id}`)
+        .then(res => res.json())
+        .then(data => {
+          // Only apply if user is still looking at this chat and not currently in active streaming
+          if (activeChatIdRef.current === id) {
+            const currentJob = getChatJob(id);
+            setDocuments(data.documents || []);
+            if (!currentJob.isProcessing) {
+              setMessages(data.messages || []);
+            }
+          }
+        })
+        .catch(err => {
+          console.error("Failed to fetch chat details:", err);
+          // Fallback to query all documents if detail endpoint fails
+          fetch(`${backendUrl}/chats`)
+            .then(r => r.json())
+            .then(sList => {
+              try {
+                const pinnedStorage = JSON.parse(localStorage.getItem("pinned_chats") || "[]") as string[];
+                const pinnedSet = new Set(pinnedStorage);
+                setSessions((sList || []).map((s: ChatSession) => ({
+                  ...s,
+                  is_pinned: pinnedSet.has(s.id)
+                })));
+              } catch {
+                setSessions(sList || []);
+              }
+            });
+        });
+  };
+
+  useEffect(() => {
+    handleSelectChatRef.current = handleSelectChat;
+  }, [handleSelectChat]);
+
   // Fetch all sessions on mount & auto-select the latest active chat if none selected
   useEffect(() => {
     fetch(`${backendUrl}/chats`)
@@ -35,8 +87,8 @@ export function useChatSession(
           is_pinned: Boolean(s.is_pinned)
         }));
         setSessions(hydrated);
-        if (hydrated.length > 0 && !activeChatId) {
-          handleSelectChat(hydrated[0].id);
+        if (hydrated.length > 0 && !activeChatId && handleSelectChatRef.current) {
+          handleSelectChatRef.current(hydrated[0].id);
         }
       })
       .catch(err => console.error("Failed to fetch sessions:", err));
@@ -96,52 +148,6 @@ export function useChatSession(
     setIsLoading(false);
     setActiveStatus(null);
     setCurrentView("chat");
-  };
-
-  const handleSelectChat = (id: string) => {
-    setCurrentView("chat");
-    if (activeChatId === id) return;
-
-    setActiveChatId(id);
-    setViewingDoc(null);
-    setPendingSources([]);
-
-    // Sync loading & queue state for the selected chat
-    const job = getChatJob(id);
-    setIsLoading(job.isProcessing);
-    setActiveStatus(job.status);
-    setQueuedPrompts(job.queue.map((q: any) => q.text));
-
-    fetch(`${backendUrl}/chats/${id}`)
-        .then(res => res.json())
-        .then(data => {
-          // Only apply if user is still looking at this chat and not currently in active streaming
-          if (activeChatIdRef.current === id) {
-            const currentJob = getChatJob(id);
-            setDocuments(data.documents || []);
-            if (!currentJob.isProcessing) {
-              setMessages(data.messages || []);
-            }
-          }
-        })
-        .catch(err => {
-          console.error("Failed to fetch chat details:", err);
-          // Fallback to query all documents if detail endpoint fails
-          fetch(`${backendUrl}/chats`)
-            .then(r => r.json())
-            .then(sList => {
-              try {
-                const pinnedStorage = JSON.parse(localStorage.getItem("pinned_chats") || "[]") as string[];
-                const pinnedSet = new Set(pinnedStorage);
-                setSessions((sList || []).map((s: ChatSession) => ({
-                  ...s,
-                  is_pinned: pinnedSet.has(s.id)
-                })));
-              } catch {
-                setSessions(sList || []);
-              }
-            });
-        });
   };
 
   const handleDeleteChat = async (id: string) => {
