@@ -73,10 +73,10 @@ export function useDocumentDownload({
     });
 
     try {
-      const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk-download`, {
+      const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/bulk_download_stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ document_ids: docIds })
+        body: JSON.stringify({ doc_ids: docIds })
       });
 
       if (!res.ok) {
