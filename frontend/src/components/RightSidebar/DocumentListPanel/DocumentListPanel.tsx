@@ -223,7 +223,6 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
 
             {/* Pending Uploading & Resolving Sources */}
             {pendingSources.map((item: PendingSourceItem, pIdx: number) => {
-              const badge = getFileBadgeInfo(item.filename);
               const itemNumber = documents.length + pIdx + 1;
 
               return (
@@ -239,8 +238,9 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                       {itemNumber}.
                     </span>
 
-                    <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${badge.bg}`}>
-                      <span className="text-[7.5px] font-bold tracking-tighter uppercase font-mono">{badge.label}</span>
+                    {/* Placeholder Silhouette Badge for Pending Sources */}
+                    <div className="w-5 h-5 rounded border border-app-border-strong border-dashed flex items-center justify-center shrink-0 bg-app-item-hover/50 opacity-50">
+                      <div className="w-2.5 h-1 bg-app-text-dim rounded-full animate-pulse" />
                     </div>
 
                     <span 
