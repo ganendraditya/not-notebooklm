@@ -129,7 +129,7 @@ def resolve_and_fetch_authentic_pdf(
         if stop_event.is_set() or not clean_doi: return
         try:
             upw_url = f"https://api.unpaywall.org/v2/{urllib.parse.quote(clean_doi)}?email=research@notbooklm.app"
-            resp = requests.get(upw_url, timeout=3.5)
+            resp = requests.get(upw_url, timeout=10.0)
             if resp.status_code == 200 and not stop_event.is_set():
                 upw_data = resp.json()
                 best_oa = upw_data.get("best_oa_location") or {}
@@ -145,7 +145,7 @@ def resolve_and_fetch_authentic_pdf(
         if stop_event.is_set() or not clean_doi: return
         try:
             oa_url = f"https://api.openalex.org/works/https://doi.org/{clean_doi}"
-            resp = requests.get(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=3.5)
+            resp = requests.get(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=10.0)
             if resp.status_code == 200 and not stop_event.is_set():
                 wdata = resp.json()
                 best_loc = wdata.get("best_oa_location") or wdata.get("primary_location") or {}
@@ -162,7 +162,7 @@ def resolve_and_fetch_authentic_pdf(
         try:
             q = f"DOI:{urllib.parse.quote(clean_doi)}" if clean_doi else f'TITLE:"{urllib.parse.quote(title)}"'
             epmc_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={q}&format=json&resultType=core&pageSize=1"
-            resp = requests.get(epmc_url, timeout=3.5)
+            resp = requests.get(epmc_url, timeout=10.0)
             if resp.status_code == 200 and not stop_event.is_set():
                 epmc_data = resp.json()
                 results = epmc_data.get("resultList", {}).get("result", [])
@@ -182,7 +182,7 @@ def resolve_and_fetch_authentic_pdf(
         if stop_event.is_set() or not clean_doi: return
         try:
             s2_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean_doi}?fields=openAccessPdf"
-            resp = requests.get(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=3.5)
+            resp = requests.get(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=10.0)
             if resp.status_code == 200 and not stop_event.is_set():
                 oa_pdf = resp.json().get("openAccessPdf", {}).get("url")
                 if oa_pdf:
@@ -201,7 +201,7 @@ def resolve_and_fetch_authentic_pdf(
             resp = requests.get(landing_target, headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-            }, timeout=4.0, allow_redirects=True, verify=False)
+            }, timeout=12.0, allow_redirects=True, verify=False)
             if resp.status_code == 200 and not stop_event.is_set():
                 html = resp.text
                 final_url = resp.url
@@ -257,7 +257,7 @@ def resolve_and_fetch_authentic_pdf(
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(workers)) as executor:
         futures = [executor.submit(w) for w in workers]
         # Wait until stop_event is set by the first winner OR timeout reached (max 4.5s)
-        stop_event.wait(timeout=3.5)
+        stop_event.wait(timeout=10.0)
         # Note: trailing futures are left to terminate as daemon/safe calls
 
     with lock:
