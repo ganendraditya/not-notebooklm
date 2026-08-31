@@ -228,16 +228,18 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
           className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
             documents.length === 0 
               ? "border-app-border-strong bg-transparent cursor-not-allowed"
-              : isAllSelected || isPartiallySelected 
-              ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:border-gray-300" 
-              : "border-app-border-strong bg-transparent cursor-pointer hover:border-blue-500"
+              : isAllSelected
+              ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:bg-blue-700" 
+              : isPartiallySelected 
+              ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:bg-blue-700"
+              : "border-app-border-strong bg-transparent cursor-pointer hover:border-gray-500"
           }`}
-          title={documents.length === 0 ? t('right.noSourcesAvail') : isAllSelected ? t('right.unselectAll') : t('right.selectAll')}
+          title={documents.length === 0 ? t('right.noSourcesAvail') : (isAllSelected || isPartiallySelected) ? t('right.unselectAll') : t('right.selectAll')}
         >
           {isAllSelected && documents.length > 0 ? (
-            <Check size={10} strokeWidth={3} />
+            <Check size={9} strokeWidth={3} />
           ) : isPartiallySelected ? (
-            <Minus size={10} strokeWidth={3} />
+            <Minus size={9} strokeWidth={3} />
           ) : null}
         </button>
       </div>

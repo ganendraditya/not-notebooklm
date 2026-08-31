@@ -9,7 +9,7 @@ export function useDocumentSelection(documents: Document[]) {
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
 
-  const selectedDocList = useMemo(() => documents.filter(doc => selectedDocs[doc.id]), [documents, selectedDocs]);
+  const selectedDocList = useMemo(() => documents.filter(doc => selectedDocs[doc.id] !== false), [documents, selectedDocs]);
   const selectedCount = selectedDocList.length;
   
   const isAllSelected = documents.length > 0 && selectedCount === documents.length;
@@ -45,9 +45,13 @@ export function useDocumentSelection(documents: Document[]) {
 
   const handleToggleSelectAll = () => {
     if (documents.length === 0) return;
-    if (isAllSelected) {
-      setSelectedDocs({});
+    if (isAllSelected || isPartiallySelected) {
+      // Unselect all (explicitly set to false to override default true)
+      const newSelection: Record<number, boolean> = {};
+      documents.forEach(doc => { newSelection[doc.id] = false; });
+      setSelectedDocs(newSelection);
     } else {
+      // Select all (set to true)
       const newSelection: Record<number, boolean> = {};
       documents.forEach(doc => { newSelection[doc.id] = true; });
       setSelectedDocs(newSelection);
