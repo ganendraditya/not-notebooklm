@@ -15,7 +15,7 @@ def is_authentic_pdf_bytes(data: bytes, min_size: int = 1024) -> bool:
         return False
     if not data.startswith(b"%PDF-"):
         return False
-    if b"NOTBOOKLM SCHOLARLY ARCHIVE" in data or b"OFFICIAL PUBLICATION ARCHIVE RECORD" in data:
+    if b"NOTBOOKLM" in data or b"OFFICIAL PUBLICATION ARCHIVE RECORD" in data:
         return False
     return True
 

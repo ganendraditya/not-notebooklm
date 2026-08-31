@@ -756,14 +756,14 @@ async def query_chat(
                     try:
                         parsed_text = parse_document_to_markdown(fpath)
                         if parsed_text and len(parsed_text.strip()) >= 150:
-                            if "NOTBOOKLM SCHOLARLY ARCHIVE" in parsed_text:
+                            if "NOTBOOKLM" in parsed_text:
                                 is_full_paper = False
-                            elif fpath.lower().endswith(".pdf") and fsize < 5000: # Below 5KB is definitely an empty stub/error page
+                            elif fpath.lower().endswith(".pdf") and fsize < 500: # Below 500 bytes is definitely an empty stub/error page
                                 is_full_paper = False
                             else:
                                 is_full_paper = True
                             # Keep generous content so LLM sees full sections, methods, and results
-                            max_chars = 14000 if len(local_docs) > 20 else 24000
+                            max_chars = 48000 if len(local_docs) > 20 else 80000
                             content_snippet = parsed_text[:max_chars]
                     except Exception as parse_err:
                         logger.debug(f"[Doc Parse Error for {fname}]: {parse_err}")
@@ -795,7 +795,7 @@ async def query_chat(
                 if doc_display_title.isupper() and len(doc_display_title) > 8:
                     doc_display_title = doc_display_title.title()
 
-                status_label = "NASKAH LENGKAP TERSEDIA (Full-Text Original PDF Downloaded)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Only - Direct PDF Download Restricted/Unavailable)"
+                status_label = "NASKAH LENGKAP TERSEDIA (Full-Text Original PDF Downloaded)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Only)"
                 has_doi_label = f"DOI Resmi: {db_record.doi}" if (db_record and db_record.doi) else "DOI Resmi: Tidak Ada / Repositori Kampus"
 
                 return (
