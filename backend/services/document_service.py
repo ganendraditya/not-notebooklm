@@ -16,11 +16,11 @@ def calculate_doc_quality(chat_id: str, d: Document) -> Tuple[int, bool, int]:
     fp = get_doc_file_path(chat_id, d.filename)
     sz = os.path.getsize(fp) if os.path.exists(fp) else 0
     has_full_pdf = False
-    if os.path.exists(fp) and sz >= 35000:
+    if os.path.exists(fp) and sz >= 1000:
         try:
             with open(fp, "rb") as f:
                 fb = f.read(2048)
-                has_full_pdf = is_authentic_pdf_bytes(fb, min_size=512)
+                has_full_pdf = is_authentic_pdf_bytes(fb, min_size=500)
         except Exception:
             has_full_pdf = False
             
@@ -101,11 +101,11 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Document, file_path: str)
     is_authentic_pdf = False
     
     # 1. Local Disk Validation (DRY)
-    if os.path.exists(file_path) and file_size >= 35000:
+    if os.path.exists(file_path) and file_size >= 1000:
         try:
             with open(file_path, "rb") as f:
                 first_bytes = f.read(2048)
-                is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=512)
+                is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=500)
         except Exception:
             is_authentic_pdf = False
 
