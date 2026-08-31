@@ -52,7 +52,7 @@ export const BulkDeleteModal: React.FC<BulkDeleteModalProps> = ({
             disabled={isBulkDeleting}
             className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
           >
-            {t('common.cancel') || "Cancel"}
+            {t('action.cancel') || "Cancel"}
           </Button>
 
           <Button
