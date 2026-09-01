@@ -16,7 +16,8 @@ import {
 } from "lucide-react";
 import { TargetedSource } from "@/stores/documentStore";
 import ModelSelector from "@/components/ModelSelector";
-import SearchFilterPopover, { SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/components/SearchFilterPopover";
+import SearchFilterPopover from "@/components/SearchFilterPopover";
+import { type SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/lib/constants/academicFilters";
 import { useTranslation } from "@/lib/i18n";
 
 const ALLOWED_ATTACHMENT_EXTS = new Set([
@@ -335,7 +336,7 @@ export const ChatInputBox = memo(function ChatInputBox({
               e.stopPropagation();
               setStorageWarningFile(null);
             }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
           >
             <div 
               onClick={(e) => e.stopPropagation()}

@@ -158,7 +158,7 @@ def delete_chat(chat_id: str, db: Session = Depends(get_db)):
 
     # 2. Clean vectors from Qdrant
     try:
-        rag.delete_qdrant_vectors(chat_id)
+        rag.delete_document_vectors(chat_id)
     except Exception as e:
         logger.debug(f"[Qdrant Vector Clean Warning]: {e}")
 
@@ -194,7 +194,7 @@ def bulk_delete_chats(payload: models.BulkDeleteChatsRequest, db: Session = Depe
 
         # Clean vectors
         try:
-            rag.delete_qdrant_vectors(chat_id)
+            rag.delete_document_vectors(chat_id)
         except Exception:
             pass
 

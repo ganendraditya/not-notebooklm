@@ -82,8 +82,9 @@ def init_embedding_and_vector_store():
     return embed_model, vstore
 
 
-def delete_qdrant_vectors(chat_id: str, doc_filename: Optional[str] = None):
-    """Purges points from Qdrant vector store by chat_id and optionally by doc_filename."""
+def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
+    """Purges points from vector store by chat_id and optionally by doc_filename.
+    Abstracted interface to ensure reversibility if vector db provider changes."""
     try:
         from qdrant_client.http import models as qmodels
         conditions = [

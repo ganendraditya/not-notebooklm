@@ -16,11 +16,11 @@ def calculate_doc_quality(chat_id: str, d: Document) -> Tuple[int, bool, int]:
     fp = get_doc_file_path(chat_id, d.filename)
     sz = os.path.getsize(fp) if os.path.exists(fp) else 0
     has_full_pdf = False
-    if os.path.exists(fp) and sz >= 35000:
+    if os.path.exists(fp) and sz >= 1000:
         try:
             with open(fp, "rb") as f:
                 fb = f.read(2048)
-                has_full_pdf = is_authentic_pdf_bytes(fb, min_size=512)
+                has_full_pdf = is_authentic_pdf_bytes(fb, min_size=500)
         except Exception:
             has_full_pdf = False
             
@@ -89,3 +89,51 @@ def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dict[str,
         "doi": extracted_doi,
         "is_valid_pdf": is_valid_pdf
     }
+
+async def check_and_fetch_authentic_pdf_on_demand(doc: Document, file_path: str) -> Tuple[bool, str]:
+    """
+    Validates if local file is authentic PDF. If not, but document has OA metadata,
+    it attempts an on-demand background fetch from open-access repositories.
+    
+    Returns (is_authentic_pdf, content_markdown)
+    """
+    file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
+    is_authentic_pdf = False
+    
+    # 1. Local Disk Validation (DRY)
+    if os.path.exists(file_path) and file_size >= 1000:
+        try:
+            with open(file_path, "rb") as f:
+                first_bytes = f.read(2048)
+                is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=500)
+        except Exception:
+            is_authentic_pdf = False
+
+    new_content = ""
+
+    # 2. On-demand fallback: if doc is OA or has PDF link but local file is not PDF, try fast download
+    if not is_authentic_pdf and (doc.is_oa or doc.pdf_url or doc.doi):
+        db_doi = clean_doi(doc.doi)
+        try:
+            fetched_oa = await asyncio.to_thread(
+                pdf_exporter.resolve_and_fetch_authentic_pdf,
+                doi=db_doi,
+                title=doc.title,
+                direct_url=doc.url or "",
+                candidate_pdf_url=doc.pdf_url or ""
+            )
+            if fetched_oa and is_authentic_pdf_bytes(fetched_oa, min_size=35000):
+                with open(file_path, "wb") as f:
+                    f.write(fetched_oa)
+                is_authentic_pdf = True
+                
+                # Re-extract markdown content from new PDF
+                try:
+                    import pymupdf4llm
+                    new_content = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug(f"[On-demand OA Fetch Warning]: {e}")
+            
+    return is_authentic_pdf, new_content

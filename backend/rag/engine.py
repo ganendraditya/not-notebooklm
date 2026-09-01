@@ -46,7 +46,7 @@ from .prompts import (
     get_workspace_analysis_system_prompt,
     get_agentic_system_prompt
 )
-from .vector_store import embed_model, vector_store, qdrant_client, delete_qdrant_vectors
+from .vector_store import embed_model, vector_store, qdrant_client, delete_document_vectors
 
 load_dotenv()
 
@@ -756,14 +756,16 @@ async def query_chat(
                     try:
                         parsed_text = parse_document_to_markdown(fpath)
                         if parsed_text and len(parsed_text.strip()) >= 150:
-                            if "NOTBOOKLM SCHOLARLY ARCHIVE" in parsed_text:
+                            if "NOTBOOKLM" in parsed_text:
                                 is_full_paper = False
-                            elif fpath.lower().endswith(".pdf") and fsize < 50000: # increased from 35000 to be safer
+                            elif fpath.lower().endswith(".txt") and fsize < 3000: # Text synthesis fallbacks are usually 1KB-2KB
+                                is_full_paper = False
+                            elif fpath.lower().endswith(".pdf") and fsize < 10000: # Stubs are below 10KB
                                 is_full_paper = False
                             else:
                                 is_full_paper = True
                             # Keep generous content so LLM sees full sections, methods, and results
-                            max_chars = 14000 if len(local_docs) > 20 else 24000
+                            max_chars = 48000 if len(local_docs) > 20 else 80000
                             content_snippet = parsed_text[:max_chars]
                     except Exception as parse_err:
                         logger.debug(f"[Doc Parse Error for {fname}]: {parse_err}")
@@ -795,7 +797,7 @@ async def query_chat(
                 if doc_display_title.isupper() and len(doc_display_title) > 8:
                     doc_display_title = doc_display_title.title()
 
-                status_label = "NASKAH LENGKAP TERSEDIA (Full-Text Original PDF Downloaded)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Only - Direct PDF Download Restricted/Unavailable)"
+                status_label = "NASKAH LENGKAP TERSEDIA (Full-Text Original PDF Downloaded - Seluruh Bab Lengkap Ada)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Only)"
                 has_doi_label = f"DOI Resmi: {db_record.doi}" if (db_record and db_record.doi) else "DOI Resmi: Tidak Ada / Repositori Kampus"
 
                 return (
@@ -807,7 +809,7 @@ async def query_chat(
                         f"Nama File: {fname}\n"
                         f"Status File Dokumen: {status_label}\n"
                         f"{has_doi_label}\n"
-                        f"Teks Dokumen:\n{content_snippet}\n"
+                        f"Teks Dokumen Asli:\n{content_snippet}\n"
                     )
                 )
 

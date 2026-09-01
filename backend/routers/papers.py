@@ -38,6 +38,7 @@ def _prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> tupl
     doc_text += f"## Abstract & Overview\n\n{abstract_text}\n"
 
     save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
+    txt_save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename.replace('.pdf', '')}.txt")
     has_downloaded_pdf = False
 
     if c_doi or paper.pdf_url or paper.url:
@@ -48,7 +49,7 @@ def _prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> tupl
                 direct_url=paper.url or "",
                 candidate_pdf_url=paper.pdf_url or ""
             )
-            if is_authentic_pdf_bytes(fetched_oa, min_size=40000):
+            if is_authentic_pdf_bytes(fetched_oa, min_size=1000):
                 with open(save_path, "wb") as f:
                     f.write(fetched_oa)
                 has_downloaded_pdf = True
@@ -56,11 +57,14 @@ def _prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> tupl
             logger.debug(f"[OA Fetch on Import]: {e}")
 
     if not has_downloaded_pdf:
+        # Tulis teks fallback (placeholder metadata dan abstract)
         try:
-            with open(save_path, "w", encoding="utf-8") as f:
+            with open(txt_save_path, "w", encoding="utf-8") as f:
                 f.write(doc_text)
+            filename = filename.replace('.pdf', '') + '.txt'
         except Exception as e:
             logger.warning(f"[Doc text save Warning]: {e}")
+            
     else:
         # If PDF was downloaded, parse markdown from PDF for vector embedding!
         try:
@@ -318,6 +322,7 @@ async def import_doi_source(chat_id: str, req: models.ImportDoiRequest, db: Sess
     is_oa = meta.get("is_oa", True)
 
     save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename}")
+    txt_save_path = os.path.join(UPLOAD_DIR, f"{chat_id}_{filename.replace('.pdf', '')}.txt")
     has_downloaded_pdf = False
 
     # Attempt fetching authentic OA PDF
@@ -339,10 +344,12 @@ async def import_doi_source(chat_id: str, req: models.ImportDoiRequest, db: Sess
     if not has_downloaded_pdf:
         doc_text = f"# {title} ({year})\n\n**DOI:** {extracted_doi}  \n**URL:** {url}  \n\n## Abstract & Overview\n\n{abstract_text}\n"
         try:
-            with open(save_path, "w", encoding="utf-8") as f:
+            with open(txt_save_path, "w", encoding="utf-8") as f:
                 f.write(doc_text)
+            filename = filename.replace('.pdf', '') + '.txt'
+            save_path = txt_save_path
         except Exception as e:
-            logger.warning(f"[Save doc text Warning]: {e}")
+            logger.warning(f"[Doc text save Warning]: {e}")
 
     # Ingest into vector store
     try:
