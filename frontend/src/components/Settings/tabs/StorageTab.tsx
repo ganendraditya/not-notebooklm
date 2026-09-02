@@ -304,23 +304,21 @@ export default function StorageTab({
 
               {sessions.length > 0 ? (
                 <div className="border border-app-border rounded-xl overflow-hidden divide-y divide-app-divider bg-transparent">
-                    <div className="flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted">
-                      <span>Conversations</span>
-                      <div className="flex items-center shrink-0 pr-[8px]">
-                        <input 
-                          type="checkbox"
-                          checked={selectedChatIds.length === sessions.length && sessions.length > 0}
-                          ref={input => {
-                            if (input) {
-                              input.indeterminate = selectedChatIds.length > 0 && selectedChatIds.length < sessions.length;
-                            }
-                          }}
-                          onChange={toggleSelectAllChats}
-                          className="rounded cursor-pointer accent-blue-500 shrink-0"
-                        />
-                      </div>
-                    </div>
-                    <div className="max-h-40 overflow-y-auto custom-scrollbar divide-y divide-app-divider">
+                  <div className="flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted [scrollbar-gutter:stable]">
+                    <span>Conversations</span>
+                    <input 
+                      type="checkbox"
+                      checked={selectedChatIds.length === sessions.length && sessions.length > 0}
+                      ref={input => {
+                        if (input) {
+                          input.indeterminate = selectedChatIds.length > 0 && selectedChatIds.length < sessions.length;
+                        }
+                      }}
+                      onChange={toggleSelectAllChats}
+                      className="rounded cursor-pointer accent-blue-500 shrink-0"
+                    />
+                  </div>
+                  <div className="max-h-40 overflow-y-auto [scrollbar-gutter:stable] custom-scrollbar divide-y divide-app-divider">
                     {sessions.map((s) => (
                       <label 
                         key={s.id} 
