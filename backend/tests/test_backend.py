@@ -42,17 +42,21 @@ def test_chat_lifecycle():
     assert res_check.status_code == 404
 
 def test_flashrank_reranker():
-    """Verify FlashRank cross-encoder loads and ranks passages properly."""
-    from flashrank import Ranker, RerankRequest
-    ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
-    passages = [
-        {"id": 1, "text": "Deep learning and LSTM for precipitation and rainfall forecasting."},
-        {"id": 2, "text": "Recipe for chocolate cake and vanilla cupcakes."}
-    ]
-    req = RerankRequest(query="rainfall machine learning prediction", passages=passages)
-    ranked = ranker.rerank(req)
-    assert len(ranked) == 2
-    assert ranked[0]["id"] == 1
+    """Verify FlashRank cross-encoder loads and ranks passages properly (if installed)."""
+    try:
+        from flashrank import Ranker, RerankRequest
+        ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+        passages = [
+            {"id": 1, "text": "Deep learning and LSTM for precipitation and rainfall forecasting."},
+            {"id": 2, "text": "Recipe for chocolate cake and vanilla cupcakes."}
+        ]
+        req = RerankRequest(query="rainfall machine learning prediction", passages=passages)
+        ranked = ranker.rerank(req)
+        assert len(ranked) == 2
+        assert ranked[0]["id"] == 1
+    except (ImportError, ModuleNotFoundError):
+        import pytest
+        pytest.skip("flashrank is not installed in the current environment")
 
 def test_section_aware_academic_chunker():
     """Verify section splitter accurately preserves breadcrumbs, tables, and IMRaD canonical tags."""

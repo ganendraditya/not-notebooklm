@@ -238,7 +238,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
                   {paperDetails?.content || viewingDoc?.content ? (
                     <div className="pt-6 mt-6 border-t border-app-border text-[14px] leading-[1.75] text-app-text break-words whitespace-pre-wrap document-content-view">
                       {(() => {
-                        let contentToRender = paperDetails?.content || viewingDoc?.content;
+                        const contentToRender = paperDetails?.content || viewingDoc?.content;
                         if (!contentToRender) return null;
                         
                         if (getHighlightedContent) {
