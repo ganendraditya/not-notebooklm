@@ -4,6 +4,7 @@ sqlalchemy
 python-multipart
 qdrant-client
 llama-index-core
+llama-index-vector-stores-qdrant
 llama-index-llms-gemini
 llama-index-embeddings-gemini
 llama-index-embeddings-huggingface
