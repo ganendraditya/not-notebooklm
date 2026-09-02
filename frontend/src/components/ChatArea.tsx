@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/stores/chatStore";
 import { Document as DocType, TargetedSource } from "@/stores/documentStore";
 import { InChatMessageComponent } from "./chat/ChatMessageItem";
+import { UserMessageBubble } from "./chat/UserMessageBubble";
 import { ChatInputBox, Attachment } from "./chat/ChatInput";
 import { CitationContext } from "./chat/CitationParser";
 import { useTranslation } from "@/lib/i18n";
@@ -400,9 +401,7 @@ export default function ChatArea({
                         ) : (
                           <>
                             {msg.content?.trim() && (
-                              <div className="bg-app-user-bubble text-app-text px-4 py-2.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm border border-app-border">
-                                {msg.content}
-                              </div>
+                              <UserMessageBubble content={msg.content} maxCollapsedHeight={180} />
                             )}
                             <div className="flex items-center gap-1 mt-1 mr-0.5">
                               <button
