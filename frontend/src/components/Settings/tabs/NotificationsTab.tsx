@@ -102,7 +102,7 @@ export default function NotificationsTab() {
             className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors border border-blue-500/20"
           >
             <BellRing size={13} />
-            <span>{testSent ? "Terkirim!" : "Test Notifikasi"}</span>
+            <span>{testSent ? t("settings.notifications.sent") || "Terkirim!" : t("settings.notifications.test") || "Test Notifikasi"}</span>
           </button>
         )}
       </div>
@@ -111,34 +111,34 @@ export default function NotificationsTab() {
       {!isSupported ? (
         <div className="mt-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs flex items-start gap-2">
           <AlertCircle size={16} className="shrink-0 mt-0.5" />
-          <span>Browser ini tidak mendukung Web Notifications API.</span>
+          <span>{t("settings.notifications.notSupported") || "Browser ini tidak mendukung Web Notifications API."}</span>
         </div>
       ) : permission === "denied" ? (
         <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2">
           <AlertCircle size={16} className="shrink-0 mt-0.5" />
           <div className="flex-1">
-            <span className="font-semibold block mb-0.5">Izin notifikasi diblokir di browser.</span>
-            <span>Buka ikon gembok / pengaturan situs di bar URL browser Anda dan ubah notifikasi ke <b>Allow</b>.</span>
+            <span className="font-semibold block mb-0.5">{t("settings.notifications.denied") || "Izin notifikasi diblokir di browser."}</span>
+            <span>{t("settings.notifications.deniedDesc") || "Buka ikon gembok / pengaturan situs di bar URL browser Anda dan ubah notifikasi ke Allow."}</span>
           </div>
         </div>
       ) : permission === "default" ? (
         <div className="mt-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bell size={16} className="shrink-0" />
-            <span>Aktifkan izin notifikasi OS/Browser agar pemberitahuan muncul di Windows.</span>
+            <span>{t("settings.notifications.prompt") || "Aktifkan izin notifikasi OS/Browser agar pemberitahuan muncul di Windows."}</span>
           </div>
           <button
             type="button"
             onClick={handleRequestPermission}
             className="shrink-0 font-medium underline hover:text-blue-300"
           >
-            Izinkan
+            {t("settings.notifications.allow") || "Izinkan"}
           </button>
         </div>
       ) : (
         <div className="mt-3 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
           <CheckCircle2 size={15} className="shrink-0" />
-          <span>Izin notifikasi Windows / Browser aktif.</span>
+          <span>{t("settings.notifications.granted") || "Izin notifikasi Windows / Browser aktif."}</span>
         </div>
       )}
 
