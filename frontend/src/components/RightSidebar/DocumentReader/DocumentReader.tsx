@@ -271,7 +271,12 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
         </div>
       ) : activeTab === "pdf" ? (
         <div className="flex-1 w-full h-full bg-app-surface overflow-hidden relative">
-          {activeChatId && viewingDoc && paperDetails?.has_full_pdf !== false ? (
+          {isLoadingDetails ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-6 space-y-4">
+               <div className="w-8 h-8 rounded-full border-2 border-app-border border-t-blue-500 animate-spin" />
+               <p className="text-xs text-app-text-muted font-medium animate-pulse">{t('right.loading')}</p>
+            </div>
+          ) : activeChatId && viewingDoc && paperDetails?.has_full_pdf !== false && !viewingDoc.filename?.toLowerCase().endsWith('.txt') ? (
             <object
               data={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/stream#toolbar=1&navpanes=0`}
               type="application/pdf"
