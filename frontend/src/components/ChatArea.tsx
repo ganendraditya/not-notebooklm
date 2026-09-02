@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { 
   Sparkles, 
   FileText, 
@@ -141,13 +141,11 @@ export default function ChatArea({
     }
   }, [isRenameOpen]);
 
-  useEffect(() => {
-    if (!isChatEmpty) {
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
-      }
+  useLayoutEffect(() => {
+    if (!isChatEmpty && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
-  }, [messages, isLoading, isChatEmpty]);
+  }, [messages, isLoading, isChatEmpty, activeChatId]);
 
   const handleSendMessage = useCallback((text: string, attachments?: Attachment[]) => {
     onSendMessage(text, attachments);
@@ -292,7 +290,7 @@ export default function ChatArea({
 
       <div 
         ref={scrollContainerRef}
-        className={`flex-1 overflow-y-auto w-full min-h-0 scroll-smooth custom-scrollbar overflow-x-hidden ${
+        className={`flex-1 overflow-y-auto w-full min-h-0 custom-scrollbar overflow-x-hidden ${
           isChatEmpty ? "flex items-center justify-center pt-0 pb-0" : "pt-12 lg:pt-14 pb-36"
         }`}
       >
