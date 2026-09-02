@@ -13,12 +13,37 @@ import { Bell, BellRing, AlertCircle, CheckCircle2 } from "lucide-react";
 export default function NotificationsTab() {
   const { t } = useTranslation();
 
-  // Notifications State
-  const [notifyResponses, setNotifyResponses] = useState<string>("push");
-  const [notifyTasks, setNotifyTasks] = useState<string>("push");
-  const [notifyDownloads, setNotifyDownloads] = useState<string>("push");
-  const [permission, setPermission] = useState<NotificationPermission>("default");
-  const [isSupported, setIsSupported] = useState<boolean>(true);
+  // Notifications State - Initialize permission synchronously when available in browser to avoid flash of "default" UI
+  const [notifyResponses, setNotifyResponses] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("notbooklm_notify_responses") || "push";
+    }
+    return "push";
+  });
+  const [notifyTasks, setNotifyTasks] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("notbooklm_notify_tasks") || "push";
+    }
+    return "push";
+  });
+  const [notifyDownloads, setNotifyDownloads] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("notbooklm_notify_downloads") || "push";
+    }
+    return "push";
+  });
+  const [permission, setPermission] = useState<NotificationPermission>(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      return Notification.permission;
+    }
+    return "default";
+  });
+  const [isSupported, setIsSupported] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return "Notification" in window;
+    }
+    return true;
+  });
   const [testSent, setTestSent] = useState<boolean>(false);
 
   // Load preferences and permission status
@@ -26,19 +51,6 @@ export default function NotificationsTab() {
     setIsSupported(isNotificationSupported());
     if (isNotificationSupported()) {
       setPermission(getNotificationPermission());
-    }
-
-    try {
-      const savedNotifyResponses = localStorage.getItem("notbooklm_notify_responses");
-      if (savedNotifyResponses) setNotifyResponses(savedNotifyResponses);
-
-      const savedNotifyTasks = localStorage.getItem("notbooklm_notify_tasks");
-      if (savedNotifyTasks) setNotifyTasks(savedNotifyTasks);
-
-      const savedNotifyDownloads = localStorage.getItem("notbooklm_notify_downloads");
-      if (savedNotifyDownloads) setNotifyDownloads(savedNotifyDownloads);
-    } catch {
-      // LocalStorage access denied/restricted
     }
   }, []);
 
