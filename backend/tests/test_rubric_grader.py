@@ -64,3 +64,39 @@ def test_evaluate_response_grounding_with_mock_llm():
     assert result.is_grounded is True
     assert result.grounding_score == 1.0
     mock_llm.acomplete.assert_called_once()
+
+def test_parse_academic_writing_rubric_json():
+    from services.rubric_grader_service import parse_academic_writing_rubric_json
+    raw = '''
+    ```json
+    {
+        "is_academic_ready": true,
+        "quality_score": 0.96,
+        "informal_phrases_found": [],
+        "structural_critique": null,
+        "revision_guide": null
+    }
+    ```
+    '''
+    res = parse_academic_writing_rubric_json(raw)
+    assert res.is_academic_ready is True
+    assert res.quality_score == 0.96
+    assert len(res.informal_phrases_found) == 0
+
+def test_evaluate_academic_writing_quality_with_mock():
+    import asyncio
+    from services.rubric_grader_service import evaluate_academic_writing_quality
+    mock_llm = MagicMock()
+    mock_response = MagicMock()
+    mock_response.text = '{"is_academic_ready": true, "quality_score": 0.92, "informal_phrases_found": [], "structural_critique": null, "revision_guide": null}'
+    mock_llm.acomplete = AsyncMock(return_value=mock_response)
+
+    draft = (
+        "Penelitian ini menginvestigasi dampak augmentasi data terhadap akurasi klasifikasi citra medis pneumonia "
+        "menggunakan arsitektur deep learning ResNet-50 dan membandingkannya secara komparatif dengan model VGG-16. "
+        "Metodologi yang diusulkan menguji ketahanan model pada variasi dataset rontgen dada sebanyak 1.200 sampel "
+        "dengan skema validasi silang lima lipatan (5-fold cross validation) untuk memastikan generalisasi fitur visual."
+    )
+    res = asyncio.run(evaluate_academic_writing_quality("Medical Imaging Classification", draft, mock_llm))
+    assert res.is_academic_ready is True
+    assert res.quality_score == 0.92

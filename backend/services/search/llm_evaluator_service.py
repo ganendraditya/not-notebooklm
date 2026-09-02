@@ -244,9 +244,11 @@ async def judge_and_filter_papers_with_llm(
     llm: Optional[LLM] = None
 ) -> List[dict]:
     """
-    Stage 3.5: AI Judge & Relevance Auditor (Vector / LLM-grade evaluation)
-    Inspects candidate papers retrieved from registries, evaluates their real domain relevance against user query,
-    and strictly discards irrelevant or tangentially related papers.
+    Stage 3.5: Multi-Criteria Academic Rubric Judge & Relevance Auditor.
+    Evaluates candidate papers retrieved from registries across 3 strict rubrics:
+    1. Core Domain Match (prevents keyword-overlap false positives)
+    2. Problem Statement & Methodology Alignment
+    3. Academic Substance (discards general blog/noise/unrelated fields)
     """
     if not candidates:
         return []
@@ -259,24 +261,29 @@ async def judge_and_filter_papers_with_llm(
         for idx, c in enumerate(candidates):
             title = c.get("title", "").strip()
             snippet = c.get("snippet", "").strip()[:400]
-            eval_items.append(f"[{idx}] Title: {title}\nSummary: {snippet}")
+            venue = c.get("venue", "").strip()
+            year = c.get("year", "")
+            eval_items.append(f"[{idx}] Title: {title} ({year})\nVenue: {venue}\nAbstract/Snippet: {snippet}")
 
         eval_context = "\n\n".join(eval_items)
 
         judge_prompt = (
-            "You are an expert Academic Relevance Auditor & Scientific Literature Judge.\n"
-            "Your objective: Strictly evaluate whether each retrieved research paper directly and substantially matches the user's core research topic.\n\n"
+            "You are a Senior Academic Peer Reviewer and Scientific Literature Selection Judge.\n"
+            "Your objective: Strictly evaluate each retrieved research candidate against the user's research query using a multi-criteria rubric.\n\n"
             f"User Research Query:\n\"{query}\"\n\n"
             f"Candidate Papers to Audit:\n{eval_context}\n\n"
-            "EVALUATION CRITERIA:\n"
-            "1. STRICT DOMAIN RELEVANCE: Keep ONLY papers that directly investigate the requested topic.\n"
-            "   - Example: If the user asked for 'road damage detection with AI', ACCEPT papers detecting asphalt cracks, potholes, pavement distress, rutting on roads. REJECT papers about wall/building cracks, train/railway tracking, trash collection, or vehicle counting/toll gates.\n"
-            "   - Example: If the user asked for 'rainfall prediction', ACCEPT precipitation/rainfall forecasting. REJECT wildfire, purely general floods without rainfall models, or disease/COVID.\n"
-            "2. Rank the relevant papers by highest relevance and quality.\n"
-            f"3. Select UP TO {target_count} best matching paper indices.\n\n"
+            "ACADEMIC EVALUATION RUBRIC:\n"
+            "1. CORE DOMAIN ALIGNMENT:\n"
+            "   - Accept papers that directly investigate the specific target domain.\n"
+            "   - Strictly reject keyword coincidence (e.g. if query is 'AI in road crack detection', REJECT medical crack, dental crack, building wall crack, train rail track).\n"
+            "2. METHODOLOGICAL & PROBLEM MATCH:\n"
+            "   - The paper must address the research questions or methods requested (e.g. classification, prediction, empirical experiment, survey).\n"
+            "3. RANKING:\n"
+            "   - Rank accepted papers from highest scientific relevance to lowest.\n\n"
             "OUTPUT FORMAT:\n"
-            "Return ONLY a JSON list of integer indices of accepted papers, in order of relevance.\n"
-            "Example format: [0, 3, 4, 7]"
+            "Return ONLY a JSON list of integer indices of accepted papers in ranked order (best matches first).\n"
+            f"Select up to {target_count} best papers.\n"
+            "Example format: [2, 0, 4, 1]"
         )
 
         resp = await llm.acomplete(judge_prompt)
@@ -292,7 +299,7 @@ async def judge_and_filter_papers_with_llm(
                     filtered_papers.append(candidates[idx])
             
             if filtered_papers:
-                print(f"[AI Judge Auditor] Filtered {len(candidates)} candidates down to {len(filtered_papers)} highly relevant papers.")
+                print(f"[AI Judge Auditor] Multi-criteria rubric filtered {len(candidates)} candidates down to {len(filtered_papers)} verified papers.")
                 return filtered_papers[:target_count]
     except Exception as e:
         print(f"[AI Judge Auditor Warning]: {e} -> fallback to candidates")

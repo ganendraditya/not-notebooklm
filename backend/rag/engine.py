@@ -563,40 +563,6 @@ async def query_chat(
                     citation_map_comment = f"\n\n<!-- CITATION_MAP: {json.dumps(extracted_quotes, ensure_ascii=False)} -->"
 
         text = text.strip() + citation_map_comment
-
-        # Auto-extract CITATION_MAP fallback if LLM cited [1], [2] but forgot to output CITATION_MAP
-        if has_local_docs and not citation_map_comment and re.search(r'\[\d{1,3}\]', text):
-            try:
-                cited_nums = set(int(m) for m in re.findall(r'\[(\d{1,3})\]', text))
-                auto_map = {}
-                for num in cited_nums:
-                    doc_idx = num - 1
-                    if 0 <= doc_idx < len(local_docs):
-                        fname = local_docs[doc_idx]
-                        fpath = get_doc_file_path(chat_id, fname)
-                        doc_text = ""
-                        if os.path.exists(fpath):
-                            try:
-                                doc_text = parse_document_to_markdown(fpath)
-                            except Exception:
-                                pass
-                        if not doc_text and fname in db_docs_by_filename:
-                            d_rec = db_docs_by_filename[fname]
-                            doc_text = d_rec.abstract or d_rec.snippet or ""
-                        
-                        if doc_text:
-                            # Extract meaningful non-empty sentences from the document text
-                            sentences = [
-                                s.strip() for s in re.split(r'(?<!\d)(?<!\d\s)[.!?]+(?=\s|$)|[\n\r]+', doc_text)
-                                if len(s.strip()) >= 30 and not re.search(r'https?:\/\/|doi\.org|\bvol\b|\bissn\b', s, re.I)
-                            ]
-                            if sentences:
-                                auto_map[str(num)] = sentences[:4]
-                if auto_map:
-                    text += f"\n\n<!-- CITATION_MAP: {json.dumps(auto_map, ensure_ascii=False)} -->"
-            except Exception as auto_map_err:
-                logger.debug(f"[Auto CitationMap Error]: {auto_map_err}")
-
         return text.strip()
 
     async def execute_agent(target_llm, timeout_sec=60.0):
