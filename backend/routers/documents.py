@@ -1,10 +1,5 @@
 import os
 import re
-import io
-import json
-import shutil
-import zipfile
-import asyncio
 import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
@@ -14,19 +9,28 @@ from sqlalchemy.orm import Session
 from database import get_db, ChatSession, Document
 import models
 import rag
-import pdf_exporter
-from services.document_service import extract_and_enrich_uploaded_file, calculate_doc_quality
-from helpers import (
+from utils.file_utils import (
     UPLOAD_DIR,
     TEMP_ZIPS_DIR,
     MAX_SOURCES_PER_CHAT,
     make_content_disposition,
-    sanitize_paper_filename,
     get_doc_file_path,
-    get_or_generate_document_pdf,
+)
+from utils.pdf_utils import (
     get_authentic_document_pdf,
-    clean_doi,
     is_authentic_pdf_bytes,
+)
+from services.document import (
+    handle_document_upload,
+    clean_chat_duplicates,
+    get_document_full_content,
+)
+from services.storage_service import (
+    delete_document_by_id,
+    delete_multiple_documents,
+)
+from services.export_service import (
+    generate_bulk_zip_stream,
 )
 
 router = APIRouter(tags=["documents"])
@@ -39,7 +43,6 @@ async def upload_document(
     file: UploadFile = File(...), 
     db: Session = Depends(get_db)
 ):
-    import werkzeug.utils
     SUPPORTED_EXTS = {".pdf", ".docx", ".doc", ".txt", ".md", ".bib", ".bibtex", ".ris"}
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in SUPPORTED_EXTS:
@@ -56,40 +59,9 @@ async def upload_document(
     if existing_count >= MAX_SOURCES_PER_CHAT:
         raise HTTPException(status_code=400, detail=f"Source limit reached! This conversation already contains {existing_count}/{MAX_SOURCES_PER_CHAT} sources.")
         
-    clean_chat_id = werkzeug.utils.secure_filename(chat_id)
-    clean_fname = werkzeug.utils.secure_filename(file.filename)
-    file_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
-    
-    # 1. Save physical file to disk
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    db_doc, file_path, enriched = handle_document_upload(chat_id, file, db)
 
-    # 2. Pure local instant metadata extraction
-    enriched = extract_and_enrich_uploaded_file(file_path, file.filename)
-
-    # 3. Save to database immediately
-    authors_json = json.dumps(enriched.get("authors", []), ensure_ascii=False) if enriched.get("authors") else None
-    db_doc = Document(
-        chat_id=chat_id,
-        filename=clean_fname,
-        title=enriched.get("title", ""),
-        authors=authors_json,
-        year=enriched.get("year", ""),
-        journal=enriched.get("journal", ""),
-        journal_metric=enriched.get("journal_metric", "Uploaded Document"),
-        doi=enriched.get("doi", ""),
-        url=enriched.get("url", ""),
-        abstract=enriched.get("abstract", ""),
-        abstract_type="official" if enriched.get("abstract") and len(enriched.get("abstract")) > 80 else "ai_summary",
-        is_oa=True if enriched.get("is_valid_pdf", False) else False,
-        access_status="Open Access (Full PDF Available)" if enriched.get("is_valid_pdf", False) else "Uploaded Document",
-        quality_tier=4
-    )
-    db.add(db_doc)
-    db.commit()
-    db.refresh(db_doc)
-
-    # 4. Schedule vector store indexing in background
+    # Schedule vector store indexing in background
     background_tasks.add_task(rag.ingest_document, file_path, chat_id)
     
     total_docs_count = db.query(Document).filter(Document.chat_id == chat_id).count()
@@ -105,21 +77,9 @@ async def upload_document(
 
 @router.delete("/chats/{chat_id}/documents/{doc_id}")
 def delete_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
-    doc = db.query(Document).filter(Document.id == doc_id, Document.chat_id == chat_id).first()
-    if not doc:
+    success = delete_document_by_id(db, chat_id, doc_id)
+    if not success:
         raise HTTPException(status_code=404, detail="Document not found")
-    file_path = get_doc_file_path(chat_id, doc.filename)
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except Exception as e:
-            logger.error(f"[Delete Document Error] Failed to delete file {file_path}: {e}")
-    try:
-        rag.delete_document_vectors(chat_id, doc.filename)
-    except Exception as e:
-        logger.error(f"[Delete Vector Error] Failed to delete vectors for {doc.filename}: {e}")
-    db.delete(doc)
-    db.commit()
     return {"status": "success"}
 
 @router.patch("/chats/{chat_id}/documents/{doc_id}/rename", response_model=models.DocumentResponse)
@@ -142,7 +102,7 @@ def rename_document(chat_id: str, doc_id: int, payload: models.RenameDocumentReq
         try:
             with open(fp, "rb") as f:
                 fb = f.read(2048)
-                is_valid_pdf = is_authentic_pdf_bytes(fb, min_size=512) and os.path.getsize(fp) >= 35000
+                is_valid_pdf = is_authentic_pdf_bytes(fb, min_size=500) and os.path.getsize(fp) >= 1000
         except Exception:
             is_valid_pdf = False
 
@@ -157,200 +117,15 @@ def rename_document(chat_id: str, doc_id: int, payload: models.RenameDocumentReq
 
 @router.post("/chats/{chat_id}/documents/bulk_delete")
 def bulk_delete_documents(chat_id: str, req: models.BulkDeleteRequest, db: Session = Depends(get_db)):
-    docs = db.query(Document).filter(Document.id.in_(req.doc_ids), Document.chat_id == chat_id).all()
-    for doc in docs:
-        file_path = get_doc_file_path(chat_id, doc.filename)
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception as e:
-                logger.error(f"[Bulk Delete Error] Failed to delete file {file_path}: {e}")
-        db.delete(doc)
-    db.commit()
-    return {"status": "success", "deleted_count": len(docs)}
+    deleted_count = delete_multiple_documents(db, chat_id, req.doc_ids)
+    return {"status": "success", "deleted_count": deleted_count}
 
 @router.post("/chats/{chat_id}/clean_duplicates")
 async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
     db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not db_chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-
-    docs = db.query(Document).filter(Document.chat_id == chat_id).all()
-    if not docs or len(docs) <= 1:
-        return {"status": "success", "cleaned_count": 0, "remaining_count": len(docs), "cleaned_doc_ids": []}
-
-    # Helper to calculate quality score for each document (prefer authentic full PDF > metadata brief)
-    # Group documents by DOI and Normalized Title
-    groups = [] # list of lists: [[doc1, doc2], [doc3]]
-
-    for doc in docs:
-        fp = get_doc_file_path(chat_id, doc.filename)
-        full_title = (doc.title or doc.filename).replace(".pdf", "").replace(".docx", "").replace(".txt", "").replace(".md", "").strip()
-        extracted_doi = (doc.doi or "").strip().lower()
-        
-        if os.path.exists(fp) and not doc.title:
-            try:
-                with open(fp, "r", encoding="utf-8", errors="ignore") as fp_r:
-                    first_lines = "".join([fp_r.readline() for _ in range(4)])
-                    m_title = re.search(r'^\#\s*([^\n]+)', first_lines)
-                    if m_title:
-                        full_title = re.sub(r'\s*\(\d{4}\)$', '', m_title.group(1)).strip()
-                    m_doi = re.search(r'(?:DOI:|\*\*DOI:\*\*|doi\.org/)\s*(10\.\d{4,9}/[^\s\)]+)', first_lines, re.I)
-                    if m_doi and not extracted_doi:
-                        extracted_doi = m_doi.group(1).lower().strip()
-            except Exception as e:
-                logger.error(f"[CleanDuplicates] Failed to read {fp}: {e}")
-
-        norm_title = rag.normalize_title_str(full_title)
-        tokens = set(norm_title.split())
-
-        matched_group_idx = None
-        for g_idx, grp in enumerate(groups):
-            for member in grp:
-                m_fp = get_doc_file_path(chat_id, member.filename)
-                m_title = (member.title or member.filename).replace(".pdf", "").replace(".docx", "").replace(".txt", "").replace(".md", "").strip()
-                m_doi = (member.doi or "").strip().lower()
-                m_norm = rag.normalize_title_str(m_title)
-                m_tokens = set(m_norm.split())
-
-                if extracted_doi and m_doi and extracted_doi == m_doi:
-                    matched_group_idx = g_idx
-                    break
-                if norm_title and m_norm:
-                    if norm_title == m_norm:
-                        matched_group_idx = g_idx
-                        break
-                    if len(m_norm) >= 20 and (norm_title.startswith(m_norm) or m_norm.startswith(norm_title)):
-                        matched_group_idx = g_idx
-                        break
-                    intersection = tokens.intersection(m_tokens)
-                    overlap = len(intersection) / min(len(tokens), len(m_tokens)) if min(len(tokens), len(m_tokens)) > 0 else 0
-                    if overlap >= 0.75 and len(intersection) >= 3:
-                        matched_group_idx = g_idx
-                        break
-            if matched_group_idx is not None:
-                break
-
-        if matched_group_idx is not None:
-            groups[matched_group_idx].append(doc)
-        else:
-            groups.append([doc])
-
-    cleaned_doc_ids = []
-    
-    # In each duplicate group with >1 documents, retain the highest quality doc (full PDF preferred) and re-verify with official registry
-    for grp in groups:
-        if len(grp) > 1:
-            # Sort descending by quality score
-            sorted_grp = sorted(grp, key=lambda d: calculate_doc_quality(chat_id, d), reverse=True)
-            keeper = sorted_grp[0]
-            duplicates = sorted_grp[1:]
-
-            # 1. Collect best candidate DOI and Title across the group for registry lookup
-            cand_doi = ""
-            for d in grp:
-                if d.doi and not cand_doi:
-                    clean_d = d.doi.strip().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
-                    if re.search(r'10\.\d{4,9}/', clean_d):
-                        cand_doi = clean_d
-            
-            cand_title = ""
-            for d in grp:
-                if d.title and len(d.title) > 8 and not d.title.isupper():
-                    cand_title = d.title
-                    break
-            if not cand_title:
-                for d in grp:
-                    if d.title and len(d.title) > 8:
-                        cand_title = d.title.title()
-                        break
-            if not cand_title:
-                cand_title = keeper.filename.replace(".pdf", "").replace("_", " ").strip().title()
-
-            # 2. Query Academic Registry (Crossref / OpenAlex) for the ground-truth metadata in thread pool
-            verified_meta = None
-            try:
-                verified_meta = await asyncio.to_thread(
-                    rag.resolve_paper_metadata_by_doi,
-                    doi=cand_doi,
-                    title_fallback=cand_title,
-                    fast_only=False
-                )
-            except Exception as e:
-                logger.error(f"[CleanDuplicates Registry Error]: {e}")
-
-            needs_db_update = False
-            if verified_meta and verified_meta.get("title") and len(verified_meta["title"]) > 5:
-                # Apply verified ground truth from publisher registry
-                keeper.title = verified_meta["title"].strip()
-                if verified_meta.get("authors"):
-                    keeper.authors = json.dumps(verified_meta["authors"], ensure_ascii=False)
-                if verified_meta.get("journal"):
-                    keeper.journal = verified_meta["journal"]
-                if verified_meta.get("journal_metric"):
-                    keeper.journal_metric = verified_meta["journal_metric"]
-                if verified_meta.get("doi"):
-                    keeper.doi = verified_meta["doi"]
-                if verified_meta.get("year"):
-                    keeper.year = str(verified_meta["year"])
-                if verified_meta.get("abstract") and rag.is_valid_abstract_content(verified_meta["abstract"]):
-                    keeper.abstract = verified_meta["abstract"]
-                    keeper.abstract_type = verified_meta.get("abstract_type", "official")
-                if verified_meta.get("url"):
-                    keeper.url = verified_meta["url"]
-                needs_db_update = True
-            else:
-                # Fallback: Merge best non-empty attributes across local duplicates
-                for dup in duplicates:
-                    if (not keeper.title or keeper.title.isupper()) and dup.title and not dup.title.isupper():
-                        keeper.title = dup.title
-                        needs_db_update = True
-                    if not keeper.doi and dup.doi:
-                        keeper.doi = dup.doi
-                        needs_db_update = True
-                    if (not keeper.journal or keeper.journal == "Academic Publication") and dup.journal and dup.journal != "Academic Publication":
-                        keeper.journal = dup.journal
-                        needs_db_update = True
-                    if (not keeper.authors or keeper.authors in ("[]", None)) and dup.authors and dup.authors not in ("[]", None):
-                        keeper.authors = dup.authors
-                        needs_db_update = True
-                    if (not keeper.abstract or len(keeper.abstract) < 80) and dup.abstract and len(dup.abstract) > 80:
-                        keeper.abstract = dup.abstract
-                        keeper.abstract_type = dup.abstract_type
-                        needs_db_update = True
-                    if (not keeper.year or keeper.year == "N/A") and dup.year and dup.year != "N/A":
-                        keeper.year = dup.year
-                        needs_db_update = True
-
-            # Normalize title to Title Case if still ALL CAPS
-            if keeper.title and keeper.title.isupper() and len(keeper.title) > 8:
-                keeper.title = keeper.title.title()
-                needs_db_update = True
-
-            # Delete the duplicates
-            for dup in duplicates:
-                cleaned_doc_ids.append(dup.id)
-                dup_fp = get_doc_file_path(chat_id, dup.filename)
-                if os.path.exists(dup_fp) and dup_fp != get_doc_file_path(chat_id, keeper.filename):
-                    try:
-                        os.remove(dup_fp)
-                    except Exception as e:
-                        logger.error(f"[CleanDuplicates Error] Failed to delete file {dup_fp}: {e}")
-                db.delete(dup)
-
-            if needs_db_update:
-                db.add(keeper)
-
-    if cleaned_doc_ids:
-        db.commit()
-
-    remaining = db.query(Document).filter(Document.chat_id == chat_id).count()
-    return {
-        "status": "success",
-        "cleaned_count": len(cleaned_doc_ids),
-        "remaining_count": remaining,
-        "cleaned_doc_ids": cleaned_doc_ids
-    }
+    return await clean_chat_duplicates(chat_id, db)
 
 @router.get("/chats/{chat_id}/documents/{doc_id}/download")
 def download_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
@@ -420,350 +195,7 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
     doc = db.query(Document).filter(Document.id == doc_id, Document.chat_id == chat_id).first()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-        
-    file_path = get_doc_file_path(chat_id, doc.filename)
-    
-    # ---------- DB metadata path (imported papers) ----------
-    has_db_metadata = bool(doc.title)
-    
-    if has_db_metadata:
-        import json as _json
-        try:
-            db_authors = _json.loads(doc.authors) if doc.authors else []
-        except Exception:
-            db_authors = []
-        
-        # Sanitize DOI from DB
-        from helpers import clean_doi
-        db_doi = clean_doi(doc.doi)
-        
-        res_data = {
-            "id": doc.id,
-            "filename": doc.filename,
-            "created_at": doc.created_at,
-            "type": os.path.splitext(doc.filename)[1].lower().replace(".", "") or "pdf",
-            "title": doc.title,
-            "authors": db_authors,
-            "publication_date": doc.year or "",
-            "year": doc.year or "",
-            "journal": doc.journal or doc.venue or "",
-            "journal_metric": doc.journal_metric or "Peer-Reviewed",
-            "quality_tier": doc.quality_tier or 4,
-            "citations": doc.citations or 0,
-            "doi": db_doi,
-            "url": doc.url or (f"https://doi.org/{db_doi}" if db_doi else ""),
-            "pdf_url": doc.pdf_url or "",
-            "abstract": doc.abstract or doc.snippet or "",
-            "abstract_type": doc.abstract_type or "official",
-            "content": "",
-            "is_oa": doc.is_oa if doc.is_oa is not None else True,
-            "access_status": doc.access_status or "Open Access",
-        }
-        
-        # Check if local file is authentic full paper PDF or needs on-demand retrieval
-        from services.document_service import check_and_fetch_authentic_pdf_on_demand
-        is_authentic_pdf, new_md_content = await check_and_fetch_authentic_pdf_on_demand(doc, file_path)
-
-        if new_md_content:
-            res_data["content"] = new_md_content
-        elif os.path.exists(file_path):
-            ext = os.path.splitext(doc.filename)[1].lower()
-            try:
-                if ext == ".pdf":
-                    if is_authentic_pdf:
-                        import pymupdf4llm
-                        res_data["content"] = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
-                    else:
-                        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                            res_data["content"] = f.read()
-                elif ext in (".docx", ".doc"):
-                    res_data["content"] = await asyncio.to_thread(rag.parse_docx_file, file_path)
-                else:
-                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                        res_data["content"] = f.read()
-            except Exception as e:
-                res_data["content"] = f"Error reading document: {str(e)}"
-        else:
-            res_data["content"] = f"# {doc.title}\n\n*Document file is registered as a reference source.*"
-
-        if is_authentic_pdf:
-            res_data["is_oa"] = True
-            res_data["access_status"] = "Open Access (Full PDF Available)"
-            res_data["has_full_pdf"] = True
-            res_data["is_abstract_only"] = False
-        else:
-            res_data["has_full_pdf"] = False
-            res_data["is_abstract_only"] = True
-            res_data["access_status"] = "Publication Brief & Abstract (Direct Download Restricted)" if doc.is_oa else "Closed Access (Paywalled)"
-            if res_data["content"].startswith("%PDF-") or "NOTBOOKLM SCHOLARLY ARCHIVE" in res_data["content"] or "OFFICIAL PUBLICATION ARCHIVE RECORD" in res_data["content"]:
-                res_data["content"] = f"# {doc.title} ({doc.year or 'N/A'})\n\n"
-                if db_doi:
-                    res_data["content"] += f"**DOI:** {db_doi}  \n"
-                if res_data["url"]:
-                    res_data["content"] += f"**URL:** {res_data['url']}  \n\n"
-                res_data["content"] += f"## Abstract & Overview\n\n{res_data['abstract']}\n"
-                
-        return res_data
-    
-    # ---------- Legacy path: manually uploaded docs (no DB metadata) ----------
-    res_data = {
-        "id": doc.id,
-        "filename": doc.filename,
-        "created_at": doc.created_at,
-        "type": os.path.splitext(doc.filename)[1].lower().replace(".", "") or "pdf",
-        "title": clean_filename_title,
-        "authors": [],
-        "publication_date": "",
-        "year": "",
-        "journal": "",
-        "journal_metric": "Peer-Reviewed",
-        "quality_tier": 4,
-        "citations": 0,
-        "doi": "",
-        "url": "",
-        "pdf_url": "",
-        "abstract": "",
-        "content": "",
-        "is_oa": False,
-        "access_status": "Closed Access (Paywalled)"
-    }
-    
-    if not os.path.exists(file_path):
-        res_data["content"] = f"# {doc.filename}\n\n*Document file is registered as a reference source.*"
-        res_data["abstract"] = "Document content is registered in the source index."
-        return res_data
-        
-    ext = os.path.splitext(doc.filename)[1].lower()
-    raw_content = ""
-    try:
-        if ext == ".pdf":
-            with open(file_path, "rb") as f:
-                header = f.read(5)
-            if header.startswith(b"%PDF"):
-                import pymupdf4llm
-                raw_content = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
-            else:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    raw_content = f.read()
-        elif ext in (".docx", ".doc"):
-            raw_content = await asyncio.to_thread(rag.parse_docx_file, file_path)
-        elif ext in (".bib", ".bibtex"):
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = await asyncio.to_thread(rag.parse_bibtex_text, f.read())
-        elif ext == ".ris":
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = await asyncio.to_thread(rag.parse_ris_text, f.read())
-        elif ext in (".csv", ".tsv"):
-            raw_content = await asyncio.to_thread(rag.parse_csv_file, file_path)
-        else:
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = f.read()
-    except Exception as e:
-        raw_content = f"Error reading document: {str(e)}"
-        
-    res_data["content"] = raw_content
-    
-    # Generic non-title blacklist
-    _GENERIC_HEADERS = {
-        "abstract", "abstrak", "overview", "paper", "document", "introduction", "keywords",
-        "article in press", "in press", "journal pre-proof", "uncorrected proof",
-        "corrected proof", "original article", "research article", "full length article",
-        "short communication", "review article", "full paper", "research paper",
-        "accepted manuscript", "author's copy",
-    }
-    
-    # 1. Parse Title (for manually uploaded docs only)
-    res_data["title"] = clean_filename_title
-    title_match = re.search(r"#+\s*\**([^\n\*]+)\**", raw_content)
-    if title_match:
-        cand_title = title_match.group(1).strip()
-        year_in_title = re.search(r"\((\d{4})\)$", cand_title)
-        if year_in_title:
-            res_data["year"] = year_in_title.group(1)
-            cand_title = cand_title[:year_in_title.start()].strip()
-        cand_title = re.sub(r'<[^>]+>', '', cand_title).strip()
-        if cand_title and cand_title.lower() not in _GENERIC_HEADERS:
-            res_data["title"] = cand_title
-
-    clean_filename_title = re.sub(r'<[^>]+>', '', clean_filename_title).strip()
-    if not res_data["title"] or res_data["title"].lower() in _GENERIC_HEADERS:
-        res_data["title"] = clean_filename_title
-            
-    # 2. Parse and Clean DOI (restrict regex search to first 2500 chars / header area to avoid catching cited references)
-    header_scope = raw_content[:2500] if len(raw_content) > 2500 else raw_content
-    doi_match = re.search(r"DOI:\*?\*?\s*([^\s\n\*\)]+)", header_scope, re.I)
-    extracted_doi = doi_match.group(1).strip() if doi_match else ""
-    if not extracted_doi:
-        doi_regex_match = re.search(r"10\.\d{4,9}/[^\s\n<>\"'{}|\\^`]+", header_scope)
-        if doi_regex_match:
-            extracted_doi = doi_regex_match.group(0).strip()
-
-    # Sanitize DOI: strip markdown artifacts and trailing punctuation
-    if extracted_doi:
-        extracted_doi = extracted_doi.replace("**", "").replace("*", "").replace("__", "")
-        extracted_doi = re.sub(r'[;.,:)\s]+$', '', extracted_doi).strip()
-    res_data["doi"] = extracted_doi
-    
-    # 3. Parse URL
-    url_match = re.search(r"URL:\*?\*?\s*([^\s\n\*\)]+)", header_scope, re.I)
-    if url_match:
-        res_data["url"] = url_match.group(1).strip()
-    elif extracted_doi:
-        res_data["url"] = f"https://doi.org/{extracted_doi}"
-        
-    # Extract abstract from local raw content using section splitter + fallback regex
-    local_abstract = ""
-    try:
-        doc_sections = rag.split_markdown_into_academic_sections(raw_content, filename=doc.filename)
-        abs_sec = next((s for s in doc_sections if s.get("canonical_section") == "abstract"), None)
-        if abs_sec and abs_sec.get("raw_text"):
-            local_abstract = abs_sec.get("raw_text").strip()
-    except Exception:
-        local_abstract = ""
-
-    if not local_abstract:
-        abs_match = re.search(r'(?:##\s*Abstract|\*\*ABSTRAK\*\*|ABSTRAK|\*\*Abstract\*\*|Abstract|Ringkasan)[^\n]*\n+([\s\S]*?)(?:Kata\s*Kunci|Keywords|I\.\s*PENDAHULUAN|1\.\s*Pendahuluan|##|$)', raw_content, re.I)
-        local_abstract = abs_match.group(1).strip() if abs_match else ""
-        if not local_abstract:
-            abs_match_fb = re.search(r'##\s*Abstract[^\n]*\n+([\s\S]+)', raw_content)
-            local_abstract = abs_match_fb.group(1).strip() if abs_match_fb else ""
-
-    if local_abstract and rag.is_valid_abstract_content(local_abstract):
-        res_data["abstract"] = rag.clean_academic_abstract(local_abstract)
-        if rag.is_ai_synthesized_overview(local_abstract):
-            res_data["abstract_type"] = "ai_summary"
-        else:
-            res_data["abstract_type"] = "official"
-    elif raw_content and len(raw_content.strip()) > 300:
-        # LLM Academic Auditor Fallback: Let AI read the first 4000 characters to extract Title, Authors, and Abstract
-        try:
-            ai_audit = await asyncio.to_thread(
-                rag.audit_paper_metadata_with_ai,
-                paper_title=res_data["title"],
-                raw_authors=res_data["authors"],
-                raw_journal=res_data["journal"],
-                raw_year=res_data["year"],
-                raw_doi=extracted_doi,
-                raw_citations=res_data["citations"],
-                raw_abstract_or_html=raw_content[:4000],
-                is_oa=True
-            )
-            if ai_audit:
-                if ai_audit.get("abstract") and len(ai_audit["abstract"]) > 40:
-                    res_data["abstract"] = ai_audit["abstract"]
-                    res_data["abstract_type"] = ai_audit.get("abstract_type", "official")
-                if ai_audit.get("title") and len(ai_audit["title"]) > 5 and ai_audit["title"].lower() not in _GENERIC_HEADERS:
-                    res_data["title"] = ai_audit["title"]
-                if ai_audit.get("authors"):
-                    res_data["authors"] = ai_audit["authors"]
-                if ai_audit.get("year"):
-                    res_data["year"] = ai_audit["year"]
-                if ai_audit.get("journal"):
-                    res_data["journal"] = ai_audit["journal"]
-                if ai_audit.get("journal_metric"):
-                    res_data["journal_metric"] = ai_audit["journal_metric"]
-        except Exception as audit_err:
-            logger.debug(f"[Document Content AI Audit Warning]: {audit_err}")
-        
-    target_lookup_title = res_data["title"] if res_data["title"].lower() not in _GENERIC_HEADERS else clean_filename_title
-    # Keep the original title from file before API lookup
-    original_file_title = res_data["title"]
-    
-    if extracted_doi or target_lookup_title:
-        meta = await asyncio.to_thread(
-            rag.resolve_paper_metadata_by_doi,
-            extracted_doi,
-            title_fallback=target_lookup_title,
-            fast_only=(bool(extracted_doi) and bool(res_data["abstract"]))
-        )
-        if meta:
-            meta_title = meta.get("title", "").strip()
-            # Only accept meta title if it's NOT a generic publisher header and matches the document
-            if meta_title and meta_title.lower() not in _GENERIC_HEADERS:
-                res_data["title"] = meta_title
-            else:
-                res_data["title"] = original_file_title or clean_filename_title
-            res_data["authors"] = meta.get("authors", []) or res_data["authors"]
-            res_data["publication_date"] = meta.get("publication_date", "") or res_data["publication_date"]
-            res_data["year"] = meta.get("year", res_data["year"]) or res_data["year"]
-            res_data["journal"] = meta.get("journal", "") or res_data["journal"]
-            res_data["journal_metric"] = meta.get("journal_metric", "Peer-Reviewed")
-            res_data["quality_tier"] = meta.get("quality_tier", 4)
-            res_data["citations"] = meta.get("citations", 0)
-            clean_meta_doi = meta.get("doi", extracted_doi)
-            if clean_meta_doi:
-                clean_meta_doi = clean_meta_doi.replace("**", "").replace("*", "")
-                clean_meta_doi = re.sub(r'[;.,:)\s]+$', '', clean_meta_doi).strip()
-            res_data["doi"] = clean_meta_doi
-            if meta.get("url"):
-                res_data["url"] = meta.get("url")
-            elif clean_meta_doi:
-                res_data["url"] = f"https://doi.org/{clean_meta_doi}"
-            res_data["pdf_url"] = meta.get("pdf_url", "")
-            if not res_data["abstract"] and meta.get("abstract"):
-                res_data["abstract"] = meta.get("abstract")
-                res_data["abstract_type"] = meta.get("abstract_type", "official")
-                
-            if meta.get("abstract") and (not rag.is_valid_abstract_content(local_abstract) or len(raw_content) < 350):
-                new_saved_content = f"# {res_data['title']} ({res_data['year']})\n\n**DOI:** {res_data['doi']}  \n**URL:** {res_data['url']}  \n\n## Abstract & Overview\n\n{res_data['abstract']}\n"
-                try:
-                    with open(file_path, "w", encoding="utf-8") as f:
-                        f.write(new_saved_content)
-                except Exception:
-                    pass
-            
-            # Persist resolved metadata to DB for future fast loads
-            try:
-                import json as _json
-                doc.title = res_data["title"]
-                doc.authors = _json.dumps(res_data["authors"], ensure_ascii=False) if res_data["authors"] else None
-                doc.year = res_data["year"]
-                doc.journal = res_data["journal"]
-                doc.journal_metric = res_data["journal_metric"]
-                doc.doi = res_data["doi"]
-                doc.url = res_data["url"]
-                doc.pdf_url = res_data.get("pdf_url", "")
-                doc.abstract = res_data["abstract"]
-                doc.abstract_type = res_data.get("abstract_type")
-                doc.citations = res_data.get("citations", 0)
-                doc.quality_tier = res_data.get("quality_tier", 4)
-                db.commit()
-            except Exception:
-                pass
-                    
-    is_authentic_pdf = False
-    if os.path.exists(file_path) and os.path.getsize(file_path) >= 35000:
-        try:
-            with open(file_path, "rb") as f:
-                first_bytes = f.read(2048)
-                is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=512)
-        except Exception:
-            is_authentic_pdf = False
-
-    if is_authentic_pdf:
-        res_data["is_oa"] = True
-        res_data["access_status"] = "Open Access (Full PDF Available)"
-        res_data["has_full_pdf"] = True
-        res_data["is_abstract_only"] = False
-    else:
-        res_data["has_full_pdf"] = False
-        res_data["is_abstract_only"] = True
-        res_data["is_oa"] = bool(res_data.get("pdf_url"))
-        res_data["access_status"] = "Publication Brief & Abstract (Direct Download Restricted)" if res_data["is_oa"] else "Closed Access (Paywalled)"
-
-    if res_data["abstract"]:
-        if rag.is_ai_synthesized_overview(res_data["abstract"]):
-            res_data["abstract_type"] = "ai_summary"
-    else:
-        res_data["abstract_type"] = "ai_summary"
-        res_data["abstract"] = rag.clean_academic_abstract(
-            f"This scholarly publication investigates '{res_data['title']}' ({res_data['year'] or 'Recent publication'}). "
-            f"Published in {res_data['journal']} by {', '.join(res_data['authors'][:3]) if res_data['authors'] else 'researchers'}, "
-            f"the research presents methodology, computational framework, and empirical analysis in this domain. "
-            f"Indexed in international academic indexing services (DOI: {extracted_doi or 'N/A'})."
-        )
-            
-    return res_data
+    return await get_document_full_content(chat_id, doc, db)
 
 @router.post("/chats/{chat_id}/documents/bulk_download")
 def bulk_download_documents(chat_id: str, req: models.BulkDeleteRequest, db: Session = Depends(get_db)):
@@ -782,140 +214,16 @@ def bulk_download_documents(chat_id: str, req: models.BulkDeleteRequest, db: Ses
             headers={"Content-Disposition": make_content_disposition("attachment", download_filename)}
         )
         
-    import concurrent.futures
     import uuid as uuid_pkg
-    
-    # Generate background task ID
     task_id = str(uuid_pkg.uuid4())
-    zip_filename = f"NotbookLM_Sources_{task_id[:8]}.zip"
-    
     return {"status": "processing", "task_id": task_id, "message": "Download started in background. Use streaming endpoint to track progress."}
 
 @router.post("/chats/{chat_id}/documents/bulk_download_stream")
 async def bulk_download_stream(chat_id: str, req: models.BulkDeleteRequest, db: Session = Depends(get_db)):
-    docs = db.query(Document).filter(Document.id.in_(req.doc_ids), Document.chat_id == chat_id).all()
-    if not docs:
-        raise HTTPException(status_code=404, detail="No documents found for download")
-
-    doc_records = [(d.id, d.filename, d.title or d.filename, d.doi or "", d.url or "") for d in docs]
-    total_count = len(doc_records)
-    import uuid as uuid_pkg
-    task_id = str(uuid_pkg.uuid4())
-    zip_file_path = os.path.join(TEMP_ZIPS_DIR, f"{task_id}.zip")
-
-    async def event_generator():
-        queue = asyncio.Queue()
-        
-        def worker_sync():
-            import concurrent.futures
-            seen_names = set()
-            processed_count = 0
-            downloaded_count = 0
-            skipped_docs = []
-            
-            with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                def process_single(doc_info):
-                    d_id, d_fn, d_title, d_doi, d_url = doc_info
-                    try:
-                        pdf_data, clean_name = get_authentic_document_pdf(chat_id, d_fn)
-                        return d_fn, d_title, d_doi, d_url, clean_name, pdf_data, None
-                    except Exception as e:
-                        logger.error(f"[Worker Sync PDF Error]: {e}")
-                        return d_fn, d_title, d_doi, d_url, d_fn, None, str(e)
-
-                with concurrent.futures.ThreadPoolExecutor(max_workers=min(total_count, 6)) as executor:
-                    futures = [executor.submit(process_single, info) for info in doc_records]
-                    for fut in concurrent.futures.as_completed(futures):
-                        orig_fn, item_title, item_doi, item_url, clean_fn, pdf_bytes, err = fut.result()
-                        processed_count += 1
-                        if pdf_bytes:
-                            downloaded_count += 1
-                            base_name = clean_fn
-                            counter = 1
-                            while base_name in seen_names:
-                                root, ext = os.path.splitext(clean_fn)
-                                base_name = f"{root}_{counter}{ext}"
-                                counter += 1
-                            seen_names.add(base_name)
-                            zf.writestr(base_name, pdf_bytes)
-                        else:
-                            skipped_docs.append({
-                                "filename": orig_fn,
-                                "title": item_title,
-                                "doi": item_doi,
-                                "url": item_url or (f"https://doi.org/{item_doi}" if item_doi else "N/A")
-                            })
-                        
-                        calc_percent = round((processed_count / max(1, total_count)) * 100)
-                        queue.put_nowait({
-                            "type": "progress",
-                            "current": processed_count,
-                            "total": total_count,
-                            "downloaded_count": downloaded_count,
-                            "skipped_count": len(skipped_docs),
-                            "percent": calc_percent,
-                            "filename": orig_fn,
-                            "is_skipped": pdf_bytes is None
-                        })
-
-                if skipped_docs:
-                    summary_lines = [
-                        "================================================================================",
-                        "NOTBOOKLM - RINGKASAN UNDUHAN DOKUMEN",
-                        "================================================================================",
-                        f"Total Dokumen Dipilih : {total_count}",
-                        f"Naskah Lengkap PDF Berhasil Diunduh : {downloaded_count}",
-                        f"Dokumen Dilewati (Hanya Abstrak / Paywalled) : {len(skipped_docs)}",
-                        "================================================================================",
-                        "",
-                        "DAFTAR DOKUMEN YANG DILEWATI (NASKAH LENGKAP TIDAK DAPAT DIUNDUH OTOMATIS):",
-                        ""
-                    ]
-                    for idx, item in enumerate(skipped_docs, 1):
-                        summary_lines.append(f"{idx}. {item['title']}")
-                        summary_lines.append(f"   Status : Naskah Berbayar (Paywalled) / Proteksi Repositori (HTTP 403)")
-                        summary_lines.append(f"   DOI / Tautan Resmi : {item['url']}")
-                        summary_lines.append("")
-                    summary_lines.append("Silakan unduh naskah lengkap melalui tautan resmi penerbit di atas.")
-                    zf.writestr("_CATATAN_DOKUMEN_DILEWATI.txt", "\n".join(summary_lines))
-            
-            if downloaded_count == 0 and len(skipped_docs) > 0:
-                # Cleanup empty zip
-                try:
-                    if os.path.exists(zip_file_path):
-                        os.remove(zip_file_path)
-                except Exception:
-                    pass
-                queue.put_nowait({
-                    "type": "error",
-                    "message": "Tidak ada naskah lengkap PDF yang dapat diunduh (dokumen yang dipilih hanya berstatus metadata / abstrak)."
-                })
-            else:
-                total_size_mb = round(os.path.getsize(zip_file_path) / (1024 * 1024), 2) if os.path.exists(zip_file_path) else 0.0
-                queue.put_nowait({
-                    "type": "complete",
-                    "task_id": task_id,
-                    "total": total_count,
-                    "downloaded_count": downloaded_count,
-                    "skipped_count": len(skipped_docs),
-                    "percent": 100,
-                    "filename": f"NotbookLM_Sources_{downloaded_count}_files.zip",
-                    "total_size_mb": total_size_mb,
-                    "download_url": f"/chats/{chat_id}/documents/download_zip/{task_id}"
-                })
-            queue.put_nowait(None)
-
-        loop = asyncio.get_event_loop()
-        loop.run_in_executor(None, worker_sync)
-
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            import json
-            yield f"data: {json.dumps(item)}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        generate_bulk_zip_stream(chat_id, req.doc_ids, db),
+        media_type="text/event-stream"
+    )
 
 @router.get("/chats/{chat_id}/documents/download_zip/{task_id}")
 def download_prepared_zip(chat_id: str, task_id: str):

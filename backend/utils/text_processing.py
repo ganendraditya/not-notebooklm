@@ -1,5 +1,6 @@
 import re
 import html
+from typing import Optional
 
 def normalize_title_str(t: str) -> str:
     """Normalizes a title by stripping extensions, punctuation, and collapsing whitespace."""
@@ -153,3 +154,14 @@ def is_ai_synthesized_overview(text: str) -> bool:
         "indexed in international academic databases",
         "indexed in international academic indexing services"
     ])
+
+def clean_doi(raw_doi: Optional[str]) -> str:
+    """Standardizes and cleans DOI string removing markdown, urls, and trailing punctuation."""
+    if not raw_doi or not isinstance(raw_doi, str):
+        return ""
+    doi = raw_doi.strip()
+    doi = doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
+    doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+    doi = re.sub(r'[;.,:)\s]+$', '', doi).strip()
+    return doi
+

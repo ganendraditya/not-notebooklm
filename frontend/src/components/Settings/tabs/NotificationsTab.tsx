@@ -2,6 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/lib/i18n";
+import {
+  isNotificationSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendSystemNotification
+} from "@/lib/notifications";
+import { Bell, BellRing, AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default function NotificationsTab() {
   const { t } = useTranslation();
@@ -10,9 +17,17 @@ export default function NotificationsTab() {
   const [notifyResponses, setNotifyResponses] = useState<string>("push");
   const [notifyTasks, setNotifyTasks] = useState<string>("push");
   const [notifyDownloads, setNotifyDownloads] = useState<string>("push");
+  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [isSupported, setIsSupported] = useState<boolean>(true);
+  const [testSent, setTestSent] = useState<boolean>(false);
 
-  // Load preferences from localStorage
+  // Load preferences and permission status
   useEffect(() => {
+    setIsSupported(isNotificationSupported());
+    if (isNotificationSupported()) {
+      setPermission(getNotificationPermission());
+    }
+
     try {
       const savedNotifyResponses = localStorage.getItem("notbooklm_notify_responses");
       if (savedNotifyResponses) setNotifyResponses(savedNotifyResponses);
@@ -27,24 +42,105 @@ export default function NotificationsTab() {
     }
   }, []);
 
-  const handleNotifyResponsesChange = (val: string) => {
+  const handleRequestPermission = async () => {
+    const res = await requestNotificationPermission();
+    setPermission(res);
+  };
+
+  const handleTestNotification = async () => {
+    if (permission !== "granted") {
+      const res = await requestNotificationPermission();
+      setPermission(res);
+      if (res !== "granted") return;
+    }
+
+    sendSystemNotification({
+      title: "NotbookLM AI",
+      body: "Notifikasi browser & OS Windows aktif dan berfungsi dengan baik! ✨",
+      force: true
+    });
+
+    setTestSent(true);
+    setTimeout(() => setTestSent(false), 3000);
+  };
+
+  const handleNotifyResponsesChange = async (val: string) => {
     setNotifyResponses(val);
     try { localStorage.setItem("notbooklm_notify_responses", val); } catch {}
+    if (val === "push" && permission === "default") {
+      const res = await requestNotificationPermission();
+      setPermission(res);
+    }
   };
 
-  const handleNotifyTasksChange = (val: string) => {
+  const handleNotifyTasksChange = async (val: string) => {
     setNotifyTasks(val);
     try { localStorage.setItem("notbooklm_notify_tasks", val); } catch {}
+    if (val === "push" && permission === "default") {
+      const res = await requestNotificationPermission();
+      setPermission(res);
+    }
   };
 
-  const handleNotifyDownloadsChange = (val: string) => {
+  const handleNotifyDownloadsChange = async (val: string) => {
     setNotifyDownloads(val);
     try { localStorage.setItem("notbooklm_notify_downloads", val); } catch {}
+    if (val === "push" && permission === "default") {
+      const res = await requestNotificationPermission();
+      setPermission(res);
+    }
   };
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-app-text">{t("settings.notifications")}</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-app-text">{t("settings.notifications")}</h3>
+        {isSupported && (
+          <button
+            type="button"
+            onClick={handleTestNotification}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors border border-blue-500/20"
+          >
+            <BellRing size={13} />
+            <span>{testSent ? "Terkirim!" : "Test Notifikasi"}</span>
+          </button>
+        )}
+      </div>
+
+      {/* Permission Status Banner */}
+      {!isSupported ? (
+        <div className="mt-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-xs flex items-start gap-2">
+          <AlertCircle size={16} className="shrink-0 mt-0.5" />
+          <span>Browser ini tidak mendukung Web Notifications API.</span>
+        </div>
+      ) : permission === "denied" ? (
+        <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2">
+          <AlertCircle size={16} className="shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-semibold block mb-0.5">Izin notifikasi diblokir di browser.</span>
+            <span>Buka ikon gembok / pengaturan situs di bar URL browser Anda dan ubah notifikasi ke <b>Allow</b>.</span>
+          </div>
+        </div>
+      ) : permission === "default" ? (
+        <div className="mt-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Bell size={16} className="shrink-0" />
+            <span>Aktifkan izin notifikasi OS/Browser agar pemberitahuan muncul di Windows.</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleRequestPermission}
+            className="shrink-0 font-medium underline hover:text-blue-300"
+          >
+            Izinkan
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+          <CheckCircle2 size={15} className="shrink-0" />
+          <span>Izin notifikasi Windows / Browser aktif.</span>
+        </div>
+      )}
 
       <div className="divide-y divide-app-divider mt-4">
         {/* Responses */}

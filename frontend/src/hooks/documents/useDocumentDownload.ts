@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Document } from "@/stores/documentStore";
 import { consumeSSEStream } from "@/lib/sse";
 import { DownloadTask } from "@/components/DownloadManager";
+import { sendSystemNotification } from "@/lib/notifications";
 
 export function useDocumentDownload({
   activeChatId,
@@ -109,6 +110,12 @@ export function useDocumentDownload({
             skippedCount: data.skipped_count,
             totalSizeMb: data.total_size_mb
           });
+
+          sendSystemNotification({
+            category: "downloads",
+            title: "NotbookLM: Unduhan Selesai",
+            body: `Arsip ZIP siap diunduh (${data.downloaded_count ?? data.total} dokumen).`
+          });
           
           const link = document.createElement("a");
           link.href = zipUrl;
@@ -124,6 +131,11 @@ export function useDocumentDownload({
             percent: 0,
             currentFile: "",
             errorMsg: data.detail || "Gagal mengompres dokumen."
+          });
+          sendSystemNotification({
+            category: "downloads",
+            title: "NotbookLM: Gagal Mengunduh",
+            body: data.detail || "Gagal mengompres dokumen ke format ZIP."
           });
         }
       });

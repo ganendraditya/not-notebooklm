@@ -1,109 +1,32 @@
-import os
-import re
-import urllib.parse
-from typing import List, Optional
-import pdf_exporter
+# Re-exports for backward compatibility and clean modular imports
+from utils.file_utils import (
+    UPLOAD_DIR,
+    TEMP_ZIPS_DIR,
+    CHAT_MEDIA_DIR,
+    MAX_SOURCES_PER_CHAT,
+    make_content_disposition,
+    sanitize_paper_filename,
+    get_doc_file_path,
+)
+from utils.pdf_utils import (
+    is_authentic_pdf_bytes,
+    get_authentic_document_pdf,
+    get_or_generate_document_pdf,
+)
+from utils.text_processing import (
+    clean_doi,
+)
 
-UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
-TEMP_ZIPS_DIR = os.path.join(UPLOAD_DIR, "temp_zips")
-CHAT_MEDIA_DIR = os.path.join(UPLOAD_DIR, "chat_media")
-os.makedirs(TEMP_ZIPS_DIR, exist_ok=True)
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
-
-MAX_SOURCES_PER_CHAT = 300
-
-def make_content_disposition(disposition_type: str, filename: str) -> str:
-    """Generates an RFC 5987 / RFC 6266 compliant Content-Disposition header supporting Unicode."""
-    ascii_fn = re.sub(r'[^\x20-\x7E]', '_', filename).replace('"', '')
-    if not ascii_fn.strip():
-        ascii_fn = "document.pdf"
-    encoded_fn = urllib.parse.quote(filename, safe='')
-    return f"{disposition_type}; filename=\"{ascii_fn}\"; filename*=UTF-8''{encoded_fn}"
-
-def sanitize_paper_filename(title: str, max_length: int = 200) -> str:
-    """Sanitizes paper title into a clean filename preserving full words without mid-word truncation."""
-    clean = re.sub(r'<[^>]+>', '', title).strip()
-    clean = re.sub(r'[\/*?:"<>|]', '', clean).strip()
-    clean = re.sub(r'\s+', ' ', clean)
-    if len(clean) > max_length:
-        truncated = clean[:max_length]
-        last_space = truncated.rfind(' ')
-        if last_space > int(max_length * 0.7):
-            clean = truncated[:last_space].strip()
-        else:
-            clean = truncated.strip()
-    return f"{clean}.pdf" if not clean.lower().endswith(".pdf") else clean
-
-def get_doc_file_path(chat_id: str, filename: str) -> str:
-    """Returns absolute file path for a chat document safely with dual unescaped/secure fallback."""
-    import werkzeug.utils
-
-    raw_chat_id = (chat_id or "").strip()
-    raw_fname = (filename or "").strip()
-    clean_chat_id = werkzeug.utils.secure_filename(raw_chat_id)
-    clean_fname = werkzeug.utils.secure_filename(raw_fname)
-
-    # 1. Candidate paths to inspect (prefer authentic binary PDF on disk if available)
-    candidate_paths = [
-        # Direct raw path with spaces (how paper files are saved)
-        os.path.join(UPLOAD_DIR, f"{raw_chat_id}_{raw_fname}"),
-        os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{raw_fname}"),
-        # Sanitized secure filename path
-        os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}"),
-        os.path.join(UPLOAD_DIR, f"None_{raw_fname}"),
-        os.path.join(UPLOAD_DIR, f"None_{clean_fname}"),
-        os.path.join(UPLOAD_DIR, raw_fname),
-        os.path.join(UPLOAD_DIR, clean_fname),
-    ]
-
-    # Return first existing file that is an authentic binary PDF (>=5KB)
-    for p in candidate_paths:
-        if os.path.exists(p) and os.path.getsize(p) >= 5000:
-            return p
-
-    # If no binary PDF found, return first existing text/markdown fallback file
-    for p in candidate_paths:
-        if os.path.exists(p):
-            return p
-
-    # Default fallback
-    return os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
-
-def clean_doi(raw_doi: Optional[str]) -> str:
-    """Standardizes and cleans DOI string removing markdown, urls, and trailing punctuation."""
-    if not raw_doi or not isinstance(raw_doi, str):
-        return ""
-    doi = raw_doi.strip()
-    doi = doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
-    doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
-    doi = re.sub(r'[;.,:)\s]+$', '', doi).strip()
-    return doi
-
-def is_authentic_pdf_bytes(data: bytes, min_size: int = 35000) -> bool:
-    """Checks if raw bytes represent an authentic non-synthetic binary PDF."""
-    return pdf_exporter.is_authentic_pdf_bytes(data, min_size)
-
-def get_authentic_document_pdf(chat_id: str, doc_filename: str) -> tuple:
-    """
-    Returns authentic binary PDF bytes and a clean attachment filename for any document.
-    Instant non-blocking disk inspection — returns (None, clean_filename) if not on disk.
-    """
-    file_path = get_doc_file_path(chat_id, doc_filename)
-    clean_dl_name = doc_filename if doc_filename.lower().endswith(".pdf") else f"{doc_filename}.pdf"
-    
-    # 1. If authentic publisher binary PDF exists on disk (>=35KB), return directly
-    if os.path.exists(file_path) and pdf_exporter.is_binary_pdf(file_path):
-        try:
-            with open(file_path, "rb") as f:
-                data = f.read()
-                if is_authentic_pdf_bytes(data):
-                    return data, clean_dl_name
-        except Exception:
-            pass
-
-    # Instant return: No authentic binary PDF stored on disk
-    return None, clean_dl_name
-
-# Backward compatibility alias
-get_or_generate_document_pdf = get_authentic_document_pdf
+__all__ = [
+    "UPLOAD_DIR",
+    "TEMP_ZIPS_DIR",
+    "CHAT_MEDIA_DIR",
+    "MAX_SOURCES_PER_CHAT",
+    "make_content_disposition",
+    "sanitize_paper_filename",
+    "get_doc_file_path",
+    "is_authentic_pdf_bytes",
+    "get_authentic_document_pdf",
+    "get_or_generate_document_pdf",
+    "clean_doi",
+]

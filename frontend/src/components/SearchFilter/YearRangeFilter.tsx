@@ -9,6 +9,16 @@ interface YearRangeFilterProps {
 }
 
 export default function YearRangeFilter({ localFilter, setLocalFilter, setYearPreset, t }: YearRangeFilterProps) {
+  const currentYear = new Date().getFullYear();
+  const y3 = String(currentYear - 3);
+  const y5 = String(currentYear - 5);
+  const y10 = String(currentYear - 10);
+  const yCurrent = String(currentYear);
+
+  const is3Selected = localFilter.yearFrom === y3 && localFilter.yearTo === yCurrent;
+  const is5Selected = localFilter.yearFrom === y5 && localFilter.yearTo === yCurrent;
+  const is10Selected = localFilter.yearFrom === y10 && localFilter.yearTo === yCurrent;
+
   return (
     <div className="space-y-2">
       <span className="text-xs font-semibold text-app-text flex items-center gap-1.5">
@@ -19,9 +29,9 @@ export default function YearRangeFilter({ localFilter, setLocalFilter, setYearPr
       <div className="grid grid-cols-3 gap-1.5 text-[11px]">
         <button
           type="button"
-          onClick={() => setYearPreset(localFilter.yearFrom === "2023" && localFilter.yearTo === "2026" ? "" : "2023", localFilter.yearFrom === "2023" && localFilter.yearTo === "2026" ? "" : "2026")}
+          onClick={() => setYearPreset(is3Selected ? "" : y3, is3Selected ? "" : yCurrent)}
           className={
-            localFilter.yearFrom === "2023" && localFilter.yearTo === "2026"
+            is3Selected
               ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
               : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
           }
@@ -30,9 +40,9 @@ export default function YearRangeFilter({ localFilter, setLocalFilter, setYearPr
         </button>
         <button
           type="button"
-          onClick={() => setYearPreset(localFilter.yearFrom === "2020" && localFilter.yearTo === "2026" ? "" : "2020", localFilter.yearFrom === "2020" && localFilter.yearTo === "2026" ? "" : "2026")}
+          onClick={() => setYearPreset(is5Selected ? "" : y5, is5Selected ? "" : yCurrent)}
           className={
-            localFilter.yearFrom === "2020" && localFilter.yearTo === "2026"
+            is5Selected
               ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
               : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
           }
@@ -41,9 +51,9 @@ export default function YearRangeFilter({ localFilter, setLocalFilter, setYearPr
         </button>
         <button
           type="button"
-          onClick={() => setYearPreset(localFilter.yearFrom === "2015" && localFilter.yearTo === "2026" ? "" : "2015", localFilter.yearFrom === "2015" && localFilter.yearTo === "2026" ? "" : "2026")}
+          onClick={() => setYearPreset(is10Selected ? "" : y10, is10Selected ? "" : yCurrent)}
           className={
-            localFilter.yearFrom === "2015" && localFilter.yearTo === "2026"
+            is10Selected
               ? "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-medium shadow-sm"
               : "py-1 px-2 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text"
           }

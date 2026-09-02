@@ -1,6 +1,7 @@
 import { useRef } from "react";
 import { type ChatMessage, type Attachment } from "@/stores/chatStore";
 import { consumeSSEStream } from "@/lib/sse";
+import { sendSystemNotification } from "@/lib/notifications";
 
 // Queue now needs to store attachments too
 export interface QueuedMessage {
@@ -112,6 +113,17 @@ export function useChatStream(
             updateMessagesList(prev => [...prev, asstMsg]);
           }
 
+          // Trigger Windows / Browser notification if user is away in another tab
+          const cleanPreview = (asstMsg.content || "")
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .replace(/\[\^(\d+)\]/g, "")
+            .trim();
+          sendSystemNotification({
+            category: "responses",
+            title: "NotbookLM: Jawaban Selesai",
+            body: cleanPreview || "AI telah selesai menyusun jawaban Anda."
+          });
+
           // Check if response contains an action payload like deleting documents
           const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
           if (actionMatch) {
@@ -135,6 +147,11 @@ export function useChatStream(
           if (activeChatIdRef.current === targetChatId) {
             updateMessagesList(prev => [...prev, errorMsg]);
           }
+          sendSystemNotification({
+            category: "responses",
+            title: "NotbookLM: Terjadi Kesalahan",
+            body: data.data || "Gagal memproses permintaan."
+          });
         }
       });
     } catch (err: any) {
@@ -314,6 +331,16 @@ export function useChatStream(
             updateMessagesList(prev => [...prev, asstMsg]);
           }
 
+          const cleanPreview = (asstMsg.content || "")
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .replace(/\[\^(\d+)\]/g, "")
+            .trim();
+          sendSystemNotification({
+            category: "responses",
+            title: "NotbookLM: Edit Selesai",
+            body: cleanPreview || "Pesan telah berhasil diperbarui."
+          });
+
           const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
           if (actionMatch) {
             try {
@@ -336,6 +363,11 @@ export function useChatStream(
           if (activeChatIdRef.current === currentChatId) {
             updateMessagesList(prev => [...prev, errorMsg]);
           }
+          sendSystemNotification({
+            category: "responses",
+            title: "NotbookLM: Terjadi Kesalahan",
+            body: data.data || "Gagal memproses edit pesan."
+          });
         }
       });
     } catch (err: any) {
@@ -450,6 +482,16 @@ export function useChatStream(
               console.error("Failed to parse SOURCES_ACTION in regenerated response:", e);
             }
           }
+
+          const cleanPreview = (asstMsg.content || "")
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .replace(/\[\^(\d+)\]/g, "")
+            .trim();
+          sendSystemNotification({
+            category: "responses",
+            title: "NotbookLM: Regenerate Selesai",
+            body: cleanPreview || "Jawaban baru telah berhasil di-generate."
+          });
         }
       });
     } catch (err: any) {
