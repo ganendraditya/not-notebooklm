@@ -36,12 +36,16 @@ def sanitize_paper_filename(title: str, max_length: int = 200) -> str:
 
 def get_doc_file_path(chat_id: str, filename: str) -> str:
     """Returns absolute file path for a chat document safely with dual unescaped/secure fallback."""
-    import werkzeug.utils
-
     raw_chat_id = (chat_id or "").strip()
     raw_fname = (filename or "").strip()
-    clean_chat_id = werkzeug.utils.secure_filename(raw_chat_id)
-    clean_fname = werkzeug.utils.secure_filename(raw_fname)
+
+    try:
+        import werkzeug.utils
+        clean_chat_id = werkzeug.utils.secure_filename(raw_chat_id)
+        clean_fname = werkzeug.utils.secure_filename(raw_fname)
+    except (ImportError, ModuleNotFoundError):
+        clean_chat_id = re.sub(r'[^a-zA-Z0-9_.-]', '_', raw_chat_id)
+        clean_fname = re.sub(r'[^a-zA-Z0-9_.-]', '_', raw_fname)
 
     # 1. Candidate paths to inspect (prefer authentic binary PDF on disk if available)
     candidate_paths = [
