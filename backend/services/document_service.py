@@ -123,8 +123,41 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Document, file_path: str)
                 candidate_pdf_url=doc.pdf_url or ""
             )
             if fetched_oa and is_authentic_pdf_bytes(fetched_oa, min_size=35000):
-                with open(file_path, "wb") as f:
+                # If current file has .txt extension, compute the .pdf path and rename/save
+                dir_name = os.path.dirname(file_path)
+                base_name = os.path.basename(file_path)
+                target_path = file_path
+
+                if base_name.lower().endswith(".txt"):
+                    pdf_base_name = base_name[:-4] + ".pdf"
+                    target_path = os.path.join(dir_name, pdf_base_name)
+                    # Also update DB record filename if doc is provided
+                    try:
+                        from database import SessionLocal, Document as DBDocument
+                        db = SessionLocal()
+                        db_doc = db.query(DBDocument).filter(DBDocument.id == doc.id).first()
+                        if db_doc:
+                            db_doc.filename = pdf_base_name
+                            db_doc.access_status = "Open Access (Full PDF Available)"
+                            db_doc.is_oa = True
+                            # Critical fix: sync doc.filename object reference so caller gets the update immediately
+                            doc.filename = pdf_base_name
+                            db.commit()
+                        db.close()
+                    except Exception as db_err:
+                        logger.debug(f"[DB filename update warning]: {db_err}")
+
+                with open(target_path, "wb") as f:
                     f.write(fetched_oa)
+
+                # Also write to old file_path if it was different to avoid stale refs
+                if target_path != file_path and os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                    except Exception:
+                        pass
+
+                file_path = target_path
                 is_authentic_pdf = True
                 
                 # Re-extract markdown content from new PDF

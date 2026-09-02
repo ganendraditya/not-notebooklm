@@ -769,6 +769,35 @@ async def query_chat(
                             content_snippet = parsed_text[:max_chars]
                     except Exception as parse_err:
                         logger.debug(f"[Doc Parse Error for {fname}]: {parse_err}")
+
+                # 1b. If not full paper, attempt on-demand OA PDF fetch (just like sidebar reader does!)
+                if (not is_full_paper) and db_record and (db_record.is_oa or db_record.pdf_url or db_record.doi):
+                    try:
+                        from services.document_service import check_and_fetch_authentic_pdf_on_demand
+                        import asyncio
+                        # Run sync since we're inside a thread worker
+                        fetched_ok, new_md = asyncio.run(check_and_fetch_authentic_pdf_on_demand(db_record, fpath))
+                        if fetched_ok:
+                            # Update fpath in case it was renamed to .pdf by check_and_fetch_authentic_pdf_on_demand
+                            if db_record.filename:
+                                fpath = get_doc_file_path(chat_id, db_record.filename)
+                                fname = db_record.filename # Update local variable used in prompt construction
+
+                            # Re-parse now that it's a PDF (if the new_md returned isn't sufficient)
+                            try:
+                                parsed_text = parse_document_to_markdown(fpath)
+                                if parsed_text and len(parsed_text.strip()) >= 150 and "NOTBOOKLM" not in parsed_text:
+                                    is_full_paper = True
+                                    max_chars = 48000 if len(local_docs) > 20 else 80000
+                                    content_snippet = parsed_text[:max_chars]
+                            except Exception as parse_err:
+                                logger.debug(f"[Doc Parse Error after on-demand fetch for {fname}]: {parse_err}")
+                                if new_md and len(new_md.strip()) >= 300:
+                                    is_full_paper = True
+                                    max_chars = 48000 if len(local_docs) > 20 else 80000
+                                    content_snippet = new_md[:max_chars]
+                    except Exception as on_demand_err:
+                        logger.debug(f"[RAG On-Demand Fetch Error for {fname}]: {on_demand_err}")
                         
                 # 2. If physical file parse failed or short stub: read from DB metadata
                 if (not is_full_paper) and db_record:

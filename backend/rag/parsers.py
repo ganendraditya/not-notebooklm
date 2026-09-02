@@ -369,7 +369,19 @@ def parse_document_to_markdown(file_path: str) -> str:
     ext = os.path.splitext(file_path)[1].lower()
     filename = os.path.basename(file_path)
     
-    if ext == ".pdf":
+    # Check if the file is secretly a binary PDF regardless of its extension (.txt, .tmp, etc.)
+    is_binary_pdf = False
+    if os.path.exists(file_path) and os.path.getsize(file_path) >= 10: # Lowered to 10 bytes for extreme testing, real is > 500
+        try:
+            with open(file_path, "rb") as f:
+                magic_bytes = f.read(1024)
+                if magic_bytes.startswith(b"%PDF-") or b"%PDF-" in magic_bytes[:1024]:
+                    is_binary_pdf = True
+        except Exception:
+            pass
+
+    md_text = ""
+    if ext == ".pdf" or is_binary_pdf:
         try:
             md_text = pymupdf4llm.to_markdown(file_path)
         except Exception:
@@ -377,11 +389,19 @@ def parse_document_to_markdown(file_path: str) -> str:
             try:
                 import pymupdf
                 doc = pymupdf.open(file_path)
-                pages_text = [page.get_text() for page in doc]
-                doc.close()
-                md_text = "\n\n".join(pages_text)
+                if len(doc) > 0:
+                    pages_text = [page.get_text() for page in doc]
+                    doc.close()
+                    md_text = "\n\n".join(pages_text)
+                else:
+                    md_text = ""
             except Exception as e:
                 md_text = ""
+                
+        # If PyMuPDF fails completely on a binary PDF, do NOT fallback to reading it as text
+        if is_binary_pdf and not md_text:
+             md_text = ""
+             
     elif ext in (".docx", ".doc"):
         md_text = parse_docx_file(file_path)
     elif ext in (".bib", ".bibtex"):
@@ -393,8 +413,12 @@ def parse_document_to_markdown(file_path: str) -> str:
     elif ext in (".csv", ".tsv"):
         md_text = parse_csv_file(file_path)
     else:
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            md_text = f.read()
+        # If it wasn't a known binary format or secretly a binary PDF, try text
+        if not is_binary_pdf:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                md_text = f.read()
+        else:
+            md_text = ""
             
     if not md_text or not md_text.strip():
         raise ValueError(f"Could not extract readable text from {filename}")
