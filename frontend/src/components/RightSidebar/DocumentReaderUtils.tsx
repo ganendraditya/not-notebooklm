@@ -65,24 +65,26 @@ export function getHighlightedContent(
 ): HighlightMatchResult {
   if (!fullText) return { nodes: null, matchCount: 0 };
 
-  // Tokenize document text into atomic chunks (sentences / table cells / headings)
-  // Preserve decimal numbers (92.23%) by not splitting on period between digits
-  const rawSentences: string[] = [];
-  // Split on sentence-ending punctuation (.!?) only when NOT between digits and followed by whitespace/EOL
-  const sentenceSplitRegex = /(?<!\d)(?<!\d\s)[.!?]+(?=\s|$)|[\n\r]+/g;
-  let lastSplitEnd = 0;
-  let splitMatch;
-  while ((splitMatch = sentenceSplitRegex.exec(fullText)) !== null) {
-    const chunk = fullText.substring(lastSplitEnd, splitMatch.index + splitMatch[0].length);
-    if (chunk.trim().length > 0) {
-      rawSentences.push(chunk);
-    }
-    lastSplitEnd = splitMatch.index + splitMatch[0].length;
+  // 0. GUARD: Ignore conversational fluff / bibliography / generic introductory clauses
+  const isGenericCitationQuery = !targetQuery || targetQuery.trim().length < 5 || (
+    /^(?:berdasarkan|dokumen|referensi|sumber|menurut|daftar\s+pustaka|sitasi\s+rujukan|paper|jurnal|artikel|kesimpulan|rincian)\b/i.test(targetQuery.trim()) &&
+    !/\d+[,.]\d+%?|\b\d+%\b|\bakurasi\b|\bmetode\b|\bhasil\b|\bdataset\b|\bsensitivitas\b|\bspesifisitas\b/i.test(targetQuery)
+  ) || (
+    /^\s*(?:santoso|rahma|et\s+al|dr\.|prof\.)/i.test(targetQuery.trim()) && targetQuery.length < 80
+  );
+
+  if (isGenericCitationQuery) {
+    return { nodes: <span>{fullText}</span>, matchCount: 0 };
   }
-  if (lastSplitEnd < fullText.length) {
-    const tail = fullText.substring(lastSplitEnd);
-    if (tail.trim().length > 0) {
-      rawSentences.push(tail);
+
+  // Tokenize document text into atomic chunks while strictly preserving all original whitespace and linebreaks
+  const rawSentences: string[] = [];
+  // Match sentence chunks ending in punctuation (.!?) or linebreaks, capturing the delimiter to preserve formatting
+  const tokenRegex = /(?:[\s\S]*?(?:(?<!\d)(?<!\d\s)[.!?]+(?=\s|$)|[\r\n]+))|[\s\S]+/g;
+  let match;
+  while ((match = tokenRegex.exec(fullText)) !== null) {
+    if (match[0].length > 0) {
+      rawSentences.push(match[0]);
     }
   }
   if (rawSentences.length === 0) return { nodes: <span>{fullText}</span>, matchCount: 0 };

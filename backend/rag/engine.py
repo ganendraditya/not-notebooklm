@@ -46,6 +46,7 @@ from .prompts import (
     get_workspace_analysis_system_prompt,
     get_agentic_system_prompt
 )
+from services.rubric_grader_service import evaluate_response_grounding
 from .vector_store import embed_model, vector_store, qdrant_client, delete_document_vectors
 
 load_dotenv()
@@ -758,7 +759,7 @@ async def query_chat(
                         if parsed_text and len(parsed_text.strip()) >= 150:
                             if "NOTBOOKLM" in parsed_text:
                                 is_full_paper = False
-                            elif fpath.lower().endswith(".txt") and fsize < 3000: # Text synthesis fallbacks are usually 1KB-2KB
+                            elif fpath.lower().endswith(".txt") and fsize < 100: # Very small empty text
                                 is_full_paper = False
                             elif fpath.lower().endswith(".pdf") and fsize < 10000: # Stubs are below 10KB
                                 is_full_paper = False
@@ -883,7 +884,45 @@ async def query_chat(
             
             await report_status("Synthesizing comparative findings and formatting response...")
             resp = await target_llm.achat(chat_msgs)
-            return clean_response(resp.message.content)
+            draft_content = clean_response(resp.message.content)
+
+            # Self-Correction Loop with Rubric Grader
+            try:
+                await report_status("Auditing factual grounding and citations with AI Rubric...")
+                rubric_res = await evaluate_response_grounding(
+                    query=query,
+                    sources_context=full_docs_context,
+                    draft_response=draft_content,
+                    llm=target_llm
+                )
+
+                # If grounded or acceptable score, return draft directly
+                if rubric_res.is_grounded or rubric_res.grounding_score >= 0.8:
+                    return draft_content
+
+                # If ungrounded with actionable revision feedback, execute single bounded self-correction
+                if rubric_res.revision_instruction:
+                    await report_status("Refining and correcting factual citations...")
+                    revision_prompt = (
+                        f"{system_prompt_text}\n\n"
+                        "CRITICAL AUDIT FEEDBACK (SELF-CORRECTION REQUIRED):\n"
+                        f"Your previous draft failed the academic grounding rubric:\n"
+                        f"- Issues: {json.dumps(rubric_res.hallucinated_claims, ensure_ascii=False)}\n"
+                        f"- Revision Instruction: {rubric_res.revision_instruction}\n\n"
+                        "Please rewrite the response to be 100% truthful, strictly aligned with the provided documents, and fix all citation tags."
+                    )
+                    revised_chat_msgs = [
+                        LlamaChatMessage(role=MessageRole.SYSTEM, content=revision_prompt),
+                        *(formatted_history if formatted_history else []),
+                        context_msg,
+                        LlamaChatMessage(role=MessageRole.USER, content=query)
+                    ]
+                    revised_resp = await target_llm.achat(revised_chat_msgs)
+                    return clean_response(revised_resp.message.content)
+            except Exception as grade_err:
+                logger.warning(f"[RAG Engine] Rubric audit bypassed due to error: {grade_err}")
+
+            return draft_content
 
         # 5. Agentic path for complex workflows
         await report_status("Executing agent reasoning & searching academic sources...")

@@ -19,6 +19,7 @@ def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dict[str,
         
     extracted_doi = ""
     raw_header = ""
+    enriched_abstract = ""
     
     # Check PDF magic bytes locally
     is_valid_pdf = False
@@ -44,6 +45,9 @@ def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dict[str,
         elif not filename.lower().endswith(".pdf"):
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 raw_header = f.read(3000)
+                # If text/markdown file, populate abstract snippet from the content so DB has full context preview
+                if not enriched_abstract:
+                    enriched_abstract = raw_header[:1000]
     except Exception:
         raw_header = ""
 
@@ -59,7 +63,7 @@ def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dict[str,
         "year": "",
         "journal": "",
         "journal_metric": "Uploaded Document",
-        "abstract": "",
+        "abstract": enriched_abstract,
         "url": f"https://doi.org/{extracted_doi}" if extracted_doi else "",
         "doi": extracted_doi,
         "is_valid_pdf": is_valid_pdf
