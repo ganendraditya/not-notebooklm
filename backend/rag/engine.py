@@ -54,11 +54,40 @@ load_dotenv()
 # Setup variables
 Settings.embed_model = embed_model
 
-def get_llm_factory(provider_override: Optional[str] = None):
+_CACHED_LLM_INSTANCES = None
+_CACHED_CONFIG_HASH = None
+
+def _get_env_config_signature():
+    """Generates a snapshot of active LLM environment variables to detect config changes."""
+    return (
+        os.getenv("LLM_PROVIDER", ""),
+        os.getenv("NINEROUTER_BASE_URL", ""),
+        os.getenv("NINEROUTER_API_KEY", ""),
+        os.getenv("NINEROUTER_MODEL", ""),
+        os.getenv("GEMINI_API_KEY", ""),
+        os.getenv("GROQ_API_KEY", ""),
+        os.getenv("FREELLMAPI_BASE_URL", ""),
+        os.getenv("FREELLMAPI_API_KEY", ""),
+        os.getenv("FREELLMAPI_MODEL", "")
+    )
+
+def clear_llm_cache():
+    """Clears cached LLM instances, forcing fresh recreation on next query."""
+    global _CACHED_LLM_INSTANCES, _CACHED_CONFIG_HASH
+    _CACHED_LLM_INSTANCES = None
+    _CACHED_CONFIG_HASH = None
+
+def get_llm_factory(provider_override: Optional[str] = None, force_refresh: bool = False):
     """
-    Thread-safe factory function that builds and returns configured LLM instances
-    without mutating global shared variables.
+    Thread-safe Singleton Factory function that returns cached LLM instances.
+    Only recreates client instances if configuration changed or force_refresh=True.
     """
+    global _CACHED_LLM_INSTANCES, _CACHED_CONFIG_HASH
+    
+    current_sig = _get_env_config_signature()
+    if not force_refresh and _CACHED_LLM_INSTANCES is not None and _CACHED_CONFIG_HASH == current_sig:
+        return _CACHED_LLM_INSTANCES
+
     ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:3000/v1")
     ninerouter_key = os.getenv("NINEROUTER_API_KEY")
     ninerouter_model = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
@@ -114,8 +143,8 @@ def get_llm_factory(provider_override: Optional[str] = None):
                     api_key=gemini_key,
                     max_tokens=8192
                 )
-            except Exception:
-                logger.warning(f"[RAG Engine] Gemini initialization failed: {e}")
+            except Exception as e2:
+                logger.warning(f"[RAG Engine] Gemini initialization failed: {e2}")
             
     gq_llm = None
     if groq_key and not groq_key.startswith("your_"):
@@ -132,14 +161,16 @@ def get_llm_factory(provider_override: Optional[str] = None):
                     api_key=groq_key,
                     max_tokens=8192
                 )
-            except Exception:
-                logger.warning(f"[RAG Engine] Groq initialization failed: {e}")
+            except Exception as e2:
+                logger.warning(f"[RAG Engine] Groq initialization failed: {e2}")
             
-    return n_llm, fl_llm, gm_llm, gq_llm
+    _CACHED_LLM_INSTANCES = (n_llm, fl_llm, gm_llm, gq_llm)
+    _CACHED_CONFIG_HASH = current_sig
+    return _CACHED_LLM_INSTANCES
 
-def create_llm_instances():
+def create_llm_instances(force_refresh: bool = False):
     """Backward compatibility wrapper."""
-    return get_llm_factory()
+    return get_llm_factory(force_refresh=force_refresh)
 
 # Module-level aliases for backward compatibility
 ninerouter_llm = None
@@ -571,326 +602,39 @@ async def query_chat(
 
         # 1. Handle General Conversational & Technical Discussion
         if intent == "GENERAL_CHAT":
-            chat_msgs = [
-                LlamaChatMessage(role=MessageRole.SYSTEM, content=get_general_chat_system_prompt()),
-                *(formatted_history if formatted_history else []),
-                LlamaChatMessage(role=MessageRole.USER, content=query)
-            ]
-            await report_status("Thinking...")
-            resp = await target_llm.achat(chat_msgs)
-            return clean_response(resp.message.content)
+            from .pipelines.chat_pipeline import handle_general_chat_pipeline
+            raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status)
+            return clean_response(raw_res)
 
-        # 3. Handle Explicit Source Removal Intent (ONLY when explicitly instructed by user)
+        # 2. Handle Explicit Source Removal Intent
         if intent == "REMOVE_SOURCES" and has_local_docs:
-            await report_status("Processing document deletion request...")
-            from database import SessionLocal, Document as DBDocument
-            db_s = SessionLocal()
-            current_db_docs = []
-            try:
-                current_db_docs = db_s.query(DBDocument).filter(DBDocument.chat_id == chat_id).all()
-            finally:
-                db_s.close()
+            from .pipelines.source_action_pipeline import handle_source_removal_pipeline
+            return await handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
 
-            doc_summaries = []
-            for d in current_db_docs:
-                t = d.title or d.filename.replace(".pdf", "")
-                snippet = (d.abstract or d.snippet or "")[:200]
-                doc_summaries.append(f"- ID: {d.id} | Filename: {d.filename} | Title: {t} | Abstract: {snippet}")
-
-            eval_prompt = get_source_deletion_prompt(query, doc_summaries)
-            try:
-                eval_resp = await target_llm.acomplete(eval_prompt)
-                clean_json_text = eval_resp.text.strip()
-                clean_json_text = re.sub(r'^```(?:json)?\s*', '', clean_json_text, flags=re.I)
-                clean_json_text = re.sub(r'\s*```$', '', clean_json_text)
-                eval_data = json.loads(clean_json_text)
-                to_delete_ids = eval_data.get("remove_doc_ids", [])
-                
-                deleted_titles = []
-                if to_delete_ids:
-                    db_del = SessionLocal()
-                    try:
-                        docs_to_del = db_del.query(DBDocument).filter(
-                            DBDocument.id.in_(to_delete_ids),
-                            DBDocument.chat_id == chat_id
-                        ).all()
-                        for dd in docs_to_del:
-                            deleted_titles.append(dd.title or dd.filename.replace(".pdf", ""))
-                            from helpers import get_doc_file_path
-                            fp = get_doc_file_path(chat_id, dd.filename)
-                            if os.path.exists(fp):
-                                try: os.remove(fp)
-                                except Exception: pass
-                            db_del.delete(dd)
-                        db_del.commit()
-                    finally:
-                        db_del.close()
-
-                num_deleted = len(deleted_titles)
-                resp_text = f"Successfully removed **{num_deleted} requested document(s)** from sources:\n\n"
-                for dt in deleted_titles:
-                    resp_text += f"- ❌ {dt}\n"
-                resp_text += f"\nYour workspace sources have been updated per your request."
-                
-                action_payload = json.dumps({"action": "bulk_delete", "deleted_doc_ids": to_delete_ids})
-                return f"{resp_text}\n\n<!-- SOURCES_ACTION: {action_payload} -->"
-            except Exception as eval_err:
-                logger.error(f"[Source Clean Error]: {eval_err}")
-                return f"Failed to remove requested documents: {str(eval_err)}"
-
-        # 4. Direct Academic Literature Search Pipeline (OpenAlex, Europe PMC, Crossref with Sources Card UI)
+        # 3. Direct Academic Literature Search Pipeline
         if intent == "SEARCH_NEW":
-            await report_status("Planning academic query parameters & search terms...")
-            plan = await plan_academic_search(query, formatted_history, target_llm)
-            
-            target_count = plan.get('target_count', 15)
-            # Request 2x candidate pool so AI Judge has plenty of candidates to audit & filter
-            search_plan = dict(plan)
-            search_plan['target_count'] = max(target_count * 2, 20)
-
-            await report_status(f"Searching verified academic repositories for candidate papers...")
-            existing_sigs = get_existing_notebook_sources_signatures(chat_id)
-            raw_papers = await asyncio.to_thread(search_academic_papers_planned, search_plan, existing_sigs)
-            
-            if not raw_papers:
-                return f"Maaf, tidak ditemukan paper ilmiah yang cocok dengan kriteria pencarian untuk topik: '{query}'."
-
-            # AI Relevance Judge: Evaluate paper summaries, audit domain relevance, and discard any irrelevant papers
-            await report_status("AI Auditor evaluating paper relevance & filtering noise...")
-            papers = await judge_and_filter_papers_with_llm(query, raw_papers, target_count, target_llm)
-            if not papers:
-                papers = raw_papers[:target_count]
-
-            await report_status("Synthesizing research landscape and structuring sources...")
-            
-            # Format candidate papers for synthesis
-            paper_bullet_list = []
-            for p in papers[:25]:
-                p_authors = ", ".join(p.get("authors", [])[:3]) if p.get("authors") else "Academic Researchers"
-                p_venue = p.get("venue", "Academic Publication")
-                paper_bullet_list.append(
-                    f"- **{p.get('title')}** ({p.get('year')}) by {p_authors} in *{p_venue}*\n"
-                    f"  Abstract: {p.get('snippet', '')[:400]}"
-                )
-            papers_context = "\n\n".join(paper_bullet_list)
-
-            synthesis_prompt = get_search_synthesis_prompt(query, len(papers), papers_context)
-
-            synth_msgs = [
-                LlamaChatMessage(role=MessageRole.SYSTEM, content=synthesis_prompt),
-                *(formatted_history if formatted_history else []),
-                LlamaChatMessage(role=MessageRole.USER, content=query)
-            ]
-            
-            resp = await target_llm.achat(synth_msgs)
-            text_response = clean_response(resp.message.content)
-            
-            # Append structured SOURCES_DATA payload for frontend ChatMessageItem interactive import card!
-            sources_json_str = json.dumps(papers, ensure_ascii=False)
-            return f"{text_response}\n\n<!-- SOURCES_DATA: {sources_json_str} -->"
+            from .pipelines.search_pipeline import handle_academic_search_pipeline
+            raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status)
+            if "<!-- SOURCES_DATA:" in raw_res:
+                parts = raw_res.split("<!-- SOURCES_DATA:", 1)
+                cleaned_text = clean_response(parts[0])
+                return f"{cleaned_text}\n\n<!-- SOURCES_DATA:{parts[1]}"
+            return clean_response(raw_res)
 
         # 4. Direct Full-Context Synthesis for workspace documents
         if intent == "ANALYZE_WORKSPACE" and has_local_docs:
-            await report_status("Reading full content of all loaded documents...")
-            uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
-            full_docs_context_parts = []
-            
-            # Fetch all documents from DB for this chat session to use as primary/fallback metadata
-            db_docs_by_filename = {}
-            try:
-                from database import SessionLocal, Document as DBDocument
-                _db = SessionLocal()
-                try:
-                    for db_d in _db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all():
-                        db_docs_by_filename[db_d.filename] = db_d
-                finally:
-                    _db.close()
-            except Exception:
-                pass
-
-            from helpers import get_doc_file_path
-
-            def load_single_doc_snippet(idx_fname):
-                i, fname = idx_fname
-                fpath = get_doc_file_path(chat_id, fname)
-                content_snippet = ""
-                db_record = db_docs_by_filename.get(fname)
-                is_full_paper = False
-                
-                # 1. Try parsing full document text properly (PDF/DOCX/TXT/MD)
-                if os.path.exists(fpath):
-                    fsize = os.path.getsize(fpath)
-                    try:
-                        parsed_text = parse_document_to_markdown(fpath)
-                        if parsed_text and len(parsed_text.strip()) >= 150:
-                            if "NOTBOOKLM" in parsed_text:
-                                is_full_paper = False
-                            elif fpath.lower().endswith(".txt") and fsize < 100: # Very small empty text
-                                is_full_paper = False
-                            elif fpath.lower().endswith(".pdf") and fsize < 10000: # Stubs are below 10KB
-                                is_full_paper = False
-                            else:
-                                is_full_paper = True
-                            # Keep generous content so LLM sees full sections, methods, and results
-                            max_chars = 48000 if len(local_docs) > 20 else 80000
-                            content_snippet = parsed_text[:max_chars]
-                    except Exception as parse_err:
-                        logger.debug(f"[Doc Parse Error for {fname}]: {parse_err}")
-
-                # 1b. If not full paper, attempt on-demand OA PDF fetch (just like sidebar reader does!)
-                if (not is_full_paper) and db_record and (db_record.is_oa or db_record.pdf_url or db_record.doi):
-                    try:
-                        from services.document_service import check_and_fetch_authentic_pdf_on_demand
-                        import asyncio
-                        # Run sync since we're inside a thread worker
-                        fetched_ok, new_md = asyncio.run(check_and_fetch_authentic_pdf_on_demand(db_record, fpath))
-                        if fetched_ok:
-                            # Update fpath in case it was renamed to .pdf by check_and_fetch_authentic_pdf_on_demand
-                            if db_record.filename:
-                                fpath = get_doc_file_path(chat_id, db_record.filename)
-                                fname = db_record.filename # Update local variable used in prompt construction
-
-                            # Re-parse now that it's a PDF (if the new_md returned isn't sufficient)
-                            try:
-                                parsed_text = parse_document_to_markdown(fpath)
-                                if parsed_text and len(parsed_text.strip()) >= 150 and "NOTBOOKLM" not in parsed_text:
-                                    is_full_paper = True
-                                    max_chars = 48000 if len(local_docs) > 20 else 80000
-                                    content_snippet = parsed_text[:max_chars]
-                            except Exception as parse_err:
-                                logger.debug(f"[Doc Parse Error after on-demand fetch for {fname}]: {parse_err}")
-                                if new_md and len(new_md.strip()) >= 300:
-                                    is_full_paper = True
-                                    max_chars = 48000 if len(local_docs) > 20 else 80000
-                                    content_snippet = new_md[:max_chars]
-                    except Exception as on_demand_err:
-                        logger.debug(f"[RAG On-Demand Fetch Error for {fname}]: {on_demand_err}")
-                        
-                # 2. If physical file parse failed or short stub: read from DB metadata
-                if (not is_full_paper) and db_record:
-                    meta_parts = []
-                    d_title = db_record.title or fname.replace(".pdf", "").replace("_", " ")
-                    d_year = db_record.year or ""
-                    d_venue = db_record.journal or db_record.venue or ""
-                    d_doi = db_record.doi or ""
-                    d_abstract = db_record.abstract or db_record.snippet or ""
-                    
-                    meta_parts.append(f"# {d_title} ({d_year})")
-                    if d_venue: meta_parts.append(f"**Venue/Journal:** {d_venue}")
-                    if d_doi: meta_parts.append(f"**DOI:** {d_doi}")
-                    if d_abstract: meta_parts.append(f"## Abstract & Overview\n{d_abstract}")
-                    
-                    # If we parsed *some* text but it was small, append it just in case
-                    if content_snippet:
-                        meta_parts.append(f"## Parsed Text Snippet\n{content_snippet}")
-                        
-                    content_snippet = "\n\n".join(meta_parts)
-                    
-                if not content_snippet:
-                    content_snippet = f"(Dokumen: {fname})"
-                    
-                doc_display_title = (db_record.title if db_record and db_record.title else fname.replace(".pdf", "").replace("_", " ").strip())
-                if doc_display_title.isupper() and len(doc_display_title) > 8:
-                    doc_display_title = doc_display_title.title()
-
-                status_label = "NASKAH LENGKAP TERSEDIA (Full-Text Original PDF Downloaded - Seluruh Bab Lengkap Ada)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Only)"
-                has_doi_label = f"DOI Resmi: {db_record.doi}" if (db_record and db_record.doi) else "DOI Resmi: Tidak Ada / Repositori Kampus"
-
-                return (
-                    is_full_paper,
-                    (
-                        f"--- DOKUMEN [{i+1}] ---\n"
-                        f"Nomor Dokumen: [{i+1}]\n"
-                        f"Judul Publikasi: {doc_display_title}\n"
-                        f"Nama File: {fname}\n"
-                        f"Status File Dokumen: {status_label}\n"
-                        f"{has_doi_label}\n"
-                        f"Teks Dokumen Asli:\n{content_snippet}\n"
-                    )
-                )
-
-            # Load all documents concurrently in thread pool without blocking event loop
-            # Maintain deterministic ordering matching DOKUMEN [1], [2], ... [N]
-            loaded_results = await asyncio.gather(
-                *(asyncio.to_thread(load_single_doc_snippet, (i, fname)) for i, fname in enumerate(local_docs))
-            )
-            
-            full_paper_indices = [i + 1 for i, (is_full, _) in enumerate(loaded_results) if is_full]
-            abstract_only_indices = [i + 1 for i, (is_full, _) in enumerate(loaded_results) if not is_full]
-            full_paper_count = len(full_paper_indices)
-            abstract_only_count = len(abstract_only_indices)
-            full_docs_context_parts = [snippet for _, snippet in loaded_results]
-            
-            full_list_str = ", ".join([f"[{idx}]" for idx in full_paper_indices]) if full_paper_indices else "0 dokumen (Tidak ada)"
-            abstract_list_str = ", ".join([f"[{idx}]" for idx in abstract_only_indices]) if abstract_only_indices else "0 dokumen (Tidak ada)"
-            
-            full_docs_context = "\n\n".join(full_docs_context_parts)
-            
-            system_prompt_text = (
-                f"{get_workspace_analysis_system_prompt(len(local_docs))}\n\n"
-                "CRITICAL INSTRUCTIONS FOR SYNTHESIS & ANALYSIS:\n"
-                "- When the user asks to summarize, analyze, compare, or generate chapters/sections (like Bab 3, Metodologi, Hasil, dll.), write a rich, detailed, and comprehensive academic text synthesizing the data.\n"
-                "- DO NOT refuse with excuses about copyright or partial text. Leverage the available document text fully."
+            from .pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
+            return await handle_workspace_analysis_pipeline(
+                chat_id=chat_id,
+                query=query,
+                local_docs=local_docs,
+                formatted_history=formatted_history,
+                target_llm=target_llm,
+                report_status=report_status,
+                clean_response_fn=clean_response
             )
 
-            system_msg = LlamaChatMessage(
-                role=MessageRole.SYSTEM,
-                content=system_prompt_text
-            )
-            context_msg = LlamaChatMessage(
-                role=MessageRole.SYSTEM,
-                content=f"BERIKUT ADALAH SELURUH DATA & TEKS DOKUMEN REFERENSI YANG DIIMPOR ({len(local_docs)} DOKUMEN):\n\n{full_docs_context}"
-            )
-            chat_msgs = [
-                system_msg,
-                *(formatted_history if formatted_history else []),
-                context_msg,
-                LlamaChatMessage(role=MessageRole.USER, content=query)
-            ]
-            
-            await report_status("Synthesizing comparative findings and formatting response...")
-            resp = await target_llm.achat(chat_msgs)
-            draft_content = clean_response(resp.message.content)
-
-            # Self-Correction Loop with Rubric Grader
-            try:
-                await report_status("Auditing factual grounding and citations with AI Rubric...")
-                rubric_res = await evaluate_response_grounding(
-                    query=query,
-                    sources_context=full_docs_context,
-                    draft_response=draft_content,
-                    llm=target_llm
-                )
-
-                # If grounded or acceptable score, return draft directly
-                if rubric_res.is_grounded or rubric_res.grounding_score >= 0.8:
-                    return draft_content
-
-                # If ungrounded with actionable revision feedback, execute single bounded self-correction
-                if rubric_res.revision_instruction:
-                    await report_status("Refining and correcting factual citations...")
-                    revision_prompt = (
-                        f"{system_prompt_text}\n\n"
-                        "CRITICAL AUDIT FEEDBACK (SELF-CORRECTION REQUIRED):\n"
-                        f"Your previous draft failed the academic grounding rubric:\n"
-                        f"- Issues: {json.dumps(rubric_res.hallucinated_claims, ensure_ascii=False)}\n"
-                        f"- Revision Instruction: {rubric_res.revision_instruction}\n\n"
-                        "Please rewrite the response to be 100% truthful, strictly aligned with the provided documents, and fix all citation tags."
-                    )
-                    revised_chat_msgs = [
-                        LlamaChatMessage(role=MessageRole.SYSTEM, content=revision_prompt),
-                        *(formatted_history if formatted_history else []),
-                        context_msg,
-                        LlamaChatMessage(role=MessageRole.USER, content=query)
-                    ]
-                    revised_resp = await target_llm.achat(revised_chat_msgs)
-                    return clean_response(revised_resp.message.content)
-            except Exception as grade_err:
-                logger.warning(f"[RAG Engine] Rubric audit bypassed due to error: {grade_err}")
-
-            return draft_content
-
-        # 5. Agentic path for complex workflows
+        # 5. Agentic path for complex multi-tool workflows
         await report_status("Executing agent reasoning & searching academic sources...")
         agent = ReActAgent(
             tools=[local_search_tool, web_tool, doi_tool], 

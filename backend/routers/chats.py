@@ -137,74 +137,19 @@ def toggle_pin_chat(chat_id: str, payload: models.PinChatRequest, db: Session = 
 
 @router.delete("/chats/{chat_id}")
 def delete_chat(chat_id: str, db: Session = Depends(get_db)):
-    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-    if not chat:
+    from services.storage_service import delete_chat_session_cascade
+    success = delete_chat_session_cascade(db, chat_id)
+    if not success:
         raise HTTPException(status_code=404, detail="Chat not found")
-        
-    # 1. Clean physical files from disk in uploads directory
-    from helpers import UPLOAD_DIR
-    try:
-        if os.path.exists(UPLOAD_DIR):
-            for fname in os.listdir(UPLOAD_DIR):
-                if fname.startswith(f"{chat_id}_"):
-                    fp = os.path.join(UPLOAD_DIR, fname)
-                    try:
-                        if os.path.isfile(fp):
-                            os.remove(fp)
-                    except Exception:
-                        pass
-    except Exception as e:
-        logger.warning(f"[Delete Chat File Cleanup Warning]: {e}")
-
-    # 2. Clean vectors from Qdrant
-    try:
-        rag.delete_document_vectors(chat_id)
-    except Exception as e:
-        logger.debug(f"[Qdrant Vector Clean Warning]: {e}")
-
-    # 3. Delete all related documents and chat messages explicitly
-    db.query(Document).filter(Document.chat_id == chat_id).delete(synchronize_session=False)
-    db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).delete(synchronize_session=False)
-    
-    # 4. Delete chat session record
-    db.delete(chat)
-    db.commit()
     return {"status": "success", "message": "Chat deleted"}
 
 @router.post("/chats/bulk-delete")
 def bulk_delete_chats(payload: models.BulkDeleteChatsRequest, db: Session = Depends(get_db)):
+    from services.storage_service import delete_chat_session_cascade
     deleted_count = 0
-    from helpers import UPLOAD_DIR
-    
     for chat_id in payload.chat_ids:
-        chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-        if not chat:
-            continue
-            
-        # Clean physical files
-        try:
-            if os.path.exists(UPLOAD_DIR):
-                for fname in os.listdir(UPLOAD_DIR):
-                    if fname.startswith(f"{chat_id}_"):
-                        fp = os.path.join(UPLOAD_DIR, fname)
-                        if os.path.isfile(fp):
-                            os.remove(fp)
-        except Exception:
-            pass
-
-        # Clean vectors
-        try:
-            rag.delete_document_vectors(chat_id)
-        except Exception:
-            pass
-
-        # Delete database records
-        db.query(Document).filter(Document.chat_id == chat_id).delete(synchronize_session=False)
-        db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).delete(synchronize_session=False)
-        db.delete(chat)
-        deleted_count += 1
-
-    db.commit()
+        if delete_chat_session_cascade(db, chat_id):
+            deleted_count += 1
     return {"status": "success", "deleted_count": deleted_count}
 
 ALLOWED_ATTACHMENT_EXTENSIONS = {

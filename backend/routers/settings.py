@@ -57,41 +57,9 @@ def get_storage_summary():
 @router.post("/settings/storage/cleanup")
 def cleanup_orphan_storage(db: Session = Depends(get_db)):
     """Scans and deletes orphan files on disk not associated with any active chat session."""
+    from services.storage_service import cleanup_orphan_files_on_disk
     active_chats = set(c.id for c in db.query(ChatSession.id).all())
-    deleted_files = 0
-    freed_bytes = 0
-    
-    # 1. Clean orphan files in uploads/
-    if os.path.exists(UPLOAD_DIR):
-        for fname in os.listdir(UPLOAD_DIR):
-            fp = os.path.join(UPLOAD_DIR, fname)
-            if not os.path.isfile(fp):
-                continue
-            # Check if filename has a chat_id prefix
-            if "_" in fname:
-                cid = fname.split("_", 1)[0]
-                if cid not in active_chats and len(cid) >= 32:
-                    try:
-                        sz = os.path.getsize(fp)
-                        os.remove(fp)
-                        deleted_files += 1
-                        freed_bytes += sz
-                    except Exception:
-                        pass
-
-    # 2. Clean temporary ZIP archives
-    if os.path.exists(TEMP_ZIPS_DIR):
-        for fname in os.listdir(TEMP_ZIPS_DIR):
-            fp = os.path.join(TEMP_ZIPS_DIR, fname)
-            try:
-                if os.path.isfile(fp):
-                    sz = os.path.getsize(fp)
-                    os.remove(fp)
-                    deleted_files += 1
-                    freed_bytes += sz
-            except Exception:
-                pass
-
+    deleted_files, freed_bytes = cleanup_orphan_files_on_disk(active_chats)
     return {
         "status": "success",
         "deleted_files_count": deleted_files,
@@ -330,7 +298,8 @@ def select_llm_model(payload: models.SelectLLMRequest):
             set_key(env_path, "NINEROUTER_MODEL", model_name)
             
         load_dotenv(env_path, override=True)
-        rag.ninerouter_llm, rag.freellm_llm, rag.gemini_llm, rag.groq_llm = rag.create_llm_instances()
+        rag.clear_llm_cache()
+        rag.ninerouter_llm, rag.freellm_llm, rag.gemini_llm, rag.groq_llm = rag.create_llm_instances(force_refresh=True)
         
         return {
             "status": "success",

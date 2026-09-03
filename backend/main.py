@@ -17,8 +17,10 @@ logger = logging.getLogger("uvicorn.error")
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+import asyncio
+
 def heal_legacy_upload_files():
-    """Validates and heals missing or zero-byte metadata files on startup without overwriting valid PDFs."""
+    """Validates and heals missing or zero-byte metadata files in background without blocking server startup."""
     from helpers import get_doc_file_path
     db = SessionLocal()
     try:
@@ -51,7 +53,8 @@ def heal_legacy_upload_files():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    heal_legacy_upload_files()
+    # Run legacy file repair as non-blocking background task so server binds instantly
+    asyncio.create_task(asyncio.to_thread(heal_legacy_upload_files))
     yield
 
 app = FastAPI(title="Not-NotebookLM API", lifespan=lifespan)
@@ -60,11 +63,12 @@ app = FastAPI(title="Not-NotebookLM API", lifespan=lifespan)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
-# Setup dynamic CORS for local dev and cloud deployment
+# Setup secure and explicit CORS configuration
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
 if allowed_origins_env:
     allowed_origins = [orig.strip() for orig in allowed_origins_env.split(",") if orig.strip()]
 else:
+    # Default trusted local development origins (Never default to wildcard in production)
     allowed_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
@@ -72,12 +76,15 @@ else:
         "http://127.0.0.1:8000",
     ]
 
+# Only enable wildcard if explicitly configured by developer in env
+is_wildcard = allowed_origins == ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if allowed_origins != ["*"] else ["*"],
-    allow_credentials=True if allowed_origins != ["*"] else False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins,
+    allow_credentials=not is_wildcard,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept", "Range", "Origin", "X-Requested-With"],
 )
 
 # Include Routers

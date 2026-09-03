@@ -69,6 +69,8 @@ from .streamer import (
 
 from .engine import (
     create_llm_instances,
+    get_llm_factory,
+    clear_llm_cache,
     ingest_document_text,
     ingest_documents_batch,
     ingest_document,
