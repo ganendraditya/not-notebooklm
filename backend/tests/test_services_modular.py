@@ -8,6 +8,7 @@ from services.document_service import extract_and_enrich_uploaded_file, calculat
 from utils.file_utils import sanitize_paper_filename, get_doc_file_path, make_content_disposition
 from utils.text_processing import clean_doi, normalize_title_str, is_valid_academic_title
 from utils.pdf_utils import is_authentic_pdf_bytes
+from rag.formatters import format_clean_response, extract_structured_citations
 
 client = TestClient(app)
 
@@ -54,3 +55,17 @@ def test_services_modular_integration(tmp_path):
     enriched = extract_and_enrich_uploaded_file(str(sample_file), "sample.txt")
     assert enriched["title"] == "sample"
     assert enriched["doi"] == "10.1234/test.2024"
+
+def test_rag_formatters():
+    """Verify clean response formatting and deterministic citation extraction."""
+    raw_response = (
+        "Here is the synthesized analysis of the papers [1].\n\n"
+        "<!-- CITATION_MAP: {\"1\": [\"Exact quote from document 1\"]} -->"
+    )
+    clean_formatted = format_clean_response(raw_response)
+    assert "<!-- CITATION_MAP:" in clean_formatted
+    
+    clean_text, citations = extract_structured_citations(raw_response)
+    assert clean_text == "Here is the synthesized analysis of the papers [1]."
+    assert citations == {"1": ["Exact quote from document 1"]}
+

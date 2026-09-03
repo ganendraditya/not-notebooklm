@@ -46,6 +46,7 @@ from .prompts import (
     get_workspace_analysis_system_prompt,
     get_agentic_system_prompt
 )
+from .formatters import format_clean_response, extract_structured_citations
 from services.rubric_grader_service import evaluate_response_grounding
 from .vector_store import embed_model, vector_store, qdrant_client, delete_document_vectors
 
@@ -537,65 +538,6 @@ async def query_chat(
 
     active_llm, primary_name = candidate_llms[0]
 
-    def clean_response(text: str) -> str:
-        text = re.sub(r'Thought:[\s\S]*?(?=Action:|Answer:|$)', '', text)
-        text = re.sub(r'Action:[\s\S]*?(?=Answer:|$)', '', text)
-        text = re.sub(r'Action Input:[\s\S]*?(?=Answer:|$)', '', text)
-        text = re.sub(r'Observation:[\s\S]*?(?=Answer:|$)', '', text)
-        text = re.sub(r'^Answer:\s*', '', text, flags=re.MULTILINE)
-        
-        # 1. Preserve and separate <!-- CITATION_MAP --> hidden comment at the very end
-        citation_map_comment = ""
-        if "<!-- CITATION_MAP:" in text:
-            parts = text.split("<!-- CITATION_MAP:", 1)
-            text = parts[0]
-            citation_map_comment = "\n\n<!-- CITATION_MAP:" + parts[1]
-
-        # 2. Strip conversational excuses / hallucinations about UI text limitations
-        text = re.sub(r'(?:Antarmuka\s+berbasis\s+teks|The\s+text-based\s+interface)[^\n]*\n+', '', text, flags=re.IGNORECASE)
-        
-        # 3. Strip pseudo-button text hallucinated in tables: e.g. "🔍 Bukti Metode", "🔍 Bukti Temuan", "[Lihat Bukti]"
-        text = re.sub(r'<br\s*/?>\s*🔍\s*Bukti\s*(?:Metode|Temuan|Klaim|Rujukan)[^\n<|]*', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'🔍\s*Bukti\s*(?:Metode|Temuan|Klaim|Rujukan)[^\n<|]*', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'\[(?:Lihat\s+Bukti|Bukti\s+Metode|Bukti\s+Temuan)\](?:\([^)]*\))?', '', text, flags=re.IGNORECASE)
-
-        # 4. Strip heading and text for manual quote sections, verification panels, anchor links (<a id=...>), and bulleted quote lists
-        # Also parse quotes if LLM wrote manual "Bukti Tekstual & Snippet Verifikasi Sumber" in response body into CITATION_MAP
-        text = re.sub(r'<a\s+id=[\'"][^\'"]*[\'"]\s*>\s*(?:</a>)?', '', text, flags=re.IGNORECASE)
-        text = re.sub(r'<a\s+href=[\'"]#[^\'"]*[\'"]\s*>([\s\S]*?)</a>', r'\1', text, flags=re.IGNORECASE)
-
-        # Extract manual snippets into citation_map before stripping if CITATION_MAP wasn't generated
-        manual_quotes_match = re.search(
-            r'(?:#{1,4}\s*(?:Bukti\s+Tekstual|Teks\s+Sitasi|Verifikasi\s+Teks|Panel\s+Verifikasi|Highlight\s+Bukti|Kutipan\s+Rujukan|Bukti\s+Klaim|Bukti\s+Kutipan|Kutipan\s+Verbatim)[\s\S]*)$',
-            text,
-            flags=re.IGNORECASE
-        )
-        if manual_quotes_match:
-            manual_section = manual_quotes_match.group(0)
-            text = text[:manual_quotes_match.start()].rstrip()
-            
-            if not citation_map_comment:
-                extracted_quotes = {}
-                # Match patterns like "Sumber: [7]" or "[7]" followed by quoted snippet
-                doc_blocks = re.split(r'(?:Sumber:\s*|Dokumen:\s*)?\[(\d{1,3})\]', manual_section)
-                for b_idx in range(1, len(doc_blocks), 2):
-                    num = doc_blocks[b_idx]
-                    b_content = doc_blocks[b_idx + 1] if b_idx + 1 < len(doc_blocks) else ""
-                    # Find text in double quotes inside this block
-                    found_quotes = re.findall(r'"([^"]{25,})"', b_content)
-                    if not found_quotes:
-                        found_quotes = [
-                            s.strip() for s in b_content.splitlines() 
-                            if len(s.strip()) >= 30 and not re.search(r'^(?:Snippet|Sumber|Dokumen|http|\d+\.)', s.strip(), re.I)
-                        ]
-                    if found_quotes:
-                        extracted_quotes[num] = found_quotes
-                if extracted_quotes:
-                    citation_map_comment = f"\n\n<!-- CITATION_MAP: {json.dumps(extracted_quotes, ensure_ascii=False)} -->"
-
-        text = text.strip() + citation_map_comment
-        return text.strip()
-
     async def execute_agent(target_llm, timeout_sec=60.0):
         intent = await classify_user_intent(query, has_local_docs, len(local_docs), target_llm)
         print(f"[RAG Engine] LLM Semantic Intent: {intent}")
@@ -604,7 +546,7 @@ async def query_chat(
         if intent == "GENERAL_CHAT":
             from .pipelines.chat_pipeline import handle_general_chat_pipeline
             raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status)
-            return clean_response(raw_res)
+            return format_clean_response(raw_res)
 
         # 2. Handle Explicit Source Removal Intent
         if intent == "REMOVE_SOURCES" and has_local_docs:
@@ -617,9 +559,9 @@ async def query_chat(
             raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status)
             if "<!-- SOURCES_DATA:" in raw_res:
                 parts = raw_res.split("<!-- SOURCES_DATA:", 1)
-                cleaned_text = clean_response(parts[0])
+                cleaned_text = format_clean_response(parts[0])
                 return f"{cleaned_text}\n\n<!-- SOURCES_DATA:{parts[1]}"
-            return clean_response(raw_res)
+            return format_clean_response(raw_res)
 
         # 4. Direct Full-Context Synthesis for workspace documents
         if intent == "ANALYZE_WORKSPACE" and has_local_docs:
@@ -630,8 +572,7 @@ async def query_chat(
                 local_docs=local_docs,
                 formatted_history=formatted_history,
                 target_llm=target_llm,
-                report_status=report_status,
-                clean_response_fn=clean_response
+                report_status=report_status
             )
 
         # 5. Agentic path for complex multi-tool workflows
@@ -646,7 +587,7 @@ async def query_chat(
             system_prompt=get_agentic_system_prompt(doc_context_info)
         )
         res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
-        return clean_response(str(res))
+        return format_clean_response(str(res))
 
     last_err = None
     for cand_idx, (curr_llm, curr_name) in enumerate(candidate_llms):

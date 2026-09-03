@@ -2,11 +2,12 @@ import os
 import json
 import asyncio
 import logging
-from typing import List, Dict, Any
+from typing import List, Tuple
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 from database import SessionLocal, Document as DBDocument
-from rag.parsers import parse_document_to_markdown
 from rag.prompts import get_workspace_analysis_system_prompt
+from rag.formatters import format_clean_response
+from utils.file_utils import get_doc_file_path
 from services.rubric_grader_service import evaluate_response_grounding
 from utils.file_utils import get_doc_file_path
 
@@ -112,8 +113,7 @@ async def handle_workspace_analysis_pipeline(
     local_docs: List[str],
     formatted_history: List[LlamaChatMessage],
     target_llm,
-    report_status,
-    clean_response_fn
+    report_status
 ) -> str:
     """Direct full-context comparative synthesis for loaded workspace documents."""
     await report_status("Reading full content of all loaded documents...")
@@ -157,7 +157,7 @@ async def handle_workspace_analysis_pipeline(
     
     await report_status("Synthesizing comparative findings and formatting response...")
     resp = await target_llm.achat(chat_msgs)
-    draft_content = clean_response_fn(resp.message.content)
+    draft_content = format_clean_response(resp.message.content)
 
     # Self-Correction Loop with Rubric Grader
     try:
@@ -189,7 +189,7 @@ async def handle_workspace_analysis_pipeline(
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
             revised_resp = await target_llm.achat(revised_chat_msgs)
-            return clean_response_fn(revised_resp.message.content)
+            return format_clean_response(revised_resp.message.content)
     except Exception as grade_err:
         logger.warning(f"[Workspace Pipeline] Rubric audit bypassed due to error: {grade_err}")
 
