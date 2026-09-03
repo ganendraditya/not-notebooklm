@@ -13,17 +13,19 @@ import {
   FileText,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { Document as DocType } from "@/stores/documentStore";
+import { PaperDetailData } from "@/hooks/usePaperDetails";
 
 export interface DocumentReaderProps {
-  viewingDoc: any;
-  paperDetails: any;
+  viewingDoc: DocType | null;
+  paperDetails: PaperDetailData | null;
   isLoadingDetails: boolean;
   activeTab: "preview" | "pdf";
   setActiveTab: (tab: "preview" | "pdf") => void;
   onClose: () => void;
-  setViewingDoc: (doc: any | null) => void;
+  setViewingDoc: (doc: DocType | null) => void;
   onClearViewingDoc?: () => void;
-  onAskAboutDocument?: (doc: any, title?: string) => void;
+  onAskAboutDocument?: (doc: DocType, title?: string) => void;
   backendUrl: string;
   activeChatId: string | null;
   totalMatches: number;
@@ -123,7 +125,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
             <div className="flex items-center gap-2 min-w-0">
               <span className={`w-2 h-2 rounded-full shrink-0 ${paperDetails?.has_full_pdf ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
               <span className="truncate max-w-[170px] font-mono text-[11px] text-app-text-muted">
-                {viewingDoc.filename}
+                {viewingDoc?.filename || ""}
               </span>
             </div>
 
@@ -362,7 +364,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
             {copiedLink ? <Check size={14} className="text-emerald-500" /> : <LinkIcon size={14} />}
           </button>
 
-          {activeChatId && (() => {
+          {activeChatId && viewingDoc && (() => {
             const isDownloadable = Boolean(!isLoadingDetails && paperDetails?.has_full_pdf);
             if (!isDownloadable) {
               return (

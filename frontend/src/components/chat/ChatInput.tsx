@@ -76,9 +76,17 @@ export const ChatInputBox = memo(function ChatInputBox({
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [storageWarningFile, setStorageWarningFile] = useState<{ filename: string; size: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showAttachmentError = (msg: string) => {
+    setAttachmentError(msg);
+    setTimeout(() => {
+      setAttachmentError(prev => (prev === msg ? null : prev));
+    }, 4000);
+  };
 
   const [isDragActive, setIsDragActive] = useState(false);
 
@@ -161,7 +169,7 @@ export const ChatInputBox = memo(function ChatInputBox({
     const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
 
     if (attachments.length >= MAX_ATTACHMENTS) {
-      alert(`Maximum ${MAX_ATTACHMENTS} file attachments allowed per prompt.`);
+      showAttachmentError(`Maximum ${MAX_ATTACHMENTS} file attachments allowed per prompt.`);
       return;
     }
 
@@ -177,7 +185,7 @@ export const ChatInputBox = memo(function ChatInputBox({
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
       
       if (file.size > MAX_FILE_SIZE_BYTES) {
-        alert(`File "${file.name}" exceeds the 25MB maximum size limit.`);
+        showAttachmentError(`File "${file.name}" exceeds the 25MB maximum size limit.`);
         continue;
       }
 
@@ -450,6 +458,22 @@ export const ChatInputBox = memo(function ChatInputBox({
         </div>
       )}
 
+      {attachmentError && (
+        <div className="mb-2 px-3.5 py-2 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-between gap-2 text-xs text-red-400 animate-in fade-in slide-in-from-bottom-1 duration-150">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold text-red-300">Notice:</span>
+            <span className="truncate">{attachmentError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAttachmentError(null)}
+            className="p-1 text-red-400/70 hover:text-red-300 rounded hover:bg-red-500/20 transition-colors shrink-0"
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
       {targetedSource && (
         <div className="mb-2 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-between gap-2 animate-in fade-in duration-200">
           <div className="flex items-center gap-2 min-w-0">
@@ -532,6 +556,7 @@ export const ChatInputBox = memo(function ChatInputBox({
           </div>
         )}
         <textarea
+          id="chat-input-textarea"
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}

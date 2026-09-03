@@ -9,6 +9,7 @@ export interface Document {
   index?: number;
   has_full_pdf?: boolean;
   is_oa?: boolean;
+  content?: string;
 }
 
 export interface TargetedSource {

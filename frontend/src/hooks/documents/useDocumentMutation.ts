@@ -92,12 +92,11 @@ export function useDocumentMutation({
         }
         return true;
       } else {
-        alert(t("right.deleteError") || "Error deleting documents");
+        console.error("Bulk delete failed:", res.status);
         return false;
       }
     } catch (err) {
       console.error("Bulk delete error:", err);
-      alert(t("right.deleteError") || "Error deleting documents");
       return false;
     } finally {
       setIsBulkDeleting(false);

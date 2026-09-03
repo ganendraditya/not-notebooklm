@@ -62,14 +62,6 @@ class LRUMetadataCache:
 
 _PAPER_METADATA_CACHE = LRUMetadataCache(capacity=500)
 
-def is_valid_academic_title(title: str) -> bool:
-    from utils.text_processing import is_valid_academic_title
-    return is_valid_academic_title(title)
-
-async def plan_academic_search(query: str, history: Optional[List[LlamaChatMessage]] = None, llm: Optional[LLM] = None) -> dict:
-    from services.search.llm_evaluator_service import plan_academic_search
-    return await plan_academic_search(query, history, llm)
-
 def get_existing_notebook_sources_signatures(chat_id: str) -> dict:
     """
     Scans all existing documents in this chat (from DB and disk) and returns
@@ -230,119 +222,34 @@ def search_academic_papers_planned(
             c_doi = doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
             seen_dois.add(c_doi)
 
+    # Build domain-agnostic search keywords from queries and plan
+    raw_query_texts = [en_query, id_query, plan.get("native_query", "")]
+    core_search_tokens = set()
+    stop_words = {
+        "the", "and", "for", "with", "from", "that", "this", "study", "analysis",
+        "paper", "journal", "research", "using", "based", "effect", "effects",
+        "dan", "dari", "yang", "untuk", "pada", "dalam", "dengan", "studi", "analisis"
+    }
+    for q_txt in raw_query_texts:
+        if q_txt:
+            for word in re.findall(r'[a-zA-Z0-9_\-\u00C0-\u024F]+', q_txt.lower()):
+                if len(word) >= 3 and word not in stop_words:
+                    core_search_tokens.add(word)
+
     def is_matching_topic_local(title: str, snippet: str) -> bool:
-        t_low = title.lower()
-        full = f"{title} {snippet}".lower()
+        """
+        Domain-agnostic candidate relevance filter.
+        Ensures the candidate shares meaningful semantic overlap with the search query.
+        Fine-grained ranking and deep relevance is handled by the LLM Judge.
+        """
+        if not core_search_tokens:
+            return True
+
+        cand_text = f"{title} {snippet}".lower()
+        cand_words = set(re.findall(r'[a-zA-Z0-9_\-\u00C0-\u024F]+', cand_text))
         
-        junk_topics = [
-            "homosexuality", "fandom", "fandoms", " fan ", " fans ", "suporter", "supporter",
-            "schadenfreude", "hukum pidana", "suap", "penegakan hukum", "kiosks", "ticket pricing",
-            "university admission", "admissions", "advertisements", "marketing", "racism",
-            "critical race theory", "chaplaincy", "nicknames", "laporan keuangan", "political economy",
-            "competition law", "collective selling", "men's health", "covid-19 pandemic and the social",
-            "football star", "psikososial", "kecemasan pra-kompetitif", "aerodynamic comparison"
-        ]
-        if any(j in full for j in junk_topics):
-            return False
-
-        # Strict entity validation for focused subject queries (e.g. Prabowo, Jokowi, COVID, etc.)
-        subject_keywords = []
-        for q_src in [en_query, id_query]:
-            clean_q = re.sub(r'\b(sentiment|sentimen|analysis|analisis|classification|klasifikasi|mining|study|studi|jurnal|paper|makalah|indonesia|public|publik)\b', '', q_src, flags=re.I)
-            words = [w.strip().lower() for w in clean_q.split() if len(w.strip()) >= 3]
-            for w in words:
-                if w not in subject_keywords:
-                    subject_keywords.append(w)
-
-        if subject_keywords:
-            # If the user specified distinctive subject keywords, at least one must match the candidate
-            has_subject = any(sk in full for sk in subject_keywords)
-            if not has_subject:
-                return False
-
-        # Rainfall / Precipitation domain topic validation
-        if any(k in en_query.lower() or k in id_query.lower() for k in ["rainfall", "curah hujan", "precipitation", "rain"]):
-            rain_terms = [
-                "rainfall", "curah hujan", "precipitation", "hujan", "rain", "presipitasi", "rainy", "pluvial"
-            ]
-            has_rain = any(r in full for r in rain_terms)
-            
-            predict_terms = [
-                "predict", "prediksi", "forecast", "forecasting", "peramalan", "prakiraan", 
-                "estimat", "model", "lstm", "arima", "deep learning", "machine learning", 
-                "neural", "xgboost", "catboost", "random forest", "prophet", "nowcast", "time series", "deret waktu"
-            ]
-            has_predict = any(p in full for p in predict_terms)
-            
-            # Reject clear non-rainfall targets (e.g. covid, disease, wildfire, purely general flood depth)
-            unrelated_targets = [
-                "covid-19", "covid", "leishmaniasis", "leishmania", "mortality", "visceral", 
-                "fire in", "fires in", "karhutla", "wildfire"
-            ]
-            if any(u in full for u in unrelated_targets):
-                return False
-                
-            return has_rain and has_predict
-
-        # Road Damage Detection domain topic validation
-        if any(k in en_query.lower() or k in id_query.lower() for k in ["road damage", "kerusakan jalan", "pothole", "lubang jalan", "retak jalan", "pavement distress", "pavement damage"]):
-            road_terms = ["road", "jalan", "pavement", "perkerasan", "asphalt", "aspal", "highway"]
-            has_road = any(r in full for r in road_terms)
-            
-            damage_terms = [
-                "damage", "kerusakan", "defect", "distress", "pothole", "lubang", 
-                "crack", "retak", "retakan", "alligator", "rutting", "ravelling", "bleeding", "pavement condition"
-            ]
-            has_damage = any(d in full for d in damage_terms)
-
-            ai_vision_terms = [
-                "detection", "deteksi", "segmentation", "segmentasi", "classification", "klasifikasi",
-                "yolo", "cnn", "deep learning", "machine learning", "computer vision", "pengolahan citra",
-                "image processing", "u-net", "resnet", "object detection", "mask r-cnn", "vision transformer", "vit"
-            ]
-            has_ai_vision = any(a in full for a in ai_vision_terms)
-            
-            # Reject clear irrelevant targets that mention "jalan" or "crack" or "yolo" in unrelated contexts:
-            # - Dinding / Tembok / Bangunan gedung (structural wall cracks)
-            # - Kereta api / Perkeretaapian / JPL / Lintasan rel kereta
-            # - Sampah / Kebersihan lingkungan (trash on roads)
-            # - Kendaraan / Mobil / Tol / Golongan kendaraan (vehicle counting, toll classification)
-            # - Jembatan non-jalan (pure bridge cable / pier)
-            unrelated_road = [
-                "dinding", "tembok", "bangunan gedung", "perumahan", "cracksafe",
-                "kereta", "perkeretaapian", "rel kereta", "jpl", "gerbong", "lokomotif",
-                "sampah", "tumpukan sampah", "sungai", "kebersihan",
-                "golongan kendaraan", "beban kendaraan", "volume kendaraan", "gerbang tol", "kemacetan", "esal",
-                "avanza", "toyota", "penerangan", "lampu", "solar", "lora", "buku ajar", "sistem pakar mobil"
-            ]
-            if any(u in full for u in unrelated_road):
-                return False
-
-            return has_road and has_damage and has_ai_vision
-
-        if any(k in en_query.lower() or k in id_query.lower() for k in ["sentiment", "sentimen", "opinion", "opini"]):
-            sentiment_keys = [
-                "sentiment", "sentimen", "opinion", "opini", "ulasan", 
-                "emotion", "emosi", "polarity", "polaritas", "sarcasm", "sarkasme", 
-                "aspect-based", "absa", "vader"
-            ]
-            return any(k in t_low for k in sentiment_keys) or any(k in full for k in ["sentiment analysis", "analisis sentimen", "opinion mining", "sentiment classification", "aspect-based sentiment", "aspect sentiment", "sentiment prediction"])
-        
-        if any(k in en_query.lower() or k in id_query.lower() for k in ["football", "soccer", "premier league", "sepak bola", "match outcome", "match result", "sports"]):
-            sports_terms = ["football", "soccer", "premier league", "match", "pertandingan", "league", "liga", "sports", "olahraga", "cricket", "basketball", "epl", "fifa"]
-            has_sports = any(s in full for s in sports_terms)
-            
-            ml_terms = [
-                "predict", "prediksi", "outcome", "forecast", "machine learning", "deep learning", 
-                "neural", "model", "modelling", "modeling", "rating", "elo", "poisson", "xg", 
-                "expected goals", "performance", "classification", "klasifikasi", "algorithm", 
-                "analytics", "data", "betting", "odds", "probabilit", "benchmark", "ensemble",
-                "adaboost", "random forest", "xgboost", "svm", "time series", "state-space", "bradley-terry"
-            ]
-            has_ml = any(m in full for m in ml_terms)
-            return has_sports and has_ml
-            
-        return True
+        # Check if candidate shares at least one core search token
+        return bool(core_search_tokens.intersection(cand_words))
 
     target_languages = plan.get("languages") or []
     native_query = plan.get("native_query") or plan.get("id_query") or en_query

@@ -105,7 +105,7 @@ def resolve_landing_page_pdf(clean_doi: str, direct_url: str) -> Optional[bytes]
         resp = requests.get(landing_target, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        }, timeout=12.0, allow_redirects=True, verify=False)
+        }, timeout=12.0, allow_redirects=True)
         if resp.status_code == 200:
             html = resp.text
             final_url = resp.url

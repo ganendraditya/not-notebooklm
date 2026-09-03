@@ -21,6 +21,20 @@ import { parseCitationsInReactNode, CitationContext } from "./CitationParser";
 import { FileText, Image as ImageIcon } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 
+export interface AcademicCandidateSource {
+  title?: string;
+  year?: string | number;
+  authors?: string[];
+  journal?: string;
+  doi?: string;
+  url?: string;
+  pdf_url?: string;
+  snippet?: string;
+  abstract?: string;
+  is_oa?: boolean;
+  citation_count?: number;
+}
+
 export interface InChatMessageProps {
   msg: ChatMessage;
   activeChatId: string | null;
@@ -53,7 +67,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     const citationMapMatch = msg.content.match(/<!-- CITATION_MAP:\s*([\s\S]*?)\s*-->/);
 
     let clean = msg.content;
-    let parsedSources: any[] = [];
+    let parsedSources: AcademicCandidateSource[] = [];
     let parsedCitationMap: Record<string, string[]> = {};
     
     if (sourcesMatch) {
@@ -83,7 +97,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     return { cleanContent: clean, sources: parsedSources, citationMap: parsedCitationMap };
   }, [msg.content]);
 
-  const isDuplicateSource = useCallback((src: any) => {
+  const isDuplicateSource = useCallback((src: AcademicCandidateSource) => {
     if (!documents || documents.length === 0) return false;
     const normalize = (s: string) => s.replace(/\.pdf$/i, "").replace(/[^a-zA-Z0-9\s]/g, " ").toLowerCase().trim().replace(/\s+/g, " ");
     const srcNorm = normalize(src.title || "");
@@ -111,7 +125,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   const [isImporting, setIsImporting] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const isSourceChecked = useCallback((src: any, index: number) => {
+  const isSourceChecked = useCallback((src: AcademicCandidateSource, index: number) => {
     if (isDuplicateSource(src)) return false;
     if (userSelectionOverrides[index] !== undefined) {
       return userSelectionOverrides[index];

@@ -1,5 +1,6 @@
 import React from "react";
 import { Document } from "@/stores/documentStore";
+import { PaperDetailData } from "@/hooks/usePaperDetails";
 import { AddSourcesModal } from "./AddSourcesModal/AddSourcesModal";
 import { CitationModal } from "./CitationModal";
 import { BulkDeleteModal } from "./BulkDeleteModal";
@@ -23,7 +24,7 @@ interface RightSidebarModalsProps {
   // Citation Modal Props
   isCiteModalOpen: boolean;
   setIsCiteModalOpen: (open: boolean) => void;
-  paperDetails: any;
+  paperDetails: PaperDetailData | null;
   viewingDoc: Document | null;
 
   // Bulk Delete Modal Props
@@ -103,7 +104,7 @@ export const RightSidebarModals: React.FC<RightSidebarModalsProps> = ({
         citations={generateCitations(
           paperDetails?.title || ((viewingDoc as any)?.filename || "paper") || "",
           paperDetails?.authors || [],
-          paperDetails?.year || "2024",
+          paperDetails?.year || new Date().getFullYear().toString(),
           paperDetails?.journal || "",
           paperDetails?.doi || "",
           paperDetails?.url || (paperDetails?.doi ? "https://doi.org/$" : "")

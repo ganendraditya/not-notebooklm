@@ -177,10 +177,10 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                                 document.body.removeChild(link);
                                 window.URL.revokeObjectURL(url);
                               } else {
-                                alert("Failed to download document");
+                                console.error("Failed to download document: status", res.status);
                               }
                             } catch (err) {
-                              console.error(err);
+                              console.error("Download error:", err);
                             }
                           }}
                           className="w-full text-left px-3 py-1.5 text-xs text-app-text hover:bg-app-item-hover transition-colors flex items-center gap-2"

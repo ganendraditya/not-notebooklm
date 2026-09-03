@@ -1,12 +1,15 @@
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text, Boolean, event
 from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 import sqlite3
 
 logger = logging.getLogger("uvicorn.error")
+
+def get_utc_now():
+    return datetime.now(timezone.utc)
 
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "not_notebooklm.db"))
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
@@ -45,8 +48,8 @@ class ChatSession(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())) # UUID string
     title = Column(String, default="New Chat")
     is_pinned = Column(Boolean, default=False, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
     
     documents = relationship("Document", back_populates="chat_session")
     messages = relationship("ChatMessage", back_populates="chat_session", order_by="ChatMessage.created_at")
@@ -57,7 +60,7 @@ class Document(Base):
     id = Column(Integer, primary_key=True, index=True)
     chat_id = Column(String, ForeignKey("chat_sessions.id"))
     filename = Column(String, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
     
     # Persistent metadata (populated at import time, never overwritten by re-parsing)
     title = Column(Text, nullable=True)
@@ -70,7 +73,7 @@ class Document(Base):
     pdf_url = Column(String, nullable=True)
     abstract = Column(Text, nullable=True)
     abstract_type = Column(String, nullable=True)  # "official" or "ai_summary"
-    is_oa = Column(Boolean, nullable=True, default=True)
+    is_oa = Column(Boolean, nullable=True, default=None)
     access_status = Column(String, nullable=True)
     snippet = Column(Text, nullable=True)
     venue = Column(String, nullable=True)
@@ -89,7 +92,7 @@ class ChatMessage(Base):
     attachments_json = Column(Text, nullable=True) # store attachments JSON
     variants_json = Column(Text, nullable=True) # JSON list of string variants [v1, v2, ...]
     active_variant_index = Column(Integer, default=0, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=get_utc_now)
     
     chat_session = relationship("ChatSession", back_populates="messages")
 

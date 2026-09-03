@@ -31,7 +31,7 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0) -> Option
     }
     
     try:
-        resp = requests.get(pdf_url, headers=headers, timeout=timeout_sec, allow_redirects=True, verify=False)
+        resp = requests.get(pdf_url, headers=headers, timeout=timeout_sec, allow_redirects=True)
         if resp.status_code == 200:
             data = resp.content
             if is_authentic_pdf_bytes(data, min_size=1000):
@@ -42,7 +42,7 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0) -> Option
                 meta_pdf = re.search(r'<meta\s+[^>]*?name=["\'](?:citation_pdf_url|eprints\.document_url)["\'][^>]*?content=["\'](.*?)["\']', html_text, re.I)
                 if meta_pdf and meta_pdf.group(1).startswith("http") and meta_pdf.group(1) != pdf_url:
                     return try_fetch_open_access_pdf(meta_pdf.group(1), timeout_sec=timeout_sec)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug(f"Failed to fetch OA PDF from {pdf_url}: {e}")
 
     return None

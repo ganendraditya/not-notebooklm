@@ -1,5 +1,6 @@
 import { useRef, useEffect } from "react";
-import { type ChatSession } from "@/stores/chatStore";
+import { type ChatSession, type ChatMessage } from "@/stores/chatStore";
+import { type Document, type PendingSourceItem, type TargetedSource } from "@/stores/documentStore";
 
 export function useChatSession(
   backendUrl: string,
@@ -7,11 +8,11 @@ export function useChatSession(
   setSessions: (sessions: ChatSession[]) => void,
   activeChatId: string | null,
   setActiveChatId: (id: string | null) => void,
-  setDocuments: (docs: any[]) => void,
-  setPendingSources: (sources: any[]) => void,
-  setMessages: (messages: any[]) => void,
-  setTargetedSource: (source: any) => void,
-  setViewingDoc: (doc: any) => void,
+  setDocuments: (docs: Document[]) => void,
+  setPendingSources: (sources: PendingSourceItem[]) => void,
+  setMessages: (messages: ChatMessage[]) => void,
+  setTargetedSource: (source: TargetedSource | null) => void,
+  setViewingDoc: (doc: Document | null) => void,
   setQueuedPrompts: (prompts: string[]) => void,
   setIsLoading: (loading: boolean) => void,
   setActiveStatus: (status: string | null) => void,

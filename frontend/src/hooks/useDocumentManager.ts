@@ -30,9 +30,9 @@ export function useDocumentManager({
   onDocumentDeleted?: (id: number) => void;
   onBulkDocumentsDeleted?: (ids: number[]) => void;
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
-  viewingDoc?: any;
-  setViewingDoc?: any;
-  t: any;
+  viewingDoc?: Document | null;
+  setViewingDoc?: (doc: Document | null) => void;
+  t: (key: string) => string;
 }) {
   // Modal states that bridge multiple logics
   const [isAddSourcesModalOpen, setIsAddSourcesModalOpen] = useState(false);

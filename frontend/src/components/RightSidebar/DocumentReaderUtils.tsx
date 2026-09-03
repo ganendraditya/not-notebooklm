@@ -505,7 +505,7 @@ export function getHighlightedContent(
 
 export const formatReadableDate = (dateStr?: string, yearFallback?: string) => {
   if (!dateStr && !yearFallback) return "Recent publication";
-  if (!dateStr) return yearFallback || "2024";
+  if (!dateStr) return yearFallback || new Date().getFullYear().toString();
   
   if (/^\d{4}$/.test(dateStr.trim())) {
     return dateStr.trim();

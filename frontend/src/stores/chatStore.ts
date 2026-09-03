@@ -14,8 +14,10 @@ export interface Attachment {
   url?: string;
 }
 
+export type MessageRole = "user" | "assistant" | "system";
+
 export interface ChatMessage {
-  role: string;
+  role: MessageRole;
   content: string;
   created_at: string;
   attachments?: Attachment[];

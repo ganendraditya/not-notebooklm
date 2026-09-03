@@ -152,6 +152,72 @@ def test_network_failure_fallback_graceful(monkeypatch):
         "language_preference": "en"
     }
     
+    # Must execute safely and return an empty list without unhandled exception
+    results = search_academic_papers_planned(plan)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+def test_sse_streaming_endpoint_flow(monkeypatch):
+    """Verify SSE streaming endpoints emit structured SSE events without regression."""
+    import rag
+    
+    async def mock_query_chat(chat_id, message, chat_history=None, status_callback=None):
+        if status_callback:
+            await status_callback("Mock thinking step...")
+        return "This is a mocked assistant response."
+        
+    monkeypatch.setattr(rag, "query_chat", mock_query_chat)
+    
+    # 1. Create a chat session
+    res_chat = client.post("/chats", json={"title": "SSE Stream Test Chat"})
+    assert res_chat.status_code == 200
+    chat_id = res_chat.json()["id"]
+    
+    # 2. Test send_message_stream SSE endpoint (/message/stream)
+    res_stream = client.post(
+        f"/chats/{chat_id}/message/stream",
+        json={"message": "Hello AI"}
+    )
+    assert res_stream.status_code == 200
+    assert "text/event-stream" in res_stream.headers.get("content-type", "")
+    body_text = res_stream.text
+    assert "data: " in body_text
+    assert "Mock thinking step..." in body_text
+    assert "This is a mocked assistant response." in body_text
+    
+    # 3. Clean up
+    client.delete(f"/chats/{chat_id}")
+    
+def test_rag_history_and_attachment_preparation():
+    """Verify format_llama_history cleans hidden markers and prepare_query_attachments appends attachments."""
+    from rag.engine import format_llama_history, prepare_query_attachments
+    from llama_index.core.llms import MessageRole
+    
+    # 1. Format history with source comments
+    raw_history = [
+        {"role": "user", "content": "What is AI?"},
+        {"role": "assistant", "content": "AI is artificial intelligence. <!-- SOURCES_DATA: [{'doi': '10.123/456'}] -->"}
+    ]
+    llama_hist = format_llama_history(raw_history)
+    assert len(llama_hist) == 2
+    assert llama_hist[0].role == MessageRole.USER
+    assert llama_hist[1].role == MessageRole.ASSISTANT
+    assert "<!-- SOURCES_DATA" not in llama_hist[1].content
+    assert llama_hist[1].content == "AI is artificial intelligence."
+    
+    # 2. Prepare attachments
+    user_query = "Summarize this paper."
+    user_chat_history = [
+        {
+            "role": "user",
+            "content": "Summarize this paper.",
+            "attachments": [{"filename": "sample_draft.txt", "type": "document", "url": ""}]
+        }
+    ]
+    prepared = prepare_query_attachments(user_query, user_chat_history)
+    assert "[Attachments Provided by User:]" in prepared
+    assert "Document attached: sample_draft.txt" in prepared
+
 def test_doi_cleaning_and_pdf_validation():
     """Verify clean_doi standardizes strings and is_authentic_pdf_bytes filters synthetic PDFs."""
     from helpers import clean_doi, is_authentic_pdf_bytes

@@ -20,8 +20,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Portal } from "@/components/ui/Portal";
-import { ChatMessage } from "@/stores/chatStore";
-import { Document as DocType, TargetedSource } from "@/stores/documentStore";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { RenameDialog } from "@/components/ui/RenameDialog";
+import { ChatMessage, useChatStore } from "@/stores/chatStore";
+import { Document as DocType, TargetedSource, useDocumentStore } from "@/stores/documentStore";
 import { InChatMessageComponent } from "./chat/ChatMessageItem";
 import { UserMessageBubble } from "./chat/UserMessageBubble";
 import { ChatInputBox, Attachment } from "./chat/ChatInput";
@@ -30,7 +32,7 @@ import { useTranslation } from "@/lib/i18n";
 
 interface ChatAreaProps {
   activeChatId: string | null;
-  messages: ChatMessage[];
+  messages?: ChatMessage[];
   isLoading?: boolean;
   onSendMessage: (message: string, attachments?: Attachment[]) => void;
   onEditMessage?: (messageIndex: number, newContent: string) => void;
@@ -38,7 +40,7 @@ interface ChatAreaProps {
   queuedPrompts?: string[];
   onRemoveQueuedPrompt?: (index: number) => void;
   onPromoteQueuedPrompt?: (index: number) => void;
-  documents: DocType[];
+  documents?: DocType[];
   onDocumentAdded?: (doc: DocType, targetChatId?: string) => void;
   onAddPendingSources?: (items: { id: string; filename: string; type: "file" | "doi"; status: "uploading" }[]) => void;
   onResolvePendingSource?: (pendingId: string) => void;
@@ -65,15 +67,15 @@ interface ChatAreaProps {
 
 export default function ChatArea({ 
   activeChatId, 
-  messages, 
-  isLoading, 
+  messages: propMessages, 
+  isLoading: propIsLoading, 
   onSendMessage, 
   onEditMessage,
   onStopGeneration,
-  queuedPrompts = [],
+  queuedPrompts: propQueuedPrompts,
   onRemoveQueuedPrompt,
   onPromoteQueuedPrompt,
-  documents, 
+  documents: propDocuments, 
   onDocumentAdded, 
   onAddPendingSources,
   onResolvePendingSource,
@@ -84,9 +86,9 @@ export default function ChatArea({
   onOpenSidebar,
   isRightSidebarOpen = true,
   onToggleRightSidebar,
-  targetedSource,
+  targetedSource: propTargetedSource,
   onClearTargetedSource,
-  activeStatus,
+  activeStatus: propActiveStatus,
   activeCitationKey,
   onRenameChat,
   onDeleteChat,
@@ -98,13 +100,28 @@ export default function ChatArea({
   onOpenStorage
 }: ChatAreaProps) {
   const { t } = useTranslation();
+  
+  // Zustand Store Selectors (Eliminate Prop Drilling)
+  const storeMessages = useChatStore((s) => s.messages);
+  const storeIsLoading = useChatStore((s) => s.isLoading);
+  const storeActiveStatus = useChatStore((s) => s.activeStatus);
+  const storeQueuedPrompts = useChatStore((s) => s.queuedPrompts);
+  const storeDocuments = useDocumentStore((s) => s.documents);
+  const storeTargetedSource = useDocumentStore((s) => s.targetedSource);
+
+  const messages = propMessages ?? storeMessages;
+  const isLoading = propIsLoading ?? storeIsLoading;
+  const activeStatus = propActiveStatus ?? storeActiveStatus;
+  const queuedPrompts = propQueuedPrompts ?? storeQueuedPrompts;
+  const documents = propDocuments ?? storeDocuments;
+  const targetedSource = propTargetedSource ?? storeTargetedSource;
+
   const [copiedMessageIdx, setCopiedMessageIdx] = useState<number | null>(null);
   const [editingMessageIdx, setEditingMessageIdx] = useState<number | null>(null);
   const [regeneratingMessageIdx, setRegeneratingMessageIdx] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
   const [isTopMenuOpen, setIsTopMenuOpen] = useState(false);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
-  const [renameInput, setRenameInput] = useState("");
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   // Clear regenerating indicator once global loading stops
@@ -222,7 +239,6 @@ export default function ChatArea({
                   <button
                     onClick={() => {
                       setIsTopMenuOpen(false);
-                      setRenameInput(chatTitle || "");
                       setIsRenameOpen(true);
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-app-item-hover hover:text-app-text transition-colors cursor-pointer"
@@ -552,122 +568,40 @@ export default function ChatArea({
 
       {/* Modal for Rename Chat */}
       {isRenameOpen && activeChatId && (
-        <Portal>
-          <div 
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsRenameOpen(false);
-            }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-          >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
-          >
-            <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-app-text">{t('left.renameConversation')}</h3>
-              <p className="text-xs text-app-text-muted">
-                {t('left.renameDesc')}
-              </p>
-            </div>
-
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (renameInput.trim() && onRenameChat && activeChatId) {
-                  onRenameChat(activeChatId, renameInput.trim());
-                }
-                setIsRenameOpen(false);
-              }} 
-              className="space-y-4"
-            >
-              <input
-                ref={renameInputRef}
-                type="text"
-                value={renameInput}
-                onChange={(e) => setRenameInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setIsRenameOpen(false);
-                }}
-                placeholder={t('left.renamePlaceholder')}
-                className="w-full bg-app-input-surface border border-app-border focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-app-text outline-none transition-colors"
-              />
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsRenameOpen(false)}
-                  className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
-                >
-                  {t('action.cancel')}
-                </Button>
-
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={!renameInput.trim()}
-                  className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow"
-                >
-                  {t('action.save')}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-        </Portal>
+        <RenameDialog
+          isOpen={isRenameOpen}
+          title={t('left.renameConversation') || "Rename Conversation"}
+          initialValue={chatTitle || ""}
+          placeholder={t('left.renamePlaceholder') || "Enter title..."}
+          confirmLabel={t('action.save') || "Save"}
+          cancelLabel={t('action.cancel') || "Cancel"}
+          onClose={() => setIsRenameOpen(false)}
+          onConfirm={(newTitle) => {
+            if (onRenameChat && activeChatId) {
+              onRenameChat(activeChatId, newTitle);
+            }
+            setIsRenameOpen(false);
+          }}
+        />
       )}
 
       {/* Confirmation Modal for Delete Chat */}
       {isDeleteConfirmOpen && activeChatId && (
-        <Portal>
-          <div 
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsDeleteConfirmOpen(false);
-            }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-          >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
-          >
-            <div className="space-y-1.5">
-              <h3 className="text-base font-semibold text-app-text">{t('ui.deleteConfirmTitle')}</h3>
-              <p className="text-xs text-app-text-muted leading-relaxed">
-                {t('ui.deleteConfirmDesc').replace('{title}', chatTitle || "conversation")}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsDeleteConfirmOpen(false)}
-                className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
-              >
-                {t('action.cancel')}
-              </Button>
-
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  if (onDeleteChat && activeChatId) {
-                    onDeleteChat(activeChatId);
-                  }
-                  setIsDeleteConfirmOpen(false);
-                }}
-                className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow"
-              >
-                {t('action.delete')}
-              </Button>
-            </div>
-          </div>
-        </div>
-        </Portal>
+        <ConfirmDialog
+          isOpen={isDeleteConfirmOpen}
+          title={t('ui.deleteConfirmTitle') || "Delete Chat"}
+          description={t('ui.deleteConfirmDesc')?.replace('{title}', chatTitle || "conversation") || "Are you sure you want to delete this chat?"}
+          confirmLabel={t('action.delete') || "Delete"}
+          cancelLabel={t('action.cancel') || "Cancel"}
+          isDestructive={true}
+          onClose={() => setIsDeleteConfirmOpen(false)}
+          onConfirm={() => {
+            if (onDeleteChat && activeChatId) {
+              onDeleteChat(activeChatId);
+            }
+            setIsDeleteConfirmOpen(false);
+          }}
+        />
       )}
     </div>
   );

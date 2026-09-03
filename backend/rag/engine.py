@@ -247,7 +247,7 @@ def ingest_document(file_path: str, chat_id: str):
 
 def web_search_and_ingest(query: str, chat_id: str) -> str:
     """Searches scholarly databases (OpenAlex) and the web for research papers and articles."""
-    print(f"[Agent] Searching papers/web for: {query}")
+    logger.info(f"[Agent] Searching papers/web for: {query}")
     output_snippets = []
     
     academic_results = search_academic_papers(query, limit=5)
@@ -273,7 +273,7 @@ def web_search_and_ingest(query: str, chat_id: str) -> str:
                 snippet = res.get('body', '')
                 output_snippets.append(f"- **{title}**\n  URL: {url}\n  Snippet: {snippet}")
         except Exception as e:
-            print(f"[Agent] Note: DDGS search skipped or timed out: {e}")
+            logger.debug(f"[Agent] Note: DDGS search skipped or timed out: {e}")
         
     if not output_snippets:
         return f"No results found for query: '{query}'."
@@ -282,7 +282,7 @@ def web_search_and_ingest(query: str, chat_id: str) -> str:
 
 def fetch_and_ingest_doi(doi: str, chat_id: str) -> str:
     """Uses OpenAlex API to find an Open Access PDF for a given DOI, downloads it, and ingests it."""
-    print(f"[Agent] Fetching DOI: {doi}")
+    logger.info(f"[Agent] Fetching DOI: {doi}")
     
     match = re.search(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', doi, re.I)
     if not match:
@@ -304,7 +304,7 @@ def fetch_and_ingest_doi(doi: str, chat_id: str) -> str:
         if not pdf_url:
             return f"Open Access URL not found for DOI {clean_doi}."
             
-        print(f"[Agent] Downloading PDF from {pdf_url}")
+        logger.info(f"[Agent] Downloading PDF from {pdf_url}")
         pdf_resp = requests.get(pdf_url, timeout=20)
         if pdf_resp.status_code != 200:
             return f"Failed to download PDF from {pdf_url}."
@@ -376,99 +376,66 @@ async def generate_chat_title(first_user_message: str) -> str:
 
     return fallback_title or "New Research"
 
-async def query_chat(
-    chat_id: str, 
-    query: str, 
-    chat_history: list = None,
-    status_callback: Optional[Callable[[str], Any]] = None
-):
-    """
-    Queries the vector store via a ReAct Agent or Direct RAG Synthesis with real-time status callbacks.
-    Automatically falls back between active LLMs if quota/rate limits occur.
-    """
-    from database import SessionLocal, Document as DBDocument
-    
-    # Process attachments on the latest user query if present
+def prepare_query_attachments(query: str, chat_history: Optional[list] = None) -> str:
+    """Processes any attachments present in the latest user message and appends extracted text."""
+    if not chat_history:
+        return query
+        
     final_user_msg = chat_history[-1] if chat_history else {}
     attachments = final_user_msg.get("attachments", [])
-    
-    if attachments:
-        from helpers import UPLOAD_DIR
-        chat_media_dir = os.path.join(UPLOAD_DIR, "chat_media")
-        query += "\n\n[Attachments Provided by User:]"
-        for att in attachments:
-            fname = att.get('filename', '')
-            att_type = att.get('type', '')
-            url = att.get('url', '')
-            
-            # If doc/docx/pdf/txt/csv file attachment, extract text content so LLM can read draft
-            extracted_text = ""
-            if url:
-                base_media_name = os.path.basename(url)
-                media_path = os.path.join(chat_media_dir, base_media_name)
-                if os.path.exists(media_path):
-                    try:
-                        from rag.parsers import parse_document_to_markdown
-                        extracted_text = parse_document_to_markdown(media_path)
-                    except Exception as pe:
-                        logger.debug(f"[Parse Attachment Warning]: {pe}")
-            
-            if att_type == 'image':
-                query += f"\n- Image attached: {fname}"
-            else:
-                query += f"\n- Document attached: {fname}"
-                if extracted_text:
-                    truncated_content = extracted_text[:12000]
-                    if len(extracted_text) > 12000:
-                        truncated_content += "\n...[Content truncated for length]..."
-                    query += f"\n\n--- Content of Attached File ({fname}) ---\n{truncated_content}\n--- End of Attached File Content ---\n"
-    
-    async def report_status(text: str):
-        if status_callback:
-            try:
-                res = status_callback(text)
-                if inspect.isawaitable(res):
-                    await res
-            except Exception as e:
-                logger.debug(f"[Status Callback Error]: {e}")
+    if not attachments:
+        return query
+        
+    from helpers import UPLOAD_DIR
+    chat_media_dir = os.path.join(UPLOAD_DIR, "chat_media")
+    query += "\n\n[Attachments Provided by User:]"
+    for att in attachments:
+        fname = att.get('filename', '')
+        att_type = att.get('type', '')
+        url = att.get('url', '')
+        
+        extracted_text = ""
+        if url:
+            base_media_name = os.path.basename(url)
+            media_path = os.path.join(chat_media_dir, base_media_name)
+            if os.path.exists(media_path):
+                try:
+                    from rag.parsers import parse_document_to_markdown
+                    extracted_text = parse_document_to_markdown(media_path)
+                except Exception as pe:
+                    logger.debug(f"[Parse Attachment Warning]: {pe}")
+        
+        if att_type == 'image':
+            query += f"\n- Image attached: {fname}"
+        else:
+            query += f"\n- Document attached: {fname}"
+            if extracted_text:
+                truncated_content = extracted_text[:12000]
+                if len(extracted_text) > 12000:
+                    truncated_content += "\n...[Content truncated for length]..."
+                query += f"\n\n--- Content of Attached File ({fname}) ---\n{truncated_content}\n--- End of Attached File Content ---\n"
+                
+    return query
 
-    await report_status("Analyzing query intent & research parameters...")
-    
-    db = SessionLocal()
-    local_docs = []
-    db_docs_by_filename = {}
-    try:
-        db_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all()
-        local_docs = [d.filename for d in db_docs]
-        db_docs_by_filename = {d.filename: d for d in db_docs}
-    finally:
-        db.close()
+def format_llama_history(chat_history: Optional[list] = None) -> List[LlamaChatMessage]:
+    """Formats raw chat message dictionaries into LlamaChatMessage objects with cleaned markers."""
+    formatted_history = []
+    if not chat_history:
+        return formatted_history
         
-    has_local_docs = len(local_docs) > 0
-    
-    if has_local_docs:
-        doc_list_str = "\n".join([f"  [{i+1}] {fname}" for i, fname in enumerate(local_docs)])
-        doc_context_info = (
-            f"INFORMASI SUMBER REFERENSI SESI INI:\n"
-            f"- Sesi chat ini memiliki total {len(local_docs)} dokumen referensi aktif yang diimpor:\n"
-            f"{doc_list_str}\n"
-            f"- Selalu gunakan fakta ini secara akurat saat menjawab pertanyaan pengguna mengenai jumlah, relevansi judul, atau daftar dokumen yang tersedia."
-        )
-    else:
-        doc_context_info = "INFORMASI SUMBER REFERENSI: Sesi percakapan ini saat ini belum memiliki dokumen referensi yang diunggah/diimpor."
-        
-    index = None
-    query_engine = None
-    if has_local_docs:
-        try:
-            index = VectorStoreIndex.from_vector_store(vector_store)
-            filters = MetadataFilters(
-                filters=[MetadataFilter(key="chat_id", operator=FilterOperator.EQ, value=chat_id)]
-            )
-            query_engine = index.as_query_engine(filters=filters)
-        except Exception as e:
-            print(f"[RAG Engine] Warning: Could not init local query engine: {e}")
-    
+    for msg in chat_history:
+        role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
+        content = msg.get("content", "")
+        if role == MessageRole.ASSISTANT:
+            if "<!-- SOURCES_DATA" in content:
+                content = content.split("<!-- SOURCES_DATA")[0].strip()
+            if "<!-- CITATION_MAP" in content:
+                content = content.split("<!-- CITATION_MAP")[0].strip()
+        formatted_history.append(LlamaChatMessage(role=role, content=content))
+    return formatted_history
+
+def build_rag_tools(chat_id: str, has_local_docs: bool, query_engine: Any) -> List[FunctionTool]:
+    """Builds FunctionTools for ReAct agentic execution."""
     def search_local_documents(q: str) -> str:
         """Use this tool ONLY if the user asks questions about content inside their uploaded PDF/documents."""
         if not has_local_docs or not query_engine:
@@ -494,25 +461,13 @@ async def query_chat(
         return fetch_and_ingest_doi(doi, chat_id)
         
     doi_tool = FunctionTool.from_defaults(fn=search_doi_tool)
-    
-    formatted_history = []
-    if chat_history:
-        for msg in chat_history:
-            role = MessageRole.USER if msg.get("role") == "user" else MessageRole.ASSISTANT
-            content = msg.get("content", "")
-            if role == MessageRole.ASSISTANT:
-                if "<!-- SOURCES_DATA" in content:
-                    content = content.split("<!-- SOURCES_DATA")[0].strip()
-                if "<!-- CITATION_MAP" in content:
-                    content = content.split("<!-- CITATION_MAP")[0].strip()
-            formatted_history.append(LlamaChatMessage(role=role, content=content))
-            
-    # Re-read environment and get instances dynamically
+    return [local_search_tool, web_tool, doi_tool]
+
+def get_candidate_llm_chain():
+    """Builds prioritized list of candidate LLMs based on configuration and active keys."""
     n_llm, fl_llm, gm_llm, gq_llm = create_llm_instances()
-    
     selected_provider = os.getenv("LLM_PROVIDER", "9router").lower()
     
-    # Priority list of available LLMs
     candidate_llms = []
     if selected_provider == "9router" and n_llm:
         candidate_llms.append((n_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"))
@@ -523,7 +478,6 @@ async def query_chat(
     elif selected_provider == "gemini" and gm_llm:
         candidate_llms.append((gm_llm, "Google Gemini Flash"))
 
-    # Add all other initialized LLMs as sequential fallbacks
     for llm_inst, name in [
         (n_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"),
         (gq_llm, "Groq (Llama 3.3 70B)"),
@@ -532,74 +486,155 @@ async def query_chat(
     ]:
         if llm_inst and not any(cand[0] == llm_inst for cand in candidate_llms):
             candidate_llms.append((llm_inst, name))
+            
+    return candidate_llms
+
+async def dispatch_intent_pipeline(
+    intent: str,
+    chat_id: str,
+    query: str,
+    local_docs: list,
+    formatted_history: list,
+    target_llm: Any,
+    report_status: Callable,
+    tools: List[FunctionTool],
+    doc_context_info: str,
+    timeout_sec: float = 60.0
+) -> str:
+    """Dispatches query execution to the specialized modular pipeline based on intent."""
+    has_local_docs = len(local_docs) > 0
+    
+    if intent == "GENERAL_CHAT":
+        from .pipelines.chat_pipeline import handle_general_chat_pipeline
+        raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status)
+        return format_clean_response(raw_res)
+
+    if intent == "REMOVE_SOURCES" and has_local_docs:
+        from .pipelines.source_action_pipeline import handle_source_removal_pipeline
+        return await handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
+
+    if intent == "SEARCH_NEW":
+        from .pipelines.search_pipeline import handle_academic_search_pipeline
+        raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status)
+        if "<!-- SOURCES_DATA:" in raw_res:
+            parts = raw_res.split("<!-- SOURCES_DATA:", 1)
+            cleaned_text = format_clean_response(parts[0])
+            return f"{cleaned_text}\n\n<!-- SOURCES_DATA:{parts[1]}"
+        return format_clean_response(raw_res)
+
+    if intent == "ANALYZE_WORKSPACE" and has_local_docs:
+        from .pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
+        return await handle_workspace_analysis_pipeline(
+            chat_id=chat_id,
+            query=query,
+            local_docs=local_docs,
+            formatted_history=formatted_history,
+            target_llm=target_llm,
+            report_status=report_status
+        )
+
+    # Agentic fallback path
+    await report_status("Executing agent reasoning & searching academic sources...")
+    agent = ReActAgent(
+        tools=tools, 
+        llm=target_llm, 
+        verbose=False,
+        streaming=False,
+        max_iterations=6,
+        timeout=timeout_sec,
+        system_prompt=get_agentic_system_prompt(doc_context_info)
+    )
+    res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
+    return format_clean_response(str(res))
+
+async def query_chat(
+    chat_id: str, 
+    query: str, 
+    chat_history: list = None,
+    status_callback: Optional[Callable[[str], Any]] = None
+):
+    """
+    Orchestrates chat queries through intent classification and modular pipelines.
+    Automatically handles attachment parsing, history formatting, and multi-LLM cascading fallback.
+    """
+    from database import SessionLocal, Document as DBDocument
+    
+    query = prepare_query_attachments(query, chat_history)
+    
+    async def report_status(text: str):
+        if status_callback:
+            try:
+                res = status_callback(text)
+                if inspect.isawaitable(res):
+                    await res
+            except Exception as e:
+                logger.debug(f"[Status Callback Error]: {e}")
+
+    await report_status("Analyzing query intent & research parameters...")
+    
+    db = SessionLocal()
+    local_docs = []
+    try:
+        db_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all()
+        local_docs = [d.filename for d in db_docs]
+    finally:
+        db.close()
+        
+    has_local_docs = len(local_docs) > 0
+    if has_local_docs:
+        doc_list_str = "\n".join([f"  [{i+1}] {fname}" for i, fname in enumerate(local_docs)])
+        doc_context_info = (
+            f"INFORMASI SUMBER REFERENSI SESI INI:\n"
+            f"- Sesi chat ini memiliki total {len(local_docs)} dokumen referensi aktif yang diimpor:\n"
+            f"{doc_list_str}\n"
+            f"- Selalu gunakan fakta ini secara akurat saat menjawab pertanyaan pengguna mengenai jumlah, relevansi judul, atau daftar dokumen yang tersedia."
+        )
+    else:
+        doc_context_info = "INFORMASI SUMBER REFERENSI: Sesi percakapan ini saat ini belum memiliki dokumen referensi yang diunggah/diimpor."
+        
+    query_engine = None
+    if has_local_docs:
+        try:
+            index = VectorStoreIndex.from_vector_store(vector_store)
+            filters = MetadataFilters(
+                filters=[MetadataFilter(key="chat_id", operator=FilterOperator.EQ, value=chat_id)]
+            )
+            query_engine = index.as_query_engine(filters=filters)
+        except Exception as e:
+            logger.warning(f"[RAG Engine] Could not init local query engine: {e}")
+    
+    tools = build_rag_tools(chat_id, has_local_docs, query_engine)
+    formatted_history = format_llama_history(chat_history)
+    candidate_llms = get_candidate_llm_chain()
 
     if not candidate_llms:
         return "Error: Tidak ada LLM Provider yang terkonfigurasi. Silakan periksa file .env."
 
-    active_llm, primary_name = candidate_llms[0]
-
-    async def execute_agent(target_llm, timeout_sec=60.0):
-        intent = await classify_user_intent(query, has_local_docs, len(local_docs), target_llm)
-        print(f"[RAG Engine] LLM Semantic Intent: {intent}")
-
-        # 1. Handle General Conversational & Technical Discussion
-        if intent == "GENERAL_CHAT":
-            from .pipelines.chat_pipeline import handle_general_chat_pipeline
-            raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status)
-            return format_clean_response(raw_res)
-
-        # 2. Handle Explicit Source Removal Intent
-        if intent == "REMOVE_SOURCES" and has_local_docs:
-            from .pipelines.source_action_pipeline import handle_source_removal_pipeline
-            return await handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
-
-        # 3. Direct Academic Literature Search Pipeline
-        if intent == "SEARCH_NEW":
-            from .pipelines.search_pipeline import handle_academic_search_pipeline
-            raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status)
-            if "<!-- SOURCES_DATA:" in raw_res:
-                parts = raw_res.split("<!-- SOURCES_DATA:", 1)
-                cleaned_text = format_clean_response(parts[0])
-                return f"{cleaned_text}\n\n<!-- SOURCES_DATA:{parts[1]}"
-            return format_clean_response(raw_res)
-
-        # 4. Direct Full-Context Synthesis for workspace documents
-        if intent == "ANALYZE_WORKSPACE" and has_local_docs:
-            from .pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
-            return await handle_workspace_analysis_pipeline(
+    last_err = None
+    for cand_idx, (curr_llm, curr_name) in enumerate(candidate_llms):
+        try:
+            logger.info(f"[RAG Engine] Attempting query with LLM [{cand_idx+1}/{len(candidate_llms)}]: {curr_name}")
+            intent = await classify_user_intent(query, has_local_docs, len(local_docs), curr_llm)
+            logger.info(f"[RAG Engine] LLM Semantic Intent: {intent}")
+            
+            return await dispatch_intent_pipeline(
+                intent=intent,
                 chat_id=chat_id,
                 query=query,
                 local_docs=local_docs,
                 formatted_history=formatted_history,
-                target_llm=target_llm,
-                report_status=report_status
+                target_llm=curr_llm,
+                report_status=report_status,
+                tools=tools,
+                doc_context_info=doc_context_info,
+                timeout_sec=60.0
             )
-
-        # 5. Agentic path for complex multi-tool workflows
-        await report_status("Executing agent reasoning & searching academic sources...")
-        agent = ReActAgent(
-            tools=[local_search_tool, web_tool, doi_tool], 
-            llm=target_llm, 
-            verbose=False,
-            streaming=False,
-            max_iterations=6,
-            timeout=timeout_sec,
-            system_prompt=get_agentic_system_prompt(doc_context_info)
-        )
-        res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
-        return format_clean_response(str(res))
-
-    last_err = None
-    for cand_idx, (curr_llm, curr_name) in enumerate(candidate_llms):
-        try:
-            print(f"[RAG Engine] Attempting query with LLM [{cand_idx+1}/{len(candidate_llms)}]: {curr_name}")
-            return await execute_agent(curr_llm, timeout_sec=60.0)
         except Exception as e:
             last_err = e
-            print(f"[RAG Fallback] {curr_name} failed: {e}")
+            logger.warning(f"[RAG Fallback] {curr_name} failed: {e}")
             if cand_idx + 1 < len(candidate_llms):
                 next_name = candidate_llms[cand_idx+1][1]
-                print(f"[RAG Fallback] -> Automatically cascading to {next_name}...")
+                logger.info(f"[RAG Fallback] -> Automatically cascading to {next_name}...")
                 await report_status(f"Switching AI provider to {next_name}...")
                 continue
             else:

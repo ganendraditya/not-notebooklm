@@ -17,7 +17,7 @@ export const generateCitations = (
   url: string
 ): CitationFormats => {
   const cleanTitle = title.replace(/\.$/, "").trim();
-  const cleanYear = year || "2024";
+  const cleanYear = year || new Date().getFullYear().toString();
   const cleanJournal = journal || "Academic Publication";
   const doiUrl = doi ? (doi.startsWith("http") ? doi : `https://doi.org/${doi}`) : url;
   const authorList = authors.length > 0 ? authors : ["Anonymous"];

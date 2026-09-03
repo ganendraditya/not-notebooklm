@@ -2,7 +2,7 @@ import os
 import uuid
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
@@ -11,11 +11,15 @@ from sqlalchemy.orm import Session
 
 from database import get_db, ChatSession, Document, ChatMessage
 from helpers import UPLOAD_DIR
+from utils.streaming import create_sse_stream_response, SSEStreamEmitter
 import models
 import rag
 
 router = APIRouter(tags=["chats"])
 logger = logging.getLogger("uvicorn.error")
+
+def get_utc_now():
+    return datetime.now(timezone.utc)
 
 CHAT_MEDIA_DIR = os.path.join(UPLOAD_DIR, "chat_media")
 os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
@@ -23,7 +27,7 @@ os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
 @router.post("/chats", response_model=models.ChatSessionResponse)
 def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
     chat_id = str(uuid.uuid4())
-    now = datetime.utcnow()
+    now = get_utc_now()
     db_chat = ChatSession(id=chat_id, title=chat.title, created_at=now, updated_at=now)
     db.add(db_chat)
     db.commit()
@@ -120,7 +124,7 @@ def update_chat(chat_id: str, update: models.ChatSessionUpdate, db: Session = De
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     chat.title = update.title
-    chat.updated_at = datetime.utcnow()
+    chat.updated_at = get_utc_now()
     db.commit()
     db.refresh(chat)
     return chat
@@ -228,7 +232,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
         attachments_json=attachments_str
     )
     db.add(user_msg)
-    chat.updated_at = datetime.utcnow()
+    chat.updated_at = get_utc_now()
     db.commit()
     
     chat_history = []
@@ -251,7 +255,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
         
     asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
     db.add(asst_msg)
-    chat.updated_at = datetime.utcnow()
+    chat.updated_at = get_utc_now()
     db.commit()
     db.refresh(asst_msg)
     
@@ -280,7 +284,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
         attachments_json=attachments_str
     )
     db.add(user_msg)
-    chat.updated_at = datetime.utcnow()
+    chat.updated_at = get_utc_now()
     db.commit()
     
     all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
@@ -299,93 +303,62 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
     # Check if chat is still using default/raw initial title and needs smart AI naming
     is_initial_chat_state = len(all_msgs) <= 1 or chat.title in ("New Chat", "New Research", "") or (chat.title and chat.title.endswith("..."))
     
-    async def event_generator():
-        import asyncio
-        queue = asyncio.Queue()
-        
-        async def status_callback(status_text: str):
-            await queue.put({"type": "status", "text": status_text, "data": status_text})
-            
-        async def worker():
+    async def stream_worker(emitter: SSEStreamEmitter):
+        # 1. Background smart title generation if new chat
+        if is_initial_chat_state:
             try:
-                # 1. Background smart title generation if new chat
-                if is_initial_chat_state:
+                ai_title = await rag.generate_chat_title(query.message)
+                if ai_title:
+                    from database import SessionLocal
+                    t_db = SessionLocal()
                     try:
-                        ai_title = await rag.generate_chat_title(query.message)
-                        if ai_title:
-                            from database import SessionLocal
-                            t_db = SessionLocal()
-                            try:
-                                t_chat = t_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-                                if t_chat:
-                                    t_chat.title = ai_title
-                                    t_db.commit()
-                            finally:
-                                t_db.close()
-                            await queue.put({"type": "title_update", "title": ai_title, "chat_id": chat_id})
-                    except Exception as title_err:
-                        logger.debug(f"[Title Update Error]: {title_err}")
+                        t_chat = t_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+                        if t_chat:
+                            t_chat.title = ai_title
+                            t_db.commit()
+                    finally:
+                        t_db.close()
+                    await emitter.emit_event({"type": "title_update", "title": ai_title, "chat_id": chat_id})
+            except Exception as title_err:
+                logger.debug(f"[Title Update Error]: {title_err}")
 
-                # 2. Main response generation
-                resp_text = await rag.query_chat(
-                    chat_id, 
-                    query.message, 
-                    chat_history=chat_history, 
-                    status_callback=status_callback
-                )
-                from database import SessionLocal
-                bg_db = SessionLocal()
-                try:
-                    asst_msg = ChatMessage(
-                        chat_id=chat_id, 
-                        role="assistant", 
-                        content=resp_text,
-                        variants_json=json.dumps([resp_text]),
-                        active_variant_index=0
-                    )
-                    bg_db.add(asst_msg)
-                    bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-                    if bg_chat:
-                        bg_chat.updated_at = datetime.utcnow()
-                    bg_db.commit()
-                finally:
-                    bg_db.close()
-                await queue.put({
-                    "type": "done",
-                    "data": resp_text,
-                    "message": {
-                        "role": "assistant",
-                        "content": resp_text,
-                        "created_at": datetime.utcnow().isoformat(),
-                        "variants": [resp_text],
-                        "active_variant_index": 0
-                    }
-                })
-            except asyncio.CancelledError:
-                logger.debug(f"[Chat Stream Worker Cancelled] chat_id={chat_id}")
-                raise
-            except Exception as e:
-                logger.error(f"[Chat Stream Worker Error]: {e}")
-                await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Sorry, an error occurred: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
-            finally:
-                await queue.put(None)
-                
-        worker_task = asyncio.create_task(worker())
-        
+        # 2. Main response generation
+        resp_text = await rag.query_chat(
+            chat_id, 
+            query.message, 
+            chat_history=chat_history, 
+            status_callback=emitter.emit_status
+        )
+        from database import SessionLocal
+        bg_db = SessionLocal()
         try:
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                yield f"data: {json.dumps(item)}\n\n"
-        except asyncio.CancelledError:
-            worker_task.cancel()
-            raise
+            asst_msg = ChatMessage(
+                chat_id=chat_id, 
+                role="assistant", 
+                content=resp_text,
+                variants_json=json.dumps([resp_text]),
+                active_variant_index=0
+            )
+            bg_db.add(asst_msg)
+            bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+            if bg_chat:
+                bg_chat.updated_at = get_utc_now()
+            bg_db.commit()
         finally:
-            if not worker_task.done():
-                worker_task.cancel()
-            
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+            bg_db.close()
+
+        await emitter.emit_done(
+            final_text=resp_text,
+            message_payload={
+                "role": "assistant",
+                "content": resp_text,
+                "created_at": get_utc_now().isoformat(),
+                "variants": [resp_text],
+                "active_variant_index": 0
+            }
+        )
+
+    return create_sse_stream_response(stream_worker)
 
 @router.put("/chats/{chat_id}/edit_message", response_model=models.ChatMessageResponse)
 async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session = Depends(get_db)):
@@ -405,7 +378,7 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     for msg_to_del in all_msgs[req.message_index + 1:]:
         db.delete(msg_to_del)
         
-    chat.updated_at = datetime.utcnow()
+    chat.updated_at = get_utc_now()
     db.commit()
     
     truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index + 1]]
@@ -418,7 +391,7 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
         
     asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
     db.add(asst_msg)
-    chat.updated_at = datetime.utcnow()
+    chat.updated_at = get_utc_now()
     db.commit()
     db.refresh(asst_msg)
     
@@ -444,69 +417,48 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
     for msg_to_del in all_msgs[req.message_index + 1:]:
         db.delete(msg_to_del)
         
-    chat.updated_at = datetime.utcnow()
+    chat.updated_at = get_utc_now()
     db.commit()
     
     truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index + 1]]
     
-    async def event_generator():
-        import asyncio
-        queue = asyncio.Queue()
-        
-        async def status_callback(status_text: str):
-            await queue.put({"type": "status", "text": status_text, "data": status_text})
-            
-        async def worker():
-            try:
-                resp_text = await rag.query_chat(
-                    chat_id, 
-                    req.message, 
-                    chat_history=truncated_history, 
-                    status_callback=status_callback
-                )
-                from database import SessionLocal
-                bg_db = SessionLocal()
-                try:
-                    asst_msg = ChatMessage(
-                        chat_id=chat_id, 
-                        role="assistant", 
-                        content=resp_text,
-                        variants_json=json.dumps([resp_text]),
-                        active_variant_index=0
-                    )
-                    bg_db.add(asst_msg)
-                    bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-                    if bg_chat:
-                        bg_chat.updated_at = datetime.utcnow()
-                    bg_db.commit()
-                finally:
-                    bg_db.close()
-                await queue.put({
-                    "type": "done",
-                    "data": resp_text,
-                    "message": {
-                        "role": "assistant",
-                        "content": resp_text,
-                        "created_at": datetime.utcnow().isoformat(),
-                        "variants": [resp_text],
-                        "active_variant_index": 0
-                    }
-                })
-            except Exception as e:
-                logger.error(f"[Chat Edit Stream Worker Error]: {e}")
-                await queue.put({"type": "error", "data": str(e), "message": {"role": "assistant", "content": f"Sorry, an error occurred: {str(e)}", "created_at": datetime.utcnow().isoformat()}})
-            finally:
-                await queue.put(None)
-                
-        asyncio.create_task(worker())
-        
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            yield f"data: {json.dumps(item)}\n\n"
-            
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    async def stream_worker(emitter: SSEStreamEmitter):
+        resp_text = await rag.query_chat(
+            chat_id, 
+            req.message, 
+            chat_history=truncated_history, 
+            status_callback=emitter.emit_status
+        )
+        from database import SessionLocal
+        bg_db = SessionLocal()
+        try:
+            asst_msg = ChatMessage(
+                chat_id=chat_id, 
+                role="assistant", 
+                content=resp_text,
+                variants_json=json.dumps([resp_text]),
+                active_variant_index=0
+            )
+            bg_db.add(asst_msg)
+            bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+            if bg_chat:
+                bg_chat.updated_at = get_utc_now()
+            bg_db.commit()
+        finally:
+            bg_db.close()
+
+        await emitter.emit_done(
+            final_text=resp_text,
+            message_payload={
+                "role": "assistant",
+                "content": resp_text,
+                "created_at": get_utc_now().isoformat(),
+                "variants": [resp_text],
+                "active_variant_index": 0
+            }
+        )
+
+    return create_sse_stream_response(stream_worker)
 
 @router.post("/chats/{chat_id}/regenerate_stream")
 async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageRequest, db: Session = Depends(get_db)):
@@ -551,84 +503,62 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
         })
     target_msg_id = target_msg.id
     
-    async def event_generator():
-        import asyncio
-        queue = asyncio.Queue()
-        
-        async def status_callback(status_text: str):
-            await queue.put({"type": "status", "text": status_text, "data": status_text})
-            
-        async def worker():
-            try:
-                resp_text = await rag.query_chat(
-                    chat_id, 
-                    user_prompt, 
-                    chat_history=truncated_history, 
-                    status_callback=status_callback
-                )
-                from database import SessionLocal
-                bg_db = SessionLocal()
-                try:
-                    db_msg = bg_db.query(ChatMessage).filter(ChatMessage.id == target_msg_id).first()
-                    if db_msg:
-                        # 1. Delete all descendant messages below this message (Truncate future history)
-                        bg_db.query(ChatMessage).filter(
-                            ChatMessage.chat_id == chat_id,
-                            ChatMessage.created_at > db_msg.created_at
-                        ).delete(synchronize_session=False)
+    async def stream_worker(emitter: SSEStreamEmitter):
+        resp_text = await rag.query_chat(
+            chat_id, 
+            user_prompt, 
+            chat_history=truncated_history, 
+            status_callback=emitter.emit_status
+        )
+        from database import SessionLocal
+        bg_db = SessionLocal()
+        try:
+            db_msg = bg_db.query(ChatMessage).filter(ChatMessage.id == target_msg_id).first()
+            if db_msg:
+                # 1. Delete all descendant messages below this message (Truncate future history)
+                bg_db.query(ChatMessage).filter(
+                    ChatMessage.chat_id == chat_id,
+                    ChatMessage.created_at > db_msg.created_at
+                ).delete(synchronize_session=False)
 
-                        existing_variants = []
-                        if db_msg.variants_json:
-                            try:
-                                existing_variants = json.loads(db_msg.variants_json)
-                            except Exception:
-                                pass
-                        if not existing_variants and db_msg.content:
-                            existing_variants = [db_msg.content]
-                            
-                        existing_variants.append(resp_text)
-                        new_active_idx = len(existing_variants) - 1
-                        
-                        db_msg.content = resp_text
-                        db_msg.variants_json = json.dumps(existing_variants)
-                        db_msg.active_variant_index = new_active_idx
-                        
-                        bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-                        if bg_chat:
-                            bg_chat.updated_at = datetime.utcnow()
-                        bg_db.commit()
-                        
-                        await queue.put({
-                            "type": "done",
-                            "data": resp_text,
-                            "message_index": req.message_index,
-                            "variants": existing_variants,
-                            "active_variant_index": new_active_idx,
-                            "message": {
-                                "role": "assistant",
-                                "content": resp_text,
-                                "created_at": db_msg.created_at.isoformat() if hasattr(db_msg, 'created_at') else datetime.utcnow().isoformat(),
-                                "variants": existing_variants,
-                                "active_variant_index": new_active_idx
-                            }
-                        })
-                finally:
-                    bg_db.close()
-            except Exception as e:
-                logger.error(f"[Chat Regenerate Stream Worker Error]: {e}")
-                await queue.put({"type": "error", "data": str(e)})
-            finally:
-                await queue.put(None)
+                existing_variants = []
+                if db_msg.variants_json:
+                    try:
+                        existing_variants = json.loads(db_msg.variants_json)
+                    except Exception:
+                        pass
+                if not existing_variants and db_msg.content:
+                    existing_variants = [db_msg.content]
+                    
+                existing_variants.append(resp_text)
+                new_active_idx = len(existing_variants) - 1
                 
-        asyncio.create_task(worker())
-        
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            yield f"data: {json.dumps(item)}\n\n"
-            
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+                db_msg.content = resp_text
+                db_msg.variants_json = json.dumps(existing_variants)
+                db_msg.active_variant_index = new_active_idx
+                
+                bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+                if bg_chat:
+                    bg_chat.updated_at = get_utc_now()
+                bg_db.commit()
+                
+                await emitter.emit_done(
+                    final_text=resp_text,
+                    message_index=req.message_index,
+                    variants=existing_variants,
+                    active_variant_index=new_active_idx,
+                    message_payload={
+                        "role": "assistant",
+                        "content": resp_text,
+                        "created_at": db_msg.created_at.isoformat() if hasattr(db_msg, 'created_at') else get_utc_now().isoformat(),
+                        "variants": existing_variants,
+                        "active_variant_index": new_active_idx
+                    }
+                )
+        finally:
+            bg_db.close()
+
+    return create_sse_stream_response(stream_worker)
 
 @router.put("/chats/{chat_id}/select_variant")
 def select_message_variant(chat_id: str, req: models.SelectVariantRequest, db: Session = Depends(get_db)):
