@@ -19,6 +19,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Portal } from "@/components/ui/Portal";
 import { ChatMessage } from "@/stores/chatStore";
 import { Document as DocType, TargetedSource } from "@/stores/documentStore";
 import { InChatMessageComponent } from "./chat/ChatMessageItem";
@@ -550,7 +551,8 @@ export default function ChatArea({
       )}
 
       {/* Modal for Rename Chat */}
-        {isRenameOpen && activeChatId && (
+      {isRenameOpen && activeChatId && (
+        <Portal>
           <div 
             onClick={(e) => {
               e.stopPropagation();
@@ -614,10 +616,12 @@ export default function ChatArea({
             </form>
           </div>
         </div>
+        </Portal>
       )}
 
       {/* Confirmation Modal for Delete Chat */}
-        {isDeleteConfirmOpen && activeChatId && (
+      {isDeleteConfirmOpen && activeChatId && (
+        <Portal>
           <div 
             onClick={(e) => {
               e.stopPropagation();
@@ -663,6 +667,7 @@ export default function ChatArea({
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

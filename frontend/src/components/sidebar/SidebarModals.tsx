@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { Portal } from "@/components/ui/Portal";
 import { useTranslation } from "@/lib/i18n";
 import { Document } from "@/stores/documentStore";
 
@@ -23,7 +24,8 @@ export function BulkDeleteModal({
 
   if (!isOpen) return null;
 
-    return (
+  return (
+    <Portal>
       <div 
         onClick={(e) => {
           e.stopPropagation();
@@ -73,6 +75,7 @@ export function BulkDeleteModal({
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -99,7 +102,8 @@ export function RenameModal({
 
   if (!isOpen || !renamingDoc) return null;
 
-    return (
+  return (
+    <Portal>
       <div 
         onClick={(e) => {
           e.stopPropagation();
@@ -161,5 +165,6 @@ export function RenameModal({
         </form>
       </div>
     </div>
+    </Portal>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "@/lib/i18n";
+import { Portal } from "@/components/ui/Portal";
 import { 
   X, 
   SlidersHorizontal, 
@@ -53,14 +54,8 @@ export default function SearchFilterPopover({
   const [languageSearch, setLanguageSearch] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Click outside & Escape key listeners
+  // Escape key listener
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
@@ -68,11 +63,9 @@ export default function SearchFilterPopover({
     };
 
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
       document.addEventListener("keydown", handleKeyDown);
     }
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onClose]);
@@ -119,7 +112,8 @@ export default function SearchFilterPopover({
       </button>
 
       {/* Centered Modal Overlay (Option 1: Centered Dialog with Backdrop) */}
-        {isOpen && (
+      {isOpen && (
+        <Portal>
           <div 
             onClick={(e) => {
               e.stopPropagation();
@@ -404,6 +398,7 @@ export default function SearchFilterPopover({
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import React from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Portal } from "@/components/ui/Portal";
 import { useTranslation } from "@/lib/i18n";
 
 interface BulkDeleteModalProps {
@@ -23,13 +24,14 @@ export const BulkDeleteModal: React.FC<BulkDeleteModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div 
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!isBulkDeleting) onClose();
-      }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
-    >
+    <Portal>
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isBulkDeleting) onClose();
+        }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
+      >
       <div 
         onClick={(e) => e.stopPropagation()}
         className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
@@ -73,5 +75,6 @@ export const BulkDeleteModal: React.FC<BulkDeleteModalProps> = ({
         </div>
       </div>
     </div>
+    </Portal>
   );
 };

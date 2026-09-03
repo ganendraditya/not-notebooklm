@@ -1,5 +1,6 @@
 import React from "react";
 import { Edit2, Loader2 } from "lucide-react";
+import { Portal } from "@/components/ui/Portal";
 import { useTranslation } from "@/lib/i18n";
 import { Document } from "@/stores/documentStore";
 
@@ -27,8 +28,9 @@ export const RenameModal: React.FC<RenameModalProps> = ({
   if (!isOpen || !renamingDoc) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-sm rounded-2xl bg-app-card border border-app-border shadow-2xl p-5 space-y-4 animate-in zoom-in-95 duration-150 text-app-text">
+    <Portal>
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="w-full max-w-sm rounded-2xl bg-app-card border border-app-border shadow-2xl p-5 space-y-4 animate-in zoom-in-95 duration-150 text-app-text">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center shrink-0">
             <Edit2 size={18} />
@@ -76,5 +78,6 @@ export const RenameModal: React.FC<RenameModalProps> = ({
         </form>
       </div>
     </div>
+    </Portal>
   );
 };

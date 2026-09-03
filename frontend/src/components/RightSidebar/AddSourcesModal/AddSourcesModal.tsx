@@ -4,6 +4,7 @@ import {
   Search,
   UploadCloud,
 } from "lucide-react";
+import { Portal } from "@/components/ui/Portal";
 import { useTranslation } from "@/lib/i18n";
 import { Document, PendingSourceItem } from "@/stores/documentStore";
 
@@ -39,14 +40,15 @@ export const AddSourcesModal: React.FC<AddSourcesModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div 
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-        setDoiInput("");
-      }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-    >
+    <Portal>
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+          setDoiInput("");
+        }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+      >
       <div 
         onClick={(e) => e.stopPropagation()}
         className="bg-app-modal border border-app-border-strong rounded-3xl w-full max-w-xl p-6 sm:p-7 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 relative text-app-text"
@@ -157,5 +159,6 @@ export const AddSourcesModal: React.FC<AddSourcesModalProps> = ({
         </div>
       </div>
     </div>
+    </Portal>
   );
 };

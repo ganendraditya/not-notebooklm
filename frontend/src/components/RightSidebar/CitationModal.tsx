@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Quote, X, Download, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Portal } from "@/components/ui/Portal";
 import { useTranslation } from "@/lib/i18n";
 import { CitationFormats } from "@/hooks/useCitationGenerator";
 
@@ -31,13 +32,14 @@ export function CitationModal({ isOpen, onClose, citations, doiStr }: CitationMo
   };
 
   return (
-    <div 
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-    >
+    <Portal>
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+      >
       <div 
         onClick={(e) => e.stopPropagation()}
         className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-[530px] p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-150 text-app-text"
@@ -132,5 +134,6 @@ export function CitationModal({ isOpen, onClose, citations, doiStr }: CitationMo
         </div>
       </div>
     </div>
+    </Portal>
   );
 }

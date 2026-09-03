@@ -17,6 +17,7 @@ import {
 import { TargetedSource } from "@/stores/documentStore";
 import ModelSelector from "@/components/ModelSelector";
 import SearchFilterPopover from "@/components/SearchFilterPopover";
+import { Portal } from "@/components/ui/Portal";
 import { type SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/lib/constants/academicFilters";
 import { useTranslation } from "@/lib/i18n";
 
@@ -331,13 +332,14 @@ export const ChatInputBox = memo(function ChatInputBox({
       <div className={`w-full ${isCentered ? "max-w-2xl mx-auto my-4" : ""}`}>
         {/* Storage Limit Exceeded Modal / Card */}
         {storageWarningFile && (
-          <div 
-            onClick={(e) => {
-              e.stopPropagation();
-              setStorageWarningFile(null);
-            }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
-          >
+          <Portal>
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                setStorageWarningFile(null);
+              }}
+              className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+            >
             <div 
               onClick={(e) => e.stopPropagation()}
               className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 relative text-left text-app-text"
@@ -378,13 +380,14 @@ export const ChatInputBox = memo(function ChatInputBox({
                   setStorageWarningFile(null);
                   onOpenStorage?.();
                 }}
-                className="px-4 py-2 text-xs font-medium text-app-text bg-app-card hover:bg-app-card-hover border border-app-border rounded-full transition-colors cursor-pointer shadow-sm"
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition-all"
               >
-                Manage storage
+                Open Storage
               </button>
             </div>
           </div>
         </div>
+        </Portal>
       )}
 
       {queuedPrompts && queuedPrompts.length > 0 && (
