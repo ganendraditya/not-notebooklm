@@ -26,8 +26,11 @@ backend/qdrant_data/
 qdrant_data/
 scratch/
 
-# Agent instructions & rules
+# Agent instructions, docs & rules
 .agents/
+notes/
+*.scratchpad.md
+REFACTOR_STATUS.md
 AGENTS.md
 */AGENTS.md
 .cursorrules
