@@ -1,6 +1,6 @@
 # NotbookLM
 
-An open-source, customizable AI research and document workspace inspired by Google Notebook (formerly NotebookLM), Consensus AI, and Elicit. The name *NotbookLM* is a pun on Google's NotebookLM. Powered by FastAPI, Next.js, LlamaIndex, and Qdrant vector database.
+A customizable AI research and document workspace inspired by Google Notebook (formerly NotebookLM), Consensus AI, and Elicit. The name *NotbookLM* is a playful pun on Google's NotebookLM. Built with FastAPI, Next.js, LlamaIndex, and Qdrant vector database.
 
 ---
 
@@ -21,7 +21,7 @@ No need to install Python, Node.js, or local dependencies.
    ```bash
    cp backend/.env.example backend/.env
    ```
-   *Edit `backend/.env` and add your LLM API keys (e.g., Gemini, Groq, or FreeLLMAPI).*
+   *Edit `backend/.env` with your preferred AI provider API key and model gateway endpoint (e.g., 9Router, OpenAI-compatible proxy, or direct API keys).*
 
 3. **Start all services with Docker Compose:**
    ```bash
@@ -50,7 +50,7 @@ source venv/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with your API keys
+# Edit .env with your API credentials
 
 uvicorn main:app --reload --port 8000
 ```
@@ -66,7 +66,7 @@ npm run dev
 
 ## Architecture & Tech Stack
 
-* **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS.
+* **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS, Zustand State Management.
 * **Backend:** FastAPI, SQLAlchemy (SQLite), LlamaIndex.
 * **Vector Store:** Qdrant (supports remote Docker instance or embedded local disk fallback).
-* **LLM Providers:** Google Gemini, Groq, FreeLLMAPI, 9Router.
+* **AI Architecture:** Two-Tier LLM Gateway (Primary Heavy Synthesizer for deep multi-document literature reasoning & Fast Lite Worker for rapid intent triage, query planning, and academic paper auditing). Any OpenAI-compatible endpoint or model gateway can be configured.
