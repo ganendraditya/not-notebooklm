@@ -130,4 +130,88 @@ def cleanup_orphan_files_on_disk(active_chat_ids: Set[str]) -> tuple:
             except Exception as e:
                 logger.warning(f"[Storage] Failed to remove temp zip {fp}: {e}")
 
+    # 3. Clean orphan chat media
+    chat_media_dir = os.path.join(UPLOAD_DIR, "chat_media")
+    if os.path.exists(chat_media_dir):
+        for fname in os.listdir(chat_media_dir):
+            fp = os.path.join(chat_media_dir, fname)
+            try:
+                if os.path.isfile(fp):
+                    sz = os.path.getsize(fp)
+                    os.remove(fp)
+                    deleted_files += 1
+                    freed_bytes += sz
+            except Exception as e:
+                logger.warning(f"[Storage] Failed to remove media file {fp}: {e}")
+
     return deleted_files, freed_bytes
+
+def get_directory_total_size(path: str) -> int:
+    """Calculates recursive size of a directory in bytes."""
+    total = 0
+    if not os.path.exists(path):
+        return 0
+    for root, _, files in os.walk(path):
+        for f in files:
+            fp = os.path.join(root, f)
+            try:
+                if os.path.isfile(fp):
+                    total += os.path.getsize(fp)
+            except Exception:
+                pass
+    return total
+
+def get_unified_storage_summary(db_path: str) -> dict:
+    """
+    Single Source of Truth: Computes comprehensive disk usage breakdown.
+    Covers uploaded documents, chat media attachments, sqlite database (including WAL/SHM), and Qdrant vectors.
+    """
+    uploads_size = get_directory_total_size(UPLOAD_DIR)
+    uploads_count = 0
+    categories = {"images": 0, "documents": 0, "others": 0}
+    category_counts = {"images": 0, "documents": 0, "others": 0}
+
+    if os.path.exists(UPLOAD_DIR):
+        for root, _, files in os.walk(UPLOAD_DIR):
+            for file in files:
+                uploads_count += 1
+                file_path = os.path.join(root, file)
+                try:
+                    size = os.path.getsize(file_path)
+                    ext = file.split('.')[-1].lower() if '.' in file else ''
+                    if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']:
+                        categories["images"] += size
+                        category_counts["images"] += 1
+                    elif ext in ['pdf', 'txt', 'md', 'docx', 'csv', 'tsv', 'bib', 'bibtex', 'ris', 'xlsx', 'pptx', 'json']:
+                        categories["documents"] += size
+                        category_counts["documents"] += 1
+                    else:
+                        categories["others"] += size
+                        category_counts["others"] += 1
+                except Exception:
+                    pass
+
+    qdrant_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "qdrant_data"))
+    qdrant_size = get_directory_total_size(qdrant_dir)
+
+    db_size = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+    wal_path = f"{db_path}-wal"
+    if os.path.exists(wal_path):
+        db_size += os.path.getsize(wal_path)
+    shm_path = f"{db_path}-shm"
+    if os.path.exists(shm_path):
+        db_size += os.path.getsize(shm_path)
+
+    total_bytes = uploads_size + qdrant_size + db_size
+
+    return {
+        "total_bytes": 10 * 1024 * 1024 * 1024,  # 10GB Quota Limit
+        "used_bytes": total_bytes,
+        "uploads_bytes": uploads_size,
+        "uploads_count": uploads_count,
+        "qdrant_bytes": qdrant_size,
+        "database_bytes": db_size,
+        "categories": categories,
+        "category_counts": category_counts,
+        "file_count": uploads_count
+    }

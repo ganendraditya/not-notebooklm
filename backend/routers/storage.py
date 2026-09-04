@@ -35,40 +35,16 @@ class FileItem(BaseModel):
 
 @router.get("/summary", response_model=StorageSummary)
 def get_storage_summary(db: Session = Depends(get_db)):
-    total_bytes = 10 * 1024 * 1024 * 1024  # Example: 10GB quota
-    used_bytes = 0
-    categories = {"images": 0, "documents": 0, "others": 0}
-    category_counts = {"images": 0, "documents": 0, "others": 0}
-    file_count = 0
+    from services.storage_service import get_unified_storage_summary
+    from database import DB_PATH
+    data = get_unified_storage_summary(DB_PATH)
     
-    if os.path.exists(UPLOAD_DIR):
-        for root, dirs, files in os.walk(UPLOAD_DIR):
-            for file in files:
-                file_path = os.path.join(root, file)
-                try:
-                    size = os.path.getsize(file_path)
-                    used_bytes += size
-                    file_count += 1
-                    
-                    ext = file.split('.')[-1].lower() if '.' in file else ''
-                    if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']:
-                        categories["images"] += size
-                        category_counts["images"] += 1
-                    elif ext in ['pdf', 'txt', 'md', 'docx', 'csv', 'xlsx', 'pptx', 'json', 'glb', 'gltf']:
-                        categories["documents"] += size
-                        category_counts["documents"] += 1
-                    else:
-                        categories["others"] += size
-                        category_counts["others"] += 1
-                except Exception:
-                    pass
-
     return StorageSummary(
-        total_bytes=total_bytes,
-        used_bytes=used_bytes,
-        categories=categories,
-        category_counts=category_counts,
-        file_count=file_count
+        total_bytes=data["total_bytes"],
+        used_bytes=data["used_bytes"],
+        categories=data["categories"],
+        category_counts=data["category_counts"],
+        file_count=data["file_count"]
     )
 
 @router.get("/files", response_model=List[FileItem])

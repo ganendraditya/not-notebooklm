@@ -15,6 +15,18 @@ import pdf_exporter
 
 logger = logging.getLogger("uvicorn.error")
 
+def inspect_document_file_status(chat_id: str, filename: str) -> bool:
+    """Checks if a document file exists on disk and is a valid binary PDF >= 35KB."""
+    fp = get_doc_file_path(chat_id, filename)
+    if os.path.exists(fp) and os.path.getsize(fp) >= 35000:
+        try:
+            with open(fp, "rb") as f:
+                fb = f.read(2048)
+                return is_authentic_pdf_bytes(fb)
+        except Exception:
+            return False
+    return False
+
 async def check_and_fetch_authentic_pdf_on_demand(doc: Document, file_path: str) -> Tuple[bool, str]:
     """
     Validates if local file is authentic PDF. If not, but document has OA metadata,

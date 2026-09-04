@@ -55,125 +55,111 @@ load_dotenv()
 # Setup variables
 Settings.embed_model = embed_model
 
-_CACHED_LLM_INSTANCES = None
+_CACHED_MAIN_LLM = None
+_CACHED_FAST_LLM = None
 _CACHED_CONFIG_HASH = None
 
 def _get_env_config_signature():
     """Generates a snapshot of active LLM environment variables to detect config changes."""
     return (
-        os.getenv("LLM_PROVIDER", ""),
         os.getenv("NINEROUTER_BASE_URL", ""),
         os.getenv("NINEROUTER_API_KEY", ""),
         os.getenv("NINEROUTER_MODEL", ""),
-        os.getenv("GEMINI_API_KEY", ""),
-        os.getenv("GROQ_API_KEY", ""),
-        os.getenv("FREELLMAPI_BASE_URL", ""),
-        os.getenv("FREELLMAPI_API_KEY", ""),
-        os.getenv("FREELLMAPI_MODEL", "")
+        os.getenv("NINEROUTER_FAST_MODEL", ""),
+        os.getenv("GEMINI_API_KEY", "")
     )
 
 def clear_llm_cache():
     """Clears cached LLM instances, forcing fresh recreation on next query."""
-    global _CACHED_LLM_INSTANCES, _CACHED_CONFIG_HASH
-    _CACHED_LLM_INSTANCES = None
+    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
+    _CACHED_MAIN_LLM = None
+    _CACHED_FAST_LLM = None
     _CACHED_CONFIG_HASH = None
 
-def get_llm_factory(provider_override: Optional[str] = None, force_refresh: bool = False):
+def get_main_llm(force_refresh: bool = False):
     """
-    Thread-safe Singleton Factory function that returns cached LLM instances.
-    Only recreates client instances if configuration changed or force_refresh=True.
+    Returns the Primary / Heavy LLM (Gemini 3.7 Flash High).
+    Used for deep synthesis, workspace analysis, and reasoning.
     """
-    global _CACHED_LLM_INSTANCES, _CACHED_CONFIG_HASH
-    
+    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
     current_sig = _get_env_config_signature()
-    if not force_refresh and _CACHED_LLM_INSTANCES is not None and _CACHED_CONFIG_HASH == current_sig:
-        return _CACHED_LLM_INSTANCES
+    if not force_refresh and _CACHED_MAIN_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
+        return _CACHED_MAIN_LLM
 
     ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:3000/v1")
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY")
-    ninerouter_model = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
-    
-    n_llm = None
-    if ninerouter_key and not ninerouter_key.startswith("your_"):
-        try:
-            n_llm = OpenAILike(
-                api_base=ninerouter_url,
-                api_key=ninerouter_key,
-                model=ninerouter_model,
-                is_chat_model=True,
-                is_function_calling_model=True,
-                max_tokens=8192,
-                timeout=90.0
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] 9Router initialization failed: {e}")
+    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "dummy_key")
+    main_model = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
 
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    groq_key = os.getenv("GROQ_API_KEY")
-    freellm_url = os.getenv("FREELLMAPI_BASE_URL", "http://localhost:3001/v1")
-    freellm_key = os.getenv("FREELLMAPI_API_KEY", "dummy")
-    freellm_model = os.getenv("FREELLMAPI_MODEL", "gpt-oss-120b")
-    
-    fl_llm = None
-    if freellm_key and not freellm_key.startswith("your_") and freellm_key != "dummy":
-        try:
-            fl_llm = OpenAILike(
-                api_base=freellm_url,
-                api_key=freellm_key,
-                model=freellm_model or "gpt-4o-mini",
-                is_chat_model=True,
-                is_function_calling_model=True,
-                max_tokens=8192,
-                timeout=90.0
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] FreeLLMAPI not configured: {e}")
-    
-    gm_llm = None
-    if gemini_key and not gemini_key.startswith("your_"):
-        try:
-            gm_llm = Gemini(
-                model="models/gemini-2.0-flash", 
-                api_key=gemini_key,
-                max_tokens=8192
-            )
-        except Exception as e:
+    try:
+        _CACHED_MAIN_LLM = OpenAILike(
+            api_base=ninerouter_url,
+            api_key=ninerouter_key,
+            model=main_model,
+            is_chat_model=True,
+            is_function_calling_model=True,
+            max_tokens=8192,
+            timeout=120.0
+        )
+    except Exception as e:
+        logger.warning(f"[RAG Engine] Main LLM (9Router) init failed: {e}")
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if gemini_key and not gemini_key.startswith("your_"):
             try:
-                gm_llm = Gemini(
-                    model="models/gemini-2.5-flash", 
+                _CACHED_MAIN_LLM = Gemini(
+                    model="models/gemini-2.5-flash",
                     api_key=gemini_key,
                     max_tokens=8192
                 )
-            except Exception as e2:
-                logger.warning(f"[RAG Engine] Gemini initialization failed: {e2}")
-            
-    gq_llm = None
-    if groq_key and not groq_key.startswith("your_"):
-        try:
-            gq_llm = Groq(
-                model="llama-3.3-70b-versatile", 
-                api_key=groq_key,
-                max_tokens=8192
-            )
-        except Exception as e:
-            try:
-                gq_llm = Groq(
-                    model="llama-3.1-8b-instant", 
-                    api_key=groq_key,
-                    max_tokens=8192
-                )
-            except Exception as e2:
-                logger.warning(f"[RAG Engine] Groq initialization failed: {e2}")
-            
-    _CACHED_LLM_INSTANCES = (n_llm, fl_llm, gm_llm, gq_llm)
+            except Exception as ge:
+                logger.error(f"[RAG Engine] Direct Gemini fallback failed: {ge}")
+                _CACHED_MAIN_LLM = None
+
     _CACHED_CONFIG_HASH = current_sig
-    return _CACHED_LLM_INSTANCES
+    return _CACHED_MAIN_LLM
+
+def get_fast_llm(force_refresh: bool = False):
+    """
+    Returns the Fast / Lite LLM (Gemini 2.0 Flash Lite / 2.5 Flash).
+    Used for rapid micro-tasks: intent classification, query planning, paper judging, title generation, and rubric checks.
+    """
+    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
+    current_sig = _get_env_config_signature()
+    if not force_refresh and _CACHED_FAST_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
+        return _CACHED_FAST_LLM
+
+    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:3000/v1")
+    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "dummy_key")
+    fast_model = os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-2.5-flash")
+
+    try:
+        _CACHED_FAST_LLM = OpenAILike(
+            api_base=ninerouter_url,
+            api_key=ninerouter_key,
+            model=fast_model,
+            is_chat_model=True,
+            is_function_calling_model=True,
+            max_tokens=4096,
+            timeout=45.0
+        )
+    except Exception as e:
+        logger.warning(f"[RAG Engine] Fast LLM (9Router) init failed: {e}")
+        # Fallback to main LLM if fast model creation fails
+        _CACHED_FAST_LLM = get_main_llm(force_refresh=force_refresh)
+
+    _CACHED_CONFIG_HASH = current_sig
+    return _CACHED_FAST_LLM
+
+def get_llm_factory(provider_override: Optional[str] = None, force_refresh: bool = False):
+    """Singleton helper returning (main_llm, fast_llm)."""
+    return get_main_llm(force_refresh=force_refresh), get_fast_llm(force_refresh=force_refresh)
 
 def create_llm_instances(force_refresh: bool = False):
-    """Backward compatibility wrapper."""
-    return get_llm_factory(force_refresh=force_refresh)
+    """Backward compatibility helper returning (main_llm, fast_llm, None, None)."""
+    main_llm, fast_llm = get_llm_factory(force_refresh=force_refresh)
+    return main_llm, fast_llm, None, None
 
-# Module-level aliases for backward compatibility
+main_llm = None
+fast_llm = None
 ninerouter_llm = None
 freellm_llm = None
 gemini_llm = None
@@ -305,9 +291,14 @@ def fetch_and_ingest_doi(doi: str, chat_id: str) -> str:
             return f"Open Access URL not found for DOI {clean_doi}."
             
         logger.info(f"[Agent] Downloading PDF from {pdf_url}")
-        pdf_resp = requests.get(pdf_url, timeout=20)
+        pdf_resp = requests.get(pdf_url, timeout=20, headers={"User-Agent": "NotbookLM-Research/1.0"})
         if pdf_resp.status_code != 200:
             return f"Failed to download PDF from {pdf_url}."
+
+        # Safety Check: Verify Content-Type & Authentic PDF Magic Bytes
+        from utils.pdf_utils import is_authentic_pdf_bytes
+        if not is_authentic_pdf_bytes(pdf_resp.content[:2048], min_size=1000):
+            return f"The Open Access URL for DOI {clean_doi} did not return a valid binary PDF (possible HTML landing page redirect)."
             
         import tempfile
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
@@ -344,11 +335,9 @@ async def generate_chat_title(first_user_message: str) -> str:
         fallback_title = clean_prompt[:35]
     fallback_title = fallback_title.title()[:45].strip()
 
-    # Dynamic per-request LLM instance creation (Thread-safe)
-    n_llm, fl_llm, gm_llm, gq_llm = get_llm_factory()
-    candidate_llms = [cand for cand in [n_llm, gm_llm, gq_llm, fl_llm] if cand is not None]
-
-    if not candidate_llms:
+    # Use Fast LLM for rapid, lightweight title generation
+    fast_llm_instance = get_fast_llm()
+    if not fast_llm_instance:
         return fallback_title or "New Research"
 
     title_prompt = (
@@ -363,16 +352,14 @@ async def generate_chat_title(first_user_message: str) -> str:
         "Title:"
     )
 
-    for llm in candidate_llms:
-        try:
-            resp = await llm.acomplete(title_prompt)
-            raw_title = resp.text.strip().strip('"\'*`#').strip()
-            raw_title = re.sub(r'^(Title|Judul|Topic)\s*:\s*', '', raw_title, flags=re.I).strip()
-            if raw_title and len(raw_title) >= 3:
-                return raw_title[:45].strip()
-        except Exception as e:
-            logger.debug(f"[Chat Title Gen Error]: {e}")
-            continue
+    try:
+        resp = await fast_llm_instance.acomplete(title_prompt)
+        raw_title = resp.text.strip().strip('"\'*`#').strip()
+        raw_title = re.sub(r'^(Title|Judul|Topic)\s*:\s*', '', raw_title, flags=re.I).strip()
+        if raw_title and len(raw_title) >= 3:
+            return raw_title[:45].strip()
+    except Exception as e:
+        logger.debug(f"[Chat Title Gen Error]: {e}")
 
     return fallback_title or "New Research"
 
@@ -464,28 +451,17 @@ def build_rag_tools(chat_id: str, has_local_docs: bool, query_engine: Any) -> Li
     return [local_search_tool, web_tool, doi_tool]
 
 def get_candidate_llm_chain():
-    """Builds prioritized list of candidate LLMs based on configuration and active keys."""
-    n_llm, fl_llm, gm_llm, gq_llm = create_llm_instances()
-    selected_provider = os.getenv("LLM_PROVIDER", "9router").lower()
+    """Builds prioritized list of candidate LLMs (Main Synthesizer with fallback)."""
+    main_instance = get_main_llm()
+    fast_instance = get_fast_llm()
     
     candidate_llms = []
-    if selected_provider == "9router" and n_llm:
-        candidate_llms.append((n_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"))
-    elif selected_provider == "freellmapi" and fl_llm:
-        candidate_llms.append((fl_llm, f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})"))
-    elif selected_provider == "groq" and gq_llm:
-        candidate_llms.append((gq_llm, "Groq (Llama 3.3 70B)"))
-    elif selected_provider == "gemini" and gm_llm:
-        candidate_llms.append((gm_llm, "Google Gemini Flash"))
-
-    for llm_inst, name in [
-        (n_llm, f"9Router ({os.getenv('NINEROUTER_MODEL', 'ag/gemini-3.7-flash-high')})"),
-        (gq_llm, "Groq (Llama 3.3 70B)"),
-        (gm_llm, "Google Gemini Flash"),
-        (fl_llm, f"FreeLLMAPI ({os.getenv('FREELLMAPI_MODEL', 'gpt-oss-120b')})")
-    ]:
-        if llm_inst and not any(cand[0] == llm_inst for cand in candidate_llms):
-            candidate_llms.append((llm_inst, name))
+    if main_instance:
+        main_model_name = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
+        candidate_llms.append((main_instance, f"Main LLM ({main_model_name})"))
+    if fast_instance and fast_instance != main_instance:
+        fast_model_name = os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-2.5-flash")
+        candidate_llms.append((fast_instance, f"Fast Lite LLM ({fast_model_name})"))
             
     return candidate_llms
 
@@ -610,12 +586,15 @@ async def query_chat(
     if not candidate_llms:
         return "Error: Tidak ada LLM Provider yang terkonfigurasi. Silakan periksa file .env."
 
+    # Intent classification is performed ultra-fast via Fast Lite LLM
+    fast_instance = get_fast_llm() or (candidate_llms[0][0] if candidate_llms else None)
+    intent = await classify_user_intent(query, has_local_docs, len(local_docs), fast_instance)
+    logger.info(f"[RAG Engine] Fast LLM Semantic Intent: {intent}")
+
     last_err = None
     for cand_idx, (curr_llm, curr_name) in enumerate(candidate_llms):
         try:
-            logger.info(f"[RAG Engine] Attempting query with LLM [{cand_idx+1}/{len(candidate_llms)}]: {curr_name}")
-            intent = await classify_user_intent(query, has_local_docs, len(local_docs), curr_llm)
-            logger.info(f"[RAG Engine] LLM Semantic Intent: {intent}")
+            logger.info(f"[RAG Engine] Executing pipeline with Primary LLM [{cand_idx+1}/{len(candidate_llms)}]: {curr_name}")
             
             return await dispatch_intent_pipeline(
                 intent=intent,

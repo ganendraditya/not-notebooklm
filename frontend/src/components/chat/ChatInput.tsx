@@ -15,7 +15,6 @@ import {
   FileSpreadsheet
 } from "lucide-react";
 import { TargetedSource } from "@/stores/documentStore";
-import ModelSelector from "@/components/ModelSelector";
 import SearchFilterPopover from "@/components/SearchFilterPopover";
 import { Portal } from "@/components/ui/Portal";
 import { type SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/lib/constants/academicFilters";
@@ -574,8 +573,8 @@ export const ChatInputBox = memo(function ChatInputBox({
 
         {/* Bottom Actions Row */}
         <div className="flex items-center justify-between gap-1.5 pt-2 px-1 w-full min-w-0">
-          {/* Left: + Button & ModelSelector */}
-          <div className="flex items-center gap-1 min-w-0 flex-1">
+          {/* Left: + Button */}
+          <div className="flex items-center gap-1 min-w-0">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -592,9 +591,6 @@ export const ChatInputBox = memo(function ChatInputBox({
               accept=".pdf,.docx,.doc,.txt,.md,.csv,.tsv,.bib,.bibtex,.ris,image/jpeg,image/png,image/webp,image/gif" 
               onChange={(e) => handleFileUpload(e.target.files)}
             />
-            <div className="min-w-0 flex-shrink">
-              <ModelSelector backendUrl={backendUrl} />
-            </div>
           </div>
 
           {/* Right: Filter, Sources Badge, and Send/Stop Button */}

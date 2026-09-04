@@ -237,15 +237,14 @@ def test_doi_cleaning_and_pdf_validation():
     authentic_pdf = b"%PDF-1.7 " + b"a" * 40000
     assert is_authentic_pdf_bytes(authentic_pdf)
 
-def test_select_llm_validation():
-    """Verify select_llm endpoint rejects disallowed providers and malformed model names."""
-    res_invalid_provider = client.post("/llm/select", json={"provider": "malicious_provider"})
-    assert res_invalid_provider.status_code == 400
-    assert "Invalid provider" in res_invalid_provider.json()["detail"]
-
-    res_invalid_chars = client.post("/llm/select", json={"provider": "9router", "model_name": "model; rm -rf /"})
-    assert res_invalid_chars.status_code == 400
-    assert "Invalid characters" in res_invalid_chars.json()["detail"]
+def test_llm_models_info_endpoint():
+    """Verify active LLM models endpoint returns two-tier architecture status."""
+    res = client.get("/llm/models")
+    assert res.status_code == 200
+    data = res.json()
+    assert data.get("tiered_architecture") is True
+    assert "main_model" in data
+    assert "fast_model" in data
 
 def test_storage_path_traversal_protection():
     """Verify storage download and delete prevent directory traversal attempts."""

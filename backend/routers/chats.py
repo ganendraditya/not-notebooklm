@@ -46,21 +46,10 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
         
     sorted_docs = sorted(chat.documents, key=lambda d: d.id)
     doc_responses = []
-    from helpers import get_doc_file_path
-    import pdf_exporter
+    from services.document.content_service import inspect_document_file_status
     
     for idx, d in enumerate(sorted_docs, start=1):
-        fp = get_doc_file_path(chat_id, d.filename)
-        has_pdf = False
-        if os.path.exists(fp) and os.path.getsize(fp) >= 35000:
-            try:
-                from helpers import is_authentic_pdf_bytes
-                with open(fp, "rb") as f:
-                    fb = f.read(2048)
-                    has_pdf = is_authentic_pdf_bytes(fb)
-            except Exception:
-                has_pdf = False
-                
+        has_pdf = inspect_document_file_status(chat_id, d.filename)
         doc_responses.append(models.DocumentResponse(
             id=d.id,
             filename=d.filename,

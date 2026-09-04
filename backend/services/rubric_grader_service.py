@@ -7,6 +7,9 @@ from llama_index.core.llms import LLM
 
 logger = logging.getLogger("uvicorn.error")
 
+MIN_GROUNDING_THRESHOLD = 0.85
+MIN_ACADEMIC_QUALITY_THRESHOLD = 0.85
+
 class RubricEvaluationResult(BaseModel):
     """
     Structured outcome of the Rubric-Checked Grounding evaluation.
@@ -148,7 +151,7 @@ async def evaluate_response_grounding(
         logger.warning(f"[RubricGrader] Evaluation execution failed: {e}")
         return RubricEvaluationResult(
             is_grounded=True,
-            grounding_score=0.9,
+            grounding_score=MIN_GROUNDING_THRESHOLD,
             citation_accuracy=True,
             hallucinated_claims=[],
             revision_instruction=None

@@ -21,8 +21,11 @@ async def handle_academic_search_pipeline(
     report_status
 ) -> str:
     """Discovers, filters, audits, and synthesizes scholarly literature."""
+    from rag.engine import get_fast_llm
+    fast_llm = get_fast_llm() or target_llm
+
     await report_status("Planning academic query parameters & search terms...")
-    plan = await plan_academic_search(query, formatted_history, target_llm)
+    plan = await plan_academic_search(query, formatted_history, fast_llm)
     
     target_count = plan.get('target_count', 15)
     # Request 2x candidate pool so AI Judge has plenty of candidates to audit & filter
@@ -36,9 +39,9 @@ async def handle_academic_search_pipeline(
     if not raw_papers:
         return f"Maaf, tidak ditemukan paper ilmiah yang cocok dengan kriteria pencarian untuk topik: '{query}'."
 
-    # AI Relevance Judge: Evaluate paper summaries, audit domain relevance, and discard any irrelevant papers
+    # Fast AI Relevance Judge: Evaluate paper summaries, audit domain relevance, and discard any noise
     await report_status("AI Auditor evaluating paper relevance & filtering noise...")
-    papers = await judge_and_filter_papers_with_llm(query, raw_papers, target_count, target_llm)
+    papers = await judge_and_filter_papers_with_llm(query, raw_papers, target_count, fast_llm)
     if not papers:
         papers = raw_papers[:target_count]
 
