@@ -27,7 +27,7 @@ def inspect_document_file_status(chat_id: str, filename: str) -> bool:
             return False
     return False
 
-async def check_and_fetch_authentic_pdf_on_demand(doc: Document, file_path: str) -> Tuple[bool, str]:
+async def check_and_fetch_authentic_pdf_on_demand(doc: Any, file_path: str) -> Tuple[bool, str]:
     """
     Validates if local file is authentic PDF. If not, but document has OA metadata,
     it attempts an on-demand background fetch from open-access repositories.
@@ -48,16 +48,24 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Document, file_path: str)
 
     new_content = ""
 
+    # Helper getters to support both SQLAlchemy Document and plain DTO dicts
+    doc_is_oa = doc.get("is_oa") if isinstance(doc, dict) else getattr(doc, "is_oa", False)
+    doc_pdf_url = doc.get("pdf_url") if isinstance(doc, dict) else getattr(doc, "pdf_url", None)
+    doc_doi = doc.get("doi") if isinstance(doc, dict) else getattr(doc, "doi", None)
+    doc_title = doc.get("title") if isinstance(doc, dict) else getattr(doc, "title", "")
+    doc_url = doc.get("url") if isinstance(doc, dict) else getattr(doc, "url", "")
+    doc_id = doc.get("id") if isinstance(doc, dict) else getattr(doc, "id", None)
+
     # 2. On-demand fallback: if doc is OA or has PDF link but local file is not PDF, try fast download
-    if not is_authentic_pdf and (doc.is_oa or doc.pdf_url or doc.doi):
-        db_doi = clean_doi(doc.doi)
+    if not is_authentic_pdf and (doc_is_oa or doc_pdf_url or doc_doi):
+        db_doi = clean_doi(doc_doi)
         try:
             fetched_oa = await asyncio.to_thread(
                 pdf_exporter.resolve_and_fetch_authentic_pdf,
                 doi=db_doi,
-                title=doc.title,
-                direct_url=doc.url or "",
-                candidate_pdf_url=doc.pdf_url or ""
+                title=doc_title,
+                direct_url=doc_url or "",
+                candidate_pdf_url=doc_pdf_url or ""
             )
             if fetched_oa and is_authentic_pdf_bytes(fetched_oa, min_size=1000):
                 dir_name = os.path.dirname(file_path)
@@ -70,12 +78,15 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Document, file_path: str)
                     try:
                         from database import SessionLocal, Document as DBDocument
                         db = SessionLocal()
-                        db_doc = db.query(DBDocument).filter(DBDocument.id == doc.id).first()
+                        db_doc = db.query(DBDocument).filter(DBDocument.id == doc_id).first()
                         if db_doc:
                             db_doc.filename = pdf_base_name
                             db_doc.access_status = "Open Access (Full PDF Available)"
                             db_doc.is_oa = True
-                            doc.filename = pdf_base_name
+                            if isinstance(doc, dict):
+                                doc["filename"] = pdf_base_name
+                            else:
+                                doc.filename = pdf_base_name
                             db.commit()
                         db.close()
                     except Exception as db_err:

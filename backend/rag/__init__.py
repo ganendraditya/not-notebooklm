@@ -59,6 +59,7 @@ from .vector_store import (
     vector_store,
     qdrant_client,
     delete_document_vectors,
+    delete_qdrant_vectors,
 )
 
 from .streamer import (
@@ -123,6 +124,7 @@ __all__ = [
     "embed_model",
     "vector_store",
     "qdrant_client",
+    "delete_document_vectors",
     "delete_qdrant_vectors",
     # Streamer
     "parse_sse_stream",

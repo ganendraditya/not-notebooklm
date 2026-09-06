@@ -2,30 +2,30 @@ import os
 import json
 import asyncio
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any, Optional
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 from database import SessionLocal, Document as DBDocument
 from rag.prompts import get_workspace_analysis_system_prompt
 from rag.formatters import format_clean_response
+from rag.parsers import parse_document_to_markdown
 from utils.file_utils import get_doc_file_path
 from services.rubric_grader_service import evaluate_response_grounding
-from utils.file_utils import get_doc_file_path
 
 logger = logging.getLogger("uvicorn.error")
 
-def _load_single_doc_snippet(idx_fname_chat: tuple, db_records: Dict[str, Any], total_doc_count: int) -> tuple:
+async def _load_single_doc_snippet_async(idx_fname_chat: tuple, db_records: Dict[str, Any], total_doc_count: int) -> Tuple[bool, str]:
     """Helper that reads and formats text from a single document record or file on disk."""
     i, fname, chat_id = idx_fname_chat
     fpath = get_doc_file_path(chat_id, fname)
     content_snippet = ""
-    db_record = db_records.get(fname)
+    db_record = db_records.get(fname, {})
     is_full_paper = False
     
     # 1. Try parsing full document text properly (PDF/DOCX/TXT/MD)
     if os.path.exists(fpath):
         fsize = os.path.getsize(fpath)
         try:
-            parsed_text = parse_document_to_markdown(fpath)
+            parsed_text = await asyncio.to_thread(parse_document_to_markdown, fpath)
             if parsed_text and len(parsed_text.strip()) >= 150:
                 if "NOTBOOKLM" in parsed_text:
                     is_full_paper = False
@@ -41,17 +41,18 @@ def _load_single_doc_snippet(idx_fname_chat: tuple, db_records: Dict[str, Any], 
             logger.debug(f"[Workspace Pipeline] Doc Parse Error for {fname}: {parse_err}")
 
     # 1b. If not full paper, attempt on-demand OA PDF fetch
-    if (not is_full_paper) and db_record and (db_record.is_oa or db_record.pdf_url or db_record.doi):
+    if (not is_full_paper) and db_record and (db_record.get("is_oa") or db_record.get("pdf_url") or db_record.get("doi")):
         try:
             from services.document_service import check_and_fetch_authentic_pdf_on_demand
-            fetched_ok, new_md = asyncio.run(check_and_fetch_authentic_pdf_on_demand(db_record, fpath))
+            fetched_ok, new_md = await check_and_fetch_authentic_pdf_on_demand(db_record, fpath)
             if fetched_ok:
-                if db_record.filename:
-                    fpath = get_doc_file_path(chat_id, db_record.filename)
-                    fname = db_record.filename
+                new_fname = db_record.get("filename")
+                if new_fname:
+                    fpath = get_doc_file_path(chat_id, new_fname)
+                    fname = new_fname
 
                 try:
-                    parsed_text = parse_document_to_markdown(fpath)
+                    parsed_text = await asyncio.to_thread(parse_document_to_markdown, fpath)
                     if parsed_text and len(parsed_text.strip()) >= 150 and "NOTBOOKLM" not in parsed_text:
                         is_full_paper = True
                         max_chars = 48000 if total_doc_count > 20 else 80000
@@ -68,11 +69,11 @@ def _load_single_doc_snippet(idx_fname_chat: tuple, db_records: Dict[str, Any], 
     # 2. If physical file parse failed or short stub: read from DB metadata
     if (not is_full_paper) and db_record:
         meta_parts = []
-        d_title = db_record.title or fname.replace(".pdf", "").replace("_", " ")
-        d_year = db_record.year or ""
-        d_venue = db_record.journal or db_record.venue or ""
-        d_doi = db_record.doi or ""
-        d_abstract = db_record.abstract or db_record.snippet or ""
+        d_title = db_record.get("title") or fname.replace(".pdf", "").replace("_", " ")
+        d_year = db_record.get("year") or ""
+        d_venue = db_record.get("journal") or db_record.get("venue") or ""
+        d_doi = db_record.get("doi") or ""
+        d_abstract = db_record.get("abstract") or db_record.get("snippet") or ""
         
         meta_parts.append(f"# {d_title} ({d_year})")
         if d_venue: meta_parts.append(f"**Venue/Journal:** {d_venue}")
@@ -87,12 +88,12 @@ def _load_single_doc_snippet(idx_fname_chat: tuple, db_records: Dict[str, Any], 
     if not content_snippet:
         content_snippet = f"(Dokumen: {fname})"
         
-    doc_display_title = (db_record.title if db_record and db_record.title else fname.replace(".pdf", "").replace("_", " ").strip())
+    doc_display_title = (db_record.get("title") if db_record and db_record.get("title") else fname.replace(".pdf", "").replace("_", " ").strip())
     if doc_display_title.isupper() and len(doc_display_title) > 8:
         doc_display_title = doc_display_title.title()
 
     status_label = "NASKAH LENGKAP TERSEDIA (Full-Text Original PDF Downloaded - Seluruh Bab Lengkap Ada)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Only)"
-    has_doi_label = f"DOI Resmi: {db_record.doi}" if (db_record and db_record.doi) else "DOI Resmi: Tidak Ada / Repositori Kampus"
+    has_doi_label = f"DOI Resmi: {db_record.get('doi')}" if (db_record and db_record.get("doi")) else "DOI Resmi: Tidak Ada / Repositori Kampus"
 
     return (
         is_full_paper,
@@ -107,6 +108,9 @@ def _load_single_doc_snippet(idx_fname_chat: tuple, db_records: Dict[str, Any], 
         )
     )
 
+# Backward-compatibility alias
+_load_single_doc_snippet = _load_single_doc_snippet_async
+
 async def handle_workspace_analysis_pipeline(
     chat_id: str,
     query: str,
@@ -118,17 +122,30 @@ async def handle_workspace_analysis_pipeline(
     """Direct full-context comparative synthesis for loaded workspace documents."""
     await report_status("Reading full content of all loaded documents...")
     
-    db_records = {}
+    db_records: Dict[str, Any] = {}
     db = SessionLocal()
     try:
-        for db_d in db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all():
-            db_records[db_d.filename] = db_d
+        for d in db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all():
+            db_records[d.filename] = {
+                "id": d.id,
+                "title": d.title,
+                "year": d.year,
+                "journal": d.journal,
+                "venue": d.venue,
+                "doi": d.doi,
+                "url": d.url,
+                "pdf_url": d.pdf_url,
+                "abstract": d.abstract,
+                "snippet": d.snippet,
+                "is_oa": d.is_oa,
+                "filename": d.filename,
+            }
     finally:
         db.close()
 
     total_doc_count = len(local_docs)
     loaded_results = await asyncio.gather(
-        *(asyncio.to_thread(_load_single_doc_snippet, (i, fname, chat_id), db_records, total_doc_count) for i, fname in enumerate(local_docs))
+        *(_load_single_doc_snippet_async((i, fname, chat_id), db_records, total_doc_count) for i, fname in enumerate(local_docs))
     )
     
     full_docs_context = "\n\n".join([snippet for _, snippet in loaded_results])

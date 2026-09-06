@@ -255,5 +255,61 @@ def test_storage_path_traversal_protection():
     res_dl_traversal = client.post("/storage/download", json={"file_ids": ["../../secret.txt"]})
     assert res_dl_traversal.status_code in (400, 404)
 
+@pytest.mark.asyncio
+async def test_workspace_pipeline_execution():
+    """Verify workspace analysis pipeline executes without DetachedInstanceError or import errors."""
+    from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
+    from unittest.mock import AsyncMock, MagicMock
+    from database import SessionLocal, Document as DBDocument
+
+    dummy_chat_id = "test_ws_chat_123"
+    db = SessionLocal()
+    try:
+        dummy_doc = DBDocument(
+            chat_id=dummy_chat_id,
+            filename="test_paper.pdf",
+            title="Testing Modern RAG Pipeline",
+            year=2024,
+            abstract="This is a test abstract.",
+            snippet="Overview snippet",
+            is_oa=False
+        )
+        db.add(dummy_doc)
+        db.commit()
+    finally:
+        db.close()
+
+    try:
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.message.content = "Hasil analisis sintesis dokumen."
+        mock_llm.achat = AsyncMock(return_value=mock_response)
+
+        async def mock_status(text):
+            pass
+
+        result = await handle_workspace_analysis_pipeline(
+            chat_id=dummy_chat_id,
+            query="Bandingkan metode paper",
+            local_docs=["test_paper.pdf"],
+            formatted_history=[],
+            target_llm=mock_llm,
+            report_status=mock_status
+        )
+        assert "Hasil analisis sintesis" in result
+    finally:
+        db = SessionLocal()
+        db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat_id).delete()
+        db.commit()
+        db.close()
+
+def test_rag_exports_and_aliases():
+    """Verify delete_document_vectors and backward-compat delete_qdrant_vectors export properly."""
+    import rag
+    assert hasattr(rag, "delete_document_vectors")
+    assert hasattr(rag, "delete_qdrant_vectors")
+    assert rag.delete_qdrant_vectors is rag.delete_document_vectors
+
+
 
 

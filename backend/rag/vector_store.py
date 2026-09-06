@@ -113,3 +113,6 @@ def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
 
 # Initialize singletons
 embed_model, vector_store = init_embedding_and_vector_store()
+
+# Backward-compatibility alias
+delete_qdrant_vectors = delete_document_vectors
