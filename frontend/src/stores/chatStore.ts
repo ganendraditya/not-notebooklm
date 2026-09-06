@@ -23,6 +23,7 @@ export interface ChatMessage {
   attachments?: Attachment[];
   variants?: string[];
   active_variant_index?: number;
+  isStreaming?: boolean;
 }
 
 interface ChatStore {

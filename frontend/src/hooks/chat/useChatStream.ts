@@ -107,10 +107,34 @@ export function useChatStream(
               setActiveStatus(statusText);
             }
           }
+        } else if (data.type === "delta") {
+          const chunkText = data.text ?? data.data ?? "";
+          if (chunkText && activeChatIdRef.current === targetChatId) {
+            updateMessagesList(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+                return [
+                  ...prev.slice(0, -1),
+                  { ...lastMsg, content: lastMsg.content + chunkText }
+                ];
+              } else {
+                return [
+                  ...prev,
+                  { role: "assistant", content: chunkText, created_at: new Date().toISOString(), isStreaming: true }
+                ];
+              }
+            });
+          }
         } else if (data.type === "done") {
           const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
           if (activeChatIdRef.current === targetChatId) {
-            updateMessagesList(prev => [...prev, asstMsg]);
+            updateMessagesList(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+                return [...prev.slice(0, -1), { ...asstMsg, isStreaming: false }];
+              }
+              return [...prev, asstMsg];
+            });
           }
 
           // Trigger Windows / Browser notification if user is away in another tab
@@ -325,10 +349,34 @@ export function useChatStream(
               setActiveStatus(statusText);
             }
           }
+        } else if (data.type === "delta") {
+          const chunkText = data.text ?? data.data ?? "";
+          if (chunkText && activeChatIdRef.current === currentChatId) {
+            updateMessagesList(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+                return [
+                  ...prev.slice(0, -1),
+                  { ...lastMsg, content: lastMsg.content + chunkText }
+                ];
+              } else {
+                return [
+                  ...prev,
+                  { role: "assistant", content: chunkText, created_at: new Date().toISOString(), isStreaming: true }
+                ];
+              }
+            });
+          }
         } else if (data.type === "done") {
           const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
           if (activeChatIdRef.current === currentChatId) {
-            updateMessagesList(prev => [...prev, asstMsg]);
+            updateMessagesList(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+                return [...prev.slice(0, -1), { ...asstMsg, isStreaming: false }];
+              }
+              return [...prev, asstMsg];
+            });
           }
 
           const cleanPreview = (asstMsg.content || "")
@@ -445,6 +493,20 @@ export function useChatStream(
               setActiveStatus(statusText);
             }
           }
+        } else if (data.type === "delta") {
+          const chunkText = data.text ?? data.data ?? "";
+          if (chunkText && activeChatIdRef.current === currentChatId) {
+            updateMessagesList(prev => {
+              const next = [...prev];
+              const target = next[messageIndex];
+              if (target && target.role === "assistant") {
+                next[messageIndex] = { ...target, content: target.content + chunkText, isStreaming: true };
+              } else {
+                next[messageIndex] = { role: "assistant", content: chunkText, created_at: new Date().toISOString(), isStreaming: true };
+              }
+              return next;
+            });
+          }
         } else if (data.type === "done") {
           const asstMsg = data.message || {
             role: "assistant",
@@ -457,7 +519,7 @@ export function useChatStream(
             updateMessagesList(prev => {
               const next = prev.slice(0, messageIndex + 1);
               if (next[messageIndex]) {
-                next[messageIndex] = asstMsg;
+                next[messageIndex] = { ...asstMsg, isStreaming: false };
               } else {
                 next.push(asstMsg);
               }

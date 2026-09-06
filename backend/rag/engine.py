@@ -62,11 +62,14 @@ _CACHED_CONFIG_HASH = None
 def _get_env_config_signature():
     """Generates a snapshot of active LLM environment variables to detect config changes."""
     return (
+        os.getenv("LLM_PROVIDER", ""),
         os.getenv("NINEROUTER_BASE_URL", ""),
         os.getenv("NINEROUTER_API_KEY", ""),
         os.getenv("NINEROUTER_MODEL", ""),
         os.getenv("NINEROUTER_FAST_MODEL", ""),
-        os.getenv("GEMINI_API_KEY", "")
+        os.getenv("GEMINI_API_KEY", ""),
+        os.getenv("GEMINI_MODEL", ""),
+        os.getenv("GROQ_API_KEY", "")
     )
 
 def clear_llm_cache():
@@ -78,48 +81,85 @@ def clear_llm_cache():
 
 def get_main_llm(force_refresh: bool = False):
     """
-    Returns the Primary / Heavy LLM (Gemini 3.7 Flash High).
-    Used for deep synthesis, workspace analysis, and reasoning.
+    Returns the Primary / Heavy LLM.
+    Priority:
+    1. If LLM_PROVIDER is 'gemini' or 9Router not configured: Direct Gemini.
+    2. If NINEROUTER_API_KEY is configured (not dummy): 9Router OpenAILike.
+    3. Direct Gemini Fallback.
+    4. Direct Groq Fallback.
     """
     global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
     current_sig = _get_env_config_signature()
     if not force_refresh and _CACHED_MAIN_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_MAIN_LLM
 
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:3000/v1")
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "dummy_key")
-    main_model = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
+    provider = os.getenv("LLM_PROVIDER", "").lower()
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    has_gemini = bool(gemini_key and not gemini_key.startswith("your_"))
+    
+    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "")
+    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "")
+    has_ninerouter = bool(ninerouter_key and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key")
 
-    try:
-        _CACHED_MAIN_LLM = OpenAILike(
-            api_base=ninerouter_url,
-            api_key=ninerouter_key,
-            model=main_model,
-            is_chat_model=True,
-            is_function_calling_model=True,
-            max_tokens=8192,
-            timeout=120.0
-        )
-    except Exception as e:
-        logger.warning(f"[RAG Engine] Main LLM (9Router) init failed: {e}")
-        gemini_key = os.getenv("GEMINI_API_KEY")
-        if gemini_key and not gemini_key.startswith("your_"):
-            try:
-                _CACHED_MAIN_LLM = Gemini(
-                    model="models/gemini-2.5-flash",
-                    api_key=gemini_key,
-                    max_tokens=8192
-                )
-            except Exception as ge:
-                logger.error(f"[RAG Engine] Direct Gemini fallback failed: {ge}")
-                _CACHED_MAIN_LLM = None
+    groq_key = os.getenv("GROQ_API_KEY")
+    has_groq = bool(groq_key and not groq_key.startswith("your_"))
+
+    _CACHED_MAIN_LLM = None
+
+    # Priority 1: Gemini if explicitly selected or if 9router not configured
+    if (provider == "gemini" or not has_ninerouter) and has_gemini:
+        try:
+            _CACHED_MAIN_LLM = Gemini(
+                model=os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash"),
+                api_key=gemini_key,
+                max_tokens=8192
+            )
+        except Exception as e:
+            logger.warning(f"[RAG Engine] Gemini init failed: {e}")
+
+    # Priority 2: 9Router
+    if _CACHED_MAIN_LLM is None and has_ninerouter:
+        try:
+            _CACHED_MAIN_LLM = OpenAILike(
+                api_base=ninerouter_url or "http://localhost:3000/v1",
+                api_key=ninerouter_key,
+                model=os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high"),
+                is_chat_model=True,
+                is_function_calling_model=True,
+                max_tokens=8192,
+                timeout=120.0
+            )
+        except Exception as e:
+            logger.warning(f"[RAG Engine] 9Router init failed: {e}")
+
+    # Priority 3: Groq fallback
+    if _CACHED_MAIN_LLM is None and has_groq:
+        try:
+            _CACHED_MAIN_LLM = Groq(
+                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                api_key=groq_key,
+                max_tokens=8192
+            )
+        except Exception as e:
+            logger.warning(f"[RAG Engine] Groq init failed: {e}")
+
+    # Final fallback if provider was not gemini but gemini is available
+    if _CACHED_MAIN_LLM is None and has_gemini:
+        try:
+            _CACHED_MAIN_LLM = Gemini(
+                model=os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash"),
+                api_key=gemini_key,
+                max_tokens=8192
+            )
+        except Exception as e:
+            logger.warning(f"[RAG Engine] Final Gemini fallback failed: {e}")
 
     _CACHED_CONFIG_HASH = current_sig
     return _CACHED_MAIN_LLM
 
 def get_fast_llm(force_refresh: bool = False):
     """
-    Returns the Fast / Lite LLM (Gemini 2.0 Flash Lite / 2.5 Flash).
+    Returns the Fast / Lite LLM.
     Used for rapid micro-tasks: intent classification, query planning, paper judging, title generation, and rubric checks.
     """
     global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
@@ -127,23 +167,54 @@ def get_fast_llm(force_refresh: bool = False):
     if not force_refresh and _CACHED_FAST_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_FAST_LLM
 
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "http://localhost:3000/v1")
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "dummy_key")
-    fast_model = os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-2.5-flash")
+    provider = os.getenv("LLM_PROVIDER", "").lower()
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    has_gemini = bool(gemini_key and not gemini_key.startswith("your_"))
+    
+    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "")
+    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "")
+    has_ninerouter = bool(ninerouter_key and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key")
 
-    try:
-        _CACHED_FAST_LLM = OpenAILike(
-            api_base=ninerouter_url,
-            api_key=ninerouter_key,
-            model=fast_model,
-            is_chat_model=True,
-            is_function_calling_model=True,
-            max_tokens=4096,
-            timeout=45.0
-        )
-    except Exception as e:
-        logger.warning(f"[RAG Engine] Fast LLM (9Router) init failed: {e}")
-        # Fallback to main LLM if fast model creation fails
+    groq_key = os.getenv("GROQ_API_KEY")
+    has_groq = bool(groq_key and not groq_key.startswith("your_"))
+
+    _CACHED_FAST_LLM = None
+
+    if (provider == "gemini" or not has_ninerouter) and has_gemini:
+        try:
+            _CACHED_FAST_LLM = Gemini(
+                model=os.getenv("GEMINI_FAST_MODEL", "models/gemini-3.5-flash-lite"),
+                api_key=gemini_key,
+                max_tokens=4096
+            )
+        except Exception as e:
+            logger.warning(f"[RAG Engine] Fast Gemini init failed: {e}")
+
+    if _CACHED_FAST_LLM is None and has_ninerouter:
+        try:
+            _CACHED_FAST_LLM = OpenAILike(
+                api_base=ninerouter_url or "http://localhost:3000/v1",
+                api_key=ninerouter_key,
+                model=os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-2.5-flash"),
+                is_chat_model=True,
+                is_function_calling_model=True,
+                max_tokens=4096,
+                timeout=45.0
+            )
+        except Exception as e:
+            logger.warning(f"[RAG Engine] Fast 9Router init failed: {e}")
+
+    if _CACHED_FAST_LLM is None and has_groq:
+        try:
+            _CACHED_FAST_LLM = Groq(
+                model=os.getenv("GROQ_FAST_MODEL", "llama-3.1-8b-instant"),
+                api_key=groq_key,
+                max_tokens=4096
+            )
+        except Exception as e:
+            logger.warning(f"[RAG Engine] Fast Groq init failed: {e}")
+
+    if _CACHED_FAST_LLM is None:
         _CACHED_FAST_LLM = get_main_llm(force_refresh=force_refresh)
 
     _CACHED_CONFIG_HASH = current_sig
@@ -335,6 +406,9 @@ async def generate_chat_title(first_user_message: str) -> str:
         fallback_title = clean_prompt[:35]
     fallback_title = fallback_title.title()[:45].strip()
 
+    if is_simple_conversational(first_user_message):
+        return fallback_title or "New Research"
+
     # Use Fast LLM for rapid, lightweight title generation
     fast_llm_instance = get_fast_llm()
     if not fast_llm_instance:
@@ -452,18 +526,77 @@ def build_rag_tools(chat_id: str, has_local_docs: bool, query_engine: Any) -> Li
 
 def get_candidate_llm_chain():
     """Builds prioritized list of candidate LLMs (Main Synthesizer with fallback)."""
+    candidate_llms = []
+    seen = set()
+
+    def add_candidate(inst, label):
+        if inst and id(inst) not in seen:
+            candidate_llms.append((inst, label))
+            seen.add(id(inst))
+
     main_instance = get_main_llm()
     fast_instance = get_fast_llm()
-    
-    candidate_llms = []
+
     if main_instance:
-        main_model_name = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
-        candidate_llms.append((main_instance, f"Main LLM ({main_model_name})"))
+        label = getattr(main_instance, "model", "default")
+        add_candidate(main_instance, f"Primary Synthesizer ({label})")
     if fast_instance and fast_instance != main_instance:
-        fast_model_name = os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-2.5-flash")
-        candidate_llms.append((fast_instance, f"Fast Lite LLM ({fast_model_name})"))
-            
+        label = getattr(fast_instance, "model", "default")
+        add_candidate(fast_instance, f"Fast Lite ({label})")
+
+    # Direct Gemini fallback
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key and not gemini_key.startswith("your_"):
+        try:
+            gemini_model = os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash")
+            g_inst = Gemini(model=gemini_model, api_key=gemini_key, max_tokens=8192)
+            add_candidate(g_inst, f"Direct Gemini Fallback ({gemini_model})")
+        except Exception as e:
+            logger.debug(f"[LLM Fallback init error]: {e}")
+
+    # Direct Groq fallback
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key and not groq_key.startswith("your_"):
+        try:
+            gq_inst = Groq(model="llama-3.3-70b-versatile", api_key=groq_key)
+            add_candidate(gq_inst, "Direct Groq Fallback")
+        except Exception as e:
+            logger.debug(f"[LLM Fallback init error]: {e}")
+
     return candidate_llms
+
+async def astream_llm_response(
+    target_llm: Any,
+    chat_msgs: list,
+    on_delta: Optional[Callable[[str], Any]] = None
+) -> str:
+    """
+    Executes an LLM chat request with progressive token streaming if on_delta is provided.
+    Falls back gracefully to standard achat if astream_chat fails or is unsupported.
+    """
+    if on_delta and hasattr(target_llm, "astream_chat"):
+        try:
+            response_stream = await target_llm.astream_chat(chat_msgs)
+            full_content = ""
+            async for chunk in response_stream:
+                token = chunk.delta or ""
+                if token:
+                    full_content += token
+                    res = on_delta(token)
+                    if inspect.isawaitable(res):
+                        await res
+            if full_content:
+                return full_content
+        except Exception as e:
+            logger.warning(f"[RAG Streaming] astream_chat error ({e}), falling back to achat")
+
+    resp = await target_llm.achat(chat_msgs)
+    full_content = resp.message.content or ""
+    if on_delta and full_content:
+        res = on_delta(full_content)
+        if inspect.isawaitable(res):
+            await res
+    return full_content
 
 async def dispatch_intent_pipeline(
     intent: str,
@@ -475,14 +608,15 @@ async def dispatch_intent_pipeline(
     report_status: Callable,
     tools: List[FunctionTool],
     doc_context_info: str,
-    timeout_sec: float = 60.0
+    timeout_sec: float = 60.0,
+    on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
     """Dispatches query execution to the specialized modular pipeline based on intent."""
     has_local_docs = len(local_docs) > 0
     
     if intent == "GENERAL_CHAT":
         from .pipelines.chat_pipeline import handle_general_chat_pipeline
-        raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status)
+        raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
         return format_clean_response(raw_res)
 
     if intent == "REMOVE_SOURCES" and has_local_docs:
@@ -491,7 +625,7 @@ async def dispatch_intent_pipeline(
 
     if intent == "SEARCH_NEW":
         from .pipelines.search_pipeline import handle_academic_search_pipeline
-        raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status)
+        raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status, on_delta=on_delta)
         if "<!-- SOURCES_DATA:" in raw_res:
             parts = raw_res.split("<!-- SOURCES_DATA:", 1)
             cleaned_text = format_clean_response(parts[0])
@@ -506,7 +640,8 @@ async def dispatch_intent_pipeline(
             local_docs=local_docs,
             formatted_history=formatted_history,
             target_llm=target_llm,
-            report_status=report_status
+            report_status=report_status,
+            on_delta=on_delta
         )
 
     # Agentic fallback path
@@ -527,11 +662,13 @@ async def query_chat(
     chat_id: str, 
     query: str, 
     chat_history: list = None,
-    status_callback: Optional[Callable[[str], Any]] = None
+    status_callback: Optional[Callable[[str], Any]] = None,
+    delta_callback: Optional[Callable[[str], Any]] = None
 ):
     """
     Orchestrates chat queries through intent classification and modular pipelines.
     Automatically handles attachment parsing, history formatting, and multi-LLM cascading fallback.
+    Supports real-time token streaming via delta_callback.
     """
     from database import SessionLocal, Document as DBDocument
     
@@ -545,6 +682,15 @@ async def query_chat(
                     await res
             except Exception as e:
                 logger.debug(f"[Status Callback Error]: {e}")
+
+    async def emit_delta(token: str):
+        if delta_callback:
+            try:
+                res = delta_callback(token)
+                if inspect.isawaitable(res):
+                    await res
+            except Exception as e:
+                logger.debug(f"[Delta Callback Error]: {e}")
 
     await report_status("Analyzing query intent & research parameters...")
     
@@ -606,7 +752,8 @@ async def query_chat(
                 report_status=report_status,
                 tools=tools,
                 doc_context_info=doc_context_info,
-                timeout_sec=60.0
+                timeout_sec=60.0,
+                on_delta=emit_delta
             )
         except Exception as e:
             last_err = e

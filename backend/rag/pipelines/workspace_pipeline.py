@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 import logging
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any, Optional, Callable
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 from database import SessionLocal, Document as DBDocument
 from rag.prompts import get_workspace_analysis_system_prompt
@@ -117,7 +117,8 @@ async def handle_workspace_analysis_pipeline(
     local_docs: List[str],
     formatted_history: List[LlamaChatMessage],
     target_llm,
-    report_status
+    report_status,
+    on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
     """Direct full-context comparative synthesis for loaded workspace documents."""
     await report_status("Reading full content of all loaded documents...")
@@ -173,8 +174,9 @@ async def handle_workspace_analysis_pipeline(
     ]
     
     await report_status("Synthesizing comparative findings and formatting response...")
-    resp = await target_llm.achat(chat_msgs)
-    draft_content = format_clean_response(resp.message.content)
+    from rag.engine import astream_llm_response
+    raw_content = await astream_llm_response(target_llm, chat_msgs, on_delta=on_delta)
+    draft_content = format_clean_response(raw_content)
 
     # Self-Correction Loop with Rubric Grader
     try:

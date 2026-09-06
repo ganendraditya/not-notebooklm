@@ -1,6 +1,7 @@
 import os
 import uuid
 import json
+import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import List
@@ -293,31 +294,42 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
     is_initial_chat_state = len(all_msgs) <= 1 or chat.title in ("New Chat", "New Research", "") or (chat.title and chat.title.endswith("..."))
     
     async def stream_worker(emitter: SSEStreamEmitter):
-        # 1. Background smart title generation if new chat
+        # 1. Background smart title generation if new chat (non-blocking)
+        title_task = None
         if is_initial_chat_state:
-            try:
-                ai_title = await rag.generate_chat_title(query.message)
-                if ai_title:
-                    from database import SessionLocal
-                    t_db = SessionLocal()
-                    try:
-                        t_chat = t_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-                        if t_chat:
-                            t_chat.title = ai_title
-                            t_db.commit()
-                    finally:
-                        t_db.close()
-                    await emitter.emit_event({"type": "title_update", "title": ai_title, "chat_id": chat_id})
-            except Exception as title_err:
-                logger.debug(f"[Title Update Error]: {title_err}")
+            async def run_smart_title_gen():
+                try:
+                    ai_title = await rag.generate_chat_title(query.message)
+                    if ai_title:
+                        from database import SessionLocal
+                        t_db = SessionLocal()
+                        try:
+                            t_chat = t_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+                            if t_chat:
+                                t_chat.title = ai_title
+                                t_db.commit()
+                        finally:
+                            t_db.close()
+                        await emitter.emit_event({"type": "title_update", "title": ai_title, "chat_id": chat_id})
+                except Exception as title_err:
+                    logger.debug(f"[Title Update Error]: {title_err}")
+
+            title_task = asyncio.create_task(run_smart_title_gen())
 
         # 2. Main response generation
         resp_text = await rag.query_chat(
             chat_id, 
             query.message, 
             chat_history=chat_history, 
-            status_callback=emitter.emit_status
+            status_callback=emitter.emit_status,
+            delta_callback=emitter.emit_delta
         )
+
+        if title_task and not title_task.done():
+            try:
+                await asyncio.wait_for(title_task, timeout=5.0)
+            except Exception:
+                pass
         from database import SessionLocal
         bg_db = SessionLocal()
         try:
@@ -416,7 +428,8 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
             chat_id, 
             req.message, 
             chat_history=truncated_history, 
-            status_callback=emitter.emit_status
+            status_callback=emitter.emit_status,
+            delta_callback=emitter.emit_delta
         )
         from database import SessionLocal
         bg_db = SessionLocal()
@@ -497,7 +510,8 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
             chat_id, 
             user_prompt, 
             chat_history=truncated_history, 
-            status_callback=emitter.emit_status
+            status_callback=emitter.emit_status,
+            delta_callback=emitter.emit_delta
         )
         from database import SessionLocal
         bg_db = SessionLocal()

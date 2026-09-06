@@ -79,7 +79,13 @@ def is_sources_meta_query(text: str) -> bool:
 
 
 async def classify_user_intent(user_query: str, has_docs: bool, doc_count: int, llm: LLM) -> str:
-    """Uses the target LLM to semantically classify user intent."""
+    """Uses fast regex heuristics and target LLM to semantically classify user intent."""
+    # Fast-path heuristics: instant zero-latency resolution
+    if is_simple_conversational(user_query) or is_technical_discussion(user_query):
+        return "GENERAL_CHAT"
+    if is_sources_meta_query(user_query) and has_docs:
+        return "ANALYZE_WORKSPACE"
+
     system_intent_prompt = f"""You are the Master Intent Classifier for NotbookLM research workspace.
 Current Workspace Status: {'Contains ' + str(doc_count) + ' imported documents' if has_docs else 'No documents imported yet'}.
 

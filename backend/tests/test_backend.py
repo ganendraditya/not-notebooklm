@@ -161,9 +161,11 @@ def test_sse_streaming_endpoint_flow(monkeypatch):
     """Verify SSE streaming endpoints emit structured SSE events without regression."""
     import rag
     
-    async def mock_query_chat(chat_id, message, chat_history=None, status_callback=None):
+    async def mock_query_chat(chat_id, message, chat_history=None, status_callback=None, delta_callback=None, **kwargs):
         if status_callback:
             await status_callback("Mock thinking step...")
+        if delta_callback:
+            await delta_callback("Mock delta chunk...")
         return "This is a mocked assistant response."
         
     monkeypatch.setattr(rag, "query_chat", mock_query_chat)
@@ -183,6 +185,7 @@ def test_sse_streaming_endpoint_flow(monkeypatch):
     body_text = res_stream.text
     assert "data: " in body_text
     assert "Mock thinking step..." in body_text
+    assert "Mock delta chunk..." in body_text
     assert "This is a mocked assistant response." in body_text
     
     # 3. Clean up

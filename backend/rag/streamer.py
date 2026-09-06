@@ -3,6 +3,7 @@ Streaming logic and response parsing for the RAG engine.
 """
 
 import json
+import inspect
 import logging
 from fastapi.responses import StreamingResponse
 
@@ -18,20 +19,18 @@ def parse_sse_stream(text: str, is_finished: bool = False, error: str = None) ->
 
 async def llm_stream_generator(chat_coroutine):
     """
-    Executes a chat coroutine and yields SSE formatted chunks.
-    Allows for dynamic processing (e.g. status updates vs real content).
+    Executes a chat coroutine or async generator and yields SSE formatted chunks.
+    Allows for dynamic real-time processing and progressive token streaming.
     """
     try:
-        # We can implement intermediate yields via report_status if we capture it
-        yield parse_sse_stream("Initializing RAG pipeline...", is_finished=False)
-        
-        # Execute the main generation (this is blocking but we await it)
-        # Note: True streaming from LlamaIndex is complex depending on the LLM class. 
-        # This fallback sends a single completed chunk.
-        response = await chat_coroutine
-        
-        # We yield the final response block
-        yield parse_sse_stream(response, is_finished=True)
+        if inspect.isasyncgen(chat_coroutine):
+            async for chunk in chat_coroutine:
+                if chunk:
+                    yield parse_sse_stream(chunk, is_finished=False)
+            yield parse_sse_stream("", is_finished=True)
+        else:
+            response = await chat_coroutine
+            yield parse_sse_stream(response, is_finished=True)
     except Exception as e:
         logger.error(f"[Stream Generator Error]: {e}")
         yield parse_sse_stream("", is_finished=True, error=str(e))

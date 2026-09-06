@@ -20,6 +20,7 @@ import { Document as DocType } from "@/stores/documentStore";
 import { parseCitationsInReactNode, CitationContext } from "./CitationParser";
 import { FileText, Image as ImageIcon } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { consumeSSEStream } from "@/lib/sse";
 
 export interface AcademicCandidateSource {
   title?: string;
@@ -171,42 +172,42 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       }
       if (!currentChatId) return;
 
-      // Client-side sequential 1-by-1 ingestion
-      // Guarantees real-time progress update (1/10 -> 2/10 -> 3/10) and instant sidebar append per finished paper
-      const CHUNK_SIZE = 1;
-      let totalSuccessfullyAdded = 0;
+      // Streamed batch ingestion via single HTTP request with real-time SSE progress
+      const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sources: toImport })
+      });
 
-      for (let i = 0; i < toImport.length; i += CHUNK_SIZE) {
-        const chunk = toImport.slice(i, i + CHUNK_SIZE);
-        const chunkPendingIds = pendingItems.slice(i, i + CHUNK_SIZE).map(p => p.id);
-        try {
-          const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sources: chunk })
-          });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.detail || `Server returned ${res.status}`);
+      }
 
-          if (res.ok) {
-            const createdDocs = await res.json();
-            if (createdDocs && createdDocs.length > 0) {
-              createdDocs.forEach((d: DocType) => onDocumentAdded?.(d, currentChatId));
-              totalSuccessfullyAdded += createdDocs.length;
+      await consumeSSEStream(res, (data: any) => {
+        if (data.type === "progress") {
+          const currentProgress = data.current || 0;
+          setImportProgress({ current: currentProgress, total: toImport.length });
+          if (data.doc) {
+            onDocumentAdded?.(data.doc as DocType, currentChatId);
+          }
+          if (currentProgress > 0 && currentProgress <= pendingItems.length) {
+            const pendingId = pendingItems[currentProgress - 1]?.id;
+            if (pendingId !== undefined) {
+              onResolvePendingSource?.(pendingId);
             }
           }
-        } catch (chunkErr) {
-          console.error("Chunk import error:", chunkErr);
-        } finally {
-          chunkPendingIds.forEach(id => onResolvePendingSource?.(id));
+        } else if (data.type === "done") {
+          setImportProgress({ current: toImport.length, total: toImport.length });
         }
-
-        const currentProgress = Math.min(i + chunk.length, toImport.length);
-        setImportProgress({ current: currentProgress, total: toImport.length });
-      }
+      });
 
       setUserSelectionOverrides({});
     } catch (e) {
       console.error("Import sources failed:", e);
     } finally {
+      // Ensure all pending source badges are cleaned up
+      pendingItems.forEach(p => onResolvePendingSource?.(p.id));
       setIsImporting(false);
       setImportProgress(null);
     }

@@ -35,6 +35,9 @@ export async function consumeSSEStream<T = any>(
           if (trimmed.startsWith("data: ")) {
             try {
               const parsed = JSON.parse(trimmed.slice(6));
+              if (parsed && (parsed.type === "ping" || parsed.type === "heartbeat")) {
+                continue;
+              }
               await onEvent(parsed);
             } catch (err) {
               console.error("[SSE Parser Error]:", err, "Raw line:", trimmed);

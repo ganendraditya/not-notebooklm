@@ -1,7 +1,7 @@
 import json
 import asyncio
 import logging
-from typing import List
+from typing import List, Optional, Callable, Any
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 from rag.search import (
     plan_academic_search,
@@ -18,7 +18,8 @@ async def handle_academic_search_pipeline(
     query: str,
     formatted_history: List[LlamaChatMessage],
     target_llm,
-    report_status
+    report_status,
+    on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
     """Discovers, filters, audits, and synthesizes scholarly literature."""
     from rag.engine import get_fast_llm
@@ -66,8 +67,9 @@ async def handle_academic_search_pipeline(
         LlamaChatMessage(role=MessageRole.USER, content=query)
     ]
     
-    resp = await target_llm.achat(synth_msgs)
-    text_response = resp.message.content
+    await report_status("Synthesizing literature review and citation insights...")
+    from rag.engine import astream_llm_response
+    text_response = await astream_llm_response(target_llm, synth_msgs, on_delta=on_delta)
     
     # Append structured SOURCES_DATA payload for frontend ChatMessageItem interactive import card
     sources_json_str = json.dumps(papers, ensure_ascii=False)
