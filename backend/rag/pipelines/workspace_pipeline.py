@@ -85,6 +85,88 @@ async def _load_single_doc_snippet_async(idx_fname_chat: tuple, db_records: Dict
 # Backward-compatibility alias
 _load_single_doc_snippet = _load_single_doc_snippet_async
 
+async def _retrieve_hybrid_workspace_context(
+    chat_id: str,
+    query: str,
+    local_docs: List[str],
+    db_records: Dict[str, Any],
+    report_status: Optional[Callable] = None
+) -> str:
+    """
+    Hybrid semantic retrieval for large workspaces (> 4 documents):
+    1. Builds a concise catalog overview for all workspace documents.
+    2. Retrieves top semantically relevant chunks from Qdrant vector index.
+    3. Reranks chunks via FlashRank Cross-Encoder to fit optimal context budget.
+    """
+    total_docs = len(local_docs)
+    catalog_lines = [f"=== KATALOG DOKUMEN WORKSPACE ({total_docs} DOKUMEN) ==="]
+
+    for i, fname in enumerate(local_docs):
+        d = db_records.get(fname, {})
+        title = d.get("title") or fname.replace(".pdf", "").replace("_", " ").strip()
+        year = f" ({d.get('year')})" if d.get("year") else ""
+        venue = f" | Venue: {d.get('journal') or d.get('venue')}" if (d.get("journal") or d.get("venue")) else ""
+        doi = f" | DOI: {d.get('doi')}" if d.get("doi") else ""
+        snippet = (d.get("abstract") or d.get("snippet") or "").strip()
+        if len(snippet) > 350:
+            snippet = snippet[:350] + "..."
+        catalog_lines.append(f"[{i+1}] {title}{year}{venue}{doi}\nRingkasan: {snippet or '(Tidak ada ringkasan)'}")
+
+    catalog_text = "\n\n".join(catalog_lines)
+
+    retrieved_blocks = []
+    try:
+        from rag.vector_store import vector_store
+        from llama_index.core import VectorStoreIndex
+        from llama_index.core.vector_stores.types import MetadataFilter, MetadataFilters, FilterOperator
+
+        if report_status:
+            await report_status("Searching relevant sections across workspace documents in vector store...")
+
+        index = VectorStoreIndex.from_vector_store(vector_store)
+        filters = MetadataFilters(
+            filters=[MetadataFilter(key="chat_id", operator=FilterOperator.EQ, value=chat_id)]
+        )
+        retriever = index.as_retriever(filters=filters, similarity_top_k=25)
+        nodes = await retriever.aretrieve(query)
+
+        if nodes:
+            if report_status:
+                await report_status("Reranking most relevant excerpts with Cross-Encoder...")
+
+            try:
+                from flashrank import Ranker, RerankRequest
+                ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+                passages = [{"id": idx, "text": n.node.get_content()[:1500]} for idx, n in enumerate(nodes)]
+                reranked = ranker.rerank(RerankRequest(query=query, passages=passages))[:12]
+                selected_nodes = [nodes[item["id"]] for item in reranked if "id" in item and 0 <= item["id"] < len(nodes)]
+            except Exception as rank_err:
+                logger.debug(f"[Workspace Hybrid] FlashRank fallback: {rank_err}")
+                selected_nodes = nodes[:12]
+
+            for idx, n in enumerate(selected_nodes, start=1):
+                fname = n.node.metadata.get("filename", "Dokumen")
+                sec = n.node.metadata.get("section") or n.node.metadata.get("breadcrumb") or ""
+                sec_lbl = f" - Bagian: {sec}" if sec else ""
+                retrieved_blocks.append(
+                    f"--- KUTIPAN RELEVAN [{idx}] (Sumber: {fname}{sec_lbl}) ---\n{n.node.get_content()}"
+                )
+    except Exception as e:
+        logger.warning(f"[Workspace Hybrid] Vector retrieval encountered error: {e}")
+
+    if retrieved_blocks:
+        return (
+            f"{catalog_text}\n\n"
+            f"=== KUTIPAN MENDALAM DARI DOKUMEN TERKAIT QUERY ({len(retrieved_blocks)} BAGIAN RELEVAN TERTINGGI) ===\n\n"
+            + "\n\n".join(retrieved_blocks)
+        )
+    else:
+        # Fallback if vector index has no chunks yet: use compact snippets
+        loaded_results = await asyncio.gather(
+            *(_load_single_doc_snippet_async((i, fname, chat_id), db_records, total_docs) for i, fname in enumerate(local_docs))
+        )
+        return "\n\n".join([snippet for _, snippet in loaded_results])
+
 async def handle_workspace_analysis_pipeline(
     chat_id: str,
     query: str,
@@ -94,9 +176,7 @@ async def handle_workspace_analysis_pipeline(
     report_status,
     on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
-    """Direct full-context comparative synthesis for loaded workspace documents."""
-    await report_status("Reading full content of all loaded documents...")
-    
+    """Direct full-context or hybrid semantic comparative synthesis for workspace documents."""
     db_records: Dict[str, Any] = {}
     db = SessionLocal()
     try:
@@ -119,11 +199,20 @@ async def handle_workspace_analysis_pipeline(
         db.close()
 
     total_doc_count = len(local_docs)
-    loaded_results = await asyncio.gather(
-        *(_load_single_doc_snippet_async((i, fname, chat_id), db_records, total_doc_count) for i, fname in enumerate(local_docs))
-    )
-    
-    full_docs_context = "\n\n".join([snippet for _, snippet in loaded_results])
+    if total_doc_count <= 4:
+        await report_status("Reading full content of loaded workspace documents...")
+        loaded_results = await asyncio.gather(
+            *(_load_single_doc_snippet_async((i, fname, chat_id), db_records, total_doc_count) for i, fname in enumerate(local_docs))
+        )
+        full_docs_context = "\n\n".join([snippet for _, snippet in loaded_results])
+    else:
+        full_docs_context = await _retrieve_hybrid_workspace_context(
+            chat_id=chat_id,
+            query=query,
+            local_docs=local_docs,
+            db_records=db_records,
+            report_status=report_status
+        )
     
     system_prompt_text = (
         f"{get_workspace_analysis_system_prompt(total_doc_count)}\n\n"

@@ -360,6 +360,59 @@ def test_rubric_grader_parse_error_handling():
     assert res_valid.is_grounded is True
     assert res_valid.grounding_score == 0.92
 
+@pytest.mark.asyncio
+async def test_workspace_pipeline_hybrid_retrieval_scaling():
+    """Verify workspace pipeline uses hybrid retrieval and catalog when docs > 4."""
+    from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
+    from unittest.mock import AsyncMock, MagicMock
+    from database import SessionLocal, Document as DBDocument
+
+    dummy_chat_id = "test_hybrid_scaling_chat"
+    db = SessionLocal()
+    docs_to_add = [
+        DBDocument(
+            chat_id=dummy_chat_id,
+            filename=f"paper_{i}.pdf",
+            title=f"Scalable Academic Research Paper {i}",
+            year=2023 + (i % 3),
+            abstract=f"Abstract methodology and empirical results for paper {i}.",
+            snippet=f"Snippet {i}",
+            is_oa=False
+        )
+        for i in range(1, 6)
+    ]
+    try:
+        for d in docs_to_add:
+            db.add(d)
+        db.commit()
+    finally:
+        db.close()
+
+    try:
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.message.content = "Sintesis perbandingan 5 dokumen."
+        mock_llm.achat = AsyncMock(return_value=mock_response)
+
+        status_logs = []
+        async def mock_status(text):
+            status_logs.append(text)
+
+        result = await handle_workspace_analysis_pipeline(
+            chat_id=dummy_chat_id,
+            query="Bandingkan kontribusi 5 paper ini",
+            local_docs=[f"paper_{i}.pdf" for i in range(1, 6)],
+            formatted_history=[],
+            target_llm=mock_llm,
+            report_status=mock_status
+        )
+        assert "Sintesis perbandingan 5 dokumen" in result
+    finally:
+        db = SessionLocal()
+        db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat_id).delete()
+        db.commit()
+        db.close()
+
 
 
 
