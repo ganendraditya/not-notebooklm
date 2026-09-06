@@ -40,33 +40,7 @@ async def _load_single_doc_snippet_async(idx_fname_chat: tuple, db_records: Dict
         except Exception as parse_err:
             logger.debug(f"[Workspace Pipeline] Doc Parse Error for {fname}: {parse_err}")
 
-    # 1b. If not full paper, attempt on-demand OA PDF fetch
-    if (not is_full_paper) and db_record and (db_record.get("is_oa") or db_record.get("pdf_url") or db_record.get("doi")):
-        try:
-            from services.document_service import check_and_fetch_authentic_pdf_on_demand
-            fetched_ok, new_md = await check_and_fetch_authentic_pdf_on_demand(db_record, fpath)
-            if fetched_ok:
-                new_fname = db_record.get("filename")
-                if new_fname:
-                    fpath = get_doc_file_path(chat_id, new_fname)
-                    fname = new_fname
-
-                try:
-                    parsed_text = await asyncio.to_thread(parse_document_to_markdown, fpath)
-                    if parsed_text and len(parsed_text.strip()) >= 150 and "NOTBOOKLM" not in parsed_text:
-                        is_full_paper = True
-                        max_chars = 48000 if total_doc_count > 20 else 80000
-                        content_snippet = parsed_text[:max_chars]
-                except Exception as parse_err:
-                    logger.debug(f"[Workspace Pipeline] Doc Parse Error after fetch for {fname}: {parse_err}")
-                    if new_md and len(new_md.strip()) >= 300:
-                        is_full_paper = True
-                        max_chars = 48000 if total_doc_count > 20 else 80000
-                        content_snippet = new_md[:max_chars]
-        except Exception as on_demand_err:
-            logger.debug(f"[Workspace Pipeline] On-Demand Fetch Error for {fname}: {on_demand_err}")
-            
-    # 2. If physical file parse failed or short stub: read from DB metadata
+    # 2. If physical file parse failed or short stub: read from DB metadata (fast, non-blocking)
     if (not is_full_paper) and db_record:
         meta_parts = []
         d_title = db_record.get("title") or fname.replace(".pdf", "").replace("_", " ")
