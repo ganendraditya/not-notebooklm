@@ -22,6 +22,25 @@ describe("CitationParser", () => {
     expect(buttons[1].textContent).toContain("2");
   });
 
+  it("parses multi-digit bracket citations like [10] and [100] with dynamic width", () => {
+    const text = "Penelitian lanjutan [10] dan analisis skala besar [100] memperkuat bukti.";
+    const result = parseCitationsInReactNode(
+      text,
+      [
+        { id: 10, index: 10, filename: "Paper10.pdf", title: "Paper 10", created_at: "2026-01-01T00:00:00Z" },
+        { id: 100, index: 100, filename: "Paper100.pdf", title: "Paper 100", created_at: "2026-01-01T00:00:00Z" }
+      ],
+      undefined
+    );
+
+    const { container } = render(<div>{result}</div>);
+    const buttons = container.querySelectorAll("button");
+    expect(buttons.length).toBe(2);
+    expect(buttons[0].textContent).toContain("10");
+    expect(buttons[1].textContent).toContain("100");
+    expect(buttons[0].className).toContain("min-w-6");
+  });
+
   it("handles text without citations gracefully", () => {
     const plainText = "Halo, selamat pagi! Apa yang bisa saya bantu hari ini?";
     const result = parseCitationsInReactNode(plainText);

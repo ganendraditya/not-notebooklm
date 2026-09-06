@@ -132,7 +132,7 @@ export function parseCitationsInReactNode(
                       });
                     }
                   }}
-                  className={`inline-flex items-center justify-center w-6 h-5 text-[10px] font-mono font-bold rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-text shadow-sm ${
+                  className={`inline-flex items-center justify-center min-w-6 px-1 h-5 text-[10px] font-mono font-bold rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-text shadow-sm ${
                     isSelected
                       ? "bg-amber-400 text-black border border-amber-300 font-extrabold shadow-amber-400/20"
                       : "text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70"

@@ -26,6 +26,7 @@ export function useChatSession(
     activeChatIdRef.current = activeChatId;
   }, [activeChatId]);
 
+  const pendingSessionCreationRef = useRef<Promise<string> | null>(null);
   const handleSelectChatRef = useRef<(id: string) => void>(() => {});
 
   const handleSelectChat = (id: string) => {
@@ -110,35 +111,50 @@ export function useChatSession(
   }, [activeChatId, sessions]);
 
   const handleEnsureChatSession = async (suggestedTitle?: string): Promise<string> => {
+    // Fast path: session already active (check both ref and state)
+    if (activeChatIdRef.current) return activeChatIdRef.current;
     if (activeChatId) return activeChatId;
-    
-    // Initial placeholder title while AI generates the smart topic name
-    let title = (suggestedTitle || "New Research").trim();
-    title = title.replace(/^(find|search|look up|get|paper on|journal about|research on|tolong carikan|cariin)\s+/i, "");
-    if (title.length > 30) {
-      title = title.substring(0, 30) + "...";
-    }
-    if (!title) title = "New Research";
-    title = title.charAt(0).toUpperCase() + title.slice(1);
 
-    try {
-      const res = await fetch(`${backendUrl}/chats`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title })
-      });
-      const newChat = await res.json();
-      activeChatIdRef.current = newChat.id;
-      setSessions([newChat, ...sessions]);
-      setActiveChatId(newChat.id);
-      return newChat.id;
-    } catch (err) {
-      console.error("Failed to auto-create chat session:", err);
-      throw err;
+    // Mutex: If a session creation request is already in-flight, await the same promise
+    if (pendingSessionCreationRef.current) {
+      return await pendingSessionCreationRef.current;
     }
+
+    pendingSessionCreationRef.current = (async () => {
+      try {
+        // Initial placeholder title while AI generates the smart topic name
+        let title = (suggestedTitle || "New Research").trim();
+        title = title.replace(/^(find|search|look up|get|paper on|journal about|research on|tolong carikan|cariin)\s+/i, "");
+        if (title.length > 30) {
+          title = title.substring(0, 30) + "...";
+        }
+        if (!title) title = "New Research";
+        title = title.charAt(0).toUpperCase() + title.slice(1);
+
+        const res = await fetch(`${backendUrl}/chats`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title })
+        });
+        const newChat = await res.json();
+        activeChatIdRef.current = newChat.id;
+        updateSessionsList(prev => [newChat, ...prev.filter(s => s.id !== newChat.id)]);
+        setActiveChatId(newChat.id);
+        return newChat.id as string;
+      } catch (err) {
+        console.error("Failed to auto-create chat session:", err);
+        throw err;
+      } finally {
+        pendingSessionCreationRef.current = null;
+      }
+    })();
+
+    return await pendingSessionCreationRef.current;
   };
 
   const handleCreateChat = () => {
+    activeChatIdRef.current = null;
+    pendingSessionCreationRef.current = null;
     setActiveChatId(null);
     setDocuments([]);
     setPendingSources([]);

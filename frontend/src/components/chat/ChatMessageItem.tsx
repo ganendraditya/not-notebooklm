@@ -257,7 +257,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           </div>
         )}
 
-    <div className="w-full space-y-2 min-w-0 overflow-hidden break-words">
+    <div className="w-full space-y-2 min-w-0 break-words">
       {/* 1. Main Markdown Text Content */}
       <div className="prose dark:prose-invert max-w-none text-[16px] leading-[1.65] break-words [word-break:break-word] text-app-text">
         <ReactMarkdown 
@@ -267,9 +267,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             h1: ({ children }) => <h1 className="text-2xl font-bold text-app-text mt-5 mb-2.5 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h1")}</h1>,
             h2: ({ children }) => <h2 className="text-xl font-bold text-app-text mt-4 mb-2 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h2")}</h2>,
             h3: ({ children }) => <h3 className="text-lg font-semibold text-app-text mt-3 mb-1.5">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h3")}</h3>,
-            ul: ({ children }) => <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-app-text">{children}</ul>,
-            ol: ({ children }) => <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-app-text">{children}</ol>,
-            li: ({ children }) => <li className="leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "li")}</li>,
+            ul: ({ node, ...props }: any) => <ul className="list-disc pl-6 my-2.5 space-y-1.5 text-app-text" {...props} />,
+            ol: ({ node, ...props }: any) => <ol className="list-decimal pl-8 my-2.5 space-y-1.5 text-app-text" {...props} />,
+            li: ({ node, children, ...props }: any) => <li className="leading-[1.65]" {...props}>{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "li")}</li>,
             em: ({ children }) => <em className="italic">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "em")}</em>,
             strong: ({ children }) => <strong className="font-semibold text-app-text">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "strong")}</strong>,
             a: ({ href, children }) => (
