@@ -313,6 +313,37 @@ def test_rag_exports_and_aliases():
     assert hasattr(rag, "delete_qdrant_vectors")
     assert rag.delete_qdrant_vectors is rag.delete_document_vectors
 
+@pytest.mark.asyncio
+async def test_dispatch_intent_pipeline_timeout_protection(monkeypatch):
+    """Verify dispatch_intent_pipeline enforces timeout protection on intent pipelines."""
+    import asyncio
+    from rag.engine import dispatch_intent_pipeline
+    import rag.pipelines.chat_pipeline as chat_pipe
+
+    async def slow_chat_pipeline(*args, **kwargs):
+        await asyncio.sleep(0.5)
+        return "Slow response"
+
+    monkeypatch.setattr(chat_pipe, "handle_general_chat_pipeline", slow_chat_pipeline)
+
+    async def mock_status(text):
+        pass
+
+    with pytest.raises(TimeoutError) as exc_info:
+        await dispatch_intent_pipeline(
+            intent="GENERAL_CHAT",
+            chat_id="dummy_chat",
+            query="Hello",
+            local_docs=[],
+            formatted_history=[],
+            target_llm=None,
+            report_status=mock_status,
+            tools=[],
+            doc_context_info="",
+            timeout_sec=0.05
+        )
+    assert "melebihi batas waktu" in str(exc_info.value)
+
 
 
 

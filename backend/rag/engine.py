@@ -121,9 +121,9 @@ def get_main_llm(force_refresh: bool = False):
     if _CACHED_MAIN_LLM is None and has_ninerouter:
         try:
             _CACHED_MAIN_LLM = OpenAILike(
-                api_base=ninerouter_url or "http://localhost:3000/v1",
+                api_base=ninerouter_url or "http://localhost:20128/v1",
                 api_key=ninerouter_key,
-                model=os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high"),
+                model=os.getenv("NINEROUTER_MODEL", "ag/gemini-3.8-flash-high"),
                 is_chat_model=True,
                 is_function_calling_model=True,
                 max_tokens=8192,
@@ -193,9 +193,9 @@ def get_fast_llm(force_refresh: bool = False):
     if _CACHED_FAST_LLM is None and has_ninerouter:
         try:
             _CACHED_FAST_LLM = OpenAILike(
-                api_base=ninerouter_url or "http://localhost:3000/v1",
+                api_base=ninerouter_url or "http://localhost:20128/v1",
                 api_key=ninerouter_key,
-                model=os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-2.5-flash"),
+                model=os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-3.8-flash-low"),
                 is_chat_model=True,
                 is_function_calling_model=True,
                 max_tokens=4096,
@@ -540,6 +540,26 @@ def get_candidate_llm_chain():
     if main_instance:
         label = getattr(main_instance, "model", "default")
         add_candidate(main_instance, f"Primary Synthesizer ({label})")
+
+    # 9Router Fallback Candidate (e.g., ag/gemini-pro-agent)
+    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "").strip()
+    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "").strip()
+    ninerouter_fallback = os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
+    if ninerouter_key and ninerouter_fallback and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key":
+        try:
+            fb_inst = OpenAILike(
+                api_base=ninerouter_url or "http://localhost:20128/v1",
+                api_key=ninerouter_key,
+                model=ninerouter_fallback,
+                is_chat_model=True,
+                is_function_calling_model=True,
+                max_tokens=8192,
+                timeout=120.0
+            )
+            add_candidate(fb_inst, f"9Router Fallback ({ninerouter_fallback})")
+        except Exception as e:
+            logger.debug(f"[9Router Fallback init error]: {e}")
+
     if fast_instance and fast_instance != main_instance:
         label = getattr(fast_instance, "model", "default")
         add_candidate(fast_instance, f"Fast Lite ({label})")
@@ -611,52 +631,62 @@ async def dispatch_intent_pipeline(
     timeout_sec: float = 60.0,
     on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
-    """Dispatches query execution to the specialized modular pipeline based on intent."""
+    """Dispatches query execution to the specialized modular pipeline based on intent with timeout protection."""
     has_local_docs = len(local_docs) > 0
     
-    if intent == "GENERAL_CHAT":
-        from .pipelines.chat_pipeline import handle_general_chat_pipeline
-        raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
-        return format_clean_response(raw_res)
+    async def _execute_selected_pipeline() -> str:
+        if intent == "GENERAL_CHAT":
+            from .pipelines.chat_pipeline import handle_general_chat_pipeline
+            raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
+            return format_clean_response(raw_res)
 
-    if intent == "REMOVE_SOURCES" and has_local_docs:
-        from .pipelines.source_action_pipeline import handle_source_removal_pipeline
-        return await handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
+        if intent == "REMOVE_SOURCES" and has_local_docs:
+            from .pipelines.source_action_pipeline import handle_source_removal_pipeline
+            return await handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
 
-    if intent == "SEARCH_NEW":
-        from .pipelines.search_pipeline import handle_academic_search_pipeline
-        raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status, on_delta=on_delta)
-        if "<!-- SOURCES_DATA:" in raw_res:
-            parts = raw_res.split("<!-- SOURCES_DATA:", 1)
-            cleaned_text = format_clean_response(parts[0])
-            return f"{cleaned_text}\n\n<!-- SOURCES_DATA:{parts[1]}"
-        return format_clean_response(raw_res)
+        if intent == "SEARCH_NEW":
+            from .pipelines.search_pipeline import handle_academic_search_pipeline
+            raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status, on_delta=on_delta)
+            if "<!-- SOURCES_DATA:" in raw_res:
+                parts = raw_res.split("<!-- SOURCES_DATA:", 1)
+                cleaned_text = format_clean_response(parts[0])
+                return f"{cleaned_text}\n\n<!-- SOURCES_DATA:{parts[1]}"
+            return format_clean_response(raw_res)
 
-    if intent == "ANALYZE_WORKSPACE" and has_local_docs:
-        from .pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
-        return await handle_workspace_analysis_pipeline(
-            chat_id=chat_id,
-            query=query,
-            local_docs=local_docs,
-            formatted_history=formatted_history,
-            target_llm=target_llm,
-            report_status=report_status,
-            on_delta=on_delta
+        if intent == "ANALYZE_WORKSPACE" and has_local_docs:
+            from .pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
+            return await handle_workspace_analysis_pipeline(
+                chat_id=chat_id,
+                query=query,
+                local_docs=local_docs,
+                formatted_history=formatted_history,
+                target_llm=target_llm,
+                report_status=report_status,
+                on_delta=on_delta
+            )
+
+        # Agentic fallback path
+        await report_status("Executing agent reasoning & searching academic sources...")
+        agent = ReActAgent(
+            tools=tools, 
+            llm=target_llm, 
+            verbose=False,
+            streaming=False,
+            max_iterations=6,
+            timeout=timeout_sec,
+            system_prompt=get_agentic_system_prompt(doc_context_info)
         )
+        res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
+        return format_clean_response(str(res))
 
-    # Agentic fallback path
-    await report_status("Executing agent reasoning & searching academic sources...")
-    agent = ReActAgent(
-        tools=tools, 
-        llm=target_llm, 
-        verbose=False,
-        streaming=False,
-        max_iterations=6,
-        timeout=timeout_sec,
-        system_prompt=get_agentic_system_prompt(doc_context_info)
-    )
-    res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
-    return format_clean_response(str(res))
+    if timeout_sec and timeout_sec > 0:
+        try:
+            return await asyncio.wait_for(_execute_selected_pipeline(), timeout=timeout_sec)
+        except asyncio.TimeoutError:
+            logger.error(f"[RAG Timeout] Pipeline {intent} exceeded {timeout_sec}s timeout.")
+            raise TimeoutError(f"Proses analisis ({intent}) melebihi batas waktu {int(timeout_sec)} detik. Silakan coba lagi.")
+    else:
+        return await _execute_selected_pipeline()
 
 async def query_chat(
     chat_id: str, 
