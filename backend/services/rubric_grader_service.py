@@ -92,12 +92,11 @@ def parse_rubric_json_response(raw_text: str) -> RubricEvaluationResult:
         )
     except Exception as e:
         logger.warning(f"[RubricGrader] Failed to parse JSON response: {e}. Raw: {raw_text[:200]}")
-        # Reversible fallback: if parsing fails, assume response is acceptable rather than crashing
         return RubricEvaluationResult(
-            is_grounded=True,
-            grounding_score=0.85,
-            citation_accuracy=True,
-            hallucinated_claims=[],
+            is_grounded=False,
+            grounding_score=0.0,
+            citation_accuracy=False,
+            hallucinated_claims=[f"Auditor JSON parse failure: {str(e)}"],
             revision_instruction=None
         )
 
@@ -150,10 +149,10 @@ async def evaluate_response_grounding(
     except Exception as e:
         logger.warning(f"[RubricGrader] Evaluation execution failed: {e}")
         return RubricEvaluationResult(
-            is_grounded=True,
-            grounding_score=MIN_GROUNDING_THRESHOLD,
-            citation_accuracy=True,
-            hallucinated_claims=[],
+            is_grounded=False,
+            grounding_score=0.0,
+            citation_accuracy=False,
+            hallucinated_claims=[f"Auditor execution failure: {str(e)}"],
             revision_instruction=None
         )
 
@@ -211,10 +210,10 @@ def parse_academic_writing_rubric_json(raw_text: str) -> AcademicWritingRubricRe
     except Exception as e:
         logger.warning(f"[RubricGrader] Failed to parse academic writing rubric JSON: {e}")
         return AcademicWritingRubricResult(
-            is_academic_ready=True,
-            quality_score=0.9,
+            is_academic_ready=False,
+            quality_score=0.0,
             informal_phrases_found=[],
-            structural_critique=None,
+            structural_critique=f"Auditor JSON parse failure: {str(e)}",
             revision_guide=None
         )
 
@@ -242,9 +241,9 @@ async def evaluate_academic_writing_quality(
     except Exception as e:
         logger.warning(f"[RubricGrader] Academic writing audit execution failed: {e}")
         return AcademicWritingRubricResult(
-            is_academic_ready=True,
-            quality_score=0.9,
+            is_academic_ready=False,
+            quality_score=0.0,
             informal_phrases_found=[],
-            structural_critique=None,
+            structural_critique=f"Auditor execution failure: {str(e)}",
             revision_guide=None
         )

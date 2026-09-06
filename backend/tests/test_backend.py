@@ -344,6 +344,22 @@ async def test_dispatch_intent_pipeline_timeout_protection(monkeypatch):
         )
     assert "melebihi batas waktu" in str(exc_info.value)
 
+def test_rubric_grader_parse_error_handling():
+    """Verify parse_rubric_json_response does not fake high grounding scores on corrupted JSON."""
+    from services.rubric_grader_service import parse_rubric_json_response
+
+    corrupted_output = "I am an AI and here is your score: {not valid json"
+    res = parse_rubric_json_response(corrupted_output)
+    assert res.is_grounded is False
+    assert res.grounding_score == 0.0
+    assert len(res.hallucinated_claims) > 0
+    assert "JSON parse failure" in res.hallucinated_claims[0]
+
+    valid_json = '{"is_grounded": true, "grounding_score": 0.92, "citation_accuracy": true, "hallucinated_claims": []}'
+    res_valid = parse_rubric_json_response(valid_json)
+    assert res_valid.is_grounded is True
+    assert res_valid.grounding_score == 0.92
+
 
 
 

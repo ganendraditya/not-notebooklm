@@ -155,14 +155,17 @@ async def handle_workspace_analysis_pipeline(
     # Self-Correction Loop with Rubric Grader
     try:
         await report_status("Auditing factual grounding and citations with AI Rubric...")
+        from rag.engine import get_fast_llm
+        auditor_llm = get_fast_llm() or target_llm
+
         rubric_res = await evaluate_response_grounding(
             query=query,
             sources_context=full_docs_context,
             draft_response=draft_content,
-            llm=target_llm
+            llm=auditor_llm
         )
 
-        if rubric_res.is_grounded or rubric_res.grounding_score >= 0.8:
+        if rubric_res.is_grounded and rubric_res.grounding_score >= 0.85:
             return draft_content
 
         if rubric_res.revision_instruction:
@@ -183,6 +186,8 @@ async def handle_workspace_analysis_pipeline(
             ]
             revised_resp = await target_llm.achat(revised_chat_msgs)
             return format_clean_response(revised_resp.message.content)
+        else:
+            logger.debug("[Workspace Pipeline] Rubric audit produced no revision instruction; using draft content.")
     except Exception as grade_err:
         logger.warning(f"[Workspace Pipeline] Rubric audit bypassed due to error: {grade_err}")
 
