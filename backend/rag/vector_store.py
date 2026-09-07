@@ -91,14 +91,17 @@ def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
             qmodels.FieldCondition(key="chat_id", match=qmodels.MatchValue(value=chat_id))
         ]
         if doc_filename:
-            # Support both 'filename' (standard across engine.py) and 'file_name'
+            # Support both 'filename' (standard across engine.py) and 'file_name', plus legacy prefixed names
+            prefixed_name = f"{chat_id}_{doc_filename}"
             filter_obj = qmodels.Filter(
                 must=[
                     qmodels.FieldCondition(key="chat_id", match=qmodels.MatchValue(value=chat_id)),
                     qmodels.Filter(
                         should=[
                             qmodels.FieldCondition(key="filename", match=qmodels.MatchValue(value=doc_filename)),
-                            qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=doc_filename))
+                            qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=doc_filename)),
+                            qmodels.FieldCondition(key="filename", match=qmodels.MatchValue(value=prefixed_name)),
+                            qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=prefixed_name)),
                         ]
                     )
                 ]

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from database import Document
 from utils.file_utils import get_doc_file_path
-from utils.pdf_utils import is_authentic_pdf_bytes
+from utils.pdf_utils import is_authentic_pdf_bytes, is_binary_pdf
 from utils.text_processing import clean_doi
 import rag
 import pdf_exporter
@@ -16,16 +16,9 @@ import pdf_exporter
 logger = logging.getLogger("uvicorn.error")
 
 def inspect_document_file_status(chat_id: str, filename: str) -> bool:
-    """Checks if a document file exists on disk and is a valid binary PDF >= 35KB."""
+    """Checks if a document file exists on disk and is an authentic binary PDF."""
     fp = get_doc_file_path(chat_id, filename)
-    if os.path.exists(fp) and os.path.getsize(fp) >= 35000:
-        try:
-            with open(fp, "rb") as f:
-                fb = f.read(2048)
-                return is_authentic_pdf_bytes(fb)
-        except Exception:
-            return False
-    return False
+    return is_binary_pdf(fp)
 
 async def check_and_fetch_authentic_pdf_on_demand(doc: Any, file_path: str) -> Tuple[bool, str]:
     """
@@ -34,18 +27,7 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Any, file_path: str) -> T
     
     Returns (is_authentic_pdf, content_markdown)
     """
-    file_size = os.path.getsize(file_path) if os.path.exists(file_path) else 0
-    is_authentic_pdf = False
-    
-    # 1. Local Disk Validation
-    if os.path.exists(file_path) and file_size >= 1000:
-        try:
-            with open(file_path, "rb") as f:
-                first_bytes = f.read(2048)
-                is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=500)
-        except Exception:
-            is_authentic_pdf = False
-
+    is_authentic_pdf = is_binary_pdf(file_path)
     new_content = ""
 
     # Helper getters to support both SQLAlchemy Document and plain DTO dicts
@@ -157,20 +139,13 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         if new_md_content:
             res_data["content"] = new_md_content
         elif os.path.exists(file_path):
-            ext = os.path.splitext(doc.filename)[1].lower()
             try:
-                if ext == ".pdf":
-                    if is_authentic_pdf:
-                        import pymupdf4llm
-                        res_data["content"] = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
-                    else:
-                        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                            res_data["content"] = f.read()
-                elif ext in (".docx", ".doc"):
-                    res_data["content"] = await asyncio.to_thread(rag.parse_docx_file, file_path)
-                else:
-                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                ext = os.path.splitext(doc.filename)[1].lower()
+                if ext == ".pdf" and not is_authentic_pdf:
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                         res_data["content"] = f.read()
+                else:
+                    res_data["content"] = await asyncio.to_thread(rag.parse_document_to_markdown, file_path)
             except Exception as e:
                 res_data["content"] = f"Error reading document: {str(e)}"
         else:
@@ -223,31 +198,9 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         res_data["abstract"] = "Document content is registered in the source index."
         return res_data
         
-    ext = os.path.splitext(doc.filename)[1].lower()
     raw_content = ""
     try:
-        if ext == ".pdf":
-            with open(file_path, "rb") as f:
-                header = f.read(5)
-            if header.startswith(b"%PDF"):
-                import pymupdf4llm
-                raw_content = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
-            else:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    raw_content = f.read()
-        elif ext in (".docx", ".doc"):
-            raw_content = await asyncio.to_thread(rag.parse_docx_file, file_path)
-        elif ext in (".bib", ".bibtex"):
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = await asyncio.to_thread(rag.parse_bibtex_text, f.read())
-        elif ext == ".ris":
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = await asyncio.to_thread(rag.parse_ris_text, f.read())
-        elif ext in (".csv", ".tsv"):
-            raw_content = await asyncio.to_thread(rag.parse_csv_file, file_path)
-        else:
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = f.read()
+        raw_content = await asyncio.to_thread(rag.parse_document_to_markdown, file_path)
     except Exception as e:
         raw_content = f"Error reading document: {str(e)}"
         
@@ -410,14 +363,7 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
             except Exception:
                 pass
                     
-    is_authentic_pdf = False
-    if os.path.exists(file_path) and os.path.getsize(file_path) >= 1000:
-        try:
-            with open(file_path, "rb") as f:
-                first_bytes = f.read(2048)
-                is_authentic_pdf = is_authentic_pdf_bytes(first_bytes, min_size=500)
-        except Exception:
-            is_authentic_pdf = False
+    is_authentic_pdf = is_binary_pdf(file_path)
 
     if is_authentic_pdf:
         res_data["is_oa"] = True

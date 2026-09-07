@@ -273,7 +273,7 @@ async def import_single_doi_source(chat_id: str, clean_doi_val: str, db: Session
             logger.warning(f"[Doc text save Warning]: {e}")
 
     try:
-        await asyncio.to_thread(rag.ingest_document, save_path, chat_id)
+        await asyncio.to_thread(rag.ingest_document, save_path, chat_id, filename)
     except Exception as e:
         logger.warning(f"[DOI Ingest Vector Warning]: {e}")
 

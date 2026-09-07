@@ -296,10 +296,26 @@ def ingest_documents_batch(doc_items: List[tuple]):
     VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
     return True
 
-def ingest_document(file_path: str, chat_id: str):
-    """Parses a multi-format document and ingests it into Qdrant."""
+def ingest_document(file_path: str, chat_id: str, original_filename: Optional[str] = None):
+    """Parses a multi-format document and ingests it into Qdrant with clean filename metadata."""
     try:
-        filename = os.path.basename(file_path)
+        if original_filename:
+            filename = original_filename
+        else:
+            raw_base = os.path.basename(file_path)
+            prefix = f"{chat_id}_"
+            if raw_base.startswith(prefix):
+                filename = raw_base[len(prefix):]
+            else:
+                try:
+                    import werkzeug.utils
+                    clean_prefix = f"{werkzeug.utils.secure_filename(chat_id)}_"
+                    if raw_base.startswith(clean_prefix):
+                        filename = raw_base[len(clean_prefix):]
+                    else:
+                        filename = raw_base
+                except Exception:
+                    filename = raw_base
         md_text = parse_document_to_markdown(file_path)
         return ingest_document_text(md_text, filename, chat_id)
     except Exception as e:

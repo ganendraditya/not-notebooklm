@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { Portal } from "@/components/ui/Portal";
 import { useTranslation } from "@/lib/i18n";
-import { Document, PendingSourceItem } from "@/stores/documentStore";
 
 export interface AddSourcesModalProps {
   isOpen: boolean;

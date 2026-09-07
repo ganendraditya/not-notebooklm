@@ -10,7 +10,6 @@ export function useDocumentMutation({
   onBulkDocumentsDeleted,
   viewingDoc,
   setViewingDoc,
-  t
 }: {
   activeChatId: string | null;
   backendUrl: string;
@@ -18,9 +17,9 @@ export function useDocumentMutation({
   onDocumentUpdated?: (doc: Document) => void;
   onDocumentDeleted?: (id: number) => void;
   onBulkDocumentsDeleted?: (ids: number[]) => void;
-  viewingDoc?: any;
-  setViewingDoc?: any;
-  t: any;
+  viewingDoc?: Document | null;
+  setViewingDoc?: (doc: Document | null) => void;
+  t?: (key: string) => string;
 }) {
   // Rename State
   const [renamingDoc, setRenamingDoc] = useState<Document | null>(null);
@@ -53,8 +52,8 @@ export function useDocumentMutation({
       if (res.ok) {
         const updatedDoc = await res.json();
         onDocumentUpdated?.(updatedDoc);
-        if (viewingDoc && ((viewingDoc as any)?.id || "undefined") === renamingDoc.id && setViewingDoc) {
-          setViewingDoc((prev: any) => prev ? { ...prev, title: updatedDoc.title } : null);
+        if (viewingDoc && viewingDoc.id === renamingDoc.id && setViewingDoc) {
+          setViewingDoc({ ...viewingDoc, title: updatedDoc.title });
         }
         setRenamingDoc(null);
         return true; // success flag
@@ -87,7 +86,7 @@ export function useDocumentMutation({
         } else if (onDocumentDeleted) {
           docIds.forEach(id => onDocumentDeleted(id));
         }
-        if (viewingDoc && docIds.includes(((viewingDoc as any)?.id || "undefined"))) {
+        if (viewingDoc && docIds.includes(viewingDoc.id) && setViewingDoc) {
           setViewingDoc(null);
         }
         return true;

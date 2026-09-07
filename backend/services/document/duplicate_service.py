@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from database import Document
 from utils.file_utils import get_doc_file_path
-from utils.pdf_utils import is_authentic_pdf_bytes
+from utils.pdf_utils import is_authentic_pdf_bytes, is_binary_pdf
 from utils.text_processing import clean_doi
 import rag
 
@@ -18,14 +18,7 @@ def calculate_doc_quality(chat_id: str, d: Document) -> Tuple[int, bool, int]:
     """Calculates quality score for duplicate cleanup (prefers authentic full PDF > metadata brief)."""
     fp = get_doc_file_path(chat_id, d.filename)
     sz = os.path.getsize(fp) if os.path.exists(fp) else 0
-    has_full_pdf = False
-    if os.path.exists(fp) and sz >= 1000:
-        try:
-            with open(fp, "rb") as f:
-                fb = f.read(2048)
-                has_full_pdf = is_authentic_pdf_bytes(fb, min_size=500)
-        except Exception:
-            has_full_pdf = False
+    has_full_pdf = is_binary_pdf(fp)
             
     score = 0
     if has_full_pdf:
@@ -204,6 +197,10 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
                         os.remove(dup_fp)
                     except Exception as e:
                         logger.error(f"[CleanDuplicates Error] Failed to delete file {dup_fp}: {e}")
+                try:
+                    rag.delete_document_vectors(chat_id, dup.filename)
+                except Exception as e:
+                    logger.error(f"[CleanDuplicates Vector Error] Failed to delete vectors for {dup.filename}: {e}")
                 db.delete(dup)
 
             if needs_db_update:
@@ -212,7 +209,7 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
     if cleaned_doc_ids:
         db.commit()
 
-    remaining = db.query(Document).filter(Document.chat_id == chat_id).count()
+    remaining = max(0, len(docs) - len(cleaned_doc_ids))
     return {
         "status": "success",
         "cleaned_count": len(cleaned_doc_ids),
