@@ -69,6 +69,7 @@ async def import_sources(chat_id: str, req: models.ImportSourcesRequest, db: Ses
     return await import_sources_batch(chat_id, allowed_sources, db)
 
 @router.post("/chats/{chat_id}/import_doi", response_model=models.DocumentResponse)
+@router.post("/chats/{chat_id}/documents/import-doi", response_model=models.DocumentResponse)
 async def import_doi_source(chat_id: str, req: models.ImportDoiRequest, db: Session = Depends(get_db)):
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:

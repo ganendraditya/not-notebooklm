@@ -298,9 +298,13 @@ def ingest_documents_batch(doc_items: List[tuple]):
 
 def ingest_document(file_path: str, chat_id: str):
     """Parses a multi-format document and ingests it into Qdrant."""
-    filename = os.path.basename(file_path)
-    md_text = parse_document_to_markdown(file_path)
-    return ingest_document_text(md_text, filename, chat_id)
+    try:
+        filename = os.path.basename(file_path)
+        md_text = parse_document_to_markdown(file_path)
+        return ingest_document_text(md_text, filename, chat_id)
+    except Exception as e:
+        logger.error(f"[Ingest Error] Failed to ingest {file_path} for chat {chat_id}: {e}")
+        return False
 
 def web_search_and_ingest(query: str, chat_id: str) -> str:
     """Searches scholarly databases (OpenAlex) and the web for research papers and articles."""

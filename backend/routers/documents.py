@@ -121,6 +121,7 @@ def bulk_delete_documents(chat_id: str, req: models.BulkDeleteRequest, db: Sessi
     return {"status": "success", "deleted_count": deleted_count}
 
 @router.post("/chats/{chat_id}/clean_duplicates")
+@router.post("/chats/{chat_id}/documents/clean-duplicates")
 async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
     db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not db_chat:
