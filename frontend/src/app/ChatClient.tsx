@@ -16,7 +16,7 @@ import { useUIStore } from "@/stores/uiStore";
 import type { Attachment } from "@/stores/chatStore";
 
 import { useChatSession } from "@/hooks/chat/useChatSession";
-import { useChatStream } from "@/hooks/chat/useChatStream";
+import { useChatStream, type ChatJobState } from "@/hooks/chat/useChatStream";
 
 export default function ChatClient() {
   const { t } = useTranslation();
@@ -44,6 +44,14 @@ export default function ChatClient() {
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const activeChatIdRef = useRef<string | null>(null);
 
+  // Bridge getChatJob to useChatSession cleanly without cyclical dependency or object monkey-patching
+  const getChatJobRef = useRef<(id: string) => ChatJobState>((id: string) => ({
+    controller: null,
+    queue: [],
+    isProcessing: false,
+    status: null,
+  }));
+
   // 1. Hook for Session DB logic
   const {
     handleEnsureChatSession,
@@ -68,7 +76,7 @@ export default function ChatClient() {
     setActiveStatus,
     setCurrentView,
     updateSessionsList,
-    (id) => chatJobsRef.current.get(id) || { queue: [], isProcessing: false, status: null, controller: null }, // Temporary fallback mapping
+    (id) => getChatJobRef.current(id),
     activeChatIdRef
   );
 
@@ -103,15 +111,9 @@ export default function ChatClient() {
     handleEnsureChatSessionRef
   );
 
-  // Sync ref back for session DB hook to access real job states
-  const chatJobsRef = useRef<Map<string, any>>(new Map());
+  // Keep getChatJobRef in sync with actual implementation
   useEffect(() => {
-    // A little hacky, but avoids cyclical dep for now
-    chatJobsRef.current.set = (key, val) => {
-      getChatJob(key);
-      return chatJobsRef.current;
-    };
-    chatJobsRef.current.get = (key) => getChatJob(key);
+    getChatJobRef.current = getChatJob;
   }, [getChatJob]);
 
   const handleBulkDocumentsDeleted = (docIds: number[]) => {

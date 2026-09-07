@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
 import { type ChatSession, type ChatMessage } from "@/stores/chatStore";
 import { type Document, type PendingSourceItem, type TargetedSource } from "@/stores/documentStore";
+import { type ChatJobState } from "./useChatStream";
 
 export function useChatSession(
   backendUrl: string,
@@ -18,7 +19,7 @@ export function useChatSession(
   setActiveStatus: (status: string | null) => void,
   setCurrentView: (view: "chat" | "library" | "search") => void,
   updateSessionsList: (updater: (prev: ChatSession[]) => ChatSession[]) => void,
-  getChatJob: (id: string) => any, // Function from stream hook
+  getChatJob: (id: string) => ChatJobState,
   activeChatIdRef: React.MutableRefObject<string | null>
 ) {
 
@@ -41,7 +42,7 @@ export function useChatSession(
     const job = getChatJob(id);
     setIsLoading(job.isProcessing);
     setActiveStatus(job.status);
-    setQueuedPrompts(job.queue.map((q: any) => q.text));
+    setQueuedPrompts(job.queue.map(q => q.text));
 
     fetch(`${backendUrl}/chats/${id}`)
         .then(res => res.json())
