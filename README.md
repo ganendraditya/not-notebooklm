@@ -8,7 +8,7 @@ A customizable AI research and document workspace inspired by Google Notebook (f
 
 You can run this project in two ways:
 
-### Option 1: Quickstart via Docker (Recommended for Users)
+### Option 1: Quickstart via Docker
 No need to install Python, Node.js, or local dependencies.
 
 1. **Clone repository:**
