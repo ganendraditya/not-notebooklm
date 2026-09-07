@@ -17,7 +17,6 @@ from utils.file_utils import (
 )
 from utils.pdf_utils import (
     get_authentic_document_pdf,
-    is_authentic_pdf_bytes,
     is_binary_pdf,
 )
 from services.document import (

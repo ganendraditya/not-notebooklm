@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 import rag
 from database import get_db, ChatSession, Document, ChatMessage
-from helpers import UPLOAD_DIR
+from utils.file_utils import UPLOAD_DIR
 
 router = APIRouter(tags=["settings"])
 

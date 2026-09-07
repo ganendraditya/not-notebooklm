@@ -25,7 +25,7 @@ from .parsers import (
     parse_document_to_markdown,
     split_markdown_into_academic_sections
 )
-from helpers import get_doc_file_path
+from utils.file_utils import get_doc_file_path, UPLOAD_DIR
 from .search import (
     search_academic_papers,
     plan_academic_search,
@@ -451,7 +451,6 @@ def prepare_query_attachments(query: str, chat_history: Optional[list] = None) -
     if not attachments:
         return query
         
-    from helpers import UPLOAD_DIR
     chat_media_dir = os.path.join(UPLOAD_DIR, "chat_media")
     query += "\n\n[Attachments Provided by User:]"
     for att in attachments:

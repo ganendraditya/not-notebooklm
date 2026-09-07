@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from database import Document
 from utils.file_utils import get_doc_file_path
-from utils.pdf_utils import is_authentic_pdf_bytes, is_binary_pdf
+from utils.pdf_utils import is_binary_pdf
 from utils.text_processing import clean_doi
 import rag
 
@@ -55,18 +55,18 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
     for doc in docs:
         fp = get_doc_file_path(chat_id, doc.filename)
         full_title = (doc.title or doc.filename).replace(".pdf", "").replace(".docx", "").replace(".txt", "").replace(".md", "").strip()
-        extracted_doi = (doc.doi or "").strip().lower()
+        extracted_doi = clean_doi(doc.doi).lower() if doc.doi else ""
         
-        if os.path.exists(fp) and not doc.title:
+        if os.path.exists(fp) and (not doc.title or not extracted_doi):
             try:
                 with open(fp, "r", encoding="utf-8", errors="ignore") as fp_r:
                     first_lines = "".join([fp_r.readline() for _ in range(4)])
                     m_title = re.search(r'^\#\s*([^\n]+)', first_lines)
-                    if m_title:
+                    if m_title and not doc.title:
                         full_title = re.sub(r'\s*\(\d{4}\)$', '', m_title.group(1)).strip()
                     m_doi = re.search(r'(?:DOI:|\*\*DOI:\*\*|doi\.org/)\s*(10\.\d{4,9}/[^\s\)]+)', first_lines, re.I)
                     if m_doi and not extracted_doi:
-                        extracted_doi = m_doi.group(1).lower().strip()
+                        extracted_doi = clean_doi(m_doi.group(1)).lower()
             except Exception as e:
                 logger.error(f"[CleanDuplicates] Failed to read {fp}: {e}")
 
@@ -78,7 +78,7 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
             for member in grp:
                 m_fp = get_doc_file_path(chat_id, member.filename)
                 m_title = (member.title or member.filename).replace(".pdf", "").replace(".docx", "").replace(".txt", "").replace(".md", "").strip()
-                m_doi = (member.doi or "").strip().lower()
+                m_doi = clean_doi(member.doi).lower() if member.doi else ""
                 m_norm = rag.normalize_title_str(m_title)
                 m_tokens = set(m_norm.split())
 
@@ -116,7 +116,7 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
             cand_doi = ""
             for d in grp:
                 if d.doi and not cand_doi:
-                    clean_d = d.doi.strip().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+                    clean_d = clean_doi(d.doi)
                     if re.search(r'10\.\d{4,9}/', clean_d):
                         cand_doi = clean_d
             

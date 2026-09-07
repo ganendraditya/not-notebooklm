@@ -136,3 +136,132 @@ def test_paper_service_prepare_and_document_response():
     assert doc_resp.has_full_pdf in (True, False)
     assert doc_resp.is_oa is True
 
+def test_delete_storage_file_and_records_resolves_prefix():
+    """Verify delete_storage_file_and_records cleans disk file, DB record, and vector index without zombie leak."""
+    from services.storage_service import delete_storage_file_and_records
+    from utils.file_utils import UPLOAD_DIR
+    import uuid
+
+    db = SessionLocal()
+    chat_id = f"test_chat_{uuid.uuid4().hex[:8]}"
+    clean_name = "test_phase4_paper.pdf"
+    disk_filename = f"{chat_id}_{clean_name}"
+    disk_path = os.path.join(UPLOAD_DIR, disk_filename)
+
+    try:
+        # Create physical dummy file
+        with open(disk_path, "w", encoding="utf-8") as f:
+            f.write("Dummy PDF content for Phase 4 test")
+
+        # Create DB document record
+        doc = Document(
+            chat_id=chat_id,
+            filename=clean_name,
+            title="Phase 4 Test Document"
+        )
+        db.add(doc)
+        db.commit()
+
+        # Ensure document exists before deletion
+        assert db.query(Document).filter(Document.chat_id == chat_id, Document.filename == clean_name).first() is not None
+        assert os.path.exists(disk_path)
+
+        # Execute single source of truth storage deletion
+        deleted = delete_storage_file_and_records(db, disk_path)
+        db.commit()
+
+        assert deleted is True
+        # Verify physical file removed
+        assert not os.path.exists(disk_path)
+        # Verify DB record removed (no zombie leak!)
+        assert db.query(Document).filter(Document.chat_id == chat_id, Document.filename == clean_name).first() is None
+    finally:
+        if os.path.exists(disk_path):
+            os.remove(disk_path)
+        db.query(Document).filter(Document.chat_id == chat_id).delete()
+        db.commit()
+        db.close()
+
+def test_delete_multiple_documents_batch():
+    """Verify batch deletion in delete_multiple_documents."""
+    from services.storage_service import delete_multiple_documents
+    import uuid
+
+    db = SessionLocal()
+    chat_id = f"test_bulk_{uuid.uuid4().hex[:8]}"
+    try:
+        d1 = Document(chat_id=chat_id, filename="bulk_doc_1.pdf", title="Bulk 1")
+        d2 = Document(chat_id=chat_id, filename="bulk_doc_2.pdf", title="Bulk 2")
+        db.add_all([d1, d2])
+        db.commit()
+        db.refresh(d1)
+        db.refresh(d2)
+
+        count = delete_multiple_documents(db, chat_id, [d1.id, d2.id])
+        assert count == 2
+        remaining = db.query(Document).filter(Document.chat_id == chat_id).count()
+        assert remaining == 0
+    finally:
+        db.query(Document).filter(Document.chat_id == chat_id).delete()
+        db.commit()
+        db.close()
+
+def test_storage_summary_consistency():
+    """Verify storage summary single traversal computes matching totals."""
+    from services.storage_service import get_unified_storage_summary
+    from database import DB_PATH
+
+    summary = get_unified_storage_summary(DB_PATH)
+    assert "total_bytes" in summary
+    assert "used_bytes" in summary
+    assert "categories" in summary
+    assert "category_counts" in summary
+    assert summary["uploads_bytes"] == sum(summary["categories"].values())
+
+@pytest.mark.asyncio
+async def test_clean_chat_duplicates_normalizes_doi_formats():
+    """Verify duplicate detection correctly equates different DOI URI schemes."""
+    from services.document.duplicate_service import clean_chat_duplicates
+    import uuid
+
+    db = SessionLocal()
+    chat_id = f"test_dup_{uuid.uuid4().hex[:8]}"
+    try:
+        session = ChatSession(id=chat_id, title="Duplicate DOI Test")
+        db.add(session)
+
+        # First doc with full HTTPS URL and comprehensive abstract (>100 chars for higher quality score)
+        d1 = Document(
+            chat_id=chat_id,
+            filename="doc_full_url.txt",
+            title="Advancements in Quantum AI",
+            doi="https://doi.org/10.1016/j.quant.2024.01",
+            abstract="This comprehensive analysis explores the theoretical intersections of quantum computing algorithms and modern machine learning synergy."
+        )
+        # Second doc with bare DOI and different title casing
+        d2 = Document(
+            chat_id=chat_id,
+            filename="doc_bare_doi.txt",
+            title="Advancements In Quantum Ai",
+            doi="10.1016/j.quant.2024.01",
+            abstract="Short abstract"
+        )
+        db.add_all([d1, d2])
+        db.commit()
+
+        result = await clean_chat_duplicates(chat_id, db)
+        assert result["status"] == "success"
+        assert result["cleaned_count"] == 1
+        assert result["remaining_count"] == 1
+
+        remaining_docs = db.query(Document).filter(Document.chat_id == chat_id).all()
+        assert len(remaining_docs) == 1
+        assert remaining_docs[0].filename == "doc_full_url.txt"
+    finally:
+        db.query(Document).filter(Document.chat_id == chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == chat_id).delete()
+        db.commit()
+        db.close()
+
+
+

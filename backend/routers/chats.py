@@ -11,7 +11,7 @@ import shutil
 from sqlalchemy.orm import Session
 
 from database import get_db, ChatSession, Document, ChatMessage, commit_with_retry
-from helpers import UPLOAD_DIR
+from utils.file_utils import UPLOAD_DIR
 from utils.streaming import create_sse_stream_response, SSEStreamEmitter
 import models
 import rag

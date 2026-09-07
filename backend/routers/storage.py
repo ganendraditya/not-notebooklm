@@ -1,16 +1,17 @@
 import os
+import io
+import zipfile
 import logging
-import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from pydantic import BaseModel
 import rag
-from database import get_db, Document
-from helpers import UPLOAD_DIR
-from routers.chats import ChatSession  # For DB context if needed
+from database import get_db, Document, ChatSession, commit_with_retry, DB_PATH
+from utils.file_utils import UPLOAD_DIR, make_content_disposition
+from services.storage_service import get_unified_storage_summary, delete_storage_file_and_records
 
 router = APIRouter(prefix="/storage", tags=["storage"])
 logger = logging.getLogger("uvicorn.error")
@@ -35,8 +36,6 @@ class FileItem(BaseModel):
 
 @router.get("/summary", response_model=StorageSummary)
 def get_storage_summary(db: Session = Depends(get_db)):
-    from services.storage_service import get_unified_storage_summary
-    from database import DB_PATH
     data = get_unified_storage_summary(DB_PATH)
     
     return StorageSummary(
@@ -154,25 +153,15 @@ def delete_files(req: DeleteRequest, db: Session = Depends(get_db)):
             continue
 
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            if delete_storage_file_and_records(db, file_path):
                 deleted += 1
-                
-                # Delete DB document and corresponding vector embeddings in Qdrant
-                filename = os.path.basename(file_path)
-                docs = db.query(Document).filter(Document.filename == filename).all()
-                for doc in docs:
-                    try:
-                        rag.delete_document_vectors(doc.chat_id, doc.filename)
-                    except Exception as ve:
-                        logger.warning(f"[Storage Delete] Vector cleanup error for {doc.filename}: {ve}")
-                    db.delete(doc)
             else:
                 failed += 1
-        except Exception:
+        except Exception as e:
+            logger.error(f"[Storage Delete] Error deleting {file_id}: {e}")
             failed += 1
             
-    db.commit()
+    commit_with_retry(db)
     return {"status": "success", "deleted": deleted, "failed": failed}
 
 class DownloadRequest(BaseModel):
@@ -182,11 +171,6 @@ class DownloadRequest(BaseModel):
 def download_storage_files(req: DownloadRequest):
     if not req.file_ids:
         raise HTTPException(status_code=400, detail="No files selected for download")
-    
-    from fastapi.responses import FileResponse, Response
-    import io
-    import zipfile
-    from helpers import make_content_disposition
 
     # Single file direct download
     if len(req.file_ids) == 1:

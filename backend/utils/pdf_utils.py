@@ -45,6 +45,3 @@ def get_authentic_document_pdf(chat_id: str, doc_filename: str) -> Tuple[Optiona
 
     # Instant return: No authentic binary PDF stored on disk
     return None, clean_dl_name
-
-# Backward compatibility alias
-get_or_generate_document_pdf = get_authentic_document_pdf
