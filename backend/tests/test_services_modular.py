@@ -67,11 +67,26 @@ def test_source_signatures_db_direct():
         db.commit()
         db.close()
 
-def test_init_journal_db_seed():
-    """Verify init_journal_db initializes tables and seeds if empty."""
-    from journal_indexer import init_journal_db
-    count = init_journal_db()
-    assert count > 0
+def test_journal_indexer_classification():
+    """Verify journal_indexer correctly classifies preprints, conference proceedings, and peer-reviewed journals."""
+    from journal_indexer import lookup_journal_index, init_journal_db
+    
+    assert init_journal_db() == 0
+    
+    # Preprints
+    res_preprint = lookup_journal_index(journal_title="arXiv preprint cs.AI", venue_type="preprint")
+    assert res_preprint["is_preprint"] is True
+    assert res_preprint["quality_tier"] == 0
+    
+    # Conferences
+    res_conf = lookup_journal_index(journal_title="IEEE Conference on Computer Vision and Pattern Recognition", venue_type="conference")
+    assert res_conf["is_conference"] is True
+    assert res_conf["quality_tier"] == 4
+    
+    # General peer-reviewed journal
+    res_journal = lookup_journal_index(journal_title="American Journal of Sociology", venue_type="journal")
+    assert res_journal["is_preprint"] is False
+    assert res_journal["is_conference"] is False
 
 def test_pdf_authenticity_check():
     """Verify authentic PDF bytes header detection."""
