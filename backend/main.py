@@ -7,10 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from database import engine, Base, SessionLocal, Document
 
-from helpers import UPLOAD_DIR, TEMP_ZIPS_DIR, CHAT_MEDIA_DIR
+from utils.file_utils import UPLOAD_DIR, TEMP_ZIPS_DIR, CHAT_MEDIA_DIR, get_doc_file_path
+from utils.pdf_utils import is_binary_pdf
 from routers import chats_router, documents_router, papers_router, settings_router, storage_router
-
-import pdf_exporter
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -21,7 +20,6 @@ import asyncio
 
 def heal_legacy_upload_files():
     """Validates and heals missing or zero-byte metadata files in background without blocking server startup."""
-    from helpers import get_doc_file_path
     db = SessionLocal()
     try:
         docs = db.query(Document).all()
@@ -29,7 +27,7 @@ def heal_legacy_upload_files():
             existing_path = get_doc_file_path(d.chat_id, d.filename)
             
             # If valid binary PDF exists anywhere on disk, keep it intact
-            if os.path.exists(existing_path) and (pdf_exporter.is_binary_pdf(existing_path) or os.path.getsize(existing_path) >= 35000):
+            if os.path.exists(existing_path) and (is_binary_pdf(existing_path) or os.path.getsize(existing_path) >= 35000):
                 continue
 
             # If file doesn't exist or is completely empty (0-byte), write overview metadata fallback

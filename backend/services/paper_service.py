@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from database import Document, ChatSession, SessionLocal, commit_with_retry
 import models
 import rag
-import pdf_exporter
+from providers.academic import resolve_and_fetch_authentic_pdf
 from utils.file_utils import (
     UPLOAD_DIR,
     MAX_SOURCES_PER_CHAT,
@@ -40,7 +40,7 @@ def prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> Tuple
 
     if c_doi or paper.pdf_url or paper.url:
         try:
-            fetched_oa = pdf_exporter.resolve_and_fetch_authentic_pdf(
+            fetched_oa = resolve_and_fetch_authentic_pdf(
                 doi=c_doi,
                 title=paper.title,
                 direct_url=paper.url or "",
@@ -75,8 +75,8 @@ async def search_academic_papers(query: str, limit: int = 10) -> List[models.Pap
     if not query.strip():
         return []
         
-    ninerouter_llm, freellm_llm, gemini_llm, groq_llm = rag.create_llm_instances()
-    active_llm = ninerouter_llm or freellm_llm or gemini_llm or groq_llm
+    from rag.engine import get_fast_llm, get_main_llm
+    active_llm = get_fast_llm() or get_main_llm()
     
     plan = await rag.plan_academic_search(query.strip(), None, active_llm)
     if limit and limit != 10:
@@ -249,7 +249,7 @@ async def import_single_doi_source(chat_id: str, clean_doi_val: str, db: Session
 
     try:
         fetched_oa = await asyncio.to_thread(
-            pdf_exporter.resolve_and_fetch_authentic_pdf,
+            resolve_and_fetch_authentic_pdf,
             doi=clean_doi_val,
             title=title,
             direct_url=url,

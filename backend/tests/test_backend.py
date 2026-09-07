@@ -163,6 +163,19 @@ def test_lru_cache_eviction():
     assert "c" in cache
     assert "a" not in cache
 
+def test_metadata_resolver_caching():
+    """Verify resolve_paper_metadata_by_doi populates and hits the global cache."""
+    from services.search.metadata_resolver_service import resolve_paper_metadata_by_doi, _GLOBAL_METADATA_CACHE
+    
+    test_doi = "10.1109/access.test.999"
+    res1 = resolve_paper_metadata_by_doi(test_doi, title_fallback="IEEE Access Test", fast_only=True)
+    assert res1 is not None
+    assert test_doi in _GLOBAL_METADATA_CACHE
+    
+    # Second call should hit the cache
+    res2 = resolve_paper_metadata_by_doi(test_doi, fast_only=True)
+    assert res2 == res1
+
 def test_document_service_quality_calculator(tmp_path):
     """Verify document quality calculator prioritizes full PDFs with DOI and high citations."""
     from services.document import calculate_doc_quality

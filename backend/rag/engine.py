@@ -351,53 +351,45 @@ def web_search_and_ingest(query: str, chat_id: str) -> str:
     return "Temuan paper dan artikel web:\n\n" + "\n\n".join(output_snippets)
 
 def fetch_and_ingest_doi(doi: str, chat_id: str) -> str:
-    """Uses OpenAlex API to find an Open Access PDF for a given DOI, downloads it, and ingests it."""
+    """Uses canonical paper_service to resolve, download, store in DB, and ingest a DOI paper."""
     logger.info(f"[Agent] Fetching DOI: {doi}")
     
     match = re.search(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', doi, re.I)
     if not match:
         return f"Invalid DOI format: {doi}"
-    clean_doi = match.group(0)
-    
-    api_url = f"https://api.openalex.org/works/doi:{clean_doi}"
-    try:
-        resp = requests.get(api_url, timeout=10)
-        if resp.status_code != 200:
-            return f"Failed to fetch metadata for DOI {clean_doi}. (Status: {resp.status_code})"
-        
-        data = resp.json()
-        oa_info = data.get("open_access", {})
-        if not oa_info.get("is_oa"):
-            return f"The paper for DOI {clean_doi} is not Open Access (paywalled). Please upload the PDF manually."
-        
-        pdf_url = oa_info.get("oa_url")
-        if not pdf_url:
-            return f"Open Access URL not found for DOI {clean_doi}."
-            
-        logger.info(f"[Agent] Downloading PDF from {pdf_url}")
-        pdf_resp = requests.get(pdf_url, timeout=20, headers={"User-Agent": "NotbookLM-Research/1.0"})
-        if pdf_resp.status_code != 200:
-            return f"Failed to download PDF from {pdf_url}."
+    clean_doi = match.group(0).rstrip(".")
 
-        # Safety Check: Verify Content-Type & Authentic PDF Magic Bytes
-        from utils.pdf_utils import is_authentic_pdf_bytes
-        if not is_authentic_pdf_bytes(pdf_resp.content[:2048], min_size=1000):
-            return f"The Open Access URL for DOI {clean_doi} did not return a valid binary PDF (possible HTML landing page redirect)."
-            
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(pdf_resp.content)
-            tmp_path = tmp.name
-            
-        filename = f"{clean_doi.replace('/', '_')}.pdf"
-        md_text = pymupdf4llm.to_markdown(tmp_path)
-        ingest_document_text(md_text, filename, chat_id)
-        
-        os.remove(tmp_path)
-        return f"Successfully downloaded and saved Open Access paper for DOI: {clean_doi}. The user can now ask questions about it."
-        
+    from database import SessionLocal
+    from services.paper_service import import_single_doi_source
+    import concurrent.futures
+
+    existing_sigs = get_existing_notebook_sources_signatures(chat_id)
+    if clean_doi.lower() in existing_sigs.get("dois", set()):
+        return f"Paper with DOI {clean_doi} is already in the workspace sources."
+
+    db = SessionLocal()
+    try:
+        def _run_import():
+            return asyncio.run(import_single_doi_source(chat_id, clean_doi, db))
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                db_doc, has_pdf, is_oa, total_count = executor.submit(_run_import).result(timeout=60)
+        else:
+            db_doc, has_pdf, is_oa, total_count = _run_import()
+
+        status_desc = "full PDF" if has_pdf else "abstract & bibliographic metadata"
+        return f"Successfully imported '{db_doc.title}' ({status_desc}) for DOI: {clean_doi}. It is now added to workspace sources and ready for questions."
     except Exception as e:
-        return f"An error occurred while fetching DOI {clean_doi}: {str(e)}"
+        logger.error(f"[Agent DOI Import Error]: {e}")
+        return f"Failed to import paper for DOI {clean_doi}: {str(e)}"
+    finally:
+        db.close()
 
 async def generate_chat_title(first_user_message: str) -> str:
     """

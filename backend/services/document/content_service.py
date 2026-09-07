@@ -10,8 +10,8 @@ from database import Document
 from utils.file_utils import get_doc_file_path
 from utils.pdf_utils import is_authentic_pdf_bytes, is_binary_pdf
 from utils.text_processing import clean_doi
+from providers.academic import resolve_and_fetch_authentic_pdf
 import rag
-import pdf_exporter
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -43,7 +43,7 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Any, file_path: str) -> T
         db_doi = clean_doi(doc_doi)
         try:
             fetched_oa = await asyncio.to_thread(
-                pdf_exporter.resolve_and_fetch_authentic_pdf,
+                resolve_and_fetch_authentic_pdf,
                 doi=db_doi,
                 title=doc_title,
                 direct_url=doc_url or "",

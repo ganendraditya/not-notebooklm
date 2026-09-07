@@ -1,27 +1,12 @@
 import os
 import re
-import json
-import html
 import logging
-import urllib.request
-import urllib.parse
 from typing import List, Optional, Dict, Any
-import requests
-from duckduckgo_search import DDGS
-from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole, LLM
-import journal_indexer
-from collections import OrderedDict
-import concurrent.futures
 
-from helpers import clean_doi as _clean_doi
+from llama_index.core.llms import LLM
 from utils.text_processing import (
     normalize_title_str,
     is_valid_academic_title,
-    clean_academic_abstract,
-    is_valid_abstract_content,
-    extract_abstract_from_html,
-    is_title_match,
-    is_ai_synthesized_overview
 )
 from providers.academic import fetch_europe_pmc, fetch_openalex, fetch_crossref
 from services.search import (
@@ -29,38 +14,9 @@ from services.search import (
     judge_and_filter_papers_with_llm,
     audit_paper_metadata_with_ai
 )
+from services.search.metadata_resolver_service import LRUMetadataCache
 
 logger = logging.getLogger("uvicorn.error")
-
-class LRUMetadataCache:
-    """Thread-safe bounded in-memory cache to avoid unbounded RAM leak."""
-    def __init__(self, capacity: int = 500):
-        self.capacity = capacity
-        self.cache: OrderedDict[str, dict] = OrderedDict()
-
-    def get(self, key: str) -> Optional[dict]:
-        if key not in self.cache:
-            return None
-        self.cache.move_to_end(key)
-        return self.cache[key]
-
-    def set(self, key: str, value: dict):
-        if key in self.cache:
-            self.cache.move_to_end(key)
-        self.cache[key] = value
-        if len(self.cache) > self.capacity:
-            self.cache.popitem(last=False)
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.cache
-
-    def __getitem__(self, key: str) -> dict:
-        return self.get(key) or {}
-
-    def __setitem__(self, key: str, value: dict):
-        self.set(key, value)
-
-_PAPER_METADATA_CACHE = LRUMetadataCache(capacity=500)
 
 def get_existing_notebook_sources_signatures(chat_id: str) -> dict:
     """
@@ -84,7 +40,7 @@ def get_existing_notebook_sources_signatures(chat_id: str) -> dict:
     finally:
         db.close()
 
-    from helpers import get_doc_file_path
+    from utils.file_utils import get_doc_file_path
     for fn in filenames:
         fpath = get_doc_file_path(chat_id, fn)
         if os.path.exists(fpath):
