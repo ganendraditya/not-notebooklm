@@ -96,10 +96,10 @@ export function usePaperDetails({
   }, [viewingDoc?.id, viewingDoc?.filename, activeChatId, backendUrl]);
 
   useEffect(() => {
-    if (groundingHighlight?.sentence) {
+    if (groundingHighlight?.sentence || (groundingHighlight?.aiQuotes && groundingHighlight.aiQuotes.length > 0)) {
       setActiveTab("preview");
     }
-  }, [groundingHighlight?.clickId, groundingHighlight?.sentence]);
+  }, [groundingHighlight?.clickId, groundingHighlight?.sentence, groundingHighlight?.aiQuotes]);
 
   return {
     viewingDoc,

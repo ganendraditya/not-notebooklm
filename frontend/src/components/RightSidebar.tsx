@@ -5,7 +5,7 @@ import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./
 "use client";
 import { useDocumentManager } from "@/hooks/useDocumentManager";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Plus, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
@@ -113,9 +113,31 @@ export default function RightSidebar({
   const [totalMatches, setTotalMatches] = useState<number>(0);
   const highlightRefsMap = useRef<Map<number, HTMLElement>>(new Map());
 
-  // Reset active highlight match index when highlighted target changes (or same citation re-clicked)
+  const currentContent = paperDetails?.content || (viewingDoc as any)?.content || "";
+
+  const highlightResult = useMemo(() => {
+    return getHighlightedContent(
+      currentContent,
+      groundingHighlight?.sentence || "",
+      highlightRefsMap,
+      activeMatchIndex,
+      groundingHighlight?.aiQuotes
+    );
+  }, [currentContent, groundingHighlight?.sentence, groundingHighlight?.aiQuotes, activeMatchIndex]);
+
   useEffect(() => {
-    setActiveMatchIndex(0);
+    setTotalMatches(highlightResult.matchCount);
+    if (highlightResult.matchCount > 0) {
+      if (highlightResult.initialActiveIndex !== undefined) {
+        setActiveMatchIndex(highlightResult.initialActiveIndex);
+      } else if (activeMatchIndex >= highlightResult.matchCount) {
+        setActiveMatchIndex(0);
+      }
+    }
+  }, [highlightResult.matchCount, highlightResult.initialActiveIndex]);
+
+  // Reset highlight refs when highlighted target changes (or same citation re-clicked)
+  useEffect(() => {
     highlightRefsMap.current.clear();
   }, [groundingHighlight?.clickId, groundingHighlight?.sentence, viewingDoc?.id]);
 
@@ -235,7 +257,7 @@ export default function RightSidebar({
             setActiveMatchIndex(prev => prev > 0 ? prev - 1 : totalMatches - 1);
           }
         }}
-        getHighlightedContent={() => getHighlightedContent((paperDetails?.content || (viewingDoc as any)?.content || ""), (groundingHighlight?.sentence || ""), highlightRefsMap, activeMatchIndex, groundingHighlight?.aiQuotes).nodes}
+        getHighlightedContent={() => highlightResult.nodes}
         cleanAbstract={cleanAbstract}
         authorsStr={authorsStr}
         pubDateStr={pubDateStr}

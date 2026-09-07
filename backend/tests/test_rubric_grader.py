@@ -47,7 +47,9 @@ def test_parse_rubric_json_response_malformed_fallback():
     res = parse_rubric_json_response(raw_bad)
     # Harus fallback aman (tidak boleh throw error/crash)
     assert isinstance(res, RubricEvaluationResult)
-    assert res.is_grounded is True
+    assert res.is_grounded is False
+    assert res.grounding_score == 0.0
+    assert len(res.hallucinated_claims) > 0
 
 def test_evaluate_response_grounding_with_mock_llm():
     import asyncio

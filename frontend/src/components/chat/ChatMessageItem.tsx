@@ -49,6 +49,81 @@ export interface InChatMessageProps {
   activeCitationKey?: string | null;
 }
 
+const TableRowContext = React.createContext<string>("");
+
+function extractNodeText(node: any): string {
+  if (!node) return "";
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractNodeText).filter(Boolean).join(" ");
+  if (node.value) return node.value;
+  if (node.children) return extractNodeText(node.children);
+  if (node.props?.children) return extractNodeText(node.props.children);
+  return "";
+}
+
+function extractTableRowText(node: any, children: any): string {
+  if (node?.children && Array.isArray(node.children)) {
+    const cellTexts = node.children
+      .map((cellNode: any) => extractNodeText(cellNode).trim())
+      .filter((txt: string) => txt.length > 0);
+    if (cellTexts.length > 0) {
+      return cellTexts.join(" | ");
+    }
+  }
+  if (children) {
+    const raw = extractNodeText(children);
+    if (raw) return raw;
+  }
+  return "";
+}
+
+interface TableCellRendererProps {
+  isHeader?: boolean;
+  documents?: DocType[];
+  onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
+  activeCitationKey?: string | null;
+  citationMap?: Record<string, string[]>;
+  children?: React.ReactNode;
+  [key: string]: any;
+}
+
+const TableCellRenderer: React.FC<TableCellRendererProps> = ({
+  isHeader = false,
+  documents,
+  onOpenDocument,
+  activeCitationKey,
+  citationMap,
+  children,
+  ...props
+}) => {
+  const rowContext = React.useContext(TableRowContext);
+  const cellRawText = extractNodeText(children);
+  const cellClean = cellRawText
+    .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
+    .trim();
+
+  // If this cell has specific content (e.g. "1.500 ulasan produk", "Naïve Bayes + TF-IDF", "77,78%"), pass cellRawText!
+  // If this cell has NO factual text (e.g. it's just "[1]" in the Source column or generic "Doc 1"), pass rowContext!
+  const isGenericOrEmpty = !cellClean || cellClean.length < 3 || /^(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?$/i.test(cellClean);
+  const contextToPass = isGenericOrEmpty ? rowContext : cellRawText;
+
+  if (isHeader) {
+    return (
+      <th className="py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase" {...props}>
+        {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, "th")}
+      </th>
+    );
+  }
+  return (
+    <td className="py-2.5 px-3 text-app-text-muted text-xs leading-relaxed" {...props}>
+      {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, "td")}
+    </td>
+  );
+};
+
 export const InChatMessageComponent = memo(function InChatMessageComponent({ 
   msg, 
   activeChatId, 
@@ -263,13 +338,48 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
-            p: ({ children }) => <p className="mb-2 last:mb-0 text-app-text leading-[1.65]">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "p")}</p>,
-            h1: ({ children }) => <h1 className="text-2xl font-bold text-app-text mt-5 mb-2.5 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h1")}</h1>,
-            h2: ({ children }) => <h2 className="text-xl font-bold text-app-text mt-4 mb-2 tracking-tight">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h2")}</h2>,
-            h3: ({ children }) => <h3 className="text-lg font-semibold text-app-text mt-3 mb-1.5">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "h3")}</h3>,
+            p: ({ node, children, ...props }: any) => {
+              const fullText = extractNodeText(node || children);
+              return (
+                <p className="mb-2 last:mb-0 text-app-text leading-[1.65]" {...props}>
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "p")}
+                </p>
+              );
+            },
+            h1: ({ node, children, ...props }: any) => {
+              const fullText = extractNodeText(node || children);
+              return (
+                <h1 className="text-2xl font-bold text-app-text mt-5 mb-2.5 tracking-tight" {...props}>
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "h1")}
+                </h1>
+              );
+            },
+            h2: ({ node, children, ...props }: any) => {
+              const fullText = extractNodeText(node || children);
+              return (
+                <h2 className="text-xl font-bold text-app-text mt-4 mb-2 tracking-tight" {...props}>
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "h2")}
+                </h2>
+              );
+            },
+            h3: ({ node, children, ...props }: any) => {
+              const fullText = extractNodeText(node || children);
+              return (
+                <h3 className="text-lg font-semibold text-app-text mt-3 mb-1.5" {...props}>
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "h3")}
+                </h3>
+              );
+            },
             ul: ({ node, ...props }: any) => <ul className="list-disc pl-6 my-2.5 space-y-1.5 text-app-text" {...props} />,
             ol: ({ node, ...props }: any) => <ol className="list-decimal pl-8 my-2.5 space-y-1.5 text-app-text" {...props} />,
-            li: ({ node, children, ...props }: any) => <li className="leading-[1.65]" {...props}>{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "li")}</li>,
+            li: ({ node, children, ...props }: any) => {
+              const fullText = extractNodeText(node || children);
+              return (
+                <li className="leading-[1.65]" {...props}>
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "li")}
+                </li>
+              );
+            },
             em: ({ children }) => <em className="italic">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "em")}</em>,
             strong: ({ children }) => <strong className="font-semibold text-app-text">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "strong")}</strong>,
             a: ({ href, children }) => (
@@ -291,14 +401,46 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             ),
             thead: ({ children }) => <thead className="bg-app-table-header text-app-text border-b border-app-border font-semibold">{children}</thead>,
             tbody: ({ children }) => <tbody className="divide-y divide-app-divider">{children}</tbody>,
-            tr: ({ children }) => <tr className="hover:bg-app-item-hover transition-colors">{children}</tr>,
-            th: ({ children }) => <th className="py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "th")}</th>,
-            td: ({ children }) => <td className="py-2.5 px-3 text-app-text-muted text-xs leading-relaxed">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "td")}</td>,
-            blockquote: ({ children }) => (
-              <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-app-text-muted bg-blue-500/5 rounded-r-lg italic">
-                {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "blockquote")}
-              </blockquote>
+            tr: ({ node, children, ...props }: any) => {
+              const rowText = extractTableRowText(node, children);
+              return (
+                <TableRowContext.Provider value={rowText}>
+                  <tr className="hover:bg-app-item-hover transition-colors" {...props}>{children}</tr>
+                </TableRowContext.Provider>
+              );
+            },
+            th: ({ children, ...props }: any) => (
+              <TableCellRenderer
+                isHeader={true}
+                documents={documents}
+                onOpenDocument={onOpenDocument}
+                activeCitationKey={activeCitationKey}
+                citationMap={citationMap}
+                {...props}
+              >
+                {children}
+              </TableCellRenderer>
             ),
+            td: ({ children, ...props }: any) => (
+              <TableCellRenderer
+                isHeader={false}
+                documents={documents}
+                onOpenDocument={onOpenDocument}
+                activeCitationKey={activeCitationKey}
+                citationMap={citationMap}
+                {...props}
+              >
+                {children}
+              </TableCellRenderer>
+            ),
+            blockquote: ({ node, children, ...props }: any) => {
+              const fullText = extractNodeText(node || children);
+              return (
+                <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-app-text-muted bg-blue-500/5 rounded-r-lg italic" {...props}>
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "blockquote")}
+                </blockquote>
+              );
+            },
             pre: ({ children }) => (
               <div className="relative group my-3">
                 <pre className="bg-app-code-bg p-3.5 rounded-xl overflow-x-auto text-xs text-app-text font-mono border border-app-border">

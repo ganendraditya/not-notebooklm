@@ -41,7 +41,7 @@ export function parseCitationsInReactNode(
       let contextSentence = "";
 
       if (effectiveFullText.includes("|")) {
-        // Inside table: extract the specific cell or current row containing this citation
+        // Inside whole row fallback: extract the row without citations
         const lines = effectiveFullText.split("\n");
         const matchingLine = lines.find(l => l.includes(match![0])) || effectiveFullText;
         contextSentence = matchingLine
@@ -50,11 +50,19 @@ export function parseCitationsInReactNode(
           .filter(c => c.length > 0 && !/^\d+$/.test(c))
           .join(" . ")
           .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
           .trim();
       } else {
-        // In natural text/paragraphs: find sentence boundaries
-        const textBefore = node.substring(0, matchIndex);
-        const textAfter = node.substring(regex.lastIndex);
+        // In individual cell or natural text/paragraphs: find sentence boundaries using effectiveFullText
+        const searchBase = effectiveFullText;
+        let baseIndex = searchBase.indexOf(node);
+        if (baseIndex === -1) {
+          baseIndex = 0;
+        }
+        const actualMatchIndex = baseIndex + matchIndex;
+        const textBefore = searchBase.substring(0, actualMatchIndex);
+        const textAfter = searchBase.substring(actualMatchIndex + match[0].length);
 
         const lastSentenceEnd = Math.max(
           textBefore.lastIndexOf(". "),
@@ -74,12 +82,22 @@ export function parseCitationsInReactNode(
             textAfter.indexOf(";\n")
           ].filter(x => x !== -1)
         );
-        const sentenceEnd = nextSentenceEnd !== -1 ? regex.lastIndex + nextSentenceEnd + 1 : node.length;
+        const sentenceEnd = nextSentenceEnd !== -1 ? actualMatchIndex + match[0].length + nextSentenceEnd + 1 : searchBase.length;
         
-        contextSentence = node
+        contextSentence = searchBase
           .substring(sentenceStart, sentenceEnd)
           .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
-          .replace(/^[|\s*#_-]+|[|\s*#_-]+$/g, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
+          .trim();
+      }
+
+      // Fallback: If contextSentence is still too short or empty, fallback to effectiveFullText
+      if (!contextSentence || contextSentence.length < 3) {
+        contextSentence = effectiveFullText
+          .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
           .trim();
       }
 
@@ -111,7 +129,7 @@ export function parseCitationsInReactNode(
           <span key={`cite-grp-${elementPrefix}-${matchIndex}-${sentenceSnippet}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
             {nums.map((num, i) => {
               const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
-              const docTitle = doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
+              const docTitle = doc?.title || doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
               const aiQuotesForDoc = citationMap?.[num.toString()] || citationMap?.[`[${num}]`];
 
               // Key includes elementPrefix & unique matchIndex to ensure ONLY the clicked citation turns amber/active

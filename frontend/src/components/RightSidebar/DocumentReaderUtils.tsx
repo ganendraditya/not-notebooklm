@@ -52,6 +52,7 @@ export const cleanHtmlAbstract = (raw?: string): string => {
 export interface HighlightMatchResult {
   nodes: React.ReactNode;
   matchCount: number;
+  initialActiveIndex?: number;
 }
 
 // Helper: Dynamic semantic grounding matcher for scientific claims & quotes (NotebookLM Style)
@@ -64,18 +65,6 @@ export function getHighlightedContent(
   aiQuotes?: string[]
 ): HighlightMatchResult {
   if (!fullText) return { nodes: null, matchCount: 0 };
-
-  // 0. GUARD: Ignore conversational fluff / bibliography / generic introductory clauses
-  const isGenericCitationQuery = !targetQuery || targetQuery.trim().length < 5 || (
-    /^(?:berdasarkan|dokumen|referensi|sumber|menurut|daftar\s+pustaka|sitasi\s+rujukan|paper|jurnal|artikel|kesimpulan|rincian)\b/i.test(targetQuery.trim()) &&
-    !/\d+[,.]\d+%?|\b\d+%\b|\bakurasi\b|\bmetode\b|\bhasil\b|\bdataset\b|\bsensitivitas\b|\bspesifisitas\b/i.test(targetQuery)
-  ) || (
-    /^\s*(?:santoso|rahma|et\s+al|dr\.|prof\.)/i.test(targetQuery.trim()) && targetQuery.length < 80
-  );
-
-  if (isGenericCitationQuery) {
-    return { nodes: <span>{fullText}</span>, matchCount: 0 };
-  }
 
   // Tokenize document text into atomic chunks while strictly preserving all original whitespace and linebreaks
   const rawSentences: string[] = [];
@@ -90,7 +79,7 @@ export function getHighlightedContent(
   if (rawSentences.length === 0) return { nodes: <span>{fullText}</span>, matchCount: 0 };
 
   // 1. PRIMARY AI-DRIVEN GROUNDING PATH:
-  // If Gemini 3.7 Flash High provided exact verbatim quote(s), match against them directly!
+  // If Gemini provided exact verbatim quote(s) via CITATION_MAP, match against them directly!
   if (aiQuotes && aiQuotes.length > 0) {
     const aiHighlightedIndices = new Set<number>();
     const aiClusters: number[][] = [];
@@ -130,8 +119,8 @@ export function getHighlightedContent(
       // Check for exact substring match (bidirectional)
       let foundExact = false;
       rawSentences.forEach((s, idx) => {
-        // Skip title heading in matches
-        if (idx === 0 && /^#\s+/i.test(s.trim())) return;
+        // Skip title and section headings in matches
+        if (/^#{1,6}\s+/i.test(s.trim())) return;
         const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
         if (sClean.length >= 15 && (sClean.includes(cleanQuote) || cleanQuote.includes(sClean))) {
           aiHighlightedIndices.add(idx);
@@ -145,8 +134,8 @@ export function getHighlightedContent(
         let highestScore = 0;
 
         rawSentences.forEach((s, idx) => {
-          // Never highlight Document Title (idx 0) on quote matching
-          if (idx === 0 && /^#\s+/i.test(s.trim())) return;
+          // Never highlight headings or titles on quote matching
+          if (/^#{1,6}\s+/i.test(s.trim())) return;
           const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
           // Skip very short fragments and metadata lines
           if (sClean.length < 15) return;
@@ -244,9 +233,32 @@ export function getHighlightedContent(
 
       return {
         nodes,
-        matchCount: aiClusters.length
+        matchCount: aiClusters.length,
+        initialActiveIndex: 0
       };
     }
+  }
+
+  // 2. FALLBACK CONTEXTUAL SEMANTIC GROUNDING PATH:
+  // Identify if query contains explicit metrics, ratios, or evaluation terms
+  const hasMetricOrData = Boolean(
+    targetQuery && (
+      /\d+(?:[,.]\d+)?%?|\b\d+:\d+\b|\bakurasi\b|\bmetode\b|\bhasil\b|\bdataset\b|\bsensitivitas\b|\bspesifisitas\b|\bpresisi\b|\brecall\b/i.test(targetQuery)
+    )
+  );
+
+  // Guard against conversational fluff / empty queries unless numerical/metric data is present
+  const isGenericCitationQuery = !targetQuery || (
+    targetQuery.trim().length < 3 && !hasMetricOrData
+  ) || (
+    /^(?:berdasarkan|dokumen|referensi|sumber|menurut|daftar\s+pustaka|sitasi\s+rujukan|paper|jurnal|artikel|kesimpulan|rincian)\b/i.test(targetQuery.trim()) &&
+    !hasMetricOrData
+  ) || (
+    /^\s*(?:santoso|rahma|et\s+al|dr\.|prof\.)/i.test(targetQuery.trim()) && targetQuery.length < 80
+  );
+
+  if (isGenericCitationQuery) {
+    return { nodes: <span>{fullText}</span>, matchCount: 0 };
   }
 
   // Identify where the bibliography / reference list starts in the document to avoid grounding on references
@@ -268,17 +280,27 @@ export function getHighlightedContent(
     "hasil", "nilai", "sebesar", "ketika", "menggunakan"
   ]);
 
-  // Normalize query & strip LaTeX delimiters ($C=10$, \gamma=1 -> c=10, gamma=1)
+  // Normalize query & strip LaTeX delimiters ($C=10$, \gamma=1 -> c=10, gamma=1) and diacritics
   const normQuery = (targetQuery || "")
     .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/\$([^$]+)\$/g, "$1")
     .replace(/\\(?:gamma|alpha|beta|sigma|lambda|theta)\b/gi, (m) => m.substring(1));
   
-  // Extract explicit numerical metrics with decimals or %: e.g. "69,15%", "84.37%", "0.87"
-  const rawMetricMatches = (normQuery.match(/\b\d+[,.]\d+%?\b|\b\d+%\b/g) || []);
+  // Extract explicit numerical metrics with decimals or %: e.g. "69,15%", "84.37%", "0.87", "77%"
+  const rawMetricMatches = (normQuery.match(/\b\d+[,.]\d+%?|\b\d+%/g) || []);
   const metricsSet = new Set(
     rawMetricMatches.map(m => m.toLowerCase().replace(/,/g, ".").replace(/%/g, ""))
   );
+
+  // Extract split ratios: e.g. "90:10", "80:20", "60:40"
+  const ratioMatches = (normQuery.match(/\b\d+\s*:\s*\d+\b/g) || []).map(r => r.replace(/\s+/g, ""));
+
+  // Extract explicit integer numbers >= 3 digits (e.g. 1500 from "1.500" or 900)
+  const rawNumberMatches = (normQuery.match(/\b\d+(?:[.,]\d+)?\b/g) || [])
+    .map(n => n.replace(/[.,]/g, ""))
+    .filter(n => n.length >= 3 && !metricsSet.has(n));
+  const numberSet = new Set(rawNumberMatches);
 
   // Extract parameter bindings: e.g. "c=10", "gamma=1", "k=5", "fold=10"
   const paramBindings = (normQuery.match(/\b[a-z_]+\s*=\s*\d+(?:[,.]\d+)?\b/g) || []).map(p => p.replace(/\s+/g, ""));
@@ -300,23 +322,32 @@ export function getHighlightedContent(
 
   // Calculate scores for each sentence with semantic entity weighting
   let maxSingleScore = 0;
+  let bestSentenceIdx = -1;
   const sentenceScores = rawSentences.map((s, idx) => {
     if (refSectionIndex !== -1 && idx >= refSectionIndex) {
       return 0;
     }
 
+    const sTrim = s.trim();
     const sLower = s.toLowerCase();
     
     // Ignore bibliography, page numbers, journal header lines, URL lines, and short metadata fragments
     if (/https?:\/\/|doi\.org|\bvol(?:ume)?\s*\d+|\bp-issn\b|\be-issn\b|\bissn\b|\bhalaman\b|\bavailable online\b|\.ac\.id|\.org\/index/i.test(sLower)) {
       return 0;
     }
-    // Skip top title, metadata lines, and heading 1 from matching if searching within body
-    if (idx === 0 && /^#\s+/i.test(s.trim())) {
+    // Skip markdown headings (e.g. # Document Title, ## Section Header), author blocks, and short fragments
+    if (/^#{1,6}\s+/i.test(sTrim)) {
+      return 0;
+    }
+    if (idx < 15 && (/^Billy Gunawan|Universitas|Fakultas Teknik|Nanawi|@gmail|@informatics/i.test(sTrim))) {
+      return 0;
+    }
+    if (sTrim.length < 10) {
       return 0;
     }
 
-    const sNormalizedNumbers = sLower
+    const sNormalizedDiacritics = sLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const sNormalizedNumbers = sNormalizedDiacritics
       .replace(/(\d+)\s*[,.]\s*(\d+)/g, "$1.$2")
       .replace(/(\d+)\s+%/g, "$1%");
     const sClean = sNormalizedNumbers.replace(/[^a-zA-Z0-9\s]/g, " ");
@@ -337,45 +368,61 @@ export function getHighlightedContent(
       }
     });
 
-    // 1. Exact Decimal/Percentage/Value Metric match
-    // Matches "0,87", "0.87", "87%", "87", "0,88", "0.88"
+    // 2. Exact Decimal/Percentage/Value Metric match
+    // Matches "0,87", "0.87", "87%", "87", "0,88", "0.88", "77.78"
     metricsSet.forEach(m => {
       const mComma = m.replace(/\./g, ",");
       const isDecimalMatch = sNormalizedNumbers.includes(m) || sLower.includes(mComma);
       if (isDecimalMatch) {
-        score += 35;
+        score += 40;
       } else if (m.startsWith("0.")) {
         // Convert decimal to percentage or integer representation: e.g. 0.87 -> 87% / 87
         const pctInt = `${Math.round(parseFloat(m) * 100)}`;
         if (sNormalizedNumbers.includes(`${pctInt}%`) || sClean.includes(pctInt)) {
-          score += 35;
+          score += 40;
         }
       } else if (/^\d+$/.test(m) && parseInt(m, 10) > 10) {
         // Integer percentage representation: e.g. 87 -> 0.87 or 87%
         const decVal = (parseInt(m, 10) / 100).toFixed(2);
         if (sNormalizedNumbers.includes(decVal) || sLower.includes(decVal.replace(/\./g, ","))) {
-          score += 35;
+          score += 40;
         }
       }
     });
 
-    // 2. Specific keyphrase n-grams (e.g. "akurasi tertinggi", "model terbaik", "kata positif", "sentimen netral")
-    queryPhrases.forEach(ph => {
-      if (sClean.includes(ph)) {
-        score += 16;
+    // 3. Split ratio match (e.g. "90:10" matching "90:10" or "90% data latih dan 10% data uji") (Weight: 30 points)
+    ratioMatches.forEach(r => {
+      const parts = r.split(":");
+      if (sLower.includes(r) || (parts.length === 2 && sNormalizedNumbers.includes(parts[0]) && sNormalizedNumbers.includes(parts[1]))) {
+        score += 30;
       }
     });
 
-    // 3. Domain Entity / Model / Sentiment keywords (Weight: 5 points)
-    // Matches "bahagia", "rajin", "senang", "capek", "muak", "bosen", "netral", "akurasi"
+    // 4. Integer count match (e.g. 1500 or 900) (Weight: 35 points)
+    numberSet.forEach(n => {
+      const nWithDot = n.length === 4 ? `${n[0]}.${n.slice(1)}` : n;
+      if (sClean.includes(n) || sLower.includes(nWithDot)) {
+        score += 35;
+      }
+    });
+
+    // 5. Specific keyphrase n-grams (e.g. "akurasi tertinggi", "model terbaik", "kata positif", "sentimen netral")
+    queryPhrases.forEach(ph => {
+      if (sClean.includes(ph)) {
+        score += 20;
+      }
+    });
+
+    // 6. Domain Entity / Model / Sentiment keywords (Weight: 6 points)
     cleanTokens.forEach(w => {
       if (sWords.has(w) || sClean.includes(w)) {
-        score += 5;
+        score += 6;
       }
     });
 
     if (score > maxSingleScore) {
       maxSingleScore = score;
+      bestSentenceIdx = idx;
     }
 
     return score;
@@ -497,9 +544,18 @@ export function getHighlightedContent(
     </>
   );
 
+  // Find which cluster contains the highest scoring evidence sentence
+  let bestClusterIndex = 0;
+  clusters.forEach((clust, cIdx) => {
+    if (clust.includes(bestSentenceIdx)) {
+      bestClusterIndex = cIdx;
+    }
+  });
+
   return {
     nodes,
-    matchCount: clusters.length
+    matchCount: clusters.length,
+    initialActiveIndex: bestClusterIndex
   };
 }
 
