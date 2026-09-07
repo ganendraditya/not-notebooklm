@@ -1,9 +1,11 @@
 import os
 import uuid
 import logging
+import time
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Text, Boolean, event
-from sqlalchemy.orm import sessionmaker, relationship, declarative_base
+from sqlalchemy.orm import Session, sessionmaker, relationship, declarative_base
+from sqlalchemy.exc import OperationalError
 import sqlite3
 
 logger = logging.getLogger("uvicorn.error")
@@ -159,3 +161,34 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def commit_with_retry(
+    db: Session,
+    max_retries: int = 3,
+    initial_delay: float = 0.1,
+    backoff_factor: float = 2.0
+) -> None:
+    """
+    Commit database transaction with exponential backoff retry on lock / concurrency contention.
+    Particularly useful for SQLite when background streams or multiple threads write concurrently.
+    """
+    delay = initial_delay
+    for attempt in range(max_retries):
+        try:
+            db.commit()
+            return
+        except (OperationalError, sqlite3.OperationalError) as e:
+            err_msg = str(e).lower()
+            is_locked = "locked" in err_msg or "busy" in err_msg
+            if is_locked and attempt < max_retries - 1:
+                logger.warning(
+                    f"[DB Lock Contention]: Database is locked or busy. Retrying commit (attempt {attempt + 1}/{max_retries}) in {delay:.2f}s..."
+                )
+                time.sleep(delay)
+                delay *= backoff_factor
+                continue
+            db.rollback()
+            raise
+        except Exception:
+            db.rollback()
+            raise

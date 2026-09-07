@@ -6,7 +6,7 @@ import asyncio
 from typing import List, Tuple, Dict, Any, AsyncGenerator
 from sqlalchemy.orm import Session
 
-from database import Document, ChatSession, SessionLocal
+from database import Document, ChatSession, SessionLocal, commit_with_retry
 import models
 import rag
 import pdf_exporter
@@ -153,7 +153,7 @@ async def import_sources_progressive_stream(
                 quality_tier=4,
             )
             local_db.add(db_doc)
-            local_db.commit()
+            commit_with_retry(local_db)
             local_db.refresh(db_doc)
             created_doc_id = db_doc.id
             created_at_str = db_doc.created_at.isoformat() if db_doc.created_at else ""
@@ -209,7 +209,7 @@ async def import_sources_batch(chat_id: str, allowed_sources: List[models.PaperC
         db.add(db_doc)
         created_docs.append(db_doc)
         
-    db.commit()
+    commit_with_retry(db)
     for d in created_docs:
         db.refresh(d)
         
@@ -299,7 +299,7 @@ async def import_single_doi_source(chat_id: str, clean_doi_val: str, db: Session
         quality_tier=4,
     )
     db.add(db_doc)
-    db.commit()
+    commit_with_retry(db)
     db.refresh(db_doc)
 
     total_count = db.query(Document).filter(Document.chat_id == chat_id).count()

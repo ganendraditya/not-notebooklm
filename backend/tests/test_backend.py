@@ -456,6 +456,43 @@ async def test_workspace_pipeline_hybrid_retrieval_scaling():
         db.commit()
         db.close()
 
+def test_commit_with_retry():
+    """Verify commit_with_retry handles success, transient locks with backoff, and fatal errors."""
+    from unittest.mock import MagicMock
+    from database import commit_with_retry
+    from sqlalchemy.exc import OperationalError
+    import sqlite3
+
+    # 1. Normal commit succeeds without retries
+    mock_db = MagicMock()
+    commit_with_retry(mock_db)
+    mock_db.commit.assert_called_once()
+    mock_db.rollback.assert_not_called()
+
+    # 2. Transient lock error succeeds on second attempt
+    mock_db = MagicMock()
+    lock_err = OperationalError("COMMIT", {}, sqlite3.OperationalError("database is locked"))
+    mock_db.commit.side_effect = [lock_err, None]
+    commit_with_retry(mock_db, max_retries=3, initial_delay=0.01)
+    assert mock_db.commit.call_count == 2
+    mock_db.rollback.assert_not_called()
+
+    # 3. Persistent lock exhausts retries, triggers rollback, and re-raises
+    mock_db = MagicMock()
+    mock_db.commit.side_effect = lock_err
+    with pytest.raises(OperationalError):
+        commit_with_retry(mock_db, max_retries=2, initial_delay=0.01)
+    assert mock_db.commit.call_count == 2
+    mock_db.rollback.assert_called_once()
+
+    # 4. Non-lock error does not retry, triggers rollback immediately
+    mock_db = MagicMock()
+    mock_db.commit.side_effect = ValueError("Non-lock exception")
+    with pytest.raises(ValueError):
+        commit_with_retry(mock_db, max_retries=3, initial_delay=0.01)
+    mock_db.commit.assert_called_once()
+    mock_db.rollback.assert_called_once()
+
 
 
 

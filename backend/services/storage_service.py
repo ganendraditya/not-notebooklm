@@ -3,7 +3,7 @@ import logging
 from typing import List, Optional, Set
 from sqlalchemy.orm import Session
 
-from database import Document, ChatSession, ChatMessage
+from database import Document, ChatSession, ChatMessage, commit_with_retry
 from utils.file_utils import get_doc_file_path, UPLOAD_DIR, TEMP_ZIPS_DIR
 import rag
 
@@ -48,7 +48,7 @@ def delete_chat_session_cascade(db: Session, chat_id: str) -> bool:
     db.query(Document).filter(Document.chat_id == chat_id).delete(synchronize_session=False)
     db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).delete(synchronize_session=False)
     db.delete(chat)
-    db.commit()
+    commit_with_retry(db)
     return True
 
 def delete_document_by_id(db: Session, chat_id: str, doc_id: int) -> bool:
@@ -70,7 +70,7 @@ def delete_document_by_id(db: Session, chat_id: str, doc_id: int) -> bool:
         logger.error(f"[Delete Vector Error] Failed to delete vectors for {doc.filename}: {e}")
         
     db.delete(doc)
-    db.commit()
+    commit_with_retry(db)
     return True
 
 def delete_multiple_documents(db: Session, chat_id: str, doc_ids: List[int]) -> int:
@@ -92,7 +92,7 @@ def delete_multiple_documents(db: Session, chat_id: str, doc_ids: List[int]) -> 
         db.delete(doc)
         deleted_count += 1
         
-    db.commit()
+    commit_with_retry(db)
     return deleted_count
 
 def cleanup_orphan_files_on_disk(active_chat_ids: Set[str]) -> tuple:

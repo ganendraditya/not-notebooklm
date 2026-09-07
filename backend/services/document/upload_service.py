@@ -7,7 +7,7 @@ from typing import Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from fastapi import UploadFile
 
-from database import Document
+from database import Document, commit_with_retry
 from utils.file_utils import UPLOAD_DIR
 from utils.pdf_utils import is_authentic_pdf_bytes
 
@@ -103,7 +103,7 @@ def handle_document_upload(chat_id: str, file: UploadFile, db: Session) -> Tuple
         quality_tier=4
     )
     db.add(db_doc)
-    db.commit()
+    commit_with_retry(db)
     db.refresh(db_doc)
 
     return db_doc, file_path, enriched

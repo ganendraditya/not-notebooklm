@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 import shutil
 from sqlalchemy.orm import Session
 
-from database import get_db, ChatSession, Document, ChatMessage
+from database import get_db, ChatSession, Document, ChatMessage, commit_with_retry
 from helpers import UPLOAD_DIR
 from utils.streaming import create_sse_stream_response, SSEStreamEmitter
 import models
@@ -31,7 +31,7 @@ def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
     now = get_utc_now()
     db_chat = ChatSession(id=chat_id, title=chat.title, created_at=now, updated_at=now)
     db.add(db_chat)
-    db.commit()
+    commit_with_retry(db)
     db.refresh(db_chat)
     return db_chat
 
@@ -125,7 +125,7 @@ def update_chat(chat_id: str, update: models.ChatSessionUpdate, db: Session = De
         raise HTTPException(status_code=404, detail="Chat not found")
     chat.title = update.title
     chat.updated_at = get_utc_now()
-    db.commit()
+    commit_with_retry(db)
     db.refresh(chat)
     return chat
 
@@ -135,7 +135,7 @@ def toggle_pin_chat(chat_id: str, payload: models.PinChatRequest, db: Session = 
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
     chat.is_pinned = payload.is_pinned
-    db.commit()
+    commit_with_retry(db)
     db.refresh(chat)
     return chat
 
@@ -233,7 +233,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
     )
     db.add(user_msg)
     chat.updated_at = get_utc_now()
-    db.commit()
+    commit_with_retry(db)
     
     chat_history = []
     for msg in chat.messages:
@@ -256,9 +256,9 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
     asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
     db.add(asst_msg)
     chat.updated_at = get_utc_now()
-    db.commit()
+    commit_with_retry(db)
     db.refresh(asst_msg)
-    
+
     return models.ChatMessageResponse(
         role=asst_msg.role,
         content=asst_msg.content,
@@ -285,7 +285,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
     )
     db.add(user_msg)
     chat.updated_at = get_utc_now()
-    db.commit()
+    commit_with_retry(db)
     
     all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
     chat_history = []
@@ -317,7 +317,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                             t_chat = t_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
                             if t_chat:
                                 t_chat.title = ai_title
-                                t_db.commit()
+                                commit_with_retry(t_db)
                         finally:
                             t_db.close()
                         await emitter.emit_event({"type": "title_update", "title": ai_title, "chat_id": chat_id})
@@ -354,7 +354,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
             bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
             if bg_chat:
                 bg_chat.updated_at = get_utc_now()
-            bg_db.commit()
+            commit_with_retry(bg_db)
         finally:
             bg_db.close()
 
@@ -390,7 +390,7 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
         db.delete(msg_to_del)
         
     chat.updated_at = get_utc_now()
-    db.commit()
+    commit_with_retry(db)
     
     truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index + 1]]
     
@@ -403,7 +403,7 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
     db.add(asst_msg)
     chat.updated_at = get_utc_now()
-    db.commit()
+    commit_with_retry(db)
     db.refresh(asst_msg)
     
     return asst_msg
@@ -429,7 +429,7 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
         db.delete(msg_to_del)
         
     chat.updated_at = get_utc_now()
-    db.commit()
+    commit_with_retry(db)
     
     truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index + 1]]
     
@@ -455,7 +455,7 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
             bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
             if bg_chat:
                 bg_chat.updated_at = get_utc_now()
-            bg_db.commit()
+            commit_with_retry(bg_db)
         finally:
             bg_db.close()
 
@@ -553,7 +553,7 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
                 bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
                 if bg_chat:
                     bg_chat.updated_at = get_utc_now()
-                bg_db.commit()
+                commit_with_retry(bg_db)
                 
                 await emitter.emit_done(
                     final_text=resp_text,
@@ -597,7 +597,7 @@ def select_message_variant(chat_id: str, req: models.SelectVariantRequest, db: S
         
     target_msg.active_variant_index = req.variant_index
     target_msg.content = variants[req.variant_index]
-    db.commit()
+    commit_with_retry(db)
     return {
         "status": "success", 
         "active_variant_index": req.variant_index, 
