@@ -130,3 +130,18 @@ embed_model, vector_store = init_embedding_and_vector_store()
 
 # Backward-compatibility alias
 delete_qdrant_vectors = delete_document_vectors
+
+_flashrank_ranker = None
+
+def get_flashrank_ranker(model_name: str = "ms-marco-TinyBERT-L-2-v2"):
+    """Singleton getter for FlashRank cross-encoder to prevent disk reload per query."""
+    global _flashrank_ranker
+    if _flashrank_ranker is None:
+        try:
+            from flashrank import Ranker
+            _flashrank_ranker = Ranker(model_name=model_name)
+        except Exception as e:
+            logger.warning(f"[FlashRank] Failed to initialize Ranker ({model_name}): {e}")
+            return None
+    return _flashrank_ranker
+

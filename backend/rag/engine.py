@@ -229,13 +229,6 @@ def create_llm_instances(force_refresh: bool = False):
     main_llm, fast_llm = get_llm_factory(force_refresh=force_refresh)
     return main_llm, fast_llm, None, None
 
-main_llm = None
-fast_llm = None
-ninerouter_llm = None
-freellm_llm = None
-gemini_llm = None
-groq_llm = None
-
 def ingest_document_text(text: str, filename: str, chat_id: str):
     """Ingests text into the vector database under a specific chat_id with section-aware chunking."""
     sections = split_markdown_into_academic_sections(text, filename=filename)

@@ -84,7 +84,17 @@ def test_flashrank_reranker():
     """Verify FlashRank cross-encoder loads and ranks passages properly (if installed)."""
     try:
         from flashrank import Ranker, RerankRequest
-        ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+        from rag.vector_store import get_flashrank_ranker
+
+        ranker = get_flashrank_ranker()
+        if ranker is None:
+            import pytest
+            pytest.skip("flashrank is not installed in the current environment")
+
+        # Test singleton caching
+        ranker2 = get_flashrank_ranker()
+        assert ranker is ranker2
+
         passages = [
             {"id": 1, "text": "Deep learning and LSTM for precipitation and rainfall forecasting."},
             {"id": 2, "text": "Recipe for chocolate cake and vanilla cupcakes."}

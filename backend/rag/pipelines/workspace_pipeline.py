@@ -82,9 +82,6 @@ async def _load_single_doc_snippet_async(idx_fname_chat: tuple, db_records: Dict
         )
     )
 
-# Backward-compatibility alias
-_load_single_doc_snippet = _load_single_doc_snippet_async
-
 async def _retrieve_hybrid_workspace_context(
     chat_id: str,
     query: str,
@@ -135,8 +132,11 @@ async def _retrieve_hybrid_workspace_context(
                 await report_status("Reranking most relevant excerpts with Cross-Encoder...")
 
             try:
-                from flashrank import Ranker, RerankRequest
-                ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+                from flashrank import RerankRequest
+                from rag.vector_store import get_flashrank_ranker
+                ranker = get_flashrank_ranker()
+                if not ranker:
+                    raise RuntimeError("FlashRank Ranker unavailable")
                 passages = [{"id": idx, "text": n.node.get_content()[:1500]} for idx, n in enumerate(nodes)]
                 reranked = ranker.rerank(RerankRequest(query=query, passages=passages))[:12]
                 selected_nodes = [nodes[item["id"]] for item in reranked if "id" in item and 0 <= item["id"] < len(nodes)]

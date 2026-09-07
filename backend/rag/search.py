@@ -321,8 +321,11 @@ def search_academic_papers_planned(
     # 4. Semantic Reranking with FlashRank (Cross-Encoder)
     if len(results) > limit:
         try:
-            from flashrank import Ranker, RerankRequest
-            ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+            from flashrank import RerankRequest
+            from rag.vector_store import get_flashrank_ranker
+            ranker = get_flashrank_ranker()
+            if not ranker:
+                raise RuntimeError("FlashRank Ranker unavailable")
             passages = [
                 {
                     "id": idx,

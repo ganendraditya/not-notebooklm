@@ -13,12 +13,12 @@ import {
   Copy, 
   Pencil, 
   Clock, 
-  Trash2 
+  Trash2,
+  FileText
 } from "lucide-react";
 import { ChatMessage } from "@/stores/chatStore";
 import { Document as DocType } from "@/stores/documentStore";
 import { parseCitationsInReactNode, CitationContext } from "./CitationParser";
-import { FileText, Image as ImageIcon } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { consumeSSEStream } from "@/lib/sse";
 
