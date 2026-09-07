@@ -41,6 +41,45 @@ def test_chat_lifecycle():
     res_check = client.get(f"/chats/{chat_id}")
     assert res_check.status_code == 404
 
+def test_chats_pagination():
+    """Verify limit and offset pagination on GET /chats."""
+    created_ids = []
+    try:
+        # Create 3 chats
+        for i in range(3):
+            res = client.post("/chats", json={"title": f"Pagination Test Chat {i}"})
+            assert res.status_code == 200
+            created_ids.append(res.json()["id"])
+
+        # Test limit
+        res_limit = client.get("/chats?limit=2")
+        assert res_limit.status_code == 200
+        data_limit = res_limit.json()
+        assert len(data_limit) <= 2
+
+        # Test offset
+        res_first = client.get("/chats?limit=1&offset=0")
+        assert res_first.status_code == 200
+        res_second = client.get("/chats?limit=1&offset=1")
+        assert res_second.status_code == 200
+        first_list = res_first.json()
+        second_list = res_second.json()
+        if first_list and second_list:
+            assert first_list[0]["id"] != second_list[0]["id"]
+
+        # Test invalid params validation
+        res_invalid_limit_low = client.get("/chats?limit=0")
+        assert res_invalid_limit_low.status_code == 422
+
+        res_invalid_limit_high = client.get("/chats?limit=201")
+        assert res_invalid_limit_high.status_code == 422
+
+        res_invalid_offset = client.get("/chats?offset=-1")
+        assert res_invalid_offset.status_code == 422
+    finally:
+        for cid in created_ids:
+            client.delete(f"/chats/{cid}")
+
 def test_flashrank_reranker():
     """Verify FlashRank cross-encoder loads and ranks passages properly (if installed)."""
     try:

@@ -5,7 +5,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 import shutil
 from sqlalchemy.orm import Session
@@ -36,8 +36,18 @@ def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
     return db_chat
 
 @router.get("/chats", response_model=List[models.ChatSessionResponse])
-def get_chats(db: Session = Depends(get_db)):
-    return db.query(ChatSession).order_by(ChatSession.updated_at.desc(), ChatSession.created_at.desc()).all()
+def get_chats(
+    limit: int = Query(50, ge=1, le=200, description="Max number of chat sessions to return"),
+    offset: int = Query(0, ge=0, description="Offset index for pagination"),
+    db: Session = Depends(get_db)
+):
+    return (
+        db.query(ChatSession)
+        .order_by(ChatSession.updated_at.desc(), ChatSession.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
 @router.get("/chats/{chat_id}", response_model=models.ChatSessionDetailResponse)
 def get_chat(chat_id: str, db: Session = Depends(get_db)):
