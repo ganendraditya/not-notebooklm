@@ -64,7 +64,6 @@ from .vector_store import (
 )
 
 from .engine import (
-    create_llm_instances,
     get_llm_factory,
     clear_llm_cache,
     ingest_document_text,
@@ -119,7 +118,6 @@ __all__ = [
     "delete_qdrant_vectors",
     "get_flashrank_ranker",
     # Engine & Agent
-    "create_llm_instances",
     "ingest_document_text",
     "ingest_document",
     "web_search_and_ingest",

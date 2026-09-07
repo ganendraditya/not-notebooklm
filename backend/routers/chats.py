@@ -3,27 +3,36 @@ import uuid
 import json
 import asyncio
 import logging
-from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
-import shutil
 from sqlalchemy.orm import Session
 
-from database import get_db, ChatSession, Document, ChatMessage, commit_with_retry
-from utils.file_utils import UPLOAD_DIR
+from database import get_db, ChatSession, Document, ChatMessage, commit_with_retry, get_utc_now
+from utils.file_utils import UPLOAD_DIR, CHAT_MEDIA_DIR
 from utils.streaming import create_sse_stream_response, SSEStreamEmitter
+from services.storage_service import get_directory_total_size
+from services.document.content_service import inspect_document_file_status
 import models
 import rag
 
 router = APIRouter(tags=["chats"])
 logger = logging.getLogger("uvicorn.error")
 
-def get_utc_now():
-    return datetime.now(timezone.utc)
-
-CHAT_MEDIA_DIR = os.path.join(UPLOAD_DIR, "chat_media")
-os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
+def build_chat_history_payload(messages: List[ChatMessage]) -> List[dict]:
+    """Serializes a sequence of ChatMessage ORM models into chat history payload for RAG querying."""
+    chat_history = []
+    for msg in messages:
+        item = {"role": msg.role, "content": msg.content or ""}
+        if hasattr(msg, 'attachments_json') and msg.attachments_json:
+            try:
+                atts = json.loads(msg.attachments_json)
+                if atts:
+                    item["attachments"] = atts
+            except Exception:
+                pass
+        chat_history.append(item)
+    return chat_history
 
 @router.post("/chats", response_model=models.ChatSessionResponse)
 def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
@@ -57,7 +66,6 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
         
     sorted_docs = sorted(chat.documents, key=lambda d: d.id)
     doc_responses = []
-    from services.document.content_service import inspect_document_file_status
     
     for idx, d in enumerate(sorted_docs, start=1):
         has_pdf = inspect_document_file_status(chat_id, d.filename)
@@ -180,17 +188,9 @@ async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
             detail=f"File '{file.filename}' exceeds maximum allowable size of 25MB."
         )
 
-    # Check current storage usage against 10GB limit
+    # Check current storage usage against 10GB limit using canonical storage service
     total_bytes_limit = 10 * 1024 * 1024 * 1024
-    used_bytes = 0
-    if os.path.exists(UPLOAD_DIR):
-        for root, _, files in os.walk(UPLOAD_DIR):
-            for f in files:
-                try:
-                    used_bytes += os.path.getsize(os.path.join(root, f))
-                except Exception:
-                    pass
-                    
+    used_bytes = get_directory_total_size(UPLOAD_DIR)
     is_storage_full = used_bytes >= total_bytes_limit
 
     # Save file
@@ -235,17 +235,7 @@ async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depe
     chat.updated_at = get_utc_now()
     commit_with_retry(db)
     
-    chat_history = []
-    for msg in chat.messages:
-        item = {"role": msg.role, "content": msg.content}
-        if hasattr(msg, 'attachments_json') and msg.attachments_json:
-            try:
-                atts = json.loads(msg.attachments_json)
-                if atts:
-                    item["attachments"] = atts
-            except Exception:
-                pass
-        chat_history.append(item)
+    chat_history = build_chat_history_payload(chat.messages)
     
     try:
         response_text = await rag.query_chat(chat_id, query.message, chat_history=chat_history)
@@ -288,17 +278,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
     commit_with_retry(db)
     
     all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
-    chat_history = []
-    for msg in all_msgs:
-        item = {"role": msg.role, "content": msg.content}
-        if hasattr(msg, 'attachments_json') and msg.attachments_json:
-            try:
-                atts = json.loads(msg.attachments_json)
-                if atts:
-                    item["attachments"] = atts
-            except Exception:
-                pass
-        chat_history.append(item)
+    chat_history = build_chat_history_payload(all_msgs)
     
     # Check if chat is still using default/raw initial title and needs smart AI naming
     is_initial_chat_state = len(all_msgs) <= 1 or chat.title in ("New Chat", "New Research", "") or (chat.title and chat.title.endswith("..."))
@@ -392,7 +372,7 @@ async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session
     chat.updated_at = get_utc_now()
     commit_with_retry(db)
     
-    truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index + 1]]
+    truncated_history = build_chat_history_payload(all_msgs[:req.message_index + 1])
     
     try:
         response_text = await rag.query_chat(chat_id, req.message, chat_history=truncated_history)
@@ -431,7 +411,7 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
     chat.updated_at = get_utc_now()
     commit_with_retry(db)
     
-    truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index + 1]]
+    truncated_history = build_chat_history_payload(all_msgs[:req.message_index + 1])
     
     async def stream_worker(emitter: SSEStreamEmitter):
         resp_text = await rag.query_chat(
@@ -500,19 +480,7 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
             break
             
     # History up to the user message
-    truncated_history = []
-    for msg in all_msgs[:req.message_index]:
-        atts = []
-        if msg.attachments_json:
-            try:
-                atts = json.loads(msg.attachments_json)
-            except Exception:
-                pass
-        truncated_history.append({
-            "role": msg.role, 
-            "content": msg.content or "",
-            "attachments": atts
-        })
+    truncated_history = build_chat_history_payload(all_msgs[:req.message_index])
     target_msg_id = target_msg.id
     
     async def stream_worker(emitter: SSEStreamEmitter):

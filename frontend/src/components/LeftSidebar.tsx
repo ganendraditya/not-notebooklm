@@ -15,8 +15,7 @@ import {
   Search,
   Sparkles,
   Settings,
-  FolderArchive,
-  Layers
+  FolderArchive
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatSession } from "@/stores/chatStore";

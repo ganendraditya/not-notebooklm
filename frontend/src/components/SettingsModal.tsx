@@ -4,28 +4,15 @@ import { useState, useEffect } from "react";
 import { 
   X, 
   HardDrive, 
-  Trash2, 
-  Sparkles, 
-  AlertTriangle, 
-  Check, 
-  RefreshCw, 
-  Database, 
-  Layers, 
-  FileText, 
   Settings, 
-  Bell, 
-  Palette,
-  ChevronRight
+  Bell
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { ChatSession } from "@/stores/chatStore";
-import { useTranslation, languages } from "@/lib/i18n";
+import { useTranslation } from "@/lib/i18n";
 import StorageLibraryModal from "./StorageLibraryModal";
 import GeneralTab from "./Settings/tabs/GeneralTab";
 import NotificationsTab from "./Settings/tabs/NotificationsTab";
 import StorageTab, { type StorageSummary } from "./Settings/tabs/StorageTab";
-
-import { useTheme, type AppearanceMode } from "@/lib/theme";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -46,7 +33,7 @@ export default function SettingsModal({
   onAllDataReset,
   onNavigateToLibrary,
 }: SettingsModalProps) {
-  const { t, language, setLanguage } = useTranslation();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"general" | "storage" | "notifications">("general");
   
     // Storage State

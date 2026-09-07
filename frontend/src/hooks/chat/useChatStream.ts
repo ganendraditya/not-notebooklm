@@ -71,9 +71,7 @@ export function useChatStream(
         created_at: new Date().toISOString(),
         attachments: nextMessage.attachments
       };
-      // We read the current length, technically this should use a state setter callback if rapid,
-      // but standard sequential updates works fine here for user messages.
-      setMessages([...messages, newMsg]);
+      updateMessagesList(prev => [...prev, newMsg]);
     }
 
     const controller = new AbortController();

@@ -5,8 +5,6 @@ import asyncio
 import inspect
 import logging
 from typing import List, Optional, Callable, Any
-import requests
-import pymupdf4llm
 from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
@@ -223,38 +221,9 @@ def get_llm_factory(provider_override: Optional[str] = None, force_refresh: bool
     """Singleton helper returning (main_llm, fast_llm)."""
     return get_main_llm(force_refresh=force_refresh), get_fast_llm(force_refresh=force_refresh)
 
-def create_llm_instances(force_refresh: bool = False):
-    """Backward compatibility helper returning (main_llm, fast_llm, None, None)."""
-    main_llm, fast_llm = get_llm_factory(force_refresh=force_refresh)
-    return main_llm, fast_llm, None, None
-
 def ingest_document_text(text: str, filename: str, chat_id: str):
     """Ingests text into the vector database under a specific chat_id with section-aware chunking."""
-    sections = split_markdown_into_academic_sections(text, filename=filename)
-    docs = []
-    for sec in sections:
-        docs.append(
-            Document(
-                text=sec.get("text", text),
-                metadata={
-                    "chat_id": chat_id,
-                    "source_type": "file",
-                    "filename": filename,
-                    "section": sec.get("section", "Overview"),
-                    "breadcrumb": sec.get("breadcrumb", "Overview"),
-                    "canonical_section": sec.get("canonical_section", "general")
-                }
-            )
-        )
-    if not docs:
-        docs = [
-            Document(
-                text=text,
-                metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
-            )
-        ]
-    VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
-    return True
+    return ingest_documents_batch([(text, filename, chat_id)])
 
 def ingest_documents_batch(doc_items: List[tuple]):
     """Batch ingests multiple (text, filename, chat_id) into Qdrant with section-aware chunks."""

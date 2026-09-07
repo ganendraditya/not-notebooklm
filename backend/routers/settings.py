@@ -45,15 +45,18 @@ def factory_reset_storage(payload: dict, db: Session = Depends(get_db)):
                     pass
 
     # 3. Purge Qdrant collections
+    fallback_colls = ["not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
     try:
-        colls = ["not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
-        for cname in colls:
-            try:
-                rag.qdrant_client.delete_collection(collection_name=cname)
-            except Exception:
-                pass
+        remote_colls = [c.name for c in rag.qdrant_client.get_collections().collections]
+        colls = list(set(remote_colls + fallback_colls))
     except Exception:
-        pass
+        colls = fallback_colls
+
+    for cname in colls:
+        try:
+            rag.qdrant_client.delete_collection(collection_name=cname)
+        except Exception:
+            pass
 
     return {"status": "success", "message": "All application data and workspaces have been reset."}
 

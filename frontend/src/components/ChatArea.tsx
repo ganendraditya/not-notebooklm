@@ -8,15 +8,13 @@ import {
   Loader2, 
   Copy, 
   Pencil, 
-  Clock,
-  MoreHorizontal,
-  Pin,
-  PinOff,
-  Trash2,
-  X,
-  RotateCw,
-  ChevronLeft,
-  ChevronRight
+  MoreHorizontal, 
+  Pin, 
+  PinOff, 
+  Trash2, 
+  RotateCw, 
+  ChevronLeft, 
+  ChevronRight 
 } from "lucide-react";
 import { Portal } from "@/components/ui/Portal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";

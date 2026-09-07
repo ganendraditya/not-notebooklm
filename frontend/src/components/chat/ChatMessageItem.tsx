@@ -12,8 +12,6 @@ import {
   BookOpen, 
   Copy, 
   Pencil, 
-  Clock, 
-  Trash2,
   FileText
 } from "lucide-react";
 import { ChatMessage } from "@/stores/chatStore";

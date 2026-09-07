@@ -10,11 +10,9 @@ import LibraryView from "@/components/LibraryView";
 import SearchChatsView from "@/components/SearchChatsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useTranslation } from "@/lib/i18n";
-import { consumeSSEStream } from "@/lib/sse";
 import { useChatStore, type ChatSession, type ChatMessage } from "@/stores/chatStore";
 import { useDocumentStore, type Document, type PendingSourceItem } from "@/stores/documentStore";
 import { useUIStore } from "@/stores/uiStore";
-import type { Attachment } from "@/stores/chatStore";
 
 import { useChatSession } from "@/hooks/chat/useChatSession";
 import { useChatStream, type ChatJobState } from "@/hooks/chat/useChatStream";
