@@ -1,6 +1,6 @@
 # NotbookLM
 
-A customizable AI research and document workspace inspired by Google Notebook (formerly NotebookLM), Consensus AI, and Elicit. The name *NotbookLM* is a playful pun on Google's NotebookLM. Built with FastAPI, Next.js, LlamaIndex, and Qdrant vector database.
+A customizable AI research and document workspace inspired by Google Notebook (formerly NotebookLM), Consensus AI, and Elicit. Built with FastAPI, Next.js, LlamaIndex, and Qdrant vector database.
 
 ---
 

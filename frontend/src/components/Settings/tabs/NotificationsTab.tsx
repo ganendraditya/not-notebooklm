@@ -68,7 +68,7 @@ export default function NotificationsTab() {
 
     sendSystemNotification({
       title: "NotbookLM AI",
-      body: "Notifikasi browser & OS Windows aktif dan berfungsi dengan baik! ✨",
+      body: "Notifikasi browser & sistem aktif dan berfungsi dengan baik! ✨",
       force: true
     });
 
@@ -137,7 +137,7 @@ export default function NotificationsTab() {
         <div className="mt-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Bell size={16} className="shrink-0" />
-            <span>{t("settings.notifications.prompt") || "Enable OS/Browser notification permission so alerts appear in Windows."}</span>
+            <span>{t("settings.notifications.prompt") || "Enable system / browser notification permission so alerts appear on your device."}</span>
           </div>
           <button
             type="button"
@@ -150,7 +150,7 @@ export default function NotificationsTab() {
       ) : (
         <div className="mt-3 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
           <CheckCircle2 size={15} className="shrink-0" />
-          <span>{t("settings.notifications.granted") || "Windows / Browser notification permission is active."}</span>
+          <span>{t("settings.notifications.granted") || "System / browser notification permission is active."}</span>
         </div>
       )}
 

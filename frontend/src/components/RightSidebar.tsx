@@ -119,6 +119,7 @@ export default function RightSidebar({
     return getHighlightedContent(
       currentContent,
       groundingHighlight?.sentence || "",
+      // eslint-disable-next-line react-hooks/refs
       highlightRefsMap,
       activeMatchIndex,
       groundingHighlight?.aiQuotes

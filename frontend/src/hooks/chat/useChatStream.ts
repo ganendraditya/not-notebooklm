@@ -137,7 +137,7 @@ export function useChatStream(
             });
           }
 
-          // Trigger Windows / Browser notification if user is away in another tab
+          // Trigger system / browser notification if user is away in another tab
           const cleanPreview = (asstMsg.content || "")
             .replace(/<!--[\s\S]*?-->/g, "")
             .replace(/\[\^(\d+)\]/g, "")

@@ -75,7 +75,7 @@ interface SendNotificationOptions {
 }
 
 /**
- * Triggers a native Windows / OS browser notification and focuses window when clicked.
+ * Triggers a native system / OS browser notification and focuses window when clicked.
  */
 export const sendSystemNotification = ({
   category = "responses",
