@@ -181,12 +181,19 @@ export default function ChatArea({
   }, []);
 
   const handleStartEdit = useCallback((text: string, idx: number) => {
+    // If AI is currently thinking or generating, immediately interrupt/abort
+    if (isLoading && onStopGeneration) {
+      onStopGeneration();
+    }
     setEditingMessageIdx(idx);
     setEditContent(text);
-  }, []);
+  }, [isLoading, onStopGeneration]);
 
   const handleSaveEdit = (idx: number) => {
-    if (editContent.trim() && !isLoading) {
+    if (editContent.trim()) {
+      if (isLoading && onStopGeneration) {
+        onStopGeneration();
+      }
       if (onEditMessage) {
         onEditMessage(idx, editContent.trim());
       } else {
