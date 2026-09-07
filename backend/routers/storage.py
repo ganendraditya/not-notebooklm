@@ -1,13 +1,13 @@
 import os
-import shutil
 import logging
 import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
+import rag
 from database import get_db, Document
 from helpers import UPLOAD_DIR
 from routers.chats import ChatSession  # For DB context if needed
@@ -158,9 +158,15 @@ def delete_files(req: DeleteRequest, db: Session = Depends(get_db)):
                 os.remove(file_path)
                 deleted += 1
                 
-                # Also delete DB document if it exists (assuming filename match for simplicity)
+                # Delete DB document and corresponding vector embeddings in Qdrant
                 filename = os.path.basename(file_path)
-                db.query(Document).filter(Document.filename == filename).delete()
+                docs = db.query(Document).filter(Document.filename == filename).all()
+                for doc in docs:
+                    try:
+                        rag.delete_document_vectors(doc.chat_id, doc.filename)
+                    except Exception as ve:
+                        logger.warning(f"[Storage Delete] Vector cleanup error for {doc.filename}: {ve}")
+                    db.delete(doc)
             else:
                 failed += 1
         except Exception:
@@ -236,44 +242,3 @@ def download_storage_files(req: DownloadRequest):
         media_type="application/zip",
         headers={"Content-Disposition": make_content_disposition("attachment", zip_filename)}
     )
-
-@router.post("/upload")
-async def upload_file(
-    file: UploadFile = File(...), 
-    category: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
-):
-    try:
-        # Ensure upload dir exists
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        
-        # Determine subfolder based on category (optional)
-        target_dir = UPLOAD_DIR
-        if category and category in ["images", "documents"]:
-            target_dir = os.path.join(UPLOAD_DIR, category)
-            os.makedirs(target_dir, exist_ok=True)
-            
-        file_id = f"{uuid.uuid4()}_{file.filename}"
-        file_path = os.path.join(target_dir, file_id)
-        
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        size = os.path.getsize(file_path)
-        ext = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
-        file_cat = category or ("images" if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else "documents")
-        
-        rel_path = os.path.relpath(file_path, UPLOAD_DIR)
-        
-        return {
-            "status": "success", 
-            "file": {
-                "id": rel_path,
-                "filename": file.filename,
-                "size": size,
-                "category": file_cat,
-                "url": f"/uploads/{rel_path}" # Assuming static mount
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

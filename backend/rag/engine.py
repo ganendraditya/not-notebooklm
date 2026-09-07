@@ -47,7 +47,6 @@ from .prompts import (
     get_agentic_system_prompt
 )
 from .formatters import format_clean_response, extract_structured_citations
-from services.rubric_grader_service import evaluate_response_grounding
 from .vector_store import embed_model, vector_store, qdrant_client, delete_document_vectors
 
 load_dotenv()

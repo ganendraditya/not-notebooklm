@@ -85,6 +85,9 @@ class SelectVariantRequest(BaseModel):
 class BulkDeleteRequest(BaseModel):
     doc_ids: List[int]
 
+class BulkDownloadRequest(BaseModel):
+    doc_ids: List[int]
+
 class BulkDeleteChatsRequest(BaseModel):
     chat_ids: List[str]
 

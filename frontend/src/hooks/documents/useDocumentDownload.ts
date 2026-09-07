@@ -84,21 +84,21 @@ export function useDocumentDownload({
         throw new Error("Failed to start zip stream");
       }
 
-      await consumeSSEStream(res, (event) => {
-        const data = JSON.parse(event.data);
-        if (event.event === "progress") {
+      await consumeSSEStream(res, (data: any) => {
+        if (!data) return;
+        if (data.type === "progress") {
           setDownloadTask(prev => ({
             ...prev!,
             status: "zipping",
             current: data.current,
             total: data.total,
-            percent: Math.round((data.current / data.total) * 100),
+            percent: data.percent ?? Math.round((data.current / data.total) * 100),
             currentFile: data.filename || "Memproses file...",
             downloadedCount: data.downloaded_count,
             skippedCount: data.skipped_count,
             totalSizeMb: data.total_size_mb
           }));
-        } else if (event.event === "complete") {
+        } else if (data.type === "complete") {
           const zipUrl = `${backendUrl}${data.download_url}`;
           setDownloadTask({
             status: "complete",
@@ -123,19 +123,20 @@ export function useDocumentDownload({
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
-        } else if (event.event === "error") {
+        } else if (data.type === "error") {
+          const errorMsg = data.message || data.detail || "Gagal mengompres dokumen.";
           setDownloadTask({
             status: "error",
             total: docIds.length,
             current: 0,
             percent: 0,
             currentFile: "",
-            errorMsg: data.detail || "Gagal mengompres dokumen."
+            errorMsg: errorMsg
           });
           sendSystemNotification({
             category: "downloads",
             title: "NotbookLM: Gagal Mengunduh",
-            body: data.detail || "Gagal mengompres dokumen ke format ZIP."
+            body: errorMsg
           });
         }
       });

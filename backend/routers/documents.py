@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -191,18 +192,35 @@ async def get_document_content(chat_id: str, doc_id: int, db: Session = Depends(
     return await get_document_full_content(chat_id, doc, db)
 
 @router.post("/chats/{chat_id}/documents/bulk_download_stream")
-async def bulk_download_stream(chat_id: str, req: models.BulkDeleteRequest, db: Session = Depends(get_db)):
+async def bulk_download_stream(chat_id: str, req: models.BulkDownloadRequest, db: Session = Depends(get_db)):
     return StreamingResponse(
         generate_bulk_zip_stream(chat_id, req.doc_ids, db),
         media_type="text/event-stream"
     )
 
 @router.get("/chats/{chat_id}/documents/download_zip/{task_id}")
-def download_prepared_zip(chat_id: str, task_id: str):
+def download_prepared_zip(chat_id: str, task_id: str, background_tasks: BackgroundTasks):
     clean_task = re.sub(r'[^a-zA-Z0-9-]', '', task_id)
     zip_path = os.path.join(TEMP_ZIPS_DIR, f"{clean_task}.zip")
     if not os.path.exists(zip_path):
         raise HTTPException(status_code=404, detail="Prepared download file not found or expired.")
+
+    # Opportunistically clean up old temporary zips (> 1 hour old)
+    def purge_expired_zips():
+        try:
+            now = time.time()
+            if os.path.exists(TEMP_ZIPS_DIR):
+                for fname in os.listdir(TEMP_ZIPS_DIR):
+                    fp = os.path.join(TEMP_ZIPS_DIR, fname)
+                    if os.path.isfile(fp) and (now - os.path.getmtime(fp)) > 3600:
+                        try:
+                            os.remove(fp)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+    background_tasks.add_task(purge_expired_zips)
 
     return FileResponse(
         zip_path,

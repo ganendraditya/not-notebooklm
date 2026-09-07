@@ -1,11 +1,10 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 import rag
 from database import get_db, ChatSession, Document, ChatMessage
-from helpers import UPLOAD_DIR, CHAT_MEDIA_DIR
+from helpers import UPLOAD_DIR
 
 router = APIRouter(tags=["settings"])
 
@@ -57,14 +56,6 @@ def factory_reset_storage(payload: dict, db: Session = Depends(get_db)):
         pass
 
     return {"status": "success", "message": "All application data and workspaces have been reset."}
-
-@router.get("/settings/storage/media/{filename}")
-def get_storage_media(filename: str):
-    """Serve media files directly to the frontend for attachment previews."""
-    fp = os.path.join(CHAT_MEDIA_DIR, os.path.basename(filename))
-    if os.path.exists(fp):
-        return FileResponse(fp)
-    raise HTTPException(status_code=404, detail="Media not found")
 
 @router.get("/llm/models")
 def get_llm_models():
