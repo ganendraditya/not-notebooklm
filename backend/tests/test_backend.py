@@ -250,13 +250,17 @@ def test_llm_models_info_endpoint():
     assert "fast_model" in data
 
 def test_storage_path_traversal_protection():
-    """Verify storage download and delete prevent directory traversal attempts."""
+    """Verify storage download and delete prevent directory traversal attempts and static uploads is restricted."""
     res_del_traversal = client.post("/storage/delete", json={"file_ids": ["../../etc/passwd", "../../../test.txt"]})
     assert res_del_traversal.status_code == 200
     assert res_del_traversal.json()["failed"] == 2
 
     res_dl_traversal = client.post("/storage/download", json={"file_ids": ["../../secret.txt"]})
     assert res_dl_traversal.status_code in (400, 404)
+
+    # Verify root /uploads is no longer statically mounted directly
+    res_uploads_root = client.get("/uploads/")
+    assert res_uploads_root.status_code == 404
 
 @pytest.mark.asyncio
 async def test_workspace_pipeline_execution():

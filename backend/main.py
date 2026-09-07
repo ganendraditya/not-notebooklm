@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from database import engine, Base, SessionLocal, Document
 
-from helpers import UPLOAD_DIR, TEMP_ZIPS_DIR
+from helpers import UPLOAD_DIR, TEMP_ZIPS_DIR, CHAT_MEDIA_DIR
 from routers import chats_router, documents_router, papers_router, settings_router, storage_router
 
 import pdf_exporter
@@ -59,9 +59,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Not-NotebookLM API", lifespan=lifespan)
 
-# Mount uploads directory for static file access
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# Secure static mount: expose only chat media attachments (images/thumbnails)
+# Research documents and ZIP downloads are protected and served exclusively via validated endpoints
+os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
+app.mount("/uploads/chat_media", StaticFiles(directory=CHAT_MEDIA_DIR), name="chat_media")
 
 # Setup secure and explicit CORS configuration
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "").strip()
