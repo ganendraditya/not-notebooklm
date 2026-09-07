@@ -8,6 +8,7 @@ import RightSidebar from "@/components/RightSidebar";
 import SettingsModal from "@/components/SettingsModal";
 import LibraryView from "@/components/LibraryView";
 import SearchChatsView from "@/components/SearchChatsView";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useTranslation } from "@/lib/i18n";
 import { consumeSSEStream } from "@/lib/sse";
 import { useChatStore, type ChatSession, type ChatMessage } from "@/stores/chatStore";
@@ -316,106 +317,110 @@ export default function ChatClient() {
         ) : (
           <div className={`flex-1 flex min-w-0 h-full overflow-hidden ${mobileTab === "menu" ? "hidden lg:flex" : "flex"}`}>
             <div className={`flex-1 h-full min-w-0 ${mobileTab === "sources" ? "hidden lg:flex" : "flex"}`}>
-              <ChatArea 
-                activeChatId={activeChatId} 
-                messages={messages} 
-                isLoading={isLoading}
-                onSendMessage={handleSendMessage} 
-                onEditMessage={handleEditMessage}
-                onStopGeneration={handleStopGeneration}
-                queuedPrompts={queuedPrompts}
-                onRemoveQueuedPrompt={handleRemoveQueuedPrompt}
-                onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
-                documents={documents}
-                onDocumentAdded={handleDocumentAdded}
-                onAddPendingSources={handleAddPendingSources}
-                onResolvePendingSource={handleResolvePendingSource}
-                onOpenDocument={(doc, citationContext) => {
-                  setViewingDoc(doc);
-                  if (citationContext) {
-                    setGroundingHighlight({
-                      docId: doc.id,
-                      sentence: citationContext.sentence,
-                      num: citationContext.num,
-                      citationKey: citationContext.citationKey,
-                      aiQuotes: citationContext.aiQuotes,
-                      clickId: Date.now()
-                    });
-                  } else {
-                    setGroundingHighlight(null);
-                  }
-                  setIsRightSidebarOpen(true);
-                  setMobileTab("sources");
-                }}
-                onEnsureChatSession={handleEnsureChatSession}
-                backendUrl={backendUrl}
-                isSidebarOpen={isSidebarOpen}
-                onOpenSidebar={() => {
-                  setIsSidebarOpen(true);
-                  setMobileTab("menu");
-                }}
-                isRightSidebarOpen={isRightSidebarOpen}
-                onToggleRightSidebar={() => {
-                  if (typeof window !== "undefined" && window.innerWidth < 1024) {
-                    setMobileTab(prev => (prev === "sources" ? "chat" : "sources"));
+              <ErrorBoundary fallbackTitle="Antarmuka percakapan mengalami kendala">
+                <ChatArea 
+                  activeChatId={activeChatId} 
+                  messages={messages} 
+                  isLoading={isLoading}
+                  onSendMessage={handleSendMessage} 
+                  onEditMessage={handleEditMessage}
+                  onStopGeneration={handleStopGeneration}
+                  queuedPrompts={queuedPrompts}
+                  onRemoveQueuedPrompt={handleRemoveQueuedPrompt}
+                  onPromoteQueuedPrompt={handlePromoteQueuedPrompt}
+                  documents={documents}
+                  onDocumentAdded={handleDocumentAdded}
+                  onAddPendingSources={handleAddPendingSources}
+                  onResolvePendingSource={handleResolvePendingSource}
+                  onOpenDocument={(doc, citationContext) => {
+                    setViewingDoc(doc);
+                    if (citationContext) {
+                      setGroundingHighlight({
+                        docId: doc.id,
+                        sentence: citationContext.sentence,
+                        num: citationContext.num,
+                        citationKey: citationContext.citationKey,
+                        aiQuotes: citationContext.aiQuotes,
+                        clickId: Date.now()
+                      });
+                    } else {
+                      setGroundingHighlight(null);
+                    }
                     setIsRightSidebarOpen(true);
-                  } else {
-                    setIsRightSidebarOpen(prev => !prev);
-                  }
-                }}
-                targetedSource={targetedSource}
-                onClearTargetedSource={() => setTargetedSource(null)}
-                activeStatus={activeStatus}
-                activeCitationKey={groundingHighlight?.citationKey}
-                onRenameChat={handleRenameChat}
-                onDeleteChat={handleDeleteChat}
-                onTogglePinChat={handleTogglePinChat}
-                isPinned={sessions.find(s => s.id === activeChatId)?.is_pinned}
-                chatTitle={sessions.find(s => s.id === activeChatId)?.title}
-                onRegenerateMessage={handleRegenerateMessage}
-                onSelectVariant={handleSelectVariant}
-                onOpenStorage={() => setIsSettingsOpen(true)}
-              />
+                    setMobileTab("sources");
+                  }}
+                  onEnsureChatSession={handleEnsureChatSession}
+                  backendUrl={backendUrl}
+                  isSidebarOpen={isSidebarOpen}
+                  onOpenSidebar={() => {
+                    setIsSidebarOpen(true);
+                    setMobileTab("menu");
+                  }}
+                  isRightSidebarOpen={isRightSidebarOpen}
+                  onToggleRightSidebar={() => {
+                    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                      setMobileTab(prev => (prev === "sources" ? "chat" : "sources"));
+                      setIsRightSidebarOpen(true);
+                    } else {
+                      setIsRightSidebarOpen(prev => !prev);
+                    }
+                  }}
+                  targetedSource={targetedSource}
+                  onClearTargetedSource={() => setTargetedSource(null)}
+                  activeStatus={activeStatus}
+                  activeCitationKey={groundingHighlight?.citationKey}
+                  onRenameChat={handleRenameChat}
+                  onDeleteChat={handleDeleteChat}
+                  onTogglePinChat={handleTogglePinChat}
+                  isPinned={sessions.find(s => s.id === activeChatId)?.is_pinned}
+                  chatTitle={sessions.find(s => s.id === activeChatId)?.title}
+                  onRegenerateMessage={handleRegenerateMessage}
+                  onSelectVariant={handleSelectVariant}
+                  onOpenStorage={() => setIsSettingsOpen(true)}
+                />
+              </ErrorBoundary>
             </div>
 
             {/* Right Sidebar: Sources Panel (NotebookLM Style) */}
             {(isRightSidebarOpen || mobileTab === "sources") && (
               <div className={`h-full min-w-0 ${mobileTab === "chat" ? "hidden lg:block" : "w-full lg:w-auto"}`}>
-                <RightSidebar 
-                  activeChatId={activeChatId} 
-                  documents={documents} 
-                  pendingSources={pendingSources}
-                  onDocumentAdded={handleDocumentAdded} 
-                  onDocumentUpdated={handleDocumentUpdated}
-                  onDocumentDeleted={(id) => {
-                    updateDocumentsList(prev => prev.filter(d => d.id !== id));
-                    if (targetedSource?.id === id) setTargetedSource(null);
-                    if (viewingDoc?.id === id) setViewingDoc(null);
-                  }}
-                  onBulkDocumentsDeleted={(ids) => {
-                    handleBulkDocumentsDeleted(ids);
-                    if (targetedSource && ids.includes(targetedSource.id)) setTargetedSource(null);
-                    if (viewingDoc && ids.includes(viewingDoc.id)) setViewingDoc(null);
-                  }}
-                  onEnsureChatSession={handleEnsureChatSession}
-                  onAskAboutDocument={(doc, paperTitle) => {
-                    setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
-                    setMobileTab("chat");
-                  }}
-                  externalViewingDoc={viewingDoc}
-                  groundingHighlight={groundingHighlight}
-                  onClearGroundingHighlight={() => setGroundingHighlight(null)}
-                  onClearViewingDoc={() => {
-                    setViewingDoc(null);
-                    setGroundingHighlight(null);
-                  }}
-                  backendUrl={backendUrl}
-                  onClose={() => {
-                    setIsRightSidebarOpen(false);
-                    setGroundingHighlight(null);
-                    setMobileTab("chat");
-                  }}
-                />
+                <ErrorBoundary fallbackTitle="Panel sumber referensi mengalami kendala">
+                  <RightSidebar 
+                    activeChatId={activeChatId} 
+                    documents={documents} 
+                    pendingSources={pendingSources}
+                    onDocumentAdded={handleDocumentAdded} 
+                    onDocumentUpdated={handleDocumentUpdated}
+                    onDocumentDeleted={(id) => {
+                      updateDocumentsList(prev => prev.filter(d => d.id !== id));
+                      if (targetedSource?.id === id) setTargetedSource(null);
+                      if (viewingDoc?.id === id) setViewingDoc(null);
+                    }}
+                    onBulkDocumentsDeleted={(ids) => {
+                      handleBulkDocumentsDeleted(ids);
+                      if (targetedSource && ids.includes(targetedSource.id)) setTargetedSource(null);
+                      if (viewingDoc && ids.includes(viewingDoc.id)) setViewingDoc(null);
+                    }}
+                    onEnsureChatSession={handleEnsureChatSession}
+                    onAskAboutDocument={(doc, paperTitle) => {
+                      setTargetedSource({ id: doc.id, filename: doc.filename, title: paperTitle });
+                      setMobileTab("chat");
+                    }}
+                    externalViewingDoc={viewingDoc}
+                    groundingHighlight={groundingHighlight}
+                    onClearGroundingHighlight={() => setGroundingHighlight(null)}
+                    onClearViewingDoc={() => {
+                      setViewingDoc(null);
+                      setGroundingHighlight(null);
+                    }}
+                    backendUrl={backendUrl}
+                    onClose={() => {
+                      setIsRightSidebarOpen(false);
+                      setGroundingHighlight(null);
+                      setMobileTab("chat");
+                    }}
+                  />
+                </ErrorBoundary>
               </div>
             )}
           </div>

@@ -1,44 +1,13 @@
 import os
-import re
-import shutil
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from dotenv import load_dotenv, set_key
 
 import rag
-from database import get_db, DB_PATH, ChatSession, Document, ChatMessage
-from helpers import UPLOAD_DIR, TEMP_ZIPS_DIR
-import models
+from database import get_db, ChatSession, Document, ChatMessage
+from helpers import UPLOAD_DIR, CHAT_MEDIA_DIR
 
 router = APIRouter(tags=["settings"])
-
-def get_dir_size(path: str) -> int:
-    """Calculates total recursive byte size of a folder."""
-    total = 0
-    if not os.path.exists(path):
-        return 0
-    for root, _, files in os.walk(path):
-        for f in files:
-            fp = os.path.join(root, f)
-            try:
-                if not os.path.islink(fp):
-                    total += os.path.getsize(fp)
-            except Exception:
-                pass
-    return total
-
-@router.get("/settings/storage/summary", response_model=models.StorageSummaryResponse)
-def get_storage_summary():
-    """Returns disk usage breakdown across uploads, vector indices, and sqlite database."""
-    from services.storage_service import get_unified_storage_summary
-    data = get_unified_storage_summary(DB_PATH)
-    return models.StorageSummaryResponse(
-        uploads_bytes=data["uploads_bytes"],
-        uploads_count=data["uploads_count"],
-        qdrant_bytes=data["qdrant_bytes"],
-        database_bytes=data["database_bytes"],
-        total_bytes=data["used_bytes"]
-    )
 
 @router.post("/settings/storage/cleanup")
 def cleanup_orphan_storage(db: Session = Depends(get_db)):
@@ -89,113 +58,13 @@ def factory_reset_storage(payload: dict, db: Session = Depends(get_db)):
 
     return {"status": "success", "message": "All application data and workspaces have been reset."}
 
-from fastapi.responses import FileResponse
-
 @router.get("/settings/storage/media/{filename}")
 def get_storage_media(filename: str):
     """Serve media files directly to the frontend for attachment previews."""
-    import os
-    from helpers import CHAT_MEDIA_DIR
     fp = os.path.join(CHAT_MEDIA_DIR, os.path.basename(filename))
     if os.path.exists(fp):
         return FileResponse(fp)
     raise HTTPException(status_code=404, detail="Media not found")
-
-@router.get("/settings/storage/library")
-def get_storage_library(category: str = "all", search: str = "", sort: str = "date", db: Session = Depends(get_db)):
-    """Returns a list of items for the storage library view (files, images, chats)."""
-    items = []
-    
-    # Files & Images (from documents table)
-    if category in ["all", "files", "images"]:
-        docs = db.query(Document).all()
-        for d in docs:
-            is_image = d.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
-            if category == "files" and is_image:
-                continue
-            if category == "images" and not is_image:
-                continue
-                
-            if search and search.lower() not in d.filename.lower():
-                continue
-                
-            fp = os.path.join(UPLOAD_DIR, f"{d.chat_id}_{d.filename}")
-            size = os.path.getsize(fp) if os.path.exists(fp) else 0
-            
-            items.append({
-                "id": f"doc_{d.id}",
-                "type": "image" if is_image else "file",
-                "name": d.filename,
-                "chat_id": d.chat_id,
-                "size_bytes": size,
-                "modified": d.created_at.isoformat() if hasattr(d, 'created_at') else "",
-                "path": fp
-            })
-            
-    # Chat Media (from chat_media upload folder)
-    chat_media_dir = os.path.join(os.path.dirname(__file__), "..", "uploads", "chat_media")
-    if os.path.exists(chat_media_dir) and category in ["all", "images"]:
-        for fname in os.listdir(chat_media_dir):
-            fp = os.path.join(chat_media_dir, fname)
-            if not os.path.isfile(fp):
-                continue
-            
-            is_image = fname.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
-            if category == "images" and not is_image:
-                continue
-                
-            if search and search.lower() not in fname.lower():
-                continue
-                
-            size = os.path.getsize(fp)
-            items.append({
-                "id": f"media_{fname}",
-                "type": "image" if is_image else "file",
-                "name": fname,
-                "chat_id": None,
-                "size_bytes": size,
-                "modified": "", # We could get os.path.getmtime if needed
-                "path": fp
-            })
-
-    # Sort logic
-    if sort == "size":
-        items.sort(key=lambda x: x["size_bytes"], reverse=True)
-    elif sort == "name":
-        items.sort(key=lambda x: x["name"].lower())
-    else: # date (or default)
-        items.sort(key=lambda x: x.get("modified", ""), reverse=True)
-
-    return {"items": items}
-
-@router.post("/settings/storage/library/delete")
-def delete_storage_library_items(payload: dict, db: Session = Depends(get_db)):
-    """Deletes selected items from disk and DB."""
-    item_ids = payload.get("item_ids", [])
-    if not item_ids:
-        return {"status": "error", "message": "No items selected."}
-        
-    deleted = 0
-    for iid in item_ids:
-        if iid.startswith("doc_"):
-            doc_id = int(iid.split("_")[1])
-            doc = db.query(Document).filter(Document.id == doc_id).first()
-            if doc:
-                fp = os.path.join(UPLOAD_DIR, f"{doc.chat_id}_{doc.filename}")
-                if os.path.exists(fp):
-                    os.remove(fp)
-                db.delete(doc)
-                deleted += 1
-        elif iid.startswith("media_"):
-            fname = iid.split("media_", 1)[1]
-            chat_media_dir = os.path.join(os.path.dirname(__file__), "..", "uploads", "chat_media")
-            fp = os.path.join(chat_media_dir, fname)
-            if os.path.exists(fp):
-                os.remove(fp)
-                deleted += 1
-                
-    db.commit()
-    return {"status": "success", "deleted_count": deleted}
 
 @router.get("/llm/models")
 def get_llm_models():
