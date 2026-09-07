@@ -149,7 +149,7 @@ The treatment group demonstrated a 34% decrease in muscular reinjury rates.
 
 def test_lru_cache_eviction():
     """Verify LRUMetadataCache bounded capacity works and evicts oldest items."""
-    from rag.search import LRUMetadataCache
+    from services.search.metadata_resolver_service import LRUMetadataCache
     cache = LRUMetadataCache(capacity=3)
     cache.set("a", {"title": "Paper A"})
     cache.set("b", {"title": "Paper B"})

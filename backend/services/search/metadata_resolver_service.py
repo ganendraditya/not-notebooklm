@@ -388,6 +388,6 @@ def fetch_full_abstract_by_doi(doi: str) -> str:
     """Fetches the full, authentic academic abstract using DOI via the unified metadata resolver."""
     if not doi:
         return ""
-    clean_doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+    clean_doi = _clean_doi(doi)
     meta = resolve_paper_metadata_by_doi(doi=clean_doi, fast_only=False)
     return (meta.get("abstract") or "") if meta else ""

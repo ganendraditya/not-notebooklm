@@ -34,10 +34,44 @@ def test_make_content_disposition():
 def test_text_processing_doi_and_title():
     """Verify DOI cleaning and title normalization."""
     assert clean_doi("https://doi.org/10.1016/j.jbi.2021.103789.") == "10.1016/j.jbi.2021.103789"
+    assert clean_doi("http://dx.doi.org/10.1145/3377325.3377500") == "10.1145/3377325.3377500"
     assert clean_doi("**doi:10.1109/TPAMI.2020.1234567**") == "10.1109/TPAMI.2020.1234567"
     assert normalize_title_str("Deep Learning for Health.pdf") == "deep learning for health"
     assert is_valid_academic_title("Table of Contents") is False
     assert is_valid_academic_title("Attention Is All You Need") is True
+
+def test_source_signatures_db_direct():
+    """Verify get_existing_notebook_sources_signatures queries database directly."""
+    from rag.search import get_existing_notebook_sources_signatures
+    db = SessionLocal()
+    chat_id = "test_sig_chat_123"
+    try:
+        session = ChatSession(id=chat_id, title="Signature Test")
+        db.add(session)
+        doc1 = Document(
+            chat_id=chat_id,
+            filename="my_paper.pdf",
+            title="A Comprehensive Survey on LLMs",
+            doi="10.1016/survey.2024"
+        )
+        db.add(doc1)
+        db.commit()
+
+        sigs = get_existing_notebook_sources_signatures(chat_id)
+        assert "10.1016/survey.2024" in sigs["dois"]
+        assert "A Comprehensive Survey on LLMs" in sigs["titles"]
+        assert "my_paper.pdf" in sigs["filenames"]
+    finally:
+        db.query(Document).filter(Document.chat_id == chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == chat_id).delete()
+        db.commit()
+        db.close()
+
+def test_init_journal_db_seed():
+    """Verify init_journal_db initializes tables and seeds if empty."""
+    from journal_indexer import init_journal_db
+    count = init_journal_db()
+    assert count > 0
 
 def test_pdf_authenticity_check():
     """Verify authentic PDF bytes header detection."""
@@ -68,4 +102,37 @@ def test_rag_formatters():
     clean_text, citations = extract_structured_citations(raw_response)
     assert clean_text == "Here is the synthesized analysis of the papers [1]."
     assert citations == {"1": ["Exact quote from document 1"]}
+
+def test_paper_service_prepare_and_document_response():
+    """Verify prepare_paper_file_sync return signature and DocumentResponse model contracts."""
+    import models
+    from services.paper_service import prepare_paper_file_sync
+    
+    cand = models.PaperCandidate(
+        title="Attention Is All You Need",
+        year="2017",
+        doi="10.48550/arXiv.1706.03762",
+        snippet="The dominant sequence transduction models are based on complex recurrent or convolutional neural networks.",
+        url="https://arxiv.org/abs/1706.03762",
+        is_oa=True
+    )
+    res = prepare_paper_file_sync("test_chat_contract", cand)
+    assert len(res) == 4
+    doc_text, filename, c_doi, has_downloaded_pdf = res
+    assert "Attention Is All You Need" in doc_text
+    assert c_doi == "10.48550/arXiv.1706.03762"
+
+    from database import get_utc_now
+    doc_resp = models.DocumentResponse(
+        id=999,
+        filename=filename,
+        title="Attention Is All You Need",
+        created_at=get_utc_now(),
+        index=1,
+        has_full_pdf=has_downloaded_pdf,
+        is_oa=True
+    )
+    assert doc_resp.title == "Attention Is All You Need"
+    assert doc_resp.has_full_pdf in (True, False)
+    assert doc_resp.is_oa is True
 

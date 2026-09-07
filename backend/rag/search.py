@@ -7,6 +7,7 @@ from llama_index.core.llms import LLM
 from utils.text_processing import (
     normalize_title_str,
     is_valid_academic_title,
+    clean_doi,
 )
 from providers.academic import fetch_europe_pmc, fetch_openalex, fetch_crossref
 from services.search import (
@@ -14,15 +15,14 @@ from services.search import (
     judge_and_filter_papers_with_llm,
     audit_paper_metadata_with_ai
 )
-from services.search.metadata_resolver_service import LRUMetadataCache
 
 logger = logging.getLogger("uvicorn.error")
 
 def get_existing_notebook_sources_signatures(chat_id: str) -> dict:
     """
-    Scans all existing documents in this chat (from DB and disk) and returns
+    Scans existing documents in this chat directly from DB and returns
     comprehensive signatures (DOIs, full titles, filenames, token sets)
-    to prevent recommending or importing duplicate papers.
+    to prevent recommending or importing duplicate papers without disk I/O.
     """
     from database import SessionLocal, Document as DBDocument
     db = SessionLocal()
@@ -34,32 +34,19 @@ def get_existing_notebook_sources_signatures(chat_id: str) -> dict:
     try:
         db_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all()
         for doc in db_docs:
-            filenames.add(doc.filename)
-            clean_fn = doc.filename.replace(".pdf", "").strip()
-            titles.add(clean_fn)
+            if doc.filename:
+                filenames.add(doc.filename)
+                clean_fn = doc.filename.replace(".pdf", "").replace(".txt", "").strip()
+                if clean_fn:
+                    titles.add(clean_fn)
+            if doc.title:
+                titles.add(doc.title.strip())
+            if doc.doi:
+                c_d = clean_doi(doc.doi).lower()
+                if c_d:
+                    dois.add(c_d)
     finally:
         db.close()
-
-    from utils.file_utils import get_doc_file_path
-    for fn in filenames:
-        fpath = get_doc_file_path(chat_id, fn)
-        if os.path.exists(fpath):
-                try:
-                    with open(fpath, "r", encoding="utf-8", errors="ignore") as fp:
-                        header = fp.readline().strip()
-                        if header.startswith("# "):
-                            full_t = re.sub(r'^\#\s*', '', header).strip()
-                            full_t = re.sub(r'\s*\(\d{4}\)$', '', full_t).strip()
-                            if full_t:
-                                titles.add(full_t)
-                        # Read next 2 lines for DOI
-                        first_block = header + " " + fp.readline() + " " + fp.readline()
-                        doi_m = re.search(r'(?:DOI:|\*\*DOI:\*\*|doi\.org/)\s*(10\.\d{4,9}/[^\s\)]+)', first_block, re.I)
-                        if doi_m:
-                            clean_d = doi_m.group(1).lower().strip()
-                            dois.add(clean_d)
-                except Exception:
-                    pass
 
     for t in titles:
         norm = normalize_title_str(t)
@@ -87,9 +74,9 @@ def is_paper_duplicate(
 
     # 1. DOI Matching (100% Exact)
     if candidate_doi:
-        c_doi = candidate_doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+        c_doi = clean_doi(candidate_doi).lower()
         for ex_doi in existing_signatures.get("dois", set()):
-            e_doi = ex_doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+            e_doi = clean_doi(ex_doi).lower()
             if c_doi and e_doi and c_doi == e_doi:
                 return True
 
@@ -155,7 +142,7 @@ def search_academic_papers_planned(
         if not c_norm:
             return True
         if doi:
-            c_doi = doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+            c_doi = clean_doi(doi).lower()
             if c_doi in seen_dois:
                 return True
         c_tokens = set(c_norm.split())
@@ -175,8 +162,9 @@ def search_academic_papers_planned(
         if c_norm:
             seen_token_signatures.append((c_norm, set(c_norm.split())))
         if doi:
-            c_doi = doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
-            seen_dois.add(c_doi)
+            c_doi = clean_doi(doi).lower()
+            if c_doi:
+                seen_dois.add(c_doi)
 
     # Build domain-agnostic search keywords from queries and plan
     raw_query_texts = [en_query, id_query, plan.get("native_query", "")]
@@ -304,15 +292,6 @@ def search_academic_papers_planned(
             logger.debug(f"[Search Rerank Fallback]: {rerank_err}")
 
     return results[:limit]
-
-async def judge_and_filter_papers_with_llm(
-    query: str,
-    candidates: List[dict],
-    target_count: int,
-    llm: Optional[LLM] = None
-) -> List[dict]:
-    from services.search.llm_evaluator_service import judge_and_filter_papers_with_llm
-    return await judge_and_filter_papers_with_llm(query, candidates, target_count, llm)
 
 def search_academic_papers(query: str, limit: int = 10) -> List[dict]:
     """Standard entrypoint for academic paper search with synchronous fallback planning."""

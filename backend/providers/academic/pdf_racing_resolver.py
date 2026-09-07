@@ -8,6 +8,7 @@ import threading
 import concurrent.futures
 
 from utils.pdf_utils import is_authentic_pdf_bytes
+from utils.text_processing import clean_doi as normalize_doi
 from providers.scrapers.oa_fetcher import try_fetch_open_access_pdf
 
 logger = logging.getLogger("uvicorn.error")
@@ -31,7 +32,7 @@ def resolve_unpaywall_pdf(clean_doi: str) -> Optional[bytes]:
         return None
     try:
         upw_url = f"https://api.unpaywall.org/v2/{urllib.parse.quote(clean_doi)}?email=research@notbooklm.app"
-        resp = requests.get(upw_url, timeout=10.0)
+        resp = requests.get(upw_url, timeout=4.5)
         if resp.status_code == 200:
             upw_data = resp.json()
             best_oa = upw_data.get("best_oa_location") or {}
@@ -48,7 +49,7 @@ def resolve_openalex_pdf(clean_doi: str) -> Optional[bytes]:
         return None
     try:
         oa_url = f"https://api.openalex.org/works/https://doi.org/{clean_doi}"
-        resp = requests.get(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=10.0)
+        resp = requests.get(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=5.0)
         if resp.status_code == 200:
             wdata = resp.json()
             best_loc = wdata.get("best_oa_location") or wdata.get("primary_location") or {}
@@ -66,7 +67,7 @@ def resolve_europe_pmc_pdf(clean_doi: str, title: str) -> Optional[bytes]:
     try:
         q = f"DOI:{urllib.parse.quote(clean_doi)}" if clean_doi else f'TITLE:"{urllib.parse.quote(title)}"'
         epmc_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={q}&format=json&resultType=core&pageSize=1"
-        resp = requests.get(epmc_url, timeout=10.0)
+        resp = requests.get(epmc_url, timeout=5.0)
         if resp.status_code == 200:
             epmc_data = resp.json()
             results = epmc_data.get("resultList", {}).get("result", [])
@@ -87,7 +88,7 @@ def resolve_semantic_scholar_pdf(clean_doi: str) -> Optional[bytes]:
         return None
     try:
         s2_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean_doi}?fields=openAccessPdf"
-        resp = requests.get(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=10.0)
+        resp = requests.get(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:research@notbooklm.app)"}, timeout=4.5)
         if resp.status_code == 200:
             oa_pdf = resp.json().get("openAccessPdf", {}).get("url")
             if oa_pdf:
@@ -105,7 +106,7 @@ def resolve_landing_page_pdf(clean_doi: str, direct_url: str) -> Optional[bytes]
         resp = requests.get(landing_target, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        }, timeout=12.0, allow_redirects=True)
+        }, timeout=5.0, allow_redirects=True)
         if resp.status_code == 200:
             html = resp.text
             final_url = resp.url
@@ -159,7 +160,7 @@ def resolve_and_fetch_authentic_pdf(
     Universal Parallel Racing Resolver for Authentic Academic Full-Text PDFs.
     Fires all discovery channels concurrently and returns the FIRST authentic binary PDF bytes immediately.
     """
-    clean_doi = doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip() if doi else ""
+    clean_doi = normalize_doi(doi).lower()
     
     # Fast path: Check candidate_pdf_url directly if provided
     if candidate_pdf_url and candidate_pdf_url.startswith("http"):

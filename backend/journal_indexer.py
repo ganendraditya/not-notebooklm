@@ -25,11 +25,24 @@ def init_journal_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_journal_title ON journals (title)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_journal_quartile ON journals (quartile)")
     
-    # Check if DB has entries
+    # Check if DB has entries; auto-seed if empty
     cursor.execute("SELECT COUNT(*) FROM journals")
     count = cursor.fetchone()[0]
     conn.commit()
     conn.close()
+
+    if count == 0:
+        try:
+            from seed_scimago import seed_scimago_database
+            seed_scimago_database()
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM journals")
+            count = cursor.fetchone()[0]
+            conn.close()
+        except Exception:
+            pass
+
     return count
 
 def clean_issn(raw_issn: str) -> str:

@@ -9,6 +9,7 @@ from database import get_db, ChatSession, Document
 import models
 import rag
 from utils.file_utils import MAX_SOURCES_PER_CHAT
+from utils.text_processing import clean_doi
 from services.paper_service import (
     search_academic_papers,
     filter_novel_sources,
@@ -83,8 +84,7 @@ async def import_doi_source(chat_id: str, req: models.ImportDoiRequest, db: Sess
         )
 
     raw_doi = (req.doi or "").strip()
-    clean_doi_val = raw_doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
-    clean_doi_val = re.sub(r'[;.,:)\s]+$', '', clean_doi_val).strip()
+    clean_doi_val = clean_doi(raw_doi)
     
     doi_match = re.search(r'10\.\d{4,9}/[^\s\n<>\"\'{}|\\^`]+', clean_doi_val)
     if not doi_match:
@@ -104,6 +104,7 @@ async def import_doi_source(chat_id: str, req: models.ImportDoiRequest, db: Sess
     return models.DocumentResponse(
         id=db_doc.id,
         filename=db_doc.filename,
+        title=db_doc.title or db_doc.filename.replace(".pdf", "").replace("_", " ").strip(),
         created_at=db_doc.created_at,
         index=total_count,
         has_full_pdf=has_downloaded_pdf,

@@ -1,8 +1,11 @@
+import logging
 import urllib.parse
 import requests
 import re
 import html
 from typing import List, Optional
+
+logger = logging.getLogger("uvicorn.error")
 
 def fetch_europe_pmc(
     term: str, 
@@ -67,7 +70,5 @@ def fetch_europe_pmc(
                     "is_oa": is_oa_pmc
                 })
     except Exception as e:
-        import logging
-        logger = logging.getLogger("uvicorn.error")
         logger.warning(f"EuropePMC API err: {e}")
     return fetched
