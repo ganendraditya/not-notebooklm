@@ -33,6 +33,28 @@ interface UsePaperDetailsProps {
   groundingHighlight?: CitationGroundingHighlight | null;
 }
 
+const MAX_CACHE_ENTRIES = 30;
+
+function getFromLruCache<K, V>(cache: Map<K, V>, key: K): V | undefined {
+  if (!cache.has(key)) return undefined;
+  const val = cache.get(key)!;
+  cache.delete(key);
+  cache.set(key, val);
+  return val;
+}
+
+function setInLruCache<K, V>(cache: Map<K, V>, key: K, value: V, maxSize: number = MAX_CACHE_ENTRIES) {
+  if (cache.has(key)) {
+    cache.delete(key);
+  } else if (cache.size >= maxSize) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey !== undefined) {
+      cache.delete(oldestKey);
+    }
+  }
+  cache.set(key, value);
+}
+
 export function usePaperDetails({
   activeChatId,
   backendUrl,
@@ -56,13 +78,11 @@ export function usePaperDetails({
       return;
     }
 
-    if (paperDetailsCacheRef.current.has(viewingDoc.id)) {
-      const cached = paperDetailsCacheRef.current.get(viewingDoc.id)!;
-      if (cached && (cached.id === viewingDoc.id || cached.filename === viewingDoc.filename)) {
-        setPaperDetails(cached);
-        setIsLoadingDetails(false);
-        return;
-      }
+    const cached = getFromLruCache(paperDetailsCacheRef.current, viewingDoc.id);
+    if (cached && (cached.id === viewingDoc.id || cached.filename === viewingDoc.filename)) {
+      setPaperDetails(cached);
+      setIsLoadingDetails(false);
+      return;
     }
 
     setPaperDetails(null);
@@ -75,7 +95,7 @@ export function usePaperDetails({
       .then(data => {
         if (!isMounted) return;
         if (data && !data.error) {
-          paperDetailsCacheRef.current.set(viewingDoc.id, data);
+          setInLruCache(paperDetailsCacheRef.current, viewingDoc.id, data);
           setPaperDetails(data);
         } else {
           setPaperDetails(null);
