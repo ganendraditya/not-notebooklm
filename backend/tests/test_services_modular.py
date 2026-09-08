@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from main import app
 from database import get_db, SessionLocal, Document, ChatSession
-from services.document_service import extract_and_enrich_uploaded_file, calculate_doc_quality
+from services.document import extract_and_enrich_uploaded_file, calculate_doc_quality
 from utils.file_utils import sanitize_paper_filename, get_doc_file_path, make_content_disposition
 from utils.text_processing import clean_doi, normalize_title_str, is_valid_academic_title
 from utils.pdf_utils import is_authentic_pdf_bytes

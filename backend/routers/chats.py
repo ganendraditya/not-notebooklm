@@ -22,6 +22,80 @@ logger = logging.getLogger("uvicorn.error")
 def get_utc_now():
     return datetime.now(timezone.utc)
 
+def extract_chat_history_from_db_messages(messages: List[ChatMessage]) -> List[dict]:
+    """Single Source of Truth: Converts ORM ChatMessage instances to standard history dicts."""
+    history = []
+    for msg in messages:
+        item = {"role": msg.role, "content": msg.content or ""}
+        if getattr(msg, "attachments_json", None):
+            try:
+                atts = json.loads(msg.attachments_json)
+                if atts:
+                    item["attachments"] = atts
+            except Exception:
+                pass
+        history.append(item)
+    return history
+
+def format_chat_message_responses(messages: List[ChatMessage]) -> List[models.ChatMessageResponse]:
+    """Single Source of Truth: Formats ORM ChatMessage instances with variant support."""
+    msg_responses = []
+    for msg in messages:
+        attachments = None
+        if getattr(msg, "attachments_json", None):
+            try:
+                attachments = json.loads(msg.attachments_json)
+            except Exception:
+                attachments = None
+
+        variants = None
+        if getattr(msg, "variants_json", None):
+            try:
+                variants = json.loads(msg.variants_json)
+            except Exception:
+                variants = None
+        if not variants and msg.content:
+            variants = [msg.content]
+
+        active_idx = getattr(msg, "active_variant_index", 0) or 0
+        if variants:
+            if active_idx < 0 or active_idx >= len(variants):
+                active_idx = len(variants) - 1
+            curr_content = variants[active_idx]
+        else:
+            active_idx = 0
+            curr_content = msg.content or ""
+
+        msg_responses.append(models.ChatMessageResponse(
+            role=msg.role,
+            content=curr_content,
+            created_at=msg.created_at,
+            attachments=attachments,
+            variants=variants,
+            active_variant_index=active_idx
+        ))
+    return msg_responses
+
+def save_stream_assistant_response(chat_id: str, resp_text: str) -> None:
+    """Single Source of Truth: Persists newly streamed assistant response with default variant."""
+    from database import SessionLocal
+    bg_db = SessionLocal()
+    try:
+        asst_msg = ChatMessage(
+            chat_id=chat_id,
+            role="assistant",
+            content=resp_text,
+            variants_json=json.dumps([resp_text]),
+            active_variant_index=0
+        )
+        bg_db.add(asst_msg)
+        bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+        if bg_chat:
+            bg_chat.updated_at = get_utc_now()
+        commit_with_retry(bg_db)
+    finally:
+        bg_db.close()
+
 CHAT_MEDIA_DIR = os.path.join(UPLOAD_DIR, "chat_media")
 os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
 
@@ -72,40 +146,7 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
         ))
         
     sorted_msgs = sorted(chat.messages, key=lambda m: m.created_at)
-    msg_responses = []
-    for msg in sorted_msgs:
-        attachments = None
-        if hasattr(msg, 'attachments_json') and msg.attachments_json:
-            try:
-                attachments = json.loads(msg.attachments_json)
-            except Exception:
-                attachments = None
-        variants = None
-        if hasattr(msg, 'variants_json') and msg.variants_json:
-            try:
-                variants = json.loads(msg.variants_json)
-            except Exception:
-                variants = None
-        if not variants and msg.content:
-            variants = [msg.content]
-            
-        active_var_idx = getattr(msg, 'active_variant_index', 0) or 0
-        if variants:
-            if active_var_idx < 0 or active_var_idx >= len(variants):
-                active_var_idx = len(variants) - 1
-            curr_content = variants[active_var_idx]
-        else:
-            active_var_idx = 0
-            curr_content = msg.content or ""
-
-        msg_responses.append(models.ChatMessageResponse(
-            role=msg.role,
-            content=curr_content,
-            created_at=msg.created_at,
-            attachments=attachments,
-            variants=variants,
-            active_variant_index=active_var_idx
-        ))
+    msg_responses = format_chat_message_responses(sorted_msgs)
         
     return models.ChatSessionDetailResponse(
         id=chat.id,
@@ -181,16 +222,9 @@ async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
         )
 
     # Check current storage usage against 10GB limit
+    from services.storage_service import get_directory_total_size
     total_bytes_limit = 10 * 1024 * 1024 * 1024
-    used_bytes = 0
-    if os.path.exists(UPLOAD_DIR):
-        for root, _, files in os.walk(UPLOAD_DIR):
-            for f in files:
-                try:
-                    used_bytes += os.path.getsize(os.path.join(root, f))
-                except Exception:
-                    pass
-                    
+    used_bytes = get_directory_total_size(UPLOAD_DIR)
     is_storage_full = used_bytes >= total_bytes_limit
 
     # Save file
@@ -215,57 +249,6 @@ async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
         }
     }
 
-@router.post("/chats/{chat_id}/message", response_model=models.ChatMessageResponse)
-async def send_message(chat_id: str, query: models.ChatQuery, db: Session = Depends(get_db)):
-    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-    if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
-        
-    attachments_str = None
-    if query.attachments:
-        attachments_str = json.dumps([a.dict() for a in query.attachments])
-
-    user_msg = ChatMessage(
-        chat_id=chat_id, 
-        role="user", 
-        content=query.message,
-        attachments_json=attachments_str
-    )
-    db.add(user_msg)
-    chat.updated_at = get_utc_now()
-    commit_with_retry(db)
-    
-    chat_history = []
-    for msg in chat.messages:
-        item = {"role": msg.role, "content": msg.content}
-        if hasattr(msg, 'attachments_json') and msg.attachments_json:
-            try:
-                atts = json.loads(msg.attachments_json)
-                if atts:
-                    item["attachments"] = atts
-            except Exception:
-                pass
-        chat_history.append(item)
-    
-    try:
-        response_text = await rag.query_chat(chat_id, query.message, chat_history=chat_history)
-    except Exception as e:
-        logger.error(f"[Chat Query Error]: {e}")
-        response_text = f"Sorry, an error occurred: {str(e)}"
-        
-    asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
-    db.add(asst_msg)
-    chat.updated_at = get_utc_now()
-    commit_with_retry(db)
-    db.refresh(asst_msg)
-
-    return models.ChatMessageResponse(
-        role=asst_msg.role,
-        content=asst_msg.content,
-        created_at=asst_msg.created_at,
-        attachments=None
-    )
-
 @router.post("/chats/{chat_id}/message/stream")
 @router.post("/chats/{chat_id}/message_stream")
 async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session = Depends(get_db)):
@@ -288,17 +271,7 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
     commit_with_retry(db)
     
     all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
-    chat_history = []
-    for msg in all_msgs:
-        item = {"role": msg.role, "content": msg.content}
-        if hasattr(msg, 'attachments_json') and msg.attachments_json:
-            try:
-                atts = json.loads(msg.attachments_json)
-                if atts:
-                    item["attachments"] = atts
-            except Exception:
-                pass
-        chat_history.append(item)
+    chat_history = extract_chat_history_from_db_messages(all_msgs)
     
     # Check if chat is still using default/raw initial title and needs smart AI naming
     is_initial_chat_state = len(all_msgs) <= 1 or chat.title in ("New Chat", "New Research", "") or (chat.title and chat.title.endswith("..."))
@@ -340,23 +313,8 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                 await asyncio.wait_for(title_task, timeout=5.0)
             except Exception:
                 pass
-        from database import SessionLocal
-        bg_db = SessionLocal()
-        try:
-            asst_msg = ChatMessage(
-                chat_id=chat_id, 
-                role="assistant", 
-                content=resp_text,
-                variants_json=json.dumps([resp_text]),
-                active_variant_index=0
-            )
-            bg_db.add(asst_msg)
-            bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-            if bg_chat:
-                bg_chat.updated_at = get_utc_now()
-            commit_with_retry(bg_db)
-        finally:
-            bg_db.close()
+
+        save_stream_assistant_response(chat_id, resp_text)
 
         await emitter.emit_done(
             final_text=resp_text,
@@ -370,43 +328,6 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
         )
 
     return create_sse_stream_response(stream_worker)
-
-@router.put("/chats/{chat_id}/edit_message", response_model=models.ChatMessageResponse)
-async def edit_message(chat_id: str, req: models.EditMessageRequest, db: Session = Depends(get_db)):
-    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-    if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
-        
-    all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
-    if req.message_index < 0 or req.message_index >= len(all_msgs):
-        raise HTTPException(status_code=400, detail="Invalid message index")
-        
-    target_msg = all_msgs[req.message_index]
-    if target_msg.role != "user":
-        raise HTTPException(status_code=400, detail="Only user messages can be edited")
-        
-    target_msg.content = req.message
-    for msg_to_del in all_msgs[req.message_index + 1:]:
-        db.delete(msg_to_del)
-        
-    chat.updated_at = get_utc_now()
-    commit_with_retry(db)
-    
-    truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index + 1]]
-    
-    try:
-        response_text = await rag.query_chat(chat_id, req.message, chat_history=truncated_history)
-    except Exception as e:
-        logger.error(f"[Chat Edit Error]: {e}")
-        response_text = f"Sorry, an error occurred: {str(e)}"
-        
-    asst_msg = ChatMessage(chat_id=chat_id, role="assistant", content=response_text)
-    db.add(asst_msg)
-    chat.updated_at = get_utc_now()
-    commit_with_retry(db)
-    db.refresh(asst_msg)
-    
-    return asst_msg
 
 @router.put("/chats/{chat_id}/edit_message/stream")
 @router.put("/chats/{chat_id}/edit_message_stream")
@@ -431,7 +352,7 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
     chat.updated_at = get_utc_now()
     commit_with_retry(db)
     
-    truncated_history = [{"role": msg.role, "content": msg.content} for msg in all_msgs[:req.message_index + 1]]
+    truncated_history = extract_chat_history_from_db_messages(all_msgs[:req.message_index + 1])
     
     async def stream_worker(emitter: SSEStreamEmitter):
         resp_text = await rag.query_chat(
@@ -441,23 +362,7 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
             status_callback=emitter.emit_status,
             delta_callback=emitter.emit_delta
         )
-        from database import SessionLocal
-        bg_db = SessionLocal()
-        try:
-            asst_msg = ChatMessage(
-                chat_id=chat_id, 
-                role="assistant", 
-                content=resp_text,
-                variants_json=json.dumps([resp_text]),
-                active_variant_index=0
-            )
-            bg_db.add(asst_msg)
-            bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-            if bg_chat:
-                bg_chat.updated_at = get_utc_now()
-            commit_with_retry(bg_db)
-        finally:
-            bg_db.close()
+        save_stream_assistant_response(chat_id, resp_text)
 
         await emitter.emit_done(
             final_text=resp_text,
@@ -488,31 +393,13 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
         
     # Find the preceding user message (or attachments)
     user_prompt = ""
-    user_attachments = []
     for m in reversed(all_msgs[:req.message_index]):
         if m.role == "user":
             user_prompt = m.content or ""
-            if m.attachments_json:
-                try:
-                    user_attachments = json.loads(m.attachments_json)
-                except Exception:
-                    pass
             break
             
     # History up to the user message
-    truncated_history = []
-    for msg in all_msgs[:req.message_index]:
-        atts = []
-        if msg.attachments_json:
-            try:
-                atts = json.loads(msg.attachments_json)
-            except Exception:
-                pass
-        truncated_history.append({
-            "role": msg.role, 
-            "content": msg.content or "",
-            "attachments": atts
-        })
+    truncated_history = extract_chat_history_from_db_messages(all_msgs[:req.message_index])
     target_msg_id = target_msg.id
     
     async def stream_worker(emitter: SSEStreamEmitter):

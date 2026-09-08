@@ -155,7 +155,7 @@ def test_lru_cache_eviction():
 
 def test_document_service_quality_calculator(tmp_path):
     """Verify document quality calculator prioritizes full PDFs with DOI and high citations."""
-    from services.document_service import calculate_doc_quality
+    from services.document import calculate_doc_quality
     from database import Document
     
     doc_stub = Document(

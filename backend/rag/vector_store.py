@@ -116,3 +116,53 @@ embed_model, vector_store = init_embedding_and_vector_store()
 
 # Backward-compatibility alias
 delete_qdrant_vectors = delete_document_vectors
+
+
+def ingest_documents_batch(doc_items: list) -> bool:
+    """Single Source of Truth: Batch ingests multiple (text, filename, chat_id) into Qdrant with section-aware chunks."""
+    if not doc_items:
+        return True
+    from llama_index.core import Document, VectorStoreIndex
+    from .parsers import split_markdown_into_academic_sections
+
+    docs = []
+    for text, filename, chat_id in doc_items:
+        sections = split_markdown_into_academic_sections(text, filename=filename)
+        for sec in sections:
+            docs.append(
+                Document(
+                    text=sec.get("text", text),
+                    metadata={
+                        "chat_id": chat_id,
+                        "source_type": "file",
+                        "filename": filename,
+                        "section": sec.get("section", "Overview"),
+                        "breadcrumb": sec.get("breadcrumb", "Overview"),
+                        "canonical_section": sec.get("canonical_section", "general"),
+                    }
+                )
+            )
+    if not docs:
+        docs = [
+            Document(
+                text=text,
+                metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
+            )
+            for text, filename, chat_id in doc_items
+        ]
+    VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
+    return True
+
+
+def ingest_document_text(text: str, filename: str, chat_id: str) -> bool:
+    """Ingests text into the vector database under a specific chat_id with section-aware chunking."""
+    return ingest_documents_batch([(text, filename, chat_id)])
+
+
+def ingest_document(file_path: str, chat_id: str) -> bool:
+    """Parses a multi-format document and ingests it into Qdrant."""
+    from .parsers import parse_document_to_markdown
+    filename = os.path.basename(file_path)
+    md_text = parse_document_to_markdown(file_path)
+    return ingest_document_text(md_text, filename, chat_id)
+

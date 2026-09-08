@@ -12,295 +12,47 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger("uvicorn.error")
 
-from llama_index.core import VectorStoreIndex, Document, Settings
+from llama_index.core import VectorStoreIndex, Settings
 from llama_index.core.vector_stores.types import MetadataFilter, MetadataFilters, FilterOperator
-from llama_index.llms.gemini import Gemini
-from llama_index.llms.groq import Groq
-from llama_index.llms.openai_like import OpenAILike
 from llama_index.core.tools import FunctionTool
 from llama_index.core.agent import ReActAgent
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
-from .parsers import (
-    parse_document_to_markdown,
-    split_markdown_into_academic_sections
-)
-from helpers import get_doc_file_path
-from .search import (
-    search_academic_papers,
-    plan_academic_search,
-    search_academic_papers_planned,
-    judge_and_filter_papers_with_llm,
-    get_existing_notebook_sources_signatures,
-)
+from .parsers import parse_document_to_markdown
+from .search import search_academic_papers
 from .intent import (
     is_simple_conversational,
-    is_technical_discussion,
-    is_sources_meta_query,
     classify_user_intent
 )
-from .prompts import (
-    get_general_chat_system_prompt,
-    get_source_deletion_prompt,
-    get_search_synthesis_prompt,
-    get_workspace_analysis_system_prompt,
-    get_agentic_system_prompt
+from .prompts import get_agentic_system_prompt
+from .formatters import format_clean_response
+from .vector_store import (
+    embed_model,
+    vector_store,
+    ingest_document_text,
+    ingest_documents_batch,
+    ingest_document,
 )
-from .formatters import format_clean_response, extract_structured_citations
-from services.rubric_grader_service import evaluate_response_grounding
-from .vector_store import embed_model, vector_store, qdrant_client, delete_document_vectors
+from .llm_factory import (
+    clear_llm_cache,
+    get_main_llm,
+    get_fast_llm,
+    get_llm_factory,
+    create_llm_instances,
+    get_candidate_llm_chain,
+    astream_llm_response,
+)
+from .pipelines import (
+    chat_pipeline,
+    source_action_pipeline,
+    search_pipeline,
+    workspace_pipeline,
+)
 
 load_dotenv()
 
 # Setup variables
 Settings.embed_model = embed_model
-
-_CACHED_MAIN_LLM = None
-_CACHED_FAST_LLM = None
-_CACHED_CONFIG_HASH = None
-
-def _get_env_config_signature():
-    """Generates a snapshot of active LLM environment variables to detect config changes."""
-    return (
-        os.getenv("LLM_PROVIDER", ""),
-        os.getenv("NINEROUTER_BASE_URL", ""),
-        os.getenv("NINEROUTER_API_KEY", ""),
-        os.getenv("NINEROUTER_MODEL", ""),
-        os.getenv("NINEROUTER_FAST_MODEL", ""),
-        os.getenv("GEMINI_API_KEY", ""),
-        os.getenv("GEMINI_MODEL", ""),
-        os.getenv("GROQ_API_KEY", "")
-    )
-
-def clear_llm_cache():
-    """Clears cached LLM instances, forcing fresh recreation on next query."""
-    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
-    _CACHED_MAIN_LLM = None
-    _CACHED_FAST_LLM = None
-    _CACHED_CONFIG_HASH = None
-
-def get_main_llm(force_refresh: bool = False):
-    """
-    Returns the Primary / Heavy LLM.
-    Priority:
-    1. If LLM_PROVIDER is 'gemini' or 9Router not configured: Direct Gemini.
-    2. If NINEROUTER_API_KEY is configured (not dummy): 9Router OpenAILike.
-    3. Direct Gemini Fallback.
-    4. Direct Groq Fallback.
-    """
-    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
-    current_sig = _get_env_config_signature()
-    if not force_refresh and _CACHED_MAIN_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
-        return _CACHED_MAIN_LLM
-
-    provider = os.getenv("LLM_PROVIDER", "").lower()
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    has_gemini = bool(gemini_key and not gemini_key.startswith("your_"))
-    
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "")
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "")
-    has_ninerouter = bool(ninerouter_key and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key")
-
-    groq_key = os.getenv("GROQ_API_KEY")
-    has_groq = bool(groq_key and not groq_key.startswith("your_"))
-
-    _CACHED_MAIN_LLM = None
-
-    # Priority 1: Gemini if explicitly selected or if 9router not configured
-    if (provider == "gemini" or not has_ninerouter) and has_gemini:
-        try:
-            _CACHED_MAIN_LLM = Gemini(
-                model=os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash"),
-                api_key=gemini_key,
-                max_tokens=8192
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Gemini init failed: {e}")
-
-    # Priority 2: 9Router
-    if _CACHED_MAIN_LLM is None and has_ninerouter:
-        try:
-            _CACHED_MAIN_LLM = OpenAILike(
-                api_base=ninerouter_url or "http://localhost:20128/v1",
-                api_key=ninerouter_key,
-                model=os.getenv("NINEROUTER_MODEL", "ag/gemini-3.8-flash-high"),
-                is_chat_model=True,
-                is_function_calling_model=True,
-                max_tokens=8192,
-                timeout=120.0
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] 9Router init failed: {e}")
-
-    # Priority 3: Groq fallback
-    if _CACHED_MAIN_LLM is None and has_groq:
-        try:
-            _CACHED_MAIN_LLM = Groq(
-                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-                api_key=groq_key,
-                max_tokens=8192
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Groq init failed: {e}")
-
-    # Final fallback if provider was not gemini but gemini is available
-    if _CACHED_MAIN_LLM is None and has_gemini:
-        try:
-            _CACHED_MAIN_LLM = Gemini(
-                model=os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash"),
-                api_key=gemini_key,
-                max_tokens=8192
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Final Gemini fallback failed: {e}")
-
-    _CACHED_CONFIG_HASH = current_sig
-    return _CACHED_MAIN_LLM
-
-def get_fast_llm(force_refresh: bool = False):
-    """
-    Returns the Fast / Lite LLM.
-    Used for rapid micro-tasks: intent classification, query planning, paper judging, title generation, and rubric checks.
-    """
-    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
-    current_sig = _get_env_config_signature()
-    if not force_refresh and _CACHED_FAST_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
-        return _CACHED_FAST_LLM
-
-    provider = os.getenv("LLM_PROVIDER", "").lower()
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    has_gemini = bool(gemini_key and not gemini_key.startswith("your_"))
-    
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "")
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "")
-    has_ninerouter = bool(ninerouter_key and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key")
-
-    groq_key = os.getenv("GROQ_API_KEY")
-    has_groq = bool(groq_key and not groq_key.startswith("your_"))
-
-    _CACHED_FAST_LLM = None
-
-    if (provider == "gemini" or not has_ninerouter) and has_gemini:
-        try:
-            _CACHED_FAST_LLM = Gemini(
-                model=os.getenv("GEMINI_FAST_MODEL", "models/gemini-3.5-flash-lite"),
-                api_key=gemini_key,
-                max_tokens=4096
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Fast Gemini init failed: {e}")
-
-    if _CACHED_FAST_LLM is None and has_ninerouter:
-        try:
-            _CACHED_FAST_LLM = OpenAILike(
-                api_base=ninerouter_url or "http://localhost:20128/v1",
-                api_key=ninerouter_key,
-                model=os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-3.8-flash-low"),
-                is_chat_model=True,
-                is_function_calling_model=True,
-                max_tokens=4096,
-                timeout=45.0
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Fast 9Router init failed: {e}")
-
-    if _CACHED_FAST_LLM is None and has_groq:
-        try:
-            _CACHED_FAST_LLM = Groq(
-                model=os.getenv("GROQ_FAST_MODEL", "llama-3.1-8b-instant"),
-                api_key=groq_key,
-                max_tokens=4096
-            )
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Fast Groq init failed: {e}")
-
-    if _CACHED_FAST_LLM is None:
-        _CACHED_FAST_LLM = get_main_llm(force_refresh=force_refresh)
-
-    _CACHED_CONFIG_HASH = current_sig
-    return _CACHED_FAST_LLM
-
-def get_llm_factory(provider_override: Optional[str] = None, force_refresh: bool = False):
-    """Singleton helper returning (main_llm, fast_llm)."""
-    return get_main_llm(force_refresh=force_refresh), get_fast_llm(force_refresh=force_refresh)
-
-def create_llm_instances(force_refresh: bool = False):
-    """Backward compatibility helper returning (main_llm, fast_llm, None, None)."""
-    main_llm, fast_llm = get_llm_factory(force_refresh=force_refresh)
-    return main_llm, fast_llm, None, None
-
-main_llm = None
-fast_llm = None
-ninerouter_llm = None
-freellm_llm = None
-gemini_llm = None
-groq_llm = None
-
-def ingest_document_text(text: str, filename: str, chat_id: str):
-    """Ingests text into the vector database under a specific chat_id with section-aware chunking."""
-    sections = split_markdown_into_academic_sections(text, filename=filename)
-    docs = []
-    for sec in sections:
-        docs.append(
-            Document(
-                text=sec.get("text", text),
-                metadata={
-                    "chat_id": chat_id,
-                    "source_type": "file",
-                    "filename": filename,
-                    "section": sec.get("section", "Overview"),
-                    "breadcrumb": sec.get("breadcrumb", "Overview"),
-                    "canonical_section": sec.get("canonical_section", "general")
-                }
-            )
-        )
-    if not docs:
-        docs = [
-            Document(
-                text=text,
-                metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
-            )
-        ]
-    VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
-    return True
-
-def ingest_documents_batch(doc_items: List[tuple]):
-    """Batch ingests multiple (text, filename, chat_id) into Qdrant with section-aware chunks."""
-    if not doc_items:
-        return True
-    docs = []
-    for text, filename, chat_id in doc_items:
-        sections = split_markdown_into_academic_sections(text, filename=filename)
-        for sec in sections:
-            docs.append(
-                Document(
-                    text=sec.get("text", text),
-                    metadata={
-                        "chat_id": chat_id,
-                        "source_type": "file",
-                        "filename": filename,
-                        "section": sec.get("section", "Overview"),
-                        "breadcrumb": sec.get("breadcrumb", "Overview"),
-                        "canonical_section": sec.get("canonical_section", "general")
-                    }
-                )
-            )
-    if not docs:
-        docs = [
-            Document(
-                text=text,
-                metadata={"chat_id": chat_id, "source_type": "file", "filename": filename}
-            )
-            for text, filename, chat_id in doc_items
-        ]
-    VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
-    return True
-
-def ingest_document(file_path: str, chat_id: str):
-    """Parses a multi-format document and ingests it into Qdrant."""
-    filename = os.path.basename(file_path)
-    md_text = parse_document_to_markdown(file_path)
-    return ingest_document_text(md_text, filename, chat_id)
 
 def web_search_and_ingest(query: str, chat_id: str) -> str:
     """Searches scholarly databases (OpenAlex) and the web for research papers and articles."""
@@ -524,100 +276,6 @@ def build_rag_tools(chat_id: str, has_local_docs: bool, query_engine: Any) -> Li
     doi_tool = FunctionTool.from_defaults(fn=search_doi_tool)
     return [local_search_tool, web_tool, doi_tool]
 
-def get_candidate_llm_chain():
-    """Builds prioritized list of candidate LLMs (Main Synthesizer with fallback)."""
-    candidate_llms = []
-    seen = set()
-
-    def add_candidate(inst, label):
-        if inst and id(inst) not in seen:
-            candidate_llms.append((inst, label))
-            seen.add(id(inst))
-
-    main_instance = get_main_llm()
-    fast_instance = get_fast_llm()
-
-    if main_instance:
-        label = getattr(main_instance, "model", "default")
-        add_candidate(main_instance, f"Primary Synthesizer ({label})")
-
-    # 9Router Fallback Candidate (e.g., ag/gemini-pro-agent)
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "").strip()
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "").strip()
-    ninerouter_fallback = os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
-    if ninerouter_key and ninerouter_fallback and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key":
-        try:
-            fb_inst = OpenAILike(
-                api_base=ninerouter_url or "http://localhost:20128/v1",
-                api_key=ninerouter_key,
-                model=ninerouter_fallback,
-                is_chat_model=True,
-                is_function_calling_model=True,
-                max_tokens=8192,
-                timeout=120.0
-            )
-            add_candidate(fb_inst, f"9Router Fallback ({ninerouter_fallback})")
-        except Exception as e:
-            logger.debug(f"[9Router Fallback init error]: {e}")
-
-    if fast_instance and fast_instance != main_instance:
-        label = getattr(fast_instance, "model", "default")
-        add_candidate(fast_instance, f"Fast Lite ({label})")
-
-    # Direct Gemini fallback
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key and not gemini_key.startswith("your_"):
-        try:
-            gemini_model = os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash")
-            g_inst = Gemini(model=gemini_model, api_key=gemini_key, max_tokens=8192)
-            add_candidate(g_inst, f"Direct Gemini Fallback ({gemini_model})")
-        except Exception as e:
-            logger.debug(f"[LLM Fallback init error]: {e}")
-
-    # Direct Groq fallback
-    groq_key = os.getenv("GROQ_API_KEY")
-    if groq_key and not groq_key.startswith("your_"):
-        try:
-            gq_inst = Groq(model="llama-3.3-70b-versatile", api_key=groq_key)
-            add_candidate(gq_inst, "Direct Groq Fallback")
-        except Exception as e:
-            logger.debug(f"[LLM Fallback init error]: {e}")
-
-    return candidate_llms
-
-async def astream_llm_response(
-    target_llm: Any,
-    chat_msgs: list,
-    on_delta: Optional[Callable[[str], Any]] = None
-) -> str:
-    """
-    Executes an LLM chat request with progressive token streaming if on_delta is provided.
-    Falls back gracefully to standard achat if astream_chat fails or is unsupported.
-    """
-    if on_delta and hasattr(target_llm, "astream_chat"):
-        try:
-            response_stream = await target_llm.astream_chat(chat_msgs)
-            full_content = ""
-            async for chunk in response_stream:
-                token = chunk.delta or ""
-                if token:
-                    full_content += token
-                    res = on_delta(token)
-                    if inspect.isawaitable(res):
-                        await res
-            if full_content:
-                return full_content
-        except Exception as e:
-            logger.warning(f"[RAG Streaming] astream_chat error ({e}), falling back to achat")
-
-    resp = await target_llm.achat(chat_msgs)
-    full_content = resp.message.content or ""
-    if on_delta and full_content:
-        res = on_delta(full_content)
-        if inspect.isawaitable(res):
-            await res
-    return full_content
-
 async def dispatch_intent_pipeline(
     intent: str,
     chat_id: str,
@@ -636,17 +294,14 @@ async def dispatch_intent_pipeline(
     
     async def _execute_selected_pipeline() -> str:
         if intent == "GENERAL_CHAT":
-            from .pipelines.chat_pipeline import handle_general_chat_pipeline
-            raw_res = await handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
+            raw_res = await chat_pipeline.handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
             return format_clean_response(raw_res)
 
         if intent == "REMOVE_SOURCES" and has_local_docs:
-            from .pipelines.source_action_pipeline import handle_source_removal_pipeline
-            return await handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
+            return await source_action_pipeline.handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
 
         if intent == "SEARCH_NEW":
-            from .pipelines.search_pipeline import handle_academic_search_pipeline
-            raw_res = await handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status, on_delta=on_delta)
+            raw_res = await search_pipeline.handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status, on_delta=on_delta)
             if "<!-- SOURCES_DATA:" in raw_res:
                 parts = raw_res.split("<!-- SOURCES_DATA:", 1)
                 cleaned_text = format_clean_response(parts[0])
@@ -654,8 +309,7 @@ async def dispatch_intent_pipeline(
             return format_clean_response(raw_res)
 
         if intent == "ANALYZE_WORKSPACE" and has_local_docs:
-            from .pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
-            return await handle_workspace_analysis_pipeline(
+            return await workspace_pipeline.handle_workspace_analysis_pipeline(
                 chat_id=chat_id,
                 query=query,
                 local_docs=local_docs,

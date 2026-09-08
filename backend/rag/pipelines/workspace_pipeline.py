@@ -10,6 +10,7 @@ from rag.formatters import format_clean_response
 from rag.parsers import parse_document_to_markdown
 from utils.file_utils import get_doc_file_path
 from services.rubric_grader_service import evaluate_response_grounding
+from rag.llm_factory import get_fast_llm, astream_llm_response
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -237,14 +238,12 @@ async def handle_workspace_analysis_pipeline(
     ]
     
     await report_status("Synthesizing comparative findings and formatting response...")
-    from rag.engine import astream_llm_response
     raw_content = await astream_llm_response(target_llm, chat_msgs, on_delta=on_delta)
     draft_content = format_clean_response(raw_content)
 
     # Self-Correction Loop with Rubric Grader
     try:
         await report_status("Auditing factual grounding and citations with AI Rubric...")
-        from rag.engine import get_fast_llm
         auditor_llm = get_fast_llm() or target_llm
 
         rubric_res = await evaluate_response_grounding(

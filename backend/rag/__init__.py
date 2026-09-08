@@ -60,6 +60,9 @@ from .vector_store import (
     qdrant_client,
     delete_document_vectors,
     delete_qdrant_vectors,
+    ingest_document_text,
+    ingest_documents_batch,
+    ingest_document,
 )
 
 from .streamer import (
@@ -68,21 +71,19 @@ from .streamer import (
     create_streaming_response
 )
 
-from .engine import (
+from .llm_factory import (
     create_llm_instances,
     get_llm_factory,
+    get_main_llm,
+    get_fast_llm,
     clear_llm_cache,
-    ingest_document_text,
-    ingest_documents_batch,
-    ingest_document,
+)
+
+from .engine import (
     web_search_and_ingest,
     fetch_and_ingest_doi,
     query_chat,
     generate_chat_title,
-    ninerouter_llm,
-    freellm_llm,
-    gemini_llm,
-    groq_llm,
 )
 
 __all__ = [
@@ -130,16 +131,18 @@ __all__ = [
     "parse_sse_stream",
     "llm_stream_generator",
     "create_streaming_response",
-    # Engine & Agent
+    # LLM & Factory
     "create_llm_instances",
+    "get_llm_factory",
+    "get_main_llm",
+    "get_fast_llm",
+    "clear_llm_cache",
+    # Engine & Ingestion
     "ingest_document_text",
+    "ingest_documents_batch",
     "ingest_document",
     "web_search_and_ingest",
     "fetch_and_ingest_doi",
     "query_chat",
     "generate_chat_title",
-    "ninerouter_llm",
-    "freellm_llm",
-    "gemini_llm",
-    "groq_llm",
 ]

@@ -75,8 +75,7 @@ async def search_academic_papers(query: str, limit: int = 10) -> List[models.Pap
     if not query.strip():
         return []
         
-    ninerouter_llm, freellm_llm, gemini_llm, groq_llm = rag.create_llm_instances()
-    active_llm = ninerouter_llm or freellm_llm or gemini_llm or groq_llm
+    active_llm = rag.get_fast_llm() or rag.get_main_llm()
     
     plan = await rag.plan_academic_search(query.strip(), None, active_llm)
     if limit and limit != 10:

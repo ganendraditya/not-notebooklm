@@ -5,7 +5,8 @@ import logging
 from typing import List
 from database import SessionLocal, Document as DBDocument
 from rag.prompts import get_source_deletion_prompt
-from utils.file_utils import get_doc_file_path
+from rag.llm_factory import get_fast_llm
+from services.storage_service import delete_multiple_documents
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -16,7 +17,6 @@ async def handle_source_removal_pipeline(
     report_status
 ) -> str:
     """Evaluates and executes user requests to delete specific sources from a workspace."""
-    from rag.engine import get_fast_llm
     fast_llm = get_fast_llm() or target_llm
 
     await report_status("Processing document deletion request...")
@@ -50,16 +50,8 @@ async def handle_source_removal_pipeline(
                     DBDocument.id.in_(to_delete_ids),
                     DBDocument.chat_id == chat_id
                 ).all()
-                for dd in docs_to_del:
-                    deleted_titles.append(dd.title or dd.filename.replace(".pdf", ""))
-                    fp = get_doc_file_path(chat_id, dd.filename)
-                    if os.path.exists(fp):
-                        try:
-                            os.remove(fp)
-                        except Exception as rm_err:
-                            logger.warning(f"[Storage] Failed deleting source file {fp}: {rm_err}")
-                    db_del.delete(dd)
-                db_del.commit()
+                deleted_titles = [dd.title or dd.filename.replace(".pdf", "") for dd in docs_to_del]
+                delete_multiple_documents(db_del, chat_id, to_delete_ids)
             finally:
                 db_del.close()
 

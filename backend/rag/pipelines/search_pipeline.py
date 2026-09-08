@@ -10,6 +10,7 @@ from rag.search import (
     get_existing_notebook_sources_signatures,
 )
 from rag.prompts import get_search_synthesis_prompt
+from rag.llm_factory import get_fast_llm, astream_llm_response
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -22,7 +23,6 @@ async def handle_academic_search_pipeline(
     on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
     """Discovers, filters, audits, and synthesizes scholarly literature."""
-    from rag.engine import get_fast_llm
     fast_llm = get_fast_llm() or target_llm
 
     await report_status("Planning academic query parameters & search terms...")
@@ -68,7 +68,6 @@ async def handle_academic_search_pipeline(
     ]
     
     await report_status("Synthesizing literature review and citation insights...")
-    from rag.engine import astream_llm_response
     text_response = await astream_llm_response(target_llm, synth_msgs, on_delta=on_delta)
     
     # Append structured SOURCES_DATA payload for frontend ChatMessageItem interactive import card
