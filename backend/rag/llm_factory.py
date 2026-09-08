@@ -21,6 +21,14 @@ def _get_env_config_signature():
     """Generates a snapshot of active LLM environment variables to detect config changes."""
     return (
         os.getenv("LLM_PROVIDER", ""),
+        os.getenv("LLM_BASE_URL", ""),
+        os.getenv("LLM_API_KEY", ""),
+        os.getenv("LLM_MODEL", ""),
+        os.getenv("LLM_FAST_MODEL", ""),
+        os.getenv("LLM_FALLBACK_MODEL", ""),
+        os.getenv("OPENAI_BASE_URL", ""),
+        os.getenv("OPENAI_API_KEY", ""),
+        os.getenv("OPENAI_MODEL", ""),
         os.getenv("NINEROUTER_BASE_URL", ""),
         os.getenv("NINEROUTER_API_KEY", ""),
         os.getenv("NINEROUTER_MODEL", ""),
@@ -29,6 +37,43 @@ def _get_env_config_signature():
         os.getenv("GEMINI_MODEL", ""),
         os.getenv("GROQ_API_KEY", ""),
     )
+
+
+def _get_gateway_credentials():
+    """
+    Resolves universal OpenAI-compatible gateway credentials.
+    Supports LLM_*, OPENAI_*, and legacy NINEROUTER_* environment variable aliases.
+    """
+    api_key = (
+        os.getenv("LLM_API_KEY", "").strip()
+        or os.getenv("OPENAI_API_KEY", "").strip()
+        or os.getenv("NINEROUTER_API_KEY", "").strip()
+    )
+    base_url = (
+        os.getenv("LLM_BASE_URL", "").strip()
+        or os.getenv("OPENAI_BASE_URL", "").strip()
+        or os.getenv("NINEROUTER_BASE_URL", "").strip()
+        or "http://localhost:20128/v1"
+    )
+    model = (
+        os.getenv("LLM_MODEL", "").strip()
+        or os.getenv("OPENAI_MODEL", "").strip()
+        or os.getenv("NINEROUTER_MODEL", "").strip()
+        or "gpt-4o"
+    )
+    fast_model = (
+        os.getenv("LLM_FAST_MODEL", "").strip()
+        or os.getenv("OPENAI_FAST_MODEL", "").strip()
+        or os.getenv("NINEROUTER_FAST_MODEL", "").strip()
+        or "gpt-4o-mini"
+    )
+    fallback_model = (
+        os.getenv("LLM_FALLBACK_MODEL", "").strip()
+        or os.getenv("OPENAI_FALLBACK_MODEL", "").strip()
+        or os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
+    )
+    has_gateway = bool(api_key and not api_key.startswith("your_") and api_key != "dummy_key")
+    return base_url, api_key, model, fast_model, fallback_model, has_gateway
 
 
 def clear_llm_cache():
@@ -43,8 +88,8 @@ def get_main_llm(force_refresh: bool = False):
     """
     Returns the Primary / Heavy LLM.
     Priority:
-    1. If LLM_PROVIDER is 'gemini' or 9Router not configured: Direct Gemini.
-    2. If NINEROUTER_API_KEY is configured (not dummy): 9Router OpenAILike.
+    1. If LLM_PROVIDER is 'gemini' or Gateway not configured: Direct Gemini.
+    2. Universal OpenAI-Compatible Gateway (OpenAI, OpenRouter, Ollama, vLLM, LMStudio, etc.).
     3. Direct Gemini Fallback.
     4. Direct Groq Fallback.
     """
@@ -57,17 +102,15 @@ def get_main_llm(force_refresh: bool = False):
     gemini_key = os.getenv("GEMINI_API_KEY")
     has_gemini = bool(gemini_key and not gemini_key.startswith("your_"))
 
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "")
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "")
-    has_ninerouter = bool(ninerouter_key and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key")
+    base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
 
     groq_key = os.getenv("GROQ_API_KEY")
     has_groq = bool(groq_key and not groq_key.startswith("your_"))
 
     _CACHED_MAIN_LLM = None
 
-    # Priority 1: Gemini if explicitly selected or if 9router not configured
-    if (provider == "gemini" or not has_ninerouter) and has_gemini:
+    # Priority 1: Gemini if explicitly selected or if gateway not configured
+    if (provider == "gemini" or not has_gateway) and has_gemini:
         try:
             _CACHED_MAIN_LLM = Gemini(
                 model=os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash"),
@@ -77,20 +120,20 @@ def get_main_llm(force_refresh: bool = False):
         except Exception as e:
             logger.warning(f"[LLM Factory] Gemini init failed: {e}")
 
-    # Priority 2: 9Router
-    if _CACHED_MAIN_LLM is None and has_ninerouter:
+    # Priority 2: Universal Gateway (OpenAI-compatible)
+    if _CACHED_MAIN_LLM is None and has_gateway:
         try:
             _CACHED_MAIN_LLM = OpenAILike(
-                api_base=ninerouter_url or "http://localhost:20128/v1",
-                api_key=ninerouter_key,
-                model=os.getenv("NINEROUTER_MODEL", "ag/gemini-3.8-flash-high"),
+                api_base=base_url,
+                api_key=api_key,
+                model=model,
                 is_chat_model=True,
                 is_function_calling_model=True,
                 max_tokens=8192,
                 timeout=120.0
             )
         except Exception as e:
-            logger.warning(f"[LLM Factory] 9Router init failed: {e}")
+            logger.warning(f"[LLM Factory] Universal Gateway init failed: {e}")
 
     # Priority 3: Groq fallback
     if _CACHED_MAIN_LLM is None and has_groq:
@@ -132,16 +175,14 @@ def get_fast_llm(force_refresh: bool = False):
     gemini_key = os.getenv("GEMINI_API_KEY")
     has_gemini = bool(gemini_key and not gemini_key.startswith("your_"))
 
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "")
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "")
-    has_ninerouter = bool(ninerouter_key and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key")
+    base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
 
     groq_key = os.getenv("GROQ_API_KEY")
     has_groq = bool(groq_key and not groq_key.startswith("your_"))
 
     _CACHED_FAST_LLM = None
 
-    if (provider == "gemini" or not has_ninerouter) and has_gemini:
+    if (provider == "gemini" or not has_gateway) and has_gemini:
         try:
             _CACHED_FAST_LLM = Gemini(
                 model=os.getenv("GEMINI_FAST_MODEL", "models/gemini-3.5-flash-lite"),
@@ -151,19 +192,19 @@ def get_fast_llm(force_refresh: bool = False):
         except Exception as e:
             logger.warning(f"[LLM Factory] Fast Gemini init failed: {e}")
 
-    if _CACHED_FAST_LLM is None and has_ninerouter:
+    if _CACHED_FAST_LLM is None and has_gateway:
         try:
             _CACHED_FAST_LLM = OpenAILike(
-                api_base=ninerouter_url or "http://localhost:20128/v1",
-                api_key=ninerouter_key,
-                model=os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-3.8-flash-low"),
+                api_base=base_url,
+                api_key=api_key,
+                model=fast_model,
                 is_chat_model=True,
                 is_function_calling_model=True,
                 max_tokens=4096,
                 timeout=45.0
             )
         except Exception as e:
-            logger.warning(f"[LLM Factory] Fast 9Router init failed: {e}")
+            logger.warning(f"[LLM Factory] Fast Universal Gateway init failed: {e}")
 
     if _CACHED_FAST_LLM is None and has_groq:
         try:
@@ -210,24 +251,22 @@ def get_candidate_llm_chain():
         label = getattr(main_instance, "model", "default")
         add_candidate(main_instance, f"Primary Synthesizer ({label})")
 
-    # 9Router Fallback Candidate (e.g., ag/gemini-pro-agent)
-    ninerouter_key = os.getenv("NINEROUTER_API_KEY", "").strip()
-    ninerouter_url = os.getenv("NINEROUTER_BASE_URL", "").strip()
-    ninerouter_fallback = os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
-    if ninerouter_key and ninerouter_fallback and not ninerouter_key.startswith("your_") and ninerouter_key != "dummy_key":
+    # Universal Gateway Fallback Candidate
+    base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
+    if has_gateway and fallback_model:
         try:
             fb_inst = OpenAILike(
-                api_base=ninerouter_url or "http://localhost:20128/v1",
-                api_key=ninerouter_key,
-                model=ninerouter_fallback,
+                api_base=base_url,
+                api_key=api_key,
+                model=fallback_model,
                 is_chat_model=True,
                 is_function_calling_model=True,
                 max_tokens=8192,
                 timeout=120.0
             )
-            add_candidate(fb_inst, f"9Router Fallback ({ninerouter_fallback})")
+            add_candidate(fb_inst, f"Gateway Fallback ({fallback_model})")
         except Exception as e:
-            logger.debug(f"[LLM Factory] 9Router Fallback init error: {e}")
+            logger.debug(f"[LLM Factory] Gateway Fallback init error: {e}")
 
     if fast_instance and fast_instance != main_instance:
         label = getattr(fast_instance, "model", "default")

@@ -62,14 +62,19 @@ def factory_reset_storage(payload: dict, db: Session = Depends(get_db)):
 
 @router.get("/llm/models")
 def get_llm_models():
-    """Returns active LLM configuration info."""
-    main_model = os.getenv("NINEROUTER_MODEL", "ag/gemini-3.7-flash-high")
-    fast_model = os.getenv("NINEROUTER_FAST_MODEL", "ag/gemini-2.5-flash")
+    """Returns active LLM configuration info dynamically."""
+    from rag.llm_factory import get_main_llm, get_fast_llm
+    
+    main_instance = get_main_llm()
+    fast_instance = get_fast_llm()
+    
+    main_model = getattr(main_instance, "model", None) or os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "default"
+    fast_model = getattr(fast_instance, "model", None) or os.getenv("LLM_FAST_MODEL") or os.getenv("OPENAI_FAST_MODEL") or "default"
     
     return {
         "status": "success",
         "tiered_architecture": True,
         "main_model": main_model,
         "fast_model": fast_model,
-        "description": "Two-Tier Engine: Heavy Synthesis powered by Gemini 3.7 Flash, Rapid Triase & Auditing powered by Flash Lite."
+        "description": f"Two-Tier Engine: Heavy Synthesis powered by {main_model}, Rapid Triage & Auditing powered by {fast_model}."
     }
