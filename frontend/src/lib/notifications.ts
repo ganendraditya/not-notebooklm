@@ -1,5 +1,7 @@
 // Notification helper using Web Notifications API and optional subtle chime sound
 
+import { getSystemTranslation } from "./i18n";
+
 export type NotificationCategory = "responses" | "tasks" | "downloads";
 
 export const isNotificationSupported = (): boolean => {
@@ -25,12 +27,13 @@ export const requestNotificationPermission = async (): Promise<NotificationPermi
 export const isNotificationCategoryEnabled = (category: NotificationCategory): boolean => {
   if (typeof window === "undefined") return false;
   try {
+    if (typeof window.localStorage === "undefined" || !window.localStorage) return true;
     const key = `notbooklm_notify_${category}`;
-    const val = localStorage.getItem(key);
+    const val = window.localStorage.getItem(key);
     // Default to "push" if not set
     return val === null || val === "push";
   } catch {
-    return false;
+    return true;
   }
 };
 
@@ -65,10 +68,13 @@ export const playNotificationSound = () => {
   }
 };
 
-interface SendNotificationOptions {
+export interface SendNotificationOptions {
   category?: NotificationCategory;
-  title: string;
+  title?: string;
+  titleKey?: string;
   body?: string;
+  bodyKey?: string;
+  variables?: Record<string, string>;
   icon?: string;
   onClick?: () => void;
   force?: boolean; // if true, notify even if tab is active (e.g. for testing)
@@ -80,7 +86,10 @@ interface SendNotificationOptions {
 export const sendSystemNotification = ({
   category = "responses",
   title,
+  titleKey,
   body,
+  bodyKey,
+  variables,
   icon,
   onClick,
   force = false,
@@ -103,10 +112,18 @@ export const sendSystemNotification = ({
 
   if (!isNotificationSupported()) return;
 
+  const finalTitle = titleKey
+    ? getSystemTranslation(titleKey, variables, title)
+    : (title || "NotbookLM");
+
+  const finalBody = body && body.trim()
+    ? body
+    : (bodyKey ? getSystemTranslation(bodyKey, variables, body) : body);
+
   if (Notification.permission === "granted") {
     try {
-      const notif = new Notification(title, {
-        body: body ? (body.length > 150 ? body.substring(0, 147) + "..." : body) : undefined,
+      const notif = new Notification(finalTitle, {
+        body: finalBody ? (finalBody.length > 150 ? finalBody.substring(0, 147) + "..." : finalBody) : undefined,
         icon: icon || "/icon",
         silent: false, // let OS make chime if configured
       });

@@ -137,8 +137,10 @@ export function useChatStream(
             .trim();
           sendSystemNotification({
             category: "responses",
-            title: "NotbookLM: Jawaban Selesai",
-            body: cleanPreview || "AI telah selesai menyusun jawaban Anda."
+            titleKey: "notify.responseCompleteTitle",
+            title: "NotbookLM: Response Ready",
+            body: cleanPreview,
+            bodyKey: "notify.responseCompleteBody",
           });
 
           // Check if response contains an action payload like deleting documents
@@ -195,8 +197,10 @@ export function useChatStream(
           }
           sendSystemNotification({
             category: "responses",
-            title: "NotbookLM: Terjadi Kesalahan",
-            body: data.data || "Gagal memproses permintaan."
+            titleKey: "notify.errorTitle",
+            title: "NotbookLM: An Error Occurred",
+            body: data.data,
+            bodyKey: "notify.errorBody",
           });
         }
       });
@@ -391,8 +395,10 @@ export function useChatStream(
           .trim();
         sendSystemNotification({
           category: "responses",
-          title: "NotbookLM: Edit Selesai",
-          body: cleanPreview || "Pesan telah berhasil diperbarui."
+          titleKey: "notify.editCompleteTitle",
+          title: "NotbookLM: Edit Completed",
+          body: cleanPreview,
+          bodyKey: "notify.editCompleteBody",
         });
 
         const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
@@ -453,8 +459,10 @@ export function useChatStream(
           }
           sendSystemNotification({
             category: "responses",
-            title: "NotbookLM: Terjadi Kesalahan",
-            body: data.data || "Gagal memproses edit pesan."
+            titleKey: "notify.errorTitle",
+            title: "NotbookLM: An Error Occurred",
+            body: data.data,
+            bodyKey: "notify.editErrorBody",
           });
         }
       });
@@ -574,8 +582,10 @@ export function useChatStream(
           .trim();
         sendSystemNotification({
           category: "responses",
-          title: "NotbookLM: Regenerate Selesai",
-          body: cleanPreview || "Jawaban baru telah berhasil di-generate."
+          titleKey: "notify.regenerateCompleteTitle",
+          title: "NotbookLM: Regeneration Ready",
+          body: cleanPreview,
+          bodyKey: "notify.regenerateCompleteBody",
         });
       }
     });

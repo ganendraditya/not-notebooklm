@@ -3,16 +3,23 @@ import { Document } from "@/stores/documentStore";
 import { consumeSSEStream } from "@/lib/sse";
 import { DownloadTask } from "@/components/DownloadManager";
 import { sendSystemNotification } from "@/lib/notifications";
+import { getSystemTranslation } from "@/lib/i18n";
 
 export function useDocumentDownload({
   activeChatId,
   backendUrl,
+  t,
 }: {
   activeChatId: string | null;
   backendUrl: string;
+  t?: (key: string, variables?: Record<string, string>) => string;
 }) {
   const [isBulkDownloading, setIsBulkDownloading] = useState(false);
   const [downloadTask, setDownloadTask] = useState<DownloadTask | null>(null);
+
+  const tr = (key: string, vars?: Record<string, string>, fallback?: string) => {
+    return t ? t(key, vars) : getSystemTranslation(key, vars, fallback);
+  };
 
   const downloadFileText = (content: string, filename: string) => {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
@@ -43,7 +50,7 @@ export function useDocumentDownload({
             current: 0,
             percent: 0,
             currentFile: doc.filename,
-            errorMsg: errJson.detail || "Naskah lengkap PDF tidak tersedia untuk diunduh."
+            errorMsg: errJson.detail || tr("notify.downloadUnavailable", undefined, "Full manuscript PDF is not available for download.")
           });
           return;
         }
@@ -93,7 +100,7 @@ export function useDocumentDownload({
             current: data.current,
             total: data.total,
             percent: data.percent ?? Math.round((data.current / data.total) * 100),
-            currentFile: data.filename || "Memproses file...",
+            currentFile: data.filename || tr("notify.downloadProcessing", undefined, "Processing file..."),
             downloadedCount: data.downloaded_count,
             skippedCount: data.skipped_count,
             totalSizeMb: data.total_size_mb
@@ -111,10 +118,14 @@ export function useDocumentDownload({
             totalSizeMb: data.total_size_mb
           });
 
+          const docCount = String(data.downloaded_count ?? data.total);
           sendSystemNotification({
             category: "downloads",
-            title: "NotbookLM: Unduhan Selesai",
-            body: `Arsip ZIP siap diunduh (${data.downloaded_count ?? data.total} dokumen).`
+            titleKey: "notify.downloadCompleteTitle",
+            title: "NotbookLM: Download Complete",
+            bodyKey: "notify.downloadCompleteBody",
+            variables: { count: docCount },
+            body: `ZIP archive ready for download (${docCount} documents).`
           });
           
           const link = document.createElement("a");
@@ -124,7 +135,7 @@ export function useDocumentDownload({
           link.click();
           document.body.removeChild(link);
         } else if (data.type === "error") {
-          const errorMsg = data.message || data.detail || "Gagal mengompres dokumen.";
+          const errorMsg = data.message || data.detail || tr("notify.downloadFailedBody", undefined, "Failed to compress documents.");
           setDownloadTask({
             status: "error",
             total: docIds.length,
@@ -135,8 +146,10 @@ export function useDocumentDownload({
           });
           sendSystemNotification({
             category: "downloads",
-            title: "NotbookLM: Gagal Mengunduh",
-            body: errorMsg
+            titleKey: "notify.downloadFailedTitle",
+            title: "NotbookLM: Download Failed",
+            body: errorMsg,
+            bodyKey: "notify.downloadFailedBody"
           });
         }
       });
@@ -148,7 +161,7 @@ export function useDocumentDownload({
         current: 0,
         percent: 0,
         currentFile: "",
-        errorMsg: err.message || "Koneksi terputus saat mengunduh."
+        errorMsg: err.message || tr("notify.downloadInterrupted", undefined, "Connection interrupted while downloading.")
       });
     } finally {
       setIsBulkDownloading(false);

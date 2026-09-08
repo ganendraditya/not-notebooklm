@@ -63,7 +63,7 @@ export function useDocumentManager({
   });
 
   // 5. Downloads
-  const download = useDocumentDownload({ activeChatId, backendUrl });
+  const download = useDocumentDownload({ activeChatId, backendUrl, t });
 
   // Merge Pending Sources
   const pendingSources = useMemo(() => {

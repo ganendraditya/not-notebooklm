@@ -51,14 +51,74 @@ type I18nContextType = {
   t: (key: string, variables?: Record<string, string>) => string;
 };
 
+let currentActiveLanguage = 'en';
+
+const getStoredLanguage = (): string | null => {
+  try {
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' && window.localStorage) {
+      return window.localStorage.getItem('system_language');
+    }
+  } catch {}
+  return null;
+};
+
+const setStoredLanguage = (lang: string) => {
+  try {
+    if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('system_language', lang);
+    }
+  } catch {}
+};
+
+export function getResolvedLanguage(): string {
+  const saved = getStoredLanguage() || 'auto';
+  if (saved && saved !== 'auto') return saved;
+  if (typeof navigator !== 'undefined' && navigator.language) {
+    const browserFullLang = navigator.language;
+    const browserLang = browserFullLang.split('-')[0];
+    if (localeLoaders[browserFullLang]) return browserFullLang;
+    if (localeLoaders[browserLang] || browserLang === 'en') return browserLang;
+  }
+  return currentActiveLanguage || 'en';
+}
+
+export function getSystemTranslation(key: string, variables?: Record<string, string>, fallbackText?: string): string {
+  const lang = currentActiveLanguage || getResolvedLanguage();
+  const dict = loadedLocales[lang] || loadedLocales['en'];
+  let text = dict?.[key] || loadedLocales['en']?.[key] || fallbackText || key;
+
+  if (variables) {
+    Object.keys(variables).forEach((vKey) => {
+      text = text.replace(new RegExp(`{${vKey}}`, 'g'), variables[vKey]);
+    });
+  }
+
+  return text;
+}
+
+export function registerLoadedLocale(lang: string, dict: LocaleDict) {
+  loadedLocales[lang] = dict;
+}
+
+export function setGlobalLanguage(lang: string) {
+  currentActiveLanguage = lang;
+}
+
+if (typeof window !== 'undefined') {
+  const initLang = getResolvedLanguage();
+  currentActiveLanguage = initLang;
+  if (initLang !== 'en' && !loadedLocales[initLang] && localeLoaders[initLang]) {
+    localeLoaders[initLang]().then((mod) => {
+      loadedLocales[initLang] = mod.default;
+    }).catch(() => {});
+  }
+}
+
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('system_language') || 'auto';
-    }
-    return 'auto';
+    return getStoredLanguage() || 'auto';
   });
 
   const [activeLanguage, setActiveLanguage] = useState('en');
@@ -67,7 +127,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let resolved = 'en';
     if (language === 'auto') {
-      if (typeof navigator !== 'undefined') {
+      if (typeof navigator !== 'undefined' && navigator.language) {
         const browserFullLang = navigator.language;
         const browserLang = browserFullLang.split('-')[0];
         if (localeLoaders[browserFullLang]) {
@@ -80,6 +140,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       resolved = language;
     }
 
+    currentActiveLanguage = resolved;
     setActiveLanguage(resolved);
 
     if (resolved !== 'en' && !loadedLocales[resolved] && localeLoaders[resolved]) {
@@ -96,22 +157,19 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const setLanguage = (lang: string) => {
     setLanguageState(lang);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('system_language', lang);
+    setStoredLanguage(lang);
+    const resolved = lang === 'auto' ? getResolvedLanguage() : lang;
+    currentActiveLanguage = resolved;
+    if (resolved !== 'en' && !loadedLocales[resolved] && localeLoaders[resolved]) {
+      localeLoaders[resolved]().then((mod) => {
+        loadedLocales[resolved] = mod.default;
+        setLocaleVersion((v) => v + 1);
+      }).catch(() => {});
     }
   };
 
   const t = useCallback((key: string, variables?: Record<string, string>) => {
-    const langDict = loadedLocales[activeLanguage] || loadedLocales['en'];
-    let text = langDict?.[key] || loadedLocales['en']?.[key] || key;
-
-    if (variables) {
-      Object.keys(variables).forEach((vKey) => {
-        text = text.replace(new RegExp(`{${vKey}}`, 'g'), variables[vKey]);
-      });
-    }
-
-    return text;
+    return getSystemTranslation(key, variables);
   }, [activeLanguage, localeVersion]);
 
   return (

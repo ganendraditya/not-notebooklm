@@ -67,8 +67,10 @@ export default function NotificationsTab() {
     }
 
     sendSystemNotification({
-      title: "NotbookLM AI",
-      body: "Notifikasi browser & sistem aktif dan berfungsi dengan baik! ✨",
+      titleKey: "notify.testTitle",
+      title: t("notify.testTitle") || "NotbookLM AI",
+      bodyKey: "notify.testBody",
+      body: t("notify.testBody") || "Browser & system notifications are active and working properly! ✨",
       force: true
     });
 
