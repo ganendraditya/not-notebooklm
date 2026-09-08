@@ -4,7 +4,43 @@ from typing import Optional
 from dotenv import load_dotenv
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore as _BaseQdrantVectorStore
+import qdrant_client
 from qdrant_client import QdrantClient
+
+# Compatibility shim for qdrant-client >= 1.14 where .search was replaced by .query_points
+if not hasattr(QdrantClient, "search"):
+    def _compat_search(self, collection_name, query_vector, query_filter=None, limit=10, with_payload=True, with_vectors=False, score_threshold=None, **kwargs):
+        kwargs.pop("search_params", None)
+        kwargs.pop("offset", None)
+        res = self.query_points(
+            collection_name=collection_name,
+            query=query_vector,
+            query_filter=query_filter,
+            limit=limit,
+            with_payload=with_payload,
+            with_vectors=with_vectors,
+            score_threshold=score_threshold,
+            **kwargs
+        )
+        return res.points
+    QdrantClient.search = _compat_search
+
+if hasattr(qdrant_client, "AsyncQdrantClient") and not hasattr(qdrant_client.AsyncQdrantClient, "search"):
+    async def _compat_asearch(self, collection_name, query_vector, query_filter=None, limit=10, with_payload=True, with_vectors=False, score_threshold=None, **kwargs):
+        kwargs.pop("search_params", None)
+        kwargs.pop("offset", None)
+        res = await self.query_points(
+            collection_name=collection_name,
+            query=query_vector,
+            query_filter=query_filter,
+            limit=limit,
+            with_payload=with_payload,
+            with_vectors=with_vectors,
+            score_threshold=score_threshold,
+            **kwargs
+        )
+        return res.points
+    qdrant_client.AsyncQdrantClient.search = _compat_asearch
 
 
 class QdrantVectorStore(_BaseQdrantVectorStore):
@@ -15,12 +51,25 @@ class QdrantVectorStore(_BaseQdrantVectorStore):
     `__init__` never forwards `path` to `super().__init__()`, so plain
     instantiation raises `ValidationError: path Field required`.
     Redeclaring the fields with defaults fixes validation without
-    changing runtime behavior.
+    changing runtime behavior. Also ensures private `_client` and collection state are preserved.
     """
 
     path: Optional[str] = None
     url: Optional[str] = None
     api_key: Optional[str] = None
+
+    def __init__(self, *args, **kwargs):
+        client = kwargs.get("client")
+        aclient = kwargs.get("aclient")
+        super().__init__(*args, **kwargs)
+        if client is not None:
+            self._client = client
+            try:
+                self._collection_initialized = self._collection_exists(self.collection_name)
+            except Exception:
+                self._collection_initialized = False
+        if aclient is not None:
+            self._aclient = aclient
 
 from llama_index.embeddings.gemini import GeminiEmbedding
 try:
@@ -55,7 +104,7 @@ else:
 
 
 def init_embedding_and_vector_store():
-    """Initializes embeddings (Local BGE or Gemini) and associates with Qdrant."""
+    """Initializes embeddings (Local Multilingual E5 or Gemini) and associates with Qdrant."""
     env_provider = os.getenv("EMBEDDING_PROVIDER", "local").lower()
     gemini_key = os.getenv("GEMINI_API_KEY")
 
@@ -65,13 +114,13 @@ def init_embedding_and_vector_store():
             vstore = QdrantVectorStore(collection_name="not_notebooklm_gemini", client=qdrant_client, enable_hybrid=False, batch_size=20)
             return embed_model, vstore
         except Exception as e:
-            logger.warning(f"[RAG Engine] Gemini Embedding initialization failed ({e}), falling back to local BGE embeddings.")
+            logger.warning(f"[RAG Engine] Gemini Embedding initialization failed ({e}), falling back to local Multilingual E5 embeddings.")
 
-    # Default Local Offline Embeddings
+    # Default Local Offline Embeddings (Multilingual 93+ languages)
     if HuggingFaceEmbedding is not None:
         try:
-            embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
-            vstore = QdrantVectorStore(collection_name="not_notebooklm_bge", client=qdrant_client, enable_hybrid=False, batch_size=20)
+            embed_model = HuggingFaceEmbedding(model_name="intfloat/multilingual-e5-small")
+            vstore = QdrantVectorStore(collection_name="not_notebooklm_e5", client=qdrant_client, enable_hybrid=False, batch_size=20)
             return embed_model, vstore
         except Exception as e:
             logger.warning(f"[RAG Engine] HuggingFace Embedding loading failed: {e}")
@@ -115,7 +164,7 @@ def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
             collections = [c.name for c in collections_response.collections]
         except Exception as e:
             logger.warning(f"[Qdrant] Failed listing collections for deletion: {e}")
-            collections = ["not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
+            collections = ["not_notebooklm_e5", "not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
             
         for coll in collections:
             try:
@@ -127,6 +176,11 @@ def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
 
 # Initialize singletons
 embed_model, vector_store = init_embedding_and_vector_store()
+try:
+    from llama_index.core import Settings
+    Settings.embed_model = embed_model
+except Exception:
+    pass
 
 # Backward-compatibility alias
 delete_qdrant_vectors = delete_document_vectors
@@ -150,7 +204,7 @@ def ingest_documents_batch(doc_items: list) -> bool:
     """Single Source of Truth: Batch ingests multiple (text, filename, chat_id) into Qdrant with section-aware chunks."""
     if not doc_items:
         return True
-    from llama_index.core import Document, VectorStoreIndex
+    from llama_index.core import Document, VectorStoreIndex, StorageContext
     from .parsers import split_markdown_into_academic_sections
 
     docs = []
@@ -178,7 +232,8 @@ def ingest_documents_batch(doc_items: list) -> bool:
             )
             for text, filename, chat_id in doc_items
         ]
-    VectorStoreIndex.from_documents(docs, vector_store=vector_store, show_progress=False)
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    VectorStoreIndex.from_documents(docs, storage_context=storage_context, embed_model=embed_model, show_progress=False)
     return True
 
 

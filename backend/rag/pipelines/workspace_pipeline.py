@@ -114,14 +114,14 @@ async def _retrieve_hybrid_workspace_context(
 
     retrieved_blocks = []
     try:
-        from rag.vector_store import vector_store
+        from rag.vector_store import vector_store, embed_model
         from llama_index.core import VectorStoreIndex
         from llama_index.core.vector_stores.types import MetadataFilter, MetadataFilters, FilterOperator
 
         if report_status:
             await report_status("Searching relevant sections across workspace documents in vector store...")
 
-        index = VectorStoreIndex.from_vector_store(vector_store)
+        index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model)
         filters = MetadataFilters(
             filters=[MetadataFilter(key="chat_id", operator=FilterOperator.EQ, value=chat_id)]
         )

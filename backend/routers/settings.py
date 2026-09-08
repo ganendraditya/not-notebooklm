@@ -45,7 +45,7 @@ def factory_reset_storage(payload: dict, db: Session = Depends(get_db)):
                     pass
 
     # 3. Purge Qdrant collections
-    fallback_colls = ["not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
+    fallback_colls = ["not_notebooklm_e5", "not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
     try:
         remote_colls = [c.name for c in rag.qdrant_client.get_collections().collections]
         colls = list(set(remote_colls + fallback_colls))
