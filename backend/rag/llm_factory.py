@@ -5,8 +5,6 @@ import logging
 from typing import Optional, List, Callable, Any
 from dotenv import load_dotenv
 
-from llama_index.llms.gemini import Gemini
-from llama_index.llms.groq import Groq
 from llama_index.llms.openai_like import OpenAILike
 
 load_dotenv()
@@ -20,58 +18,32 @@ _CACHED_CONFIG_HASH = None
 def _get_env_config_signature():
     """Generates a snapshot of active LLM environment variables to detect config changes."""
     return (
-        os.getenv("LLM_PROVIDER", ""),
         os.getenv("LLM_BASE_URL", ""),
         os.getenv("LLM_API_KEY", ""),
         os.getenv("LLM_MODEL", ""),
         os.getenv("LLM_FAST_MODEL", ""),
         os.getenv("LLM_FALLBACK_MODEL", ""),
-        os.getenv("OPENAI_BASE_URL", ""),
-        os.getenv("OPENAI_API_KEY", ""),
-        os.getenv("OPENAI_MODEL", ""),
-        os.getenv("NINEROUTER_BASE_URL", ""),
-        os.getenv("NINEROUTER_API_KEY", ""),
-        os.getenv("NINEROUTER_MODEL", ""),
-        os.getenv("NINEROUTER_FAST_MODEL", ""),
-        os.getenv("GEMINI_API_KEY", ""),
-        os.getenv("GEMINI_MODEL", ""),
-        os.getenv("GROQ_API_KEY", ""),
     )
 
 
 def _get_gateway_credentials():
     """
-    Resolves universal OpenAI-compatible gateway credentials.
-    Supports LLM_*, OPENAI_*, and legacy NINEROUTER_* environment variable aliases.
+    Resolves OpenAI-compatible LLM gateway credentials.
+    Standardized vendor-neutral variables:
+    - LLM_BASE_URL: OpenAI-compatible API endpoint URL
+    - LLM_API_KEY: Secret API key / bearer token
+    - LLM_MODEL: Primary model for heavy reasoning & document synthesis
+    - LLM_FAST_MODEL: (Optional) Lightweight model for rapid micro-tasks (defaults to LLM_MODEL)
+    - LLM_FALLBACK_MODEL: (Optional) Safety fallback model if primary fails
     """
-    api_key = (
-        os.getenv("LLM_API_KEY", "").strip()
-        or os.getenv("OPENAI_API_KEY", "").strip()
-        or os.getenv("NINEROUTER_API_KEY", "").strip()
-    )
-    base_url = (
-        os.getenv("LLM_BASE_URL", "").strip()
-        or os.getenv("OPENAI_BASE_URL", "").strip()
-        or os.getenv("NINEROUTER_BASE_URL", "").strip()
-        or "http://localhost:20128/v1"
-    )
-    model = (
-        os.getenv("LLM_MODEL", "").strip()
-        or os.getenv("OPENAI_MODEL", "").strip()
-        or os.getenv("NINEROUTER_MODEL", "").strip()
-        or "gpt-4o"
-    )
-    fast_model = (
-        os.getenv("LLM_FAST_MODEL", "").strip()
-        or os.getenv("OPENAI_FAST_MODEL", "").strip()
-        or os.getenv("NINEROUTER_FAST_MODEL", "").strip()
-        or "gpt-4o-mini"
-    )
-    fallback_model = (
-        os.getenv("LLM_FALLBACK_MODEL", "").strip()
-        or os.getenv("OPENAI_FALLBACK_MODEL", "").strip()
-        or os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
-    )
+    api_key = os.getenv("LLM_API_KEY", "").strip()
+    base_url = os.getenv("LLM_BASE_URL", "http://localhost:20128/v1").strip() or "http://localhost:20128/v1"
+    model = os.getenv("LLM_MODEL", "gpt-4o").strip() or "gpt-4o"
+
+    # If fast_model is not explicitly set, gracefully default to main model (supports 1-model setups)
+    fast_model = os.getenv("LLM_FAST_MODEL", "").strip() or model
+    fallback_model = os.getenv("LLM_FALLBACK_MODEL", "").strip()
+
     has_gateway = bool(api_key and not api_key.startswith("your_") and api_key != "dummy_key")
     return base_url, api_key, model, fast_model, fallback_model, has_gateway
 
@@ -87,41 +59,17 @@ def clear_llm_cache():
 def get_main_llm(force_refresh: bool = False):
     """
     Returns the Primary / Heavy LLM.
-    Priority:
-    1. If LLM_PROVIDER is 'gemini' or Gateway not configured: Direct Gemini.
-    2. Universal OpenAI-Compatible Gateway (OpenAI, OpenRouter, Ollama, vLLM, LMStudio, etc.).
-    3. Direct Gemini Fallback.
-    4. Direct Groq Fallback.
+    Powers reasoning-heavy tasks: multi-document synthesis, literature review, grounded citations.
     """
     global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
     current_sig = _get_env_config_signature()
     if not force_refresh and _CACHED_MAIN_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_MAIN_LLM
 
-    provider = os.getenv("LLM_PROVIDER", "").lower()
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    has_gemini = bool(gemini_key and not gemini_key.startswith("your_"))
-
     base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
 
-    groq_key = os.getenv("GROQ_API_KEY")
-    has_groq = bool(groq_key and not groq_key.startswith("your_"))
-
     _CACHED_MAIN_LLM = None
-
-    # Priority 1: Gemini if explicitly selected or if gateway not configured
-    if (provider == "gemini" or not has_gateway) and has_gemini:
-        try:
-            _CACHED_MAIN_LLM = Gemini(
-                model=os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash"),
-                api_key=gemini_key,
-                max_tokens=8192
-            )
-        except Exception as e:
-            logger.warning(f"[LLM Factory] Gemini init failed: {e}")
-
-    # Priority 2: Universal Gateway (OpenAI-compatible)
-    if _CACHED_MAIN_LLM is None and has_gateway:
+    if has_gateway:
         try:
             _CACHED_MAIN_LLM = OpenAILike(
                 api_base=base_url,
@@ -133,29 +81,7 @@ def get_main_llm(force_refresh: bool = False):
                 timeout=120.0
             )
         except Exception as e:
-            logger.warning(f"[LLM Factory] Universal Gateway init failed: {e}")
-
-    # Priority 3: Groq fallback
-    if _CACHED_MAIN_LLM is None and has_groq:
-        try:
-            _CACHED_MAIN_LLM = Groq(
-                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-                api_key=groq_key,
-                max_tokens=8192
-            )
-        except Exception as e:
-            logger.warning(f"[LLM Factory] Groq init failed: {e}")
-
-    # Final fallback if provider was not gemini but gemini is available
-    if _CACHED_MAIN_LLM is None and has_gemini:
-        try:
-            _CACHED_MAIN_LLM = Gemini(
-                model=os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash"),
-                api_key=gemini_key,
-                max_tokens=8192
-            )
-        except Exception as e:
-            logger.warning(f"[LLM Factory] Final Gemini fallback failed: {e}")
+            logger.warning(f"[LLM Factory] Failed to initialize Primary LLM ({model}): {e}")
 
     _CACHED_CONFIG_HASH = current_sig
     return _CACHED_MAIN_LLM
@@ -164,35 +90,24 @@ def get_main_llm(force_refresh: bool = False):
 def get_fast_llm(force_refresh: bool = False):
     """
     Returns the Fast / Lite LLM.
-    Used for rapid micro-tasks: intent classification, query planning, paper judging, title generation, and rubric checks.
+    Powers rapid micro-tasks: intent triage, query planning, paper relevance judging, auto title generation.
+    If LLM_FAST_MODEL is identical to LLM_MODEL or not configured, reuses the Primary LLM instance.
     """
     global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
     current_sig = _get_env_config_signature()
     if not force_refresh and _CACHED_FAST_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_FAST_LLM
 
-    provider = os.getenv("LLM_PROVIDER", "").lower()
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    has_gemini = bool(gemini_key and not gemini_key.startswith("your_"))
-
     base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
 
-    groq_key = os.getenv("GROQ_API_KEY")
-    has_groq = bool(groq_key and not groq_key.startswith("your_"))
+    # Re-use main instance directly if models are identical
+    if fast_model == model:
+        _CACHED_FAST_LLM = get_main_llm(force_refresh=force_refresh)
+        _CACHED_CONFIG_HASH = current_sig
+        return _CACHED_FAST_LLM
 
     _CACHED_FAST_LLM = None
-
-    if (provider == "gemini" or not has_gateway) and has_gemini:
-        try:
-            _CACHED_FAST_LLM = Gemini(
-                model=os.getenv("GEMINI_FAST_MODEL", "models/gemini-3.5-flash-lite"),
-                api_key=gemini_key,
-                max_tokens=4096
-            )
-        except Exception as e:
-            logger.warning(f"[LLM Factory] Fast Gemini init failed: {e}")
-
-    if _CACHED_FAST_LLM is None and has_gateway:
+    if has_gateway:
         try:
             _CACHED_FAST_LLM = OpenAILike(
                 api_base=base_url,
@@ -204,17 +119,7 @@ def get_fast_llm(force_refresh: bool = False):
                 timeout=45.0
             )
         except Exception as e:
-            logger.warning(f"[LLM Factory] Fast Universal Gateway init failed: {e}")
-
-    if _CACHED_FAST_LLM is None and has_groq:
-        try:
-            _CACHED_FAST_LLM = Groq(
-                model=os.getenv("GROQ_FAST_MODEL", "llama-3.1-8b-instant"),
-                api_key=groq_key,
-                max_tokens=4096
-            )
-        except Exception as e:
-            logger.warning(f"[LLM Factory] Fast Groq init failed: {e}")
+            logger.warning(f"[LLM Factory] Failed to initialize Fast LLM ({fast_model}): {e}")
 
     if _CACHED_FAST_LLM is None:
         _CACHED_FAST_LLM = get_main_llm(force_refresh=force_refresh)
@@ -235,7 +140,12 @@ def create_llm_instances(force_refresh: bool = False):
 
 
 def get_candidate_llm_chain():
-    """Builds prioritized list of candidate LLMs (Main Synthesizer with cascading fallback)."""
+    """
+    Builds prioritized list of candidate LLMs:
+    1. Primary LLM (LLM_MODEL)
+    2. Fallback LLM (LLM_FALLBACK_MODEL, if configured and distinct)
+    3. Fast LLM (LLM_FAST_MODEL, if distinct from Primary)
+    """
     candidate_llms = []
     seen = set()
 
@@ -251,9 +161,8 @@ def get_candidate_llm_chain():
         label = getattr(main_instance, "model", "default")
         add_candidate(main_instance, f"Primary Synthesizer ({label})")
 
-    # Universal Gateway Fallback Candidate
     base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
-    if has_gateway and fallback_model:
+    if has_gateway and fallback_model and fallback_model != model:
         try:
             fb_inst = OpenAILike(
                 api_base=base_url,
@@ -264,32 +173,13 @@ def get_candidate_llm_chain():
                 max_tokens=8192,
                 timeout=120.0
             )
-            add_candidate(fb_inst, f"Gateway Fallback ({fallback_model})")
+            add_candidate(fb_inst, f"Fallback Model ({fallback_model})")
         except Exception as e:
-            logger.debug(f"[LLM Factory] Gateway Fallback init error: {e}")
+            logger.debug(f"[LLM Factory] Fallback model init error: {e}")
 
     if fast_instance and fast_instance != main_instance:
         label = getattr(fast_instance, "model", "default")
         add_candidate(fast_instance, f"Fast Lite ({label})")
-
-    # Direct Gemini fallback
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key and not gemini_key.startswith("your_"):
-        try:
-            gemini_model = os.getenv("GEMINI_MODEL", "models/gemini-3.7-flash")
-            g_inst = Gemini(model=gemini_model, api_key=gemini_key, max_tokens=8192)
-            add_candidate(g_inst, f"Direct Gemini Fallback ({gemini_model})")
-        except Exception as e:
-            logger.debug(f"[LLM Factory] Gemini Fallback init error: {e}")
-
-    # Direct Groq fallback
-    groq_key = os.getenv("GROQ_API_KEY")
-    if groq_key and not groq_key.startswith("your_"):
-        try:
-            gq_inst = Groq(model="llama-3.3-70b-versatile", api_key=groq_key)
-            add_candidate(gq_inst, "Direct Groq Fallback")
-        except Exception as e:
-            logger.debug(f"[LLM Factory] Groq Fallback init error: {e}")
 
     return candidate_llms
 

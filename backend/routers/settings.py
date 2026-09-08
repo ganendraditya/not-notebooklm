@@ -68,8 +68,8 @@ def get_llm_models():
     main_instance = get_main_llm()
     fast_instance = get_fast_llm()
     
-    main_model = getattr(main_instance, "model", None) or os.getenv("LLM_MODEL") or os.getenv("OPENAI_MODEL") or "default"
-    fast_model = getattr(fast_instance, "model", None) or os.getenv("LLM_FAST_MODEL") or os.getenv("OPENAI_FAST_MODEL") or "default"
+    main_model = getattr(main_instance, "model", None) or os.getenv("LLM_MODEL", "gpt-4o")
+    fast_model = getattr(fast_instance, "model", None) or os.getenv("LLM_FAST_MODEL", main_model)
     
     return {
         "status": "success",
