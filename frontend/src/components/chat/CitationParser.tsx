@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Document as DocType } from "@/stores/documentStore";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export interface CitationContext {
   sentence: string;
@@ -139,7 +140,7 @@ export function parseCitationsInReactNode(
           : "ctx";
 
         parts.push(
-          <span key={`cite-grp-${elementPrefix}-${matchIndex}-${sentenceSnippet}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline">
+          <span key={`cite-grp-${elementPrefix}-${matchIndex}-${sentenceSnippet}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline not-italic font-normal">
             {nums.map((num, i) => {
               const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
               const docTitle = doc?.title || doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
@@ -148,32 +149,52 @@ export function parseCitationsInReactNode(
               // Key includes elementPrefix, sentenceSnippet, num, matchIndex & i to ensure ONLY the clicked citation turns amber/active
               const citeUniqueKey = `cite-${elementPrefix}-${sentenceSnippet}-${num}-${matchIndex}-${i}`;
               const isSelected = Boolean(activeCitationKey && activeCitationKey === citeUniqueKey);
+
+              const tooltipContent = (
+                <div className="flex flex-col gap-1 text-left max-w-[280px] not-italic select-none">
+                  <div className="text-[11.5px] font-semibold text-white leading-snug line-clamp-2">
+                    <span className="text-blue-400 font-mono font-bold mr-1 inline-block">[{num}]</span>
+                    <span>{docTitle}</span>
+                  </div>
+                  <div className="text-[10px] text-neutral-400 font-normal leading-tight">
+                    Click to view source and highlight AI-verified evidence
+                  </div>
+                </div>
+              );
+
               return (
-                <button
+                <Tooltip
                   key={citeUniqueKey}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (doc && onOpenDocument) {
-                      onOpenDocument(doc, {
-                        sentence: contextSentence,
-                        num: num,
-                        citationKey: citeUniqueKey,
-                        aiQuotes: aiQuotesForDoc
-                      });
-                    }
-                  }}
-                  className={`inline-flex items-center justify-center min-w-6 px-1 h-5 text-[10px] font-mono font-bold rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-text shadow-sm ${
-                    isSelected
-                      ? "bg-amber-400 text-black border border-amber-300 font-extrabold shadow-amber-400/20"
-                      : "text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70"
-                  }`}
-                  title={`[${num}] ${docTitle}\nClick to view source and highlight AI-verified evidence`}
+                  content={tooltipContent}
+                  side="top"
+                  sideOffset={6}
+                  className="p-2 whitespace-normal"
                 >
-                  <span className="sr-only">[</span>
-                  <span>{num}</span>
-                  <span className="sr-only">]</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (doc && onOpenDocument) {
+                        onOpenDocument(doc, {
+                          sentence: contextSentence,
+                          num: num,
+                          citationKey: citeUniqueKey,
+                          aiQuotes: aiQuotesForDoc
+                        });
+                      }
+                    }}
+                    className={`inline-flex items-center justify-center min-w-6 px-1 h-5 text-[10px] font-mono font-bold not-italic normal-case tracking-normal rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-none shadow-sm ${
+                      isSelected
+                        ? "bg-amber-400 text-black border border-amber-300 font-extrabold shadow-amber-400/20"
+                        : "text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70"
+                    }`}
+                    aria-label={`Source [${num}]: ${docTitle}`}
+                  >
+                    <span className="sr-only">[</span>
+                    <span className="not-italic inline-block leading-none">{num}</span>
+                    <span className="sr-only">]</span>
+                  </button>
+                </Tooltip>
               );
             })}
           </span>

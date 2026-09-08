@@ -120,4 +120,24 @@ describe("CitationParser", () => {
     expect(container.textContent).not.toContain("[1] ]");
     expect(container.textContent).toBe("Penerapan IndoBERT: [8], [10], & [1]. Di bab kesimpulan, [1] merekomendasikan.");
   });
+
+  it("enforces fixed un-slanted typography with not-italic and eliminates native title attribute", () => {
+    const docs = [{ id: 5, index: 5, filename: "Paper5.pdf", title: "Paper 5 Naive Bayes", created_at: "2026-01-01T00:00:00Z" }];
+    const text = "Data preparation meliputi [5] tokenize";
+    const result = parseCitationsInReactNode(text, docs);
+
+    const { container } = render(<div>{result}</div>);
+    const btn = container.querySelector("button")!;
+    expect(btn).toBeTruthy();
+
+    // Must have not-italic to prevent inheriting italic style from blockquotes/markdown
+    expect(btn.className).toContain("not-italic");
+    expect(btn.className).toContain("normal-case");
+
+    // Must NOT have native title attribute (which causes ugly OS browser tooltips)
+    expect(btn.getAttribute("title")).toBeNull();
+
+    // Must have accessible aria-label
+    expect(btn.getAttribute("aria-label")).toContain("Source [5]");
+  });
 });
