@@ -2,6 +2,7 @@ import requests
 import html
 import re
 from typing import List, Optional
+from utils.text_processing import reconstruct_inverted_index
 
 def fetch_openalex(
     term: str, 
@@ -73,15 +74,8 @@ def fetch_openalex(
                         aname = (auth.get("author") or {}).get("display_name")
                         if aname: authors.append(aname.strip())
                             
-                    abstract = ""
                     ab_idx = work.get("abstract_inverted_index")
-                    if ab_idx:
-                        word_index = []
-                        for word, positions in ab_idx.items():
-                            for pos in positions:
-                                word_index.append((pos, word))
-                        word_index.sort(key=lambda x: x[0])
-                        abstract = " ".join([w[1] for w in word_index])
+                    abstract = reconstruct_inverted_index(ab_idx)
                     
                     snippet = abstract if abstract else f"Scholarly research published in {venue} ({year})."
                     if not is_matching_topic_fn(title, snippet): continue

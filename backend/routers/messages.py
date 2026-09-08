@@ -6,17 +6,13 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from database import get_db, ChatSession, ChatMessage, commit_with_retry
+from database import get_db, ChatSession, ChatMessage, commit_with_retry, get_utc_now
 from utils.streaming import create_sse_stream_response, SSEStreamEmitter
 import models
 import rag
 
 router = APIRouter(tags=["messages"])
 logger = logging.getLogger("uvicorn.error")
-
-
-def get_utc_now():
-    return datetime.now(timezone.utc)
 
 
 def extract_chat_history_from_db_messages(messages: List[ChatMessage]) -> List[dict]:

@@ -7,16 +7,12 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 
-from database import get_db, ChatSession, ChatMessage, commit_with_retry
+from database import get_db, ChatSession, ChatMessage, commit_with_retry, get_utc_now
 from helpers import UPLOAD_DIR
 import models
 
 router = APIRouter(tags=["chats"])
 logger = logging.getLogger("uvicorn.error")
-
-
-def get_utc_now():
-    return datetime.now(timezone.utc)
 
 
 def format_chat_message_responses(messages: List[ChatMessage]) -> List[models.ChatMessageResponse]:

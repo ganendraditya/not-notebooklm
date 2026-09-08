@@ -12,7 +12,8 @@ from utils.text_processing import (
     is_valid_abstract_content,
     extract_abstract_from_html,
     is_title_match,
-    is_ai_synthesized_overview
+    is_ai_synthesized_overview,
+    reconstruct_inverted_index
 )
 from services.search.llm_evaluator_service import audit_paper_metadata_with_ai
 import journal_indexer
@@ -76,47 +77,28 @@ def resolve_paper_metadata_by_doi(
     if fast_only:
         t_low = (title_fallback or "").lower()
         d_low = clean_doi.lower()
-        metric = "Peer-Reviewed"
-        journal_name = title_fallback
-
-        if "10.1109/access" in d_low or "ieee access" in t_low:
-            metric = "Scopus Q2 (SJR)"
-            journal_name = "IEEE Access"
-        elif any(c in t_low or c in d_low for c in ["proceedings", "conference", "symposium", "workshop", "10.1609/aaai", "10.1109/ic", "10.1145"]):
-            metric = "Conference Proceedings (Indexed)"
+        
+        venue_type = "journal"
+        if any(c in t_low or c in d_low for c in ["proceedings", "conference", "symposium", "workshop"]):
+            venue_type = "conference"
         elif any(p in t_low or p in d_low for p in ["sportrxiv", "arxiv", "biorxiv", "medrxiv", "ssrn", "osf", "preprint"]):
-            metric = "Preprint (Non-Peer-Reviewed)"
-        elif any(s in t_low or s in d_low for s in ["sinta", "indonesia", "edumatic", "multilateral"]):
-            metric = "SINTA Accredited"
-        elif "procs" in d_low or "procedia" in t_low:
-            metric = "Scopus Q2 (SJR)"
-            journal_name = "Procedia Computer Science"
-        elif "10.1007/s10994" in d_low or "machine learning (springer)" in t_low:
-            metric = "Scopus Q1 (SJR)"
-            journal_name = "Machine Learning (Springer)"
-        elif "10.1249/mss" in d_low:
-            metric = "Scopus Q1 (SJR)"
-            journal_name = "Medicine & Science in Sports & Exercise"
-        elif "10.1016/j.aci" in d_low:
-            metric = "Scopus Q1 (SJR)"
-            journal_name = "Applied Computing and Informatics"
-        elif "10.1177/17479541" in d_low:
-            metric = "Scopus Q2 (SJR)"
-            journal_name = "International Journal of Sports Science & Coaching"
-        elif "10.1186/s40634" in d_low:
-            metric = "Scopus Q2 (SJR)"
-            journal_name = "Journal of Experimental Orthopaedics"
-        elif any(k in d_low for k in ["10.1016", "10.1007", "10.1038", "10.1111"]):
-            metric = "Scopus Indexed Journal"
+            venue_type = "preprint"
+
+        idx_info = journal_indexer.lookup_journal_index(
+            journal_title=title_fallback,
+            venue_type=venue_type
+        )
+        metric = idx_info.get("journal_metric") or "Peer-Reviewed"
+        quality_tier = idx_info.get("quality_tier", 4)
 
         fast_result = {
             "title": title_fallback,
             "authors": [],
             "publication_date": "",
             "year": "",
-            "journal": journal_name,
+            "journal": title_fallback or "Peer-reviewed Publication",
             "journal_metric": metric,
-            "quality_tier": 1 if "q1" in metric.lower() else (2 if "q2" in metric.lower() else 3),
+            "quality_tier": quality_tier,
             "citations": 0,
             "doi": clean_doi,
             "url": f"https://doi.org/{clean_doi}" if clean_doi else "",
@@ -179,11 +161,7 @@ def resolve_paper_metadata_by_doi(
                         
                     idx = data.get("abstract_inverted_index")
                     if idx:
-                        pos = []
-                        for w, p in idx.items():
-                            for x in p: pos.append((x, w))
-                        pos.sort()
-                        cand_abs = clean_academic_abstract(" ".join([w[1] for w in pos]).strip())
+                        cand_abs = clean_academic_abstract(reconstruct_inverted_index(idx))
                         if is_valid_abstract_content(cand_abs):
                             abstract = cand_abs
                             abstract_type = "official"
@@ -216,11 +194,7 @@ def resolve_paper_metadata_by_doi(
                             
                         idx = w.get("abstract_inverted_index")
                         if idx and not abstract:
-                            pos = []
-                            for k, v in idx.items():
-                                for p in v: pos.append((p, k))
-                            pos.sort()
-                            cand_abs = clean_academic_abstract(" ".join([x[1] for x in pos]).strip())
+                            cand_abs = clean_academic_abstract(reconstruct_inverted_index(idx))
                             if is_valid_abstract_content(cand_abs):
                                 abstract = cand_abs
                                 abstract_type = "official"

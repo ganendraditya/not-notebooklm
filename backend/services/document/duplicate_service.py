@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from database import Document
 from utils.file_utils import get_doc_file_path
 from utils.pdf_utils import is_binary_pdf
-from utils.text_processing import clean_doi
+from utils.text_processing import clean_doi, is_matching_academic_paper
 import rag
 
 logger = logging.getLogger("uvicorn.error")
@@ -70,33 +70,13 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
             except Exception as e:
                 logger.error(f"[CleanDuplicates] Failed to read {fp}: {e}")
 
-        norm_title = rag.normalize_title_str(full_title)
-        tokens = set(norm_title.split())
-
         matched_group_idx = None
         for g_idx, grp in enumerate(groups):
             for member in grp:
-                m_fp = get_doc_file_path(chat_id, member.filename)
                 m_title = (member.title or member.filename).replace(".pdf", "").replace(".docx", "").replace(".txt", "").replace(".md", "").strip()
-                m_doi = clean_doi(member.doi).lower() if member.doi else ""
-                m_norm = rag.normalize_title_str(m_title)
-                m_tokens = set(m_norm.split())
-
-                if extracted_doi and m_doi and extracted_doi == m_doi:
+                if is_matching_academic_paper(full_title, extracted_doi, m_title, member.doi):
                     matched_group_idx = g_idx
                     break
-                if norm_title and m_norm:
-                    if norm_title == m_norm:
-                        matched_group_idx = g_idx
-                        break
-                    if len(m_norm) >= 20 and (norm_title.startswith(m_norm) or m_norm.startswith(norm_title)):
-                        matched_group_idx = g_idx
-                        break
-                    intersection = tokens.intersection(m_tokens)
-                    overlap = len(intersection) / min(len(tokens), len(m_tokens)) if min(len(tokens), len(m_tokens)) > 0 else 0
-                    if overlap >= 0.75 and len(intersection) >= 3:
-                        matched_group_idx = g_idx
-                        break
             if matched_group_idx is not None:
                 break
 

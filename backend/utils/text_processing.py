@@ -166,3 +166,53 @@ def clean_doi(raw_doi: Optional[str]) -> str:
     doi = re.sub(r'[;.,:)\s]+$', '', doi).strip()
     return doi
 
+def reconstruct_inverted_index(inverted_index: Optional[dict]) -> str:
+    """Reconstructs linear textual abstract from OpenAlex abstract_inverted_index format."""
+    if not inverted_index or not isinstance(inverted_index, dict):
+        return ""
+    pos_words = []
+    for word, positions in inverted_index.items():
+        if isinstance(positions, list):
+            for pos in positions:
+                pos_words.append((pos, word))
+    pos_words.sort(key=lambda x: x[0])
+    return " ".join(w[1] for w in pos_words).strip()
+
+def is_matching_academic_paper(
+    title1: str,
+    doi1: Optional[str],
+    title2: str,
+    doi2: Optional[str]
+) -> bool:
+    """
+    Checks if two papers are duplicates via:
+    1. Exact DOI match
+    2. Normalized title equality
+    3. Prefix substring match (minimum 20 chars)
+    4. Token Jaccard / Overlap similarity (>= 0.75 overlap and >= 3 common tokens)
+    """
+    c_doi1 = clean_doi(doi1).lower() if doi1 else ""
+    c_doi2 = clean_doi(doi2).lower() if doi2 else ""
+    if c_doi1 and c_doi2 and c_doi1 == c_doi2:
+        return True
+
+    norm1 = normalize_title_str(title1)
+    norm2 = normalize_title_str(title2)
+    if not norm1 or not norm2:
+        return False
+    if norm1 == norm2:
+        return True
+    if len(norm1) >= 20 and len(norm2) >= 20 and (norm1.startswith(norm2) or norm2.startswith(norm1)):
+        return True
+
+    tokens1 = set(norm1.split())
+    tokens2 = set(norm2.split())
+    intersection = tokens1.intersection(tokens2)
+    min_len = min(len(tokens1), len(tokens2))
+    if min_len > 0 and (len(intersection) / min_len) >= 0.75 and len(intersection) >= 3:
+        return True
+
+    return False
+
+
+

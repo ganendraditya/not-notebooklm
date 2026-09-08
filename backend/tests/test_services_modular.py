@@ -233,9 +233,9 @@ def test_storage_summary_consistency():
     assert "category_counts" in summary
     assert summary["uploads_bytes"] == sum(summary["categories"].values())
 
-@pytest.mark.asyncio
-async def test_clean_chat_duplicates_normalizes_doi_formats():
+def test_clean_chat_duplicates_normalizes_doi_formats():
     """Verify duplicate detection correctly equates different DOI URI schemes."""
+    import asyncio
     from services.document.duplicate_service import clean_chat_duplicates
     import uuid
 
@@ -264,7 +264,7 @@ async def test_clean_chat_duplicates_normalizes_doi_formats():
         db.add_all([d1, d2])
         db.commit()
 
-        result = await clean_chat_duplicates(chat_id, db)
+        result = asyncio.run(clean_chat_duplicates(chat_id, db))
         assert result["status"] == "success"
         assert result["cleaned_count"] == 1
         assert result["remaining_count"] == 1
