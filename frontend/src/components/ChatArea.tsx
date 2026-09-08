@@ -26,6 +26,7 @@ import { UserMessageBubble } from "./chat/UserMessageBubble";
 import { ChatInputBox, Attachment } from "./chat/ChatInput";
 import { CitationContext } from "./chat/CitationParser";
 import { useTranslation } from "@/lib/i18n";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface ChatAreaProps {
   activeChatId: string | null;
@@ -320,14 +321,16 @@ export default function ChatArea({
         {/* Left: Open Sidebar Button */}
         <div className="flex items-center gap-2 pointer-events-auto">
           {!isSidebarOpen && onOpenSidebar && (
-            <button 
-              type="button"
-              onClick={onOpenSidebar}
-              className="h-8 w-8 text-app-text-muted hover:text-app-text bg-app-card hover:bg-app-card-hover border border-app-border rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
-              title={t('chat.openSidebar')}
-            >
-              <Sparkles size={16} />
-            </button>
+            <Tooltip content={t('chat.openSidebar')} side="bottom">
+              <button 
+                type="button"
+                onClick={onOpenSidebar}
+                className="h-8 w-8 text-app-text-muted hover:text-app-text bg-app-card hover:bg-app-card-hover border border-app-border rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
+                aria-label={t('chat.openSidebar')}
+              >
+                <Sparkles size={16} />
+              </button>
+            </Tooltip>
           )}
         </div>
 
@@ -336,14 +339,16 @@ export default function ChatArea({
           {/* Three Dots Context Menu (Only when chat is not empty & activeChatId exists) */}
           {!isChatEmpty && activeChatId && (
             <div className="relative" ref={topMenuRef}>
-              <button
-                type="button"
-                onClick={() => setIsTopMenuOpen(prev => !prev)}
-                className="h-8 w-8 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
-                title={t('left.options')}
-              >
-                <MoreHorizontal size={16} />
-              </button>
+              <Tooltip content={t('left.options')} side="bottom">
+                <button
+                  type="button"
+                  onClick={() => setIsTopMenuOpen(prev => !prev)}
+                  className="h-8 w-8 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+                  aria-label={t('left.options')}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+              </Tooltip>
 
               {/* Dropdown Menu */}
               {isTopMenuOpen && (
@@ -405,19 +410,21 @@ export default function ChatArea({
 
           {/* Open Sources Toggle (when right sidebar is closed) */}
           {!isRightSidebarOpen && onToggleRightSidebar && (
-            <button 
-              type="button"
-              onClick={onToggleRightSidebar}
-              className="relative h-8 w-8 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
-              title={t('chat.openSources') || "Open sources"}
-            >
-              <FileText size={15} className="text-blue-500" />
-              {documents.length > 0 && (
-                <span className="absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-app-card leading-none shadow">
-                  {documents.length}
-                </span>
-              )}
-            </button>
+            <Tooltip content={t('chat.openSources') || "Open sources"} side="bottom">
+              <button 
+                type="button"
+                onClick={onToggleRightSidebar}
+                className="relative h-8 w-8 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+                aria-label={t('chat.openSources') || "Open sources"}
+              >
+                <FileText size={15} className="text-blue-500" />
+                {documents.length > 0 && (
+                  <span className="absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-app-card leading-none shadow">
+                    {documents.length}
+                  </span>
+                )}
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>
@@ -540,23 +547,27 @@ export default function ChatArea({
                               <UserMessageBubble content={msg.content} maxCollapsedHeight={180} />
                             )}
                             <div className="flex items-center gap-1 mt-1 mr-0.5">
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(msg.content || "", idx)}
-                                className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
-                                title={t('chat.editMessage')}
-                              >
-                                <Pencil size={15} />
-                              </button>
-                              {msg.content?.trim() && (
+                              <Tooltip content={t('chat.editMessage')} side="top">
                                 <button
                                   type="button"
-                                  onClick={() => handleCopy(msg.content, idx)}
+                                  onClick={() => handleStartEdit(msg.content || "", idx)}
                                   className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
-                                  title={t('chat.copyPrompt')}
+                                  aria-label={t('chat.editMessage')}
                                 >
-                                  {copiedMessageIdx === idx ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
+                                  <Pencil size={15} />
                                 </button>
+                              </Tooltip>
+                              {msg.content?.trim() && (
+                                <Tooltip content={copiedMessageIdx === idx ? "Copied!" : t('chat.copyPrompt')} side="top">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(msg.content, idx)}
+                                    className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
+                                    aria-label={t('chat.copyPrompt')}
+                                  >
+                                    {copiedMessageIdx === idx ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
+                                  </button>
+                                </Tooltip>
                               )}
                             </div>
                           </>
@@ -590,57 +601,65 @@ export default function ChatArea({
                             {/* Pagination for response variants (e.g. 1/2, 2/2) */}
                             {msg.variants && msg.variants.length > 1 && (
                               <div className="flex items-center gap-0.5 text-xs text-gray-400 font-mono select-none bg-white/5 px-2 py-0.5 rounded-lg border border-white/5 mr-1">
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) - 1)}
-                                  disabled={(msg.active_variant_index || 0) <= 0 || isLoading}
-                                  className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                                  title={t('chat.previousResponse')}
-                                >
-                                  <ChevronLeft size={14} />
-                                </button>
+                                <Tooltip content={t('chat.previousResponse')} side="top">
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) - 1)}
+                                    disabled={(msg.active_variant_index || 0) <= 0 || isLoading}
+                                    className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                    aria-label={t('chat.previousResponse')}
+                                  >
+                                    <ChevronLeft size={14} />
+                                  </button>
+                                </Tooltip>
                                 <span className="px-1 text-app-text text-xs">
                                   {(msg.active_variant_index || 0) + 1}/{msg.variants.length}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) + 1)}
-                                  disabled={(msg.active_variant_index || 0) >= msg.variants.length - 1 || isLoading}
-                                  className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
-                                  title={t('chat.nextResponse')}
-                                >
-                                  <ChevronRight size={14} />
-                                </button>
+                                <Tooltip content={t('chat.nextResponse')} side="top">
+                                  <button
+                                    type="button"
+                                    onClick={() => onSelectVariant?.(idx, (msg.active_variant_index || 0) + 1)}
+                                    disabled={(msg.active_variant_index || 0) >= msg.variants.length - 1 || isLoading}
+                                    className="p-0.5 hover:text-app-text disabled:opacity-25 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                                    aria-label={t('chat.nextResponse')}
+                                  >
+                                    <ChevronRight size={14} />
+                                  </button>
+                                </Tooltip>
                               </div>
                             )}
 
                             {/* Copy Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "").trim(), idx)}
-                              className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
-                              title={t('chat.copyResponse')}
-                            >
-                              {copiedMessageIdx === idx ? (
-                                <Check size={15} className="text-emerald-500" />
-                              ) : (
-                                <Copy size={15} />
-                              )}
-                            </button>
+                            <Tooltip content={copiedMessageIdx === idx ? "Copied!" : t('chat.copyResponse')} side="top">
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(msg.content.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/g, "").trim(), idx)}
+                                className="p-1.5 text-app-text-muted hover:text-app-text rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
+                                aria-label={t('chat.copyResponse')}
+                              >
+                                {copiedMessageIdx === idx ? (
+                                  <Check size={15} className="text-emerald-500" />
+                                ) : (
+                                  <Copy size={15} />
+                                )}
+                              </button>
+                            </Tooltip>
 
                             {/* Retry / Regenerate Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRegeneratingMessageIdx(idx);
-                                onRegenerateMessage?.(idx);
-                              }}
-                              disabled={isLoading}
-                              className="p-1.5 text-app-text-muted hover:text-app-text disabled:opacity-30 rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
-                              title={t('chat.regenerateResponse')}
-                            >
-                              <RotateCw size={15} />
-                            </button>
+                            <Tooltip content={t('chat.regenerateResponse')} side="top">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRegeneratingMessageIdx(idx);
+                                  onRegenerateMessage?.(idx);
+                                }}
+                                disabled={isLoading}
+                                className="p-1.5 text-app-text-muted hover:text-app-text disabled:opacity-30 rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer flex items-center justify-center"
+                                aria-label={t('chat.regenerateResponse')}
+                              >
+                                <RotateCw size={15} />
+                              </button>
+                            </Tooltip>
                           </div>
                         )}
                       </div>

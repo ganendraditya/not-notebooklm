@@ -12,6 +12,7 @@ import { TargetedSource } from "@/stores/documentStore";
 import SearchFilterPopover from "@/components/SearchFilterPopover";
 import { type SearchFilterState, DEFAULT_SEARCH_FILTER } from "@/lib/constants/academicFilters";
 import { useTranslation } from "@/lib/i18n";
+import { Tooltip } from "@/components/ui/tooltip";
 import { StorageWarningModal } from "./input/StorageWarningModal";
 import { QueuedPromptsList } from "./input/QueuedPromptsList";
 import { TargetedSourceBadge } from "./input/TargetedSourceBadge";
@@ -371,14 +372,16 @@ export const ChatInputBox = memo(function ChatInputBox({
         <div className="flex items-center justify-between gap-1.5 pt-2 px-1 w-full min-w-0">
           {/* Left: File Attach Button */}
           <div className="flex items-center gap-1 min-w-0">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 rounded-full text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors shrink-0 cursor-pointer"
-              title={t('chat.attachTitle')}
-            >
-              <Plus size={20} />
-            </button>
+            <Tooltip content={t('chat.attachTitle')} side="top">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1.5 rounded-full text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors shrink-0 cursor-pointer"
+                aria-label={t('chat.attachTitle')}
+              >
+                <Plus size={20} />
+              </button>
+            </Tooltip>
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -399,35 +402,41 @@ export const ChatInputBox = memo(function ChatInputBox({
               onApplyFilter={setFilter}
             />
 
-            <button 
-              type="button"
-              onClick={onToggleRightSidebar}
-              className="relative px-3 py-1.5 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text text-xs font-medium border border-app-border transition-colors cursor-pointer shrink-0 flex items-center justify-center gap-1.5"
-              title={t('chat.sourcesCount').replace('{count}', documentsCount.toString())}
-            >
-              <FileText size={15} className="text-blue-500 fill-blue-500/20 shrink-0" />
-              <span>{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
-            </button>
+            <Tooltip content={t('chat.sourcesCount').replace('{count}', documentsCount.toString())} side="top">
+              <button 
+                type="button"
+                onClick={onToggleRightSidebar}
+                className="relative px-3 py-1.5 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text text-xs font-medium border border-app-border transition-colors cursor-pointer shrink-0 flex items-center justify-center gap-1.5"
+                aria-label={t('chat.sourcesCount').replace('{count}', documentsCount.toString())}
+              >
+                <FileText size={15} className="text-blue-500 fill-blue-500/20 shrink-0" />
+                <span>{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
+              </button>
+            </Tooltip>
 
             {isLoading && onStopGeneration ? (
-              <button
-                type="button"
-                onClick={onStopGeneration}
-                className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
-                title={t('chat.stopTitle')}
-              >
-                <Square size={16} className="fill-current" />
-              </button>
+              <Tooltip content={t('chat.stopTitle')} side="top">
+                <button
+                  type="button"
+                  onClick={onStopGeneration}
+                  className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
+                  aria-label={t('chat.stopTitle')}
+                >
+                  <Square size={16} className="fill-current" />
+                </button>
+              </Tooltip>
             ) : (
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={(!input.trim() && attachments.length === 0) || isUploading}
-                className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 disabled:opacity-30 disabled:hover:opacity-30 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0"
-                title={t('chat.sendTitle')}
-              >
-                <ArrowUp size={18} strokeWidth={2.5} />
-              </button>
+              <Tooltip content={t('chat.sendTitle')} side="top">
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={(!input.trim() && attachments.length === 0) || isUploading}
+                  className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 disabled:opacity-30 disabled:hover:opacity-30 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0"
+                  aria-label={t('chat.sendTitle')}
+                >
+                  <ArrowUp size={18} strokeWidth={2.5} />
+                </button>
+              </Tooltip>
             )}
           </div>
         </div>

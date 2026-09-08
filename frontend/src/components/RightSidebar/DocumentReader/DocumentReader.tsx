@@ -15,6 +15,7 @@ import {
 import { useTranslation } from "@/lib/i18n";
 import { Document as DocType } from "@/stores/documentStore";
 import { PaperDetailData } from "@/hooks/usePaperDetails";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export interface DocumentReaderProps {
   viewingDoc: DocType | null;
@@ -88,13 +89,15 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
           <span className="text-sm tracking-tight font-medium">Paper</span>
         </button>
 
-        <button 
-          onClick={onClose}
-          className="w-7 h-7 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer hidden lg:flex"
-          title={t('right.close')}
-        >
-          <X size={14} />
-        </button>
+        <Tooltip content={t('right.close')} side="bottom">
+          <button 
+            onClick={onClose}
+            className="w-7 h-7 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer hidden lg:flex"
+            aria-label={t('right.close')}
+          >
+            <X size={14} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* 2. Navigation Tabs */}
@@ -327,65 +330,75 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
         isLoadingDetails ? "opacity-40 pointer-events-none" : "opacity-100"
       }`}>
         <div className="flex items-center gap-1.5">
-          <button
-            disabled={isLoadingDetails}
-            onClick={() => {
-              if (viewingDoc && onAskAboutDocument) {
-                onAskAboutDocument(viewingDoc, paperDetails?.title || viewingDoc.filename);
-              }
-              const chatInput = document.getElementById("chat-input-textarea");
-              if (chatInput) {
-                chatInput.focus();
-              }
-            }}
-            className="h-8 px-3 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:cursor-not-allowed"
-            title={t('right.askAI')}
-          >
-            <MessageSquare size={13} />
-            <span>{t('right.ask')}</span>
-          </button>
+          <Tooltip content={t('right.askAI')} side="top">
+            <button
+              disabled={isLoadingDetails}
+              onClick={() => {
+                if (viewingDoc && onAskAboutDocument) {
+                  onAskAboutDocument(viewingDoc, paperDetails?.title || viewingDoc.filename);
+                }
+                const chatInput = document.getElementById("chat-input-textarea");
+                if (chatInput) {
+                  chatInput.focus();
+                }
+              }}
+              className="h-8 px-3 rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm disabled:cursor-not-allowed"
+              aria-label={t('right.askAI')}
+            >
+              <MessageSquare size={13} />
+              <span>{t('right.ask')}</span>
+            </button>
+          </Tooltip>
 
-          <button
-            disabled={isLoadingDetails}
-            onClick={() => setIsCiteModalOpen(true)}
-            className="h-8 px-2.5 rounded-full bg-app-card hover:bg-app-card-hover disabled:opacity-50 border border-app-border text-app-text text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
-            title={t('right.citePaper')}
-          >
-            <Quote size={13} />
-            <span>{t('action.cite') || 'Cite'}</span>
-          </button>
+          <Tooltip content={t('right.citePaper')} side="top">
+            <button
+              disabled={isLoadingDetails}
+              onClick={() => setIsCiteModalOpen(true)}
+              className="h-8 px-2.5 rounded-full bg-app-card hover:bg-app-card-hover disabled:opacity-50 border border-app-border text-app-text text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
+              aria-label={t('right.citePaper')}
+            >
+              <Quote size={13} />
+              <span>{t('action.cite') || 'Cite'}</span>
+            </button>
+          </Tooltip>
 
-          <button
-            disabled={isLoadingDetails || !landingUrl}
-            onClick={() => copyToClipboard(landingUrl, "link")}
-            className="w-8 h-8 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border disabled:opacity-50 text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
-            title={copiedLink ? t('right.copiedLink') : t('right.copyLink')}
-          >
-            {copiedLink ? <Check size={14} className="text-emerald-500" /> : <LinkIcon size={14} />}
-          </button>
+          <Tooltip content={copiedLink ? t('right.copiedLink') : t('right.copyLink')} side="top">
+            <button
+              disabled={isLoadingDetails || !landingUrl}
+              onClick={() => copyToClipboard(landingUrl, "link")}
+              className="w-8 h-8 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border disabled:opacity-50 text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
+              aria-label={copiedLink ? t('right.copiedLink') : t('right.copyLink')}
+            >
+              {copiedLink ? <Check size={14} className="text-emerald-500" /> : <LinkIcon size={14} />}
+            </button>
+          </Tooltip>
 
           {activeChatId && viewingDoc && (() => {
             const isDownloadable = Boolean(!isLoadingDetails && paperDetails?.has_full_pdf);
             if (!isDownloadable) {
               return (
-                <button
-                  disabled
-                  className="w-8 h-8 rounded-full bg-app-card border border-app-border text-app-text-dim opacity-30 flex items-center justify-center cursor-not-allowed"
-                  title={t('right.downloadNotAvail')}
-                >
-                  <Download size={14} />
-                </button>
+                <Tooltip content={t('right.downloadNotAvail')} side="top">
+                  <button
+                    disabled
+                    className="w-8 h-8 rounded-full bg-app-card border border-app-border text-app-text-dim opacity-30 flex items-center justify-center cursor-not-allowed"
+                    aria-label={t('right.downloadNotAvail')}
+                  >
+                    <Download size={14} />
+                  </button>
+                </Tooltip>
               );
             }
             return (
-              <a
-                href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
-                download={viewingDoc.filename}
-                className="w-8 h-8 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer shadow-sm"
-                title="Download original manuscript PDF"
-              >
-                <Download size={14} />
-              </a>
+              <Tooltip content="Download original manuscript PDF" side="top">
+                <a
+                  href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
+                  download={viewingDoc.filename}
+                  className="w-8 h-8 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer shadow-sm"
+                  aria-label="Download original manuscript PDF"
+                >
+                  <Download size={14} />
+                </a>
+              </Tooltip>
             );
           })()}
         </div>
@@ -393,18 +406,20 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
         {(() => {
           const pdfLink = landingUrl || `https://scholar.google.com/scholar?q=${encodeURIComponent(title)}`;
           return (
-            <a
-              href={isLoadingDetails ? undefined : pdfLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`h-8 px-2.5 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 shadow-sm ${
-                isLoadingDetails ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}
-              title={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"}
-            >
-              <ExternalLink size={12} />
-              <span>{landingUrl ? "PDF \u2197" : "PDF \u2197"}</span>
-            </a>
+            <Tooltip content={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"} side="top">
+              <a
+                href={isLoadingDetails ? undefined : pdfLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`h-8 px-2.5 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text text-xs font-medium flex items-center gap-1.5 transition-colors shrink-0 shadow-sm ${
+                  isLoadingDetails ? "pointer-events-none opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
+                aria-label={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"}
+              >
+                <ExternalLink size={12} />
+                <span>{landingUrl ? "PDF \u2197" : "PDF \u2197"}</span>
+              </a>
+            </Tooltip>
           );
         })()}
       </div>

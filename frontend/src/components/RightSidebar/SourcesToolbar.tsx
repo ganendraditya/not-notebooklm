@@ -2,6 +2,7 @@ import React from "react";
 import { Check, Sparkles, Edit2, Loader2, Download, Trash2, Minus } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { Document } from "@/stores/documentStore";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface SourcesToolbarProps {
   documents: Document[];
@@ -57,26 +58,28 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
       <div className="flex items-center gap-1">
         {/* Sort Button & Dropdown (Disabled if <= 1 document) */}
         <div className="relative" ref={sortMenuRef}>
-          <button 
-            onClick={() => {
-              if (documents.length > 1) {
-                setIsSortMenuOpen(prev => !prev);
-              }
-            }}
-            disabled={documents.length <= 1}
-            className={`w-6 h-6 -ml-1 rounded transition-colors flex items-center justify-center ${
-              documents.length > 1
-                ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
-                : "text-app-text-dim opacity-30 cursor-not-allowed"
-            }`}
-            title={documents.length > 1 ? t('right.sortSources') : t('right.addMoreSort')}
-          >
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" className="opacity-90">
-              <rect x="2" y="3" width="12" height="1.6" rx="0.8" />
-              <rect x="2" y="7.2" width="8" height="1.6" rx="0.8" />
-              <rect x="2" y="11.4" width="4.5" height="1.6" rx="0.8" />
-            </svg>
-          </button>
+          <Tooltip content={documents.length > 1 ? t('right.sortSources') : t('right.addMoreSort')} side="bottom">
+            <button 
+              onClick={() => {
+                if (documents.length > 1) {
+                  setIsSortMenuOpen(prev => !prev);
+                }
+              }}
+              disabled={documents.length <= 1}
+              className={`w-6 h-6 -ml-1 rounded transition-colors flex items-center justify-center ${
+                documents.length > 1
+                  ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
+                  : "text-app-text-dim opacity-30 cursor-not-allowed"
+              }`}
+              aria-label={documents.length > 1 ? t('right.sortSources') : t('right.addMoreSort')}
+            >
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" className="opacity-90">
+                <rect x="2" y="3" width="12" height="1.6" rx="0.8" />
+                <rect x="2" y="7.2" width="8" height="1.6" rx="0.8" />
+                <rect x="2" y="11.4" width="4.5" height="1.6" rx="0.8" />
+              </svg>
+            </button>
+          </Tooltip>
 
           {/* Sort Dropdown Menu */}
           {isSortMenuOpen && (
@@ -126,44 +129,57 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
         {/* Action Icon Buttons */}
         <div className="flex items-center gap-1">
           {/* Clean Duplicates */}
-          <button
-            onClick={handleCleanDuplicates}
-            disabled={documents.length <= 1 || isCleaningDuplicates}
-            className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-              documents.length > 1 && !isCleaningDuplicates
-                ? "text-app-text-muted hover:text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
-                : "text-app-text-dim opacity-30 cursor-not-allowed"
-            }`}
-            title={t('right.cleanDup')}
-          >
-            {isCleaningDuplicates ? (
-              <Loader2 size={14} className="animate-spin text-emerald-500" />
-            ) : (
-              <Sparkles size={14} />
-            )}
-          </button>
+          <Tooltip content={t('right.cleanDup')} side="bottom">
+            <button
+              onClick={handleCleanDuplicates}
+              disabled={documents.length <= 1 || isCleaningDuplicates}
+              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                documents.length > 1 && !isCleaningDuplicates
+                  ? "text-app-text-muted hover:text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
+                  : "text-app-text-dim opacity-30 cursor-not-allowed"
+              }`}
+              aria-label={t('right.cleanDup')}
+            >
+              {isCleaningDuplicates ? (
+                <Loader2 size={14} className="animate-spin text-emerald-500" />
+              ) : (
+                <Sparkles size={14} />
+              )}
+            </button>
+          </Tooltip>
 
           {/* Rename Button */}
-          <button
-            onClick={handleOpenRename}
-            disabled={selectedCount !== 1}
-            className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-              selectedCount === 1
-                ? "text-app-text-muted hover:text-blue-500 hover:bg-blue-500/10 cursor-pointer"
-                : selectedCount > 1
-                ? "text-app-text-dim opacity-25 cursor-not-allowed"
-                : "text-app-text-dim opacity-30 cursor-not-allowed"
-            }`}
-            title={
+          <Tooltip
+            content={
               selectedCount === 1
                 ? t('right.renameSelected')
                 : selectedCount > 1
                 ? t('right.selectOneRename')
                 : t('right.selectToRename')
             }
+            side="bottom"
           >
-            <Edit2 size={14} />
-          </button>
+            <button
+              onClick={handleOpenRename}
+              disabled={selectedCount !== 1}
+              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                selectedCount === 1
+                  ? "text-app-text-muted hover:text-blue-500 hover:bg-blue-500/10 cursor-pointer"
+                  : selectedCount > 1
+                  ? "text-app-text-dim opacity-25 cursor-not-allowed"
+                  : "text-app-text-dim opacity-30 cursor-not-allowed"
+              }`}
+              aria-label={
+                selectedCount === 1
+                  ? t('right.renameSelected')
+                  : selectedCount > 1
+                  ? t('right.selectOneRename')
+                  : t('right.selectToRename')
+              }
+            >
+              <Edit2 size={14} />
+            </button>
+          </Tooltip>
 
           {/* Bulk Download Button */}
           {(() => {
@@ -178,41 +194,48 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
               : t('right.downloadSelectedZip').replace('{n}', selectedCount.toString());
 
             return (
-              <button
-                onClick={handleBulkDownload}
-                disabled={!canDownload}
-                className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-                  canDownload
-                    ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
-                    : "text-app-text-dim opacity-30 cursor-not-allowed"
-                }`}
-                title={tooltipText}
-              >
-                {isBulkDownloading ? (
-                  <Loader2 size={15} className="animate-spin text-blue-500" />
-                ) : (
-                  <Download size={15} />
-                )}
-              </button>
+              <Tooltip content={tooltipText} side="bottom">
+                <button
+                  onClick={handleBulkDownload}
+                  disabled={!canDownload}
+                  className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                    canDownload
+                      ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
+                      : "text-app-text-dim opacity-30 cursor-not-allowed"
+                  }`}
+                  aria-label={tooltipText}
+                >
+                  {isBulkDownloading ? (
+                    <Loader2 size={15} className="animate-spin text-blue-500" />
+                  ) : (
+                    <Download size={15} />
+                  )}
+                </button>
+              </Tooltip>
             );
           })()}
 
           {/* Delete Button */}
-          <button
-            onClick={() => {
-              setDocToDelete(null);
-              setShowBulkDeleteConfirm(true);
-            }}
-            disabled={selectedCount === 0 || isBulkDeleting}
-            className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
-              selectedCount > 0
-                ? "text-app-text-muted hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
-                : "text-app-text-dim opacity-30 cursor-not-allowed"
-            }`}
-            title={selectedCount > 0 ? t('right.deleteSelected').replace('{n}', selectedCount.toString()) : t('right.selectToDelete')}
+          <Tooltip
+            content={selectedCount > 0 ? t('right.deleteSelected').replace('{n}', selectedCount.toString()) : t('right.selectToDelete')}
+            side="bottom"
           >
-            <Trash2 size={15} />
-          </button>
+            <button
+              onClick={() => {
+                setDocToDelete(null);
+                setShowBulkDeleteConfirm(true);
+              }}
+              disabled={selectedCount === 0 || isBulkDeleting}
+              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                selectedCount > 0
+                  ? "text-app-text-muted hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                  : "text-app-text-dim opacity-30 cursor-not-allowed"
+              }`}
+              aria-label={selectedCount > 0 ? t('right.deleteSelected').replace('{n}', selectedCount.toString()) : t('right.selectToDelete')}
+            >
+              <Trash2 size={15} />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -221,27 +244,32 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
         documents.length === 0 ? "opacity-30 pointer-events-none" : ""
       }`}>
         <span className="text-[11px] font-medium text-app-text-muted select-none">{t('right.selectAll')}</span>
-        <button
-          type="button"
-          onClick={handleToggleSelectAll}
-          disabled={documents.length === 0}
-          className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
-            documents.length === 0 
-              ? "border-app-border-strong bg-transparent cursor-not-allowed"
-              : isAllSelected
-              ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:bg-blue-700" 
-              : isPartiallySelected 
-              ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:bg-blue-700"
-              : "border-app-border-strong bg-transparent cursor-pointer hover:border-gray-500"
-          }`}
-          title={documents.length === 0 ? t('right.noSourcesAvail') : (isAllSelected || isPartiallySelected) ? t('right.unselectAll') : t('right.selectAll')}
+        <Tooltip
+          content={documents.length === 0 ? t('right.noSourcesAvail') : (isAllSelected || isPartiallySelected) ? t('right.unselectAll') : t('right.selectAll')}
+          side="left"
         >
-          {isAllSelected && documents.length > 0 ? (
-            <Check size={9} strokeWidth={3} />
-          ) : isPartiallySelected ? (
-            <Minus size={9} strokeWidth={3} />
-          ) : null}
-        </button>
+          <button
+            type="button"
+            onClick={handleToggleSelectAll}
+            disabled={documents.length === 0}
+            className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
+              documents.length === 0 
+                ? "border-app-border-strong bg-transparent cursor-not-allowed"
+                : isAllSelected
+                ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:bg-blue-700" 
+                : isPartiallySelected 
+                ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:bg-blue-700"
+                : "border-app-border-strong bg-transparent cursor-pointer hover:border-gray-500"
+            }`}
+            aria-label={documents.length === 0 ? t('right.noSourcesAvail') : (isAllSelected || isPartiallySelected) ? t('right.unselectAll') : t('right.selectAll')}
+          >
+            {isAllSelected && documents.length > 0 ? (
+              <Check size={9} strokeWidth={3} />
+            ) : isPartiallySelected ? (
+              <Minus size={9} strokeWidth={3} />
+            ) : null}
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

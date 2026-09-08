@@ -18,6 +18,7 @@ import {
   FolderArchive
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
 
@@ -157,15 +158,17 @@ export default function LeftSidebar({
         </div>
 
         {/* Hide Sidebar Button (Only visible on desktop) */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8 text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer hidden lg:flex"
-          onClick={onToggleSidebar}
-          title={t('left.closeSidebar')}
-        >
-          <Sidebar size={17} />
-        </Button>
+        <Tooltip content={t('left.closeSidebar')} side="right">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer hidden lg:flex"
+            onClick={onToggleSidebar}
+            aria-label={t('left.closeSidebar')}
+          >
+            <Sidebar size={17} />
+          </Button>
+        </Tooltip>
       </div>
 
       {/* Top Action Items: New chat, Search, & Library */}
@@ -246,18 +249,20 @@ export default function LeftSidebar({
 
                     {/* Three-dots button on hover */}
                     <div className="shrink-0 flex items-center">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(isMenuOpen ? null : session.id);
-                        }}
-                        className={`p-1 rounded-md text-app-text-dim hover:text-app-text hover:bg-app-item-hover transition-opacity cursor-pointer ${
-                          isMenuOpen || isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                        }`}
-                        title={t('left.options')}
-                      >
-                        <MoreHorizontal size={14} />
-                      </button>
+                      <Tooltip content={t('left.options')} side="top">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(isMenuOpen ? null : session.id);
+                          }}
+                          className={`p-1 rounded-md text-app-text-dim hover:text-app-text hover:bg-app-item-hover transition-opacity cursor-pointer ${
+                            isMenuOpen || isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                          }`}
+                          aria-label={t('left.options')}
+                        >
+                          <MoreHorizontal size={14} />
+                        </button>
+                      </Tooltip>
                     </div>
                   </div>
 
@@ -342,14 +347,16 @@ export default function LeftSidebar({
         <span className="font-medium tracking-wide text-app-text-muted select-none">
           NotbookLM <span className="text-[11px] text-app-text-dim font-mono">v0.1</span>
         </span>
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          title={t('ui.settings') || "Settings"}
-          className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
-        >
-          <Settings size={15} />
-        </button>
+        <Tooltip content={t('ui.settings') || "Settings"} side="top">
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            aria-label={t('ui.settings') || "Settings"}
+            className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
+          >
+            <Settings size={15} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* Centered Modal for Rename Chat */}

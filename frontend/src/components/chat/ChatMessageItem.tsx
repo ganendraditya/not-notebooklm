@@ -19,6 +19,7 @@ import { Document as DocType } from "@/stores/documentStore";
 import { parseCitationsInReactNode, CitationContext } from "./CitationParser";
 import { useTranslation } from "@/lib/i18n";
 import { consumeSSEStream } from "@/lib/sse";
+import { Tooltip } from "@/components/ui/tooltip";
 
 export interface AcademicCandidateSource {
   title?: string;
@@ -175,23 +176,20 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode }> = ({ children
     <div className="relative my-4 group/tbl">
       {/* Top right corner copy button */}
       <div className="absolute top-2 right-2 z-10 flex items-center">
-        <button
-          type="button"
-          onClick={handleCopy}
-          aria-label="Copy table"
-          title="Copy table"
-          className="relative group/btn p-1.5 rounded-md text-app-text-muted hover:text-app-text hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
-        >
-          {copied ? (
-            <Check size={14} className="text-emerald-500 dark:text-emerald-400" />
-          ) : (
-            <Copy size={14} />
-          )}
-          {/* Tooltip on hover */}
-          <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover/btn:flex items-center px-2 py-0.5 text-[11px] font-medium text-white bg-neutral-900 dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30 transition-opacity">
-            {copied ? "Copied!" : "Copy table"}
-          </div>
-        </button>
+        <Tooltip content={copied ? "Copied!" : "Copy table"} side="top">
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy table"
+            className="p-1.5 rounded-md text-app-text-muted hover:text-app-text hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
+          >
+            {copied ? (
+              <Check size={14} className="text-emerald-500 dark:text-emerald-400" />
+            ) : (
+              <Copy size={14} />
+            )}
+          </button>
+        </Tooltip>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-app-border shadow-md custom-scrollbar">

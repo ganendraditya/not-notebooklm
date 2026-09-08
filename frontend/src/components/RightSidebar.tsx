@@ -12,6 +12,7 @@ import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/store
 import { useTranslation } from "@/lib/i18n";
 import { SourcesToolbar } from "./RightSidebar/SourcesToolbar";
 import { RightSidebarModals } from "./RightSidebar/RightSidebarModals";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface RightSidebarProps {
   activeChatId: string | null;
@@ -286,13 +287,15 @@ export default function RightSidebar({
             {documents.length}
           </span>
         </div>
-        <button 
-          onClick={onClose}
-          className="w-7 h-7 rounded-lg bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer"
-          title={t('right.close') || "Hide sidebar"}
-        >
-          <X size={15} />
-        </button>
+        <Tooltip content={t('right.close') || "Hide sidebar"} side="left">
+          <button 
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer"
+            aria-label={t('right.close') || "Hide sidebar"}
+          >
+            <X size={15} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* Hidden File Input for Multi-format Document Upload */}
