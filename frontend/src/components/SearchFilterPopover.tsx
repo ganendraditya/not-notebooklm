@@ -144,14 +144,16 @@ export default function SearchFilterPopover({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={onClose}
-                className="h-7 w-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
-                title="Close (Esc)"
-              >
-                <X size={15} />
-              </button>
+              <Tooltip content={t('right.close') ? `${t('right.close')} (Esc)` : "Close (Esc)"} side="bottom">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-7 w-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label={t('right.close') ? `${t('right.close')} (Esc)` : "Close (Esc)"}
+                >
+                  <X size={15} />
+                </button>
+              </Tooltip>
             </div>
 
             {/* Scrollable Body */}
@@ -229,19 +231,20 @@ export default function SearchFilterPopover({
                   {SCOPUS_QUARTILES.map((sc) => {
                     const isChecked = localFilter.scopusQuartiles.includes(sc.id);
                     return (
-                      <button
-                        key={sc.id}
-                        type="button"
-                        onClick={() => toggleScopus(sc.id)}
-                        className={
-                          isChecked
-                            ? "py-1.5 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-semibold shadow-sm text-xs"
-                            : "py-1.5 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text text-xs"
-                        }
-                        title={`Scopus ${sc.label} (${sc.desc})`}
-                      >
-                        {sc.label}
-                      </button>
+                      <Tooltip key={sc.id} content={`Scopus ${sc.label} (${sc.desc})`} side="top">
+                        <button
+                          type="button"
+                          onClick={() => toggleScopus(sc.id)}
+                          className={
+                            isChecked
+                              ? "py-1.5 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-blue-600/30 border-blue-500 text-app-text font-semibold shadow-sm text-xs w-full"
+                              : "py-1.5 px-1.5 rounded-lg border text-center transition-colors cursor-pointer bg-app-item-hover border-app-border hover:bg-app-item-active text-app-text-muted hover:text-app-text text-xs w-full"
+                          }
+                          aria-label={`Scopus ${sc.label} (${sc.desc})`}
+                        >
+                          {sc.label}
+                        </button>
+                      </Tooltip>
                     );
                   })}
                 </div>

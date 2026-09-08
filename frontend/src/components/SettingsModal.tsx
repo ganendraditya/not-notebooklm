@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
+import { Tooltip } from "@/components/ui/tooltip";
 import StorageLibraryModal from "./StorageLibraryModal";
 import GeneralTab from "./Settings/tabs/GeneralTab";
 import NotificationsTab from "./Settings/tabs/NotificationsTab";
@@ -97,12 +98,15 @@ export default function SettingsModal({
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-app-text">{t('settings.title')}</h2>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-1 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
-          >
-            <X size={18} />
-          </button>
+          <Tooltip content={t('settings.close') || "Close"} side="bottom">
+            <button 
+              onClick={onClose}
+              className="p-1 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
+              aria-label={t('settings.close') || "Close"}
+            >
+              <X size={18} />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Modal Body: Two-column layout with sidebar tabs */}

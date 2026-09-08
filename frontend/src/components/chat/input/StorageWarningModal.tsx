@@ -3,6 +3,7 @@
 import React from "react";
 import { FileText, X } from "lucide-react";
 import { Portal } from "@/components/ui/Portal";
+import { Tooltip } from "@/components/ui/tooltip";
 import { formatFileSize } from "./fileUtils";
 
 interface StorageWarningModalProps {
@@ -33,13 +34,16 @@ export function StorageWarningModal({
         >
           <div className="flex items-start justify-between">
             <h3 className="text-base font-semibold text-app-text">File added to chat only</h3>
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-app-text-muted hover:text-app-text p-1 rounded-lg hover:bg-app-item-hover transition-colors"
-            >
-              <X size={18} />
-            </button>
+            <Tooltip content="Close" side="bottom">
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-app-text-muted hover:text-app-text p-1 rounded-lg hover:bg-app-item-hover transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </Tooltip>
           </div>
 
           <p className="text-sm text-app-text-muted leading-relaxed">

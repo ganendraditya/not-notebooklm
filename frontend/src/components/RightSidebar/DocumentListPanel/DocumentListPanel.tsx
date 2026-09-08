@@ -1,6 +1,7 @@
 import React from "react";
 import { useTranslation } from "@/lib/i18n";
 import { Document, PendingSourceItem } from "@/stores/documentStore";
+import { Tooltip } from "@/components/ui/tooltip";
 import { 
   FileText, 
   MoreHorizontal, 
@@ -83,12 +84,13 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                   {/* Left: Clean Monospace Index + Compact Format Badge + File Name */}
                   <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
                     {/* Clean Minimalist Index */}
-                    <span 
-                      className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-app-text-dim group-hover:text-app-text transition-colors shrink-0 select-none tabular-nums"
-                      title={`Permanent Reference Index [${docIndex}]`}
-                    >
-                      {docIndex}.
-                    </span>
+                    <Tooltip content={`Permanent Reference Index [${docIndex}]`} side="top">
+                      <span 
+                        className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-app-text-dim group-hover:text-app-text transition-colors shrink-0 select-none tabular-nums"
+                      >
+                        {docIndex}.
+                      </span>
+                    </Tooltip>
 
                     <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${badge.bg}`}>
                       <span className="text-[7.5px] font-bold tracking-tighter uppercase font-mono">{badge.label}</span>
@@ -203,20 +205,22 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                   </div>
 
                   {/* Right: Checkbox ONLY toggles selection */}
-                  <div 
-                    className="flex items-center shrink-0 p-1 -m-1 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleDocSelection(doc.id);
-                    }}
-                    title={isChecked ? "Exclude from AI context" : "Include in AI context"}
-                  >
-                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
-                      isChecked ? "bg-blue-600 border-blue-600 text-white" : "border-app-border-strong bg-transparent"
-                    }`}>
-                      {isChecked && <Check size={9} strokeWidth={3} />}
+                  <Tooltip content={isChecked ? "Exclude from AI context" : "Include in AI context"} side="left">
+                    <div 
+                      className="flex items-center shrink-0 p-1 -m-1 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleDocSelection(doc.id);
+                      }}
+                      aria-label={isChecked ? "Exclude from AI context" : "Include in AI context"}
+                    >
+                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                        isChecked ? "bg-blue-600 border-blue-600 text-white" : "border-app-border-strong bg-transparent"
+                      }`}>
+                        {isChecked && <Check size={9} strokeWidth={3} />}
+                      </div>
                     </div>
-                  </div>
+                  </Tooltip>
                 </div>
               );
             })}
@@ -267,14 +271,16 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                         <span title={item.error || t('right.uploadFailed')} className="text-red-400 cursor-help">
                           <AlertCircle size={13} />
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setInternalPendingSources(prev => prev.filter(p => p.id !== item.id))}
-                          className="text-app-text-dim hover:text-app-text p-0.5 rounded cursor-pointer"
-                          title={t('right.dismiss')}
-                        >
-                          <X size={12} />
-                        </button>
+                        <Tooltip content={t('right.dismiss')} side="top">
+                          <button
+                            type="button"
+                            onClick={() => setInternalPendingSources(prev => prev.filter(p => p.id !== item.id))}
+                            className="text-app-text-dim hover:text-app-text p-0.5 rounded cursor-pointer"
+                            aria-label={t('right.dismiss')}
+                          >
+                            <X size={12} />
+                          </button>
+                        </Tooltip>
                       </div>
                     )}
                   </div>

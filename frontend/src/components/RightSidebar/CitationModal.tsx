@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Quote, X, Download, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Portal } from "@/components/ui/Portal";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useTranslation } from "@/lib/i18n";
 import { CitationFormats } from "@/hooks/useCitationGenerator";
 
@@ -50,12 +51,15 @@ export function CitationModal({ isOpen, onClose, citations, doiStr }: CitationMo
             <Quote size={16} className="text-blue-500" />
             <h3 className="text-sm font-semibold text-app-text">{t('right.citeThis') || "Cite this Paper"}</h3>
           </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X size={14} />
-          </button>
+          <Tooltip content={t('right.close') || "Close"} side="bottom">
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
+              aria-label={t('right.close') || "Close"}
+            >
+              <X size={14} />
+            </button>
+          </Tooltip>
         </div>
 
         {/* Citation Format Tabs (Clean, Scrollable & Compact) */}

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, MessageSquare, Sidebar, X, ArrowUpDown, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
 
@@ -63,15 +64,17 @@ export default function SearchChatsView({
       {/* Top Bar for Sidebar toggle if closed */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-app-divider bg-app-sidebar">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer mr-1 ${isSidebarOpen ? "hidden" : "flex"}`}
-            onClick={onOpenSidebar}
-            title={t('ui.openSidebar')}
-          >
-            <Sidebar size={18} />
-          </Button>
+          <Tooltip content={t('ui.openSidebar')} side="bottom">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer mr-1 ${isSidebarOpen ? "hidden" : "flex"}`}
+              onClick={onOpenSidebar}
+              aria-label={t('ui.openSidebar')}
+            >
+              <Sidebar size={18} />
+            </Button>
+          </Tooltip>
           <h1 className="text-lg sm:text-xl font-bold text-app-text tracking-tight">{t('searchView.title')}</h1>
         </div>
       </div>

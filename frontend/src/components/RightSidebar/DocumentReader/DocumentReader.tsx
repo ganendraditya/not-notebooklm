@@ -139,22 +139,26 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
                     {activeMatchIndex + 1}/{totalMatches}
                   </span>
                   <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => navigateMatch("prev")}
-                      className="p-1 text-amber-500 hover:bg-amber-500/20 rounded cursor-pointer transition-colors"
-                      title="Previous match"
-                    >
-                      <ChevronUp size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigateMatch("next")}
-                      className="p-1 text-amber-500 hover:bg-amber-500/20 rounded cursor-pointer transition-colors"
-                      title="Next match"
-                    >
-                      <ChevronDown size={12} />
-                    </button>
+                    <Tooltip content="Previous match" side="top">
+                      <button
+                        type="button"
+                        onClick={() => navigateMatch("prev")}
+                        className="p-1 text-amber-500 hover:bg-amber-500/20 rounded cursor-pointer transition-colors"
+                        aria-label="Previous match"
+                      >
+                        <ChevronUp size={12} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Next match" side="top">
+                      <button
+                        type="button"
+                        onClick={() => navigateMatch("next")}
+                        className="p-1 text-amber-500 hover:bg-amber-500/20 rounded cursor-pointer transition-colors"
+                        aria-label="Next match"
+                      >
+                        <ChevronDown size={12} />
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               )}
@@ -375,29 +379,35 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
 
           {activeChatId && viewingDoc && (() => {
             const isDownloadable = Boolean(!isLoadingDetails && paperDetails?.has_full_pdf);
-            if (!isDownloadable) {
-              return (
-                <Tooltip content={t('right.downloadNotAvail')} side="top">
-                  <button
-                    disabled
-                    className="w-8 h-8 rounded-full bg-app-card border border-app-border text-app-text-dim opacity-30 flex items-center justify-center cursor-not-allowed"
-                    aria-label={t('right.downloadNotAvail')}
-                  >
-                    <Download size={14} />
-                  </button>
-                </Tooltip>
-              );
-            }
+            const downloadTooltip = isDownloadable
+              ? (t('right.downloadOriginal') || t('right.downloadPdf') || "Download full manuscript PDF")
+              : (t('right.downloadNotAvail') || "Full manuscript PDF is not available for download");
+
+            const handleDownload = () => {
+              if (!isDownloadable) return;
+              const link = document.createElement("a");
+              link.href = `${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`;
+              link.download = viewingDoc.filename;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            };
+
             return (
-              <Tooltip content="Download original manuscript PDF" side="top">
-                <a
-                  href={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/download`}
-                  download={viewingDoc.filename}
-                  className="w-8 h-8 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer shadow-sm"
-                  aria-label="Download original manuscript PDF"
+              <Tooltip content={downloadTooltip} side="top">
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  aria-disabled={!isDownloadable}
+                  className={`w-8 h-8 rounded-full bg-app-card border border-app-border flex items-center justify-center transition-colors shadow-sm ${
+                    isDownloadable
+                      ? "hover:bg-app-card-hover text-app-text-muted hover:text-app-text cursor-pointer"
+                      : "text-app-text-dim opacity-30 cursor-not-allowed"
+                  }`}
+                  aria-label={downloadTooltip}
                 >
                   <Download size={14} />
-                </a>
+                </button>
               </Tooltip>
             );
           })()}

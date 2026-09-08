@@ -6,6 +6,7 @@ import {
   FileText, LayoutGrid, List as ListIcon, Download, Box,
   MessageSquare
 } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useTranslation } from "@/lib/i18n";
 
 export interface LibraryItem {
@@ -370,28 +371,32 @@ export default function LibraryBrowser({
               <div className="h-3.5 w-px bg-app-divider"></div>
               
               {/* Download Button */}
-              <button 
-                onClick={handleDownload}
-                disabled={isDownloading}
-                className="flex items-center gap-1.5 text-xs text-app-text-muted hover:text-app-text font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
-                title={t("library.download")}
-              >
-                <Download size={13} />
-                <span>{isDownloading ? t("download.preparing") : t("library.download")}</span>
-              </button>
+              <Tooltip content={t("library.download")} side="bottom">
+                <button 
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="flex items-center gap-1.5 text-xs text-app-text-muted hover:text-app-text font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
+                  aria-label={t("library.download")}
+                >
+                  <Download size={13} />
+                  <span>{isDownloading ? t("download.preparing") : t("library.download")}</span>
+                </button>
+              </Tooltip>
 
               <div className="h-3.5 w-px bg-app-divider"></div>
 
               {/* Delete Button */}
-              <button 
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600 font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
-                title={t("library.delete")}
-              >
-                <Trash2 size={13} />
-                <span>{isDeleting ? t("library.deleting") : t("library.delete")}</span>
-              </button>
+              <Tooltip content={t("library.delete")} side="bottom">
+                <button 
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-600 font-medium cursor-pointer transition-colors px-1 disabled:opacity-50"
+                  aria-label={t("library.delete")}
+                >
+                  <Trash2 size={13} />
+                  <span>{isDeleting ? t("library.deleting") : t("library.delete")}</span>
+                </button>
+              </Tooltip>
             </div>
           )}
         </div>
@@ -399,20 +404,24 @@ export default function LibraryBrowser({
         {/* Right Side: View Mode Toggle */}
         <div className="flex items-center gap-2.5">
           <div className="flex items-center bg-app-surface border border-app-border rounded-lg p-0.5">
-            <button 
-              onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "list" ? "bg-app-item-active text-app-text" : "text-app-text-muted hover:text-app-text"}`}
-              title={t("library.listView")}
-            >
-              <ListIcon size={14} />
-            </button>
-            <button 
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "grid" ? "bg-app-item-active text-app-text" : "text-app-text-muted hover:text-app-text"}`}
-              title={t("library.gridView")}
-            >
-              <LayoutGrid size={14} />
-            </button>
+            <Tooltip content={t("library.listView")} side="bottom">
+              <button 
+                onClick={() => setViewMode("list")}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "list" ? "bg-app-item-active text-app-text" : "text-app-text-muted hover:text-app-text"}`}
+                aria-label={t("library.listView")}
+              >
+                <ListIcon size={14} />
+              </button>
+            </Tooltip>
+            <Tooltip content={t("library.gridView")} side="bottom">
+              <button 
+                onClick={() => setViewMode("grid")}
+                className={`p-1.5 rounded-md transition-colors cursor-pointer ${viewMode === "grid" ? "bg-app-item-active text-app-text" : "text-app-text-muted hover:text-app-text"}`}
+                aria-label={t("library.gridView")}
+              >
+                <LayoutGrid size={14} />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -535,20 +544,22 @@ export default function LibraryBrowser({
                 {/* Conversation */}
                 <div className="w-44 sm:w-48 md:w-56 shrink-0 pr-4 text-xs truncate">
                   {item.chat_id && item.chat_title ? (
-                    <span 
-                      onClick={(e) => {
-                        if (onItemChatSelect) onItemChatSelect();
-                        if (onSelectChat && item.chat_id) {
-                          e.stopPropagation();
-                          onSelectChat(item.chat_id);
-                        }
-                      }}
-                      title={t("library.goToConversation", { title: item.chat_title })}
-                      className="text-app-text-muted hover:!text-blue-500 transition-colors inline-flex items-center gap-1.5 truncate max-w-full"
-                    >
-                      <MessageSquare size={13} className="shrink-0 opacity-70" />
-                      <span className="truncate">{item.chat_title}</span>
-                    </span>
+                    <Tooltip content={t("library.goToConversation", { title: item.chat_title })} side="top">
+                      <span 
+                        onClick={(e) => {
+                          if (onItemChatSelect) onItemChatSelect();
+                          if (onSelectChat && item.chat_id) {
+                            e.stopPropagation();
+                            onSelectChat(item.chat_id);
+                          }
+                        }}
+                        className="text-app-text-muted hover:!text-blue-500 transition-colors inline-flex items-center gap-1.5 truncate max-w-full cursor-pointer"
+                        aria-label={t("library.goToConversation", { title: item.chat_title })}
+                      >
+                        <MessageSquare size={13} className="shrink-0 opacity-70" />
+                        <span className="truncate">{item.chat_title}</span>
+                      </span>
+                    </Tooltip>
                   ) : (
                     <span className="text-app-text-dim font-mono text-[11px]">-</span>
                   )}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp, X, CheckCircle2, AlertCircle, FileArchive, ArrowDownToLine, Loader2 } from "lucide-react";
-
+import { Tooltip } from "@/components/ui/tooltip";
 import { useTranslation } from "@/lib/i18n";
 
 export interface DownloadTask {
@@ -65,20 +65,24 @@ export const DownloadManager: React.FC<DownloadManagerProps> = ({ task, onClose 
           </div>
 
           <div className="flex items-center gap-0.5">
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-1 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded transition-colors cursor-pointer"
-              title={isCollapsed ? t('download.expand') : t('download.collapse')}
-            >
-              {isCollapsed ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded transition-colors cursor-pointer"
-              title={t('download.close')}
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
+            <Tooltip content={isCollapsed ? t('download.expand') : t('download.collapse')} side="bottom">
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="p-1 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded transition-colors cursor-pointer"
+                aria-label={isCollapsed ? t('download.expand') : t('download.collapse')}
+              >
+                {isCollapsed ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+            </Tooltip>
+            <Tooltip content={t('download.close')} side="bottom">
+              <button
+                onClick={onClose}
+                className="p-1 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded transition-colors cursor-pointer"
+                aria-label={t('download.close')}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import {
   UploadCloud,
 } from "lucide-react";
 import { Portal } from "@/components/ui/Portal";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useTranslation } from "@/lib/i18n";
 
 export interface AddSourcesModalProps {
@@ -53,16 +54,18 @@ export const AddSourcesModal: React.FC<AddSourcesModalProps> = ({
         className="bg-app-modal border border-app-border-strong rounded-3xl w-full max-w-xl p-6 sm:p-7 shadow-2xl space-y-6 animate-in zoom-in-95 duration-150 relative text-app-text"
       >
         {/* Close Button */}
-        <button
-          onClick={() => {
-            onClose();
-            setDoiInput("");
-          }}
-          className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-app-item-hover text-app-text-muted hover:text-app-text transition-colors cursor-pointer"
-          title={t('right.close')}
-        >
-          <X size={18} />
-        </button>
+        <Tooltip content={t('right.close') || "Close"} side="bottom">
+          <button
+            onClick={() => {
+              onClose();
+              setDoiInput("");
+            }}
+            className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-app-item-hover text-app-text-muted hover:text-app-text transition-colors cursor-pointer"
+            aria-label={t('right.close') || "Close"}
+          >
+            <X size={18} />
+          </button>
+        </Tooltip>
 
         {/* Modal Header */}
         <div className="space-y-1.5 pr-8">

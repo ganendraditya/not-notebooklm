@@ -2,6 +2,7 @@
 
 import { ArrowLeft, X } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { Tooltip } from "@/components/ui/tooltip";
 import LibraryBrowser from "@/components/library/LibraryBrowser";
 
 interface StorageLibraryModalProps {
@@ -33,22 +34,26 @@ export default function StorageLibraryModal({
         onItemChatSelect={onClose}
         containerClassName="flex-1 flex flex-col h-full bg-app-bg text-app-text relative overflow-hidden"
         headerLeading={
-          <button 
-            onClick={onClose} 
-            className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
-            title={t("ui.back")}
-          >
-            <ArrowLeft size={18} />
-          </button>
+          <Tooltip content={t("ui.back")} side="bottom">
+            <button 
+              onClick={onClose} 
+              className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
+              aria-label={t("ui.back")}
+            >
+              <ArrowLeft size={18} />
+            </button>
+          </Tooltip>
         }
         headerTrailing={
-          <button 
-            onClick={onClose} 
-            className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
-            title={t("settings.close")}
-          >
-            <X size={18} />
-          </button>
+          <Tooltip content={t("settings.close")} side="bottom">
+            <button 
+              onClick={onClose} 
+              className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
+              aria-label={t("settings.close")}
+            >
+              <X size={18} />
+            </button>
+          </Tooltip>
         }
       />
     </div>

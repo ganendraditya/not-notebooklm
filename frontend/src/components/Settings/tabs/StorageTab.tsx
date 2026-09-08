@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ChevronRight } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
 
@@ -175,11 +176,13 @@ export default function StorageTab({
             <div className="mt-2.5 w-full bg-app-input-surface rounded-full h-2.5 overflow-hidden flex border border-app-border">
               {storageSummary && (
                 <>
-                  <div 
-                    className="bg-blue-500 h-full transition-all" 
-                    style={{ width: `${Math.max(1, ((storageSummary.used_bytes || 0) / (storageSummary.total_bytes || 10240 * 1024 * 1024)) * 100)}%` }} 
-                    title={t('settings.filesAndDocuments')}
-                  ></div>
+                  <Tooltip content={t('settings.filesAndDocuments')} side="top">
+                    <div 
+                      className="bg-blue-500 h-full transition-all cursor-pointer" 
+                      style={{ width: `${Math.max(1, ((storageSummary.used_bytes || 0) / (storageSummary.total_bytes || 10240 * 1024 * 1024)) * 100)}%` }} 
+                      aria-label={t('settings.filesAndDocuments')}
+                    />
+                  </Tooltip>
                 </>
               )}
             </div>

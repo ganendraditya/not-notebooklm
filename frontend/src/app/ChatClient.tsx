@@ -9,6 +9,7 @@ import SettingsModal from "@/components/SettingsModal";
 import LibraryView from "@/components/LibraryView";
 import SearchChatsView from "@/components/SearchChatsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useTranslation } from "@/lib/i18n";
 import { useChatStore, type ChatSession, type ChatMessage } from "@/stores/chatStore";
 import { useDocumentStore, type Document, type PendingSourceItem } from "@/stores/documentStore";
@@ -183,13 +184,15 @@ export default function ChatClient() {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
-              title="Settings"
-            >
-              <Settings size={17} />
-            </button>
+            <Tooltip content={t('settings.title') || "Settings"} side="bottom">
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
+                aria-label={t('settings.title') || "Settings"}
+              >
+                <Settings size={17} />
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -245,12 +248,14 @@ export default function ChatClient() {
               )}
             </button>
           ) : (
-            <div
-              className="flex-1 py-2.5 text-center relative text-app-text-dim cursor-not-allowed select-none opacity-40"
-              title={t('nav.sourcesDisabledTooltip')}
-            >
-              <span>{t('nav.sources')}</span>
-            </div>
+            <Tooltip content={t('nav.sourcesDisabledTooltip')} side="top">
+              <div
+                className="flex-1 py-2.5 text-center relative text-app-text-dim cursor-not-allowed select-none opacity-40"
+                aria-label={t('nav.sourcesDisabledTooltip')}
+              >
+                <span>{t('nav.sources')}</span>
+              </div>
+            </Tooltip>
           )}
         </div>
       </div>

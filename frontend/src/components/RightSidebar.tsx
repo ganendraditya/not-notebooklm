@@ -235,7 +235,7 @@ export default function RightSidebar({
     const citationsCount = paperDetails?.citations !== undefined ? paperDetails.citations : 0;
     const doiStr = paperDetails?.doi || "";
     const cleanAbstract = cleanHtmlAbstract(paperDetails?.abstract) || (isLoadingDetails ? "" : t('right.noAbstractProvided'));
-    const landingUrl = paperDetails?.url || (doiStr ? "https://doi.org/$" : "");
+    const landingUrl = paperDetails?.url || (doiStr ? `https://doi.org/${doiStr}` : "");
 
     return (
       <DocumentReader
