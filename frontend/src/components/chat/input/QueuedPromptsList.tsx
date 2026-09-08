@@ -3,6 +3,7 @@
 import React from "react";
 import { ArrowRight, Pencil, Trash2 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface QueuedPromptsListProps {
   queuedPrompts: string[];
@@ -46,30 +47,36 @@ export function QueuedPromptsList({
             </p>
 
             <div className="flex items-center gap-1 shrink-0">
-              <button
-                type="button"
-                onClick={() => onPromoteQueuedPrompt?.(qIdx)}
-                className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                title={t("chat.switchProcess")}
-              >
-                <ArrowRight size={14} className="text-blue-500" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onEditQueuedPrompt?.(qText, qIdx)}
-                className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
-                title={t("chat.editQueued")}
-              >
-                <Pencil size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onRemoveQueuedPrompt?.(qIdx)}
-                className="p-1.5 text-app-text-muted hover:text-red-500 hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
-                title={t("chat.removeQueued")}
-              >
-                <Trash2 size={13} />
-              </button>
+              <Tooltip content={t("chat.switchProcess")} side="top">
+                <button
+                  type="button"
+                  onClick={() => onPromoteQueuedPrompt?.(qIdx)}
+                  className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                  aria-label={t("chat.switchProcess")}
+                >
+                  <ArrowRight size={14} className="text-blue-500" />
+                </button>
+              </Tooltip>
+              <Tooltip content={t("chat.editQueued")} side="top">
+                <button
+                  type="button"
+                  onClick={() => onEditQueuedPrompt?.(qText, qIdx)}
+                  className="p-1.5 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
+                  aria-label={t("chat.editQueued")}
+                >
+                  <Pencil size={13} />
+                </button>
+              </Tooltip>
+              <Tooltip content={t("chat.removeQueued")} side="top">
+                <button
+                  type="button"
+                  onClick={() => onRemoveQueuedPrompt?.(qIdx)}
+                  className="p-1.5 text-app-text-muted hover:text-red-500 hover:bg-app-item-hover rounded-lg transition-colors cursor-pointer"
+                  aria-label={t("chat.removeQueued")}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </Tooltip>
             </div>
           </div>
         ))}

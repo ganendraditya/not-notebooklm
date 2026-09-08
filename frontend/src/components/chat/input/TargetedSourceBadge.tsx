@@ -4,6 +4,7 @@ import React from "react";
 import { FileText, X } from "lucide-react";
 import { TargetedSource } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
+import { Tooltip } from "@/components/ui/tooltip";
 
 interface TargetedSourceBadgeProps {
   targetedSource: TargetedSource | null;
@@ -26,14 +27,16 @@ export function TargetedSourceBadge({
           Focusing on: <strong className="font-semibold text-white">{targetedSource.title || targetedSource.filename}</strong>
         </span>
       </div>
-      <button
-        type="button"
-        onClick={onClearTargetedSource}
-        className="p-1 text-app-text-muted hover:text-app-text rounded-md hover:bg-app-item-hover transition-colors shrink-0 cursor-pointer"
-        title={t("chat.clearTargeted")}
-      >
-        <X size={14} />
-      </button>
+      <Tooltip content={t("chat.clearTargeted")} side="top">
+        <button
+          type="button"
+          onClick={onClearTargetedSource}
+          className="p-1 text-app-text-muted hover:text-app-text rounded-md hover:bg-app-item-hover transition-colors shrink-0 cursor-pointer"
+          aria-label={t("chat.clearTargeted")}
+        >
+          <X size={14} />
+        </button>
+      </Tooltip>
     </div>
   );
 }

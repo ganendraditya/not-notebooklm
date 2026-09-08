@@ -186,12 +186,14 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
             const hasSelection = selectedCount > 0;
             const canDownload = hasSelection && !isBulkDownloading;
             const tooltipText = isBulkDownloading
-              ? t('right.downloading')
+              ? (t('download.preparing') || "Downloading...")
               : selectedCount === 0
-              ? t('right.selectToDownload')
+              ? (t('right.selectToDownload') || "Select sources to download")
               : selectedCount === 1
-              ? (selectedDocList[0]?.has_full_pdf !== false ? t('right.downloadSelectedPdf') : t('right.downloadSelectedText'))
-              : t('right.downloadSelectedZip').replace('{n}', selectedCount.toString());
+              ? (selectedDocList[0]?.has_full_pdf !== false 
+                  ? (t('right.downloadPdf') || "Download manuscript PDF") 
+                  : (t('right.downloadFile') || "Download document text"))
+              : (t('right.downloadSelected')?.replace('{n}', selectedCount.toString()) || `Download ${selectedCount} selected files`);
 
             return (
               <Tooltip content={tooltipText} side="bottom">

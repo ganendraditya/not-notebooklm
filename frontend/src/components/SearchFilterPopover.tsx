@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "@/lib/i18n";
 import { Portal } from "@/components/ui/Portal";
+import { Tooltip } from "@/components/ui/tooltip";
 import { 
   X, 
   SlidersHorizontal, 
@@ -92,24 +93,26 @@ export default function SearchFilterPopover({
   return (
     <div className="relative inline-block text-left select-none text-app-text" ref={containerRef}>
       {/* Trigger Button: Always display pill with Text + Icon */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className={
-          appliedCount > 0 
-            ? "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-500 font-medium shadow-sm" 
-            : "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-app-item-hover hover:bg-app-item-active border-app-border text-app-text-muted hover:text-app-text font-medium"
-        }
-        title={t('filter.button')}
-      >
-        <SlidersHorizontal size={13} className={appliedCount > 0 ? "text-blue-500" : "text-app-text-dim"} />
-        <span>{t('filter.button')}</span>
-        {appliedCount > 0 && (
-          <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-mono font-semibold">
-            {appliedCount}
-          </span>
-        )}
-      </button>
+      <Tooltip content={appliedCount > 0 ? `${t('filter.button')} (${appliedCount})` : t('filter.button')} side="top">
+        <button
+          type="button"
+          onClick={onToggle}
+          className={
+            appliedCount > 0 
+              ? "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-500 font-medium shadow-sm" 
+              : "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-app-item-hover hover:bg-app-item-active border-app-border text-app-text-muted hover:text-app-text font-medium"
+          }
+          aria-label={t('filter.button')}
+        >
+          <SlidersHorizontal size={13} className={appliedCount > 0 ? "text-blue-500" : "text-app-text-dim"} />
+          <span>{t('filter.button')}</span>
+          {appliedCount > 0 && (
+            <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-mono font-semibold">
+              {appliedCount}
+            </span>
+          )}
+        </button>
+      </Tooltip>
 
       {/* Centered Modal Overlay (Option 1: Centered Dialog with Backdrop) */}
       {isOpen && (
