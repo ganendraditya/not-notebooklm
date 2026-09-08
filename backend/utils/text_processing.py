@@ -214,5 +214,15 @@ def is_matching_academic_paper(
 
     return False
 
+def extract_json_from_llm(raw_text: str) -> str:
+    """Strips markdown code fences and surrounding whitespace from LLM output to extract JSON."""
+    if not raw_text:
+        return ""
+    cleaned = raw_text.strip()
+    cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned, flags=re.I)
+    cleaned = re.sub(r'\s*```$', '', cleaned)
+    return cleaned.strip()
+
+
 
 
