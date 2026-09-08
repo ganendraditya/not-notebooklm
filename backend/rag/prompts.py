@@ -17,6 +17,7 @@ def get_general_chat_system_prompt() -> str:
         "OUTPUT CLEANLINESS CONSTRAINTS (STRICT):\n"
         "- DO NOT output internal ReAct reasoning traces (e.g. 'Thought:', 'Action:', 'Observation:', 'Answer:'). Output only clean, direct markdown for the user.\n"
         "- DO NOT invent fake interactive HTML or pseudo-buttons (such as '[Lihat Bukti]' or '🔍 Bukti').\n"
+        "- STRICTLY FORBIDDEN: DO NOT write raw HTML tags or anchor tags (e.g. <a id='...'></a>, <a name='...'>, <span id='...'>, or <a href='#...'>). Standard clean markdown only.\n"
         "- INTERACTIVE CITATIONS & UI INTEGRATION: The platform UI natively and automatically transforms standard markdown citations like [1], [2], or [1, 2] (and in table cells like '77,78% [1]') into clickable buttons that open the document and highlight the source sentence. NEVER refuse or say you cannot create buttons/scripts; simply output standard bracketed citations [X]."
     )
 
@@ -88,9 +89,12 @@ def get_workspace_analysis_system_prompt(doc_count: int) -> str:
         "   - Always output strictly ONE single Master Table encompassing all documents (1 row = 1 document).\n"
         "   - Standard columns: `Dokumen / Judul | Metode yang Dipakai | Temuan Utama | Limitasi | Rekomendasi`.\n"
         "   - STRICTLY FORBIDDEN: NEVER create separate sub-tables per document.\n"
+        "   - STRICTLY FORBIDDEN: NEVER put documents as table column headers (e.g. Columns: Dokumen 1 | Dokumen 2 | Dokumen 3). ALWAYS format rows as documents (1 row = 1 document) and columns as evaluation criteria/metrics.\n"
+        "   - TABLE ALIGNMENT: Left-align text columns (`:---`), right-align numeric/metric/percentage/year columns (`---:`), and center-align status/ID columns (`:---:`).\n"
         "   - IN EVERY TABLE CELL: Attach bracketed citations [1], [2], etc. directly beside EVERY factual claim and metric.\n\n"
         "4. ZERO MANUAL QUOTE DUMP & CLEANLINESS CONSTRAINTS:\n"
         "   - DO NOT dump raw manual quotes, quote lists, anchor tags, or verification headings (e.g. '### Bukti Tekstual' or '### Panel Verifikasi') in the response body.\n"
+        "   - STRICTLY FORBIDDEN: NEVER write HTML anchor tags (like `<a id='...'></a>`, `<a name='...'>`, or `<a>`), fake anchor links (`#doc1`), or raw HTML tags. Only output clean, standard markdown syntax! The platform frontend handles all citation linking and document navigation automatically.\n"
         "   - DO NOT invent fake interactive HTML or pseudo-buttons (such as '[Lihat Bukti]' or '🔍 Bukti').\n"
         "   - DO NOT include ReAct thoughts ('Thought:', 'Action:', 'Observation:').\n"
         "   - Store all exact verbatim sentences strictly in the structured <!-- CITATION_MAP --> block at the very end.\n\n"

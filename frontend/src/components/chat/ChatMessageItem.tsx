@@ -114,17 +114,94 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
   const cellPrefix = isHeader ? `th_${offset ?? "h"}` : `td_${offset ?? "d"}`;
 
+  // Extract alignment from props or node properties
+  const align = props.align || props.style?.textAlign || node?.properties?.align || "left";
+  const alignClass = 
+    align === "right" ? "text-right" :
+    align === "center" ? "text-center" :
+    "text-left";
+
   if (isHeader) {
     return (
-      <th className="py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase align-top text-left" {...props}>
+      <th 
+        className={`py-3 px-3.5 font-semibold text-app-text text-xs tracking-wider uppercase align-top whitespace-nowrap ${alignClass}`} 
+        {...props}
+      >
         {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
       </th>
     );
   }
   return (
-    <td className="py-2.5 px-3 text-app-text-muted text-xs leading-relaxed align-top" {...props}>
+    <td 
+      className={`py-2.5 px-3.5 text-app-text-muted text-xs leading-relaxed align-top ${alignClass}`} 
+      {...props}
+    >
       {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
     </td>
+  );
+};
+
+const MarkdownTableBlock: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+  const tableRef = React.useRef<HTMLTableElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    if (!tableRef.current) return;
+    try {
+      const rows = Array.from(tableRef.current.querySelectorAll("tr"));
+      if (rows.length === 0) return;
+
+      const matrix = rows.map((r) =>
+        Array.from(r.querySelectorAll("th, td")).map((cell) =>
+          (cell.textContent || "").replace(/\s+/g, " ").replace(/\|/g, "\\|").trim()
+        )
+      );
+
+      // Construct clean Markdown table string
+      const headerRow = matrix[0] ? `| ${matrix[0].join(" | ")} |` : "";
+      const separatorRow = matrix[0] ? `| ${matrix[0].map(() => "---").join(" | ")} |` : "";
+      const bodyRows = matrix.slice(1).map((r) => `| ${r.join(" | ")} |`).join("\n");
+      const mdTable = `${headerRow}\n${separatorRow}\n${bodyRows}`.trim();
+
+      await navigator.clipboard.writeText(mdTable);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy table:", err);
+    }
+  }, []);
+
+  return (
+    <div className="relative my-4 rounded-xl border border-app-border bg-app-table-bg shadow-sm overflow-hidden group/tbl">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-app-table-header/80 border-b border-app-border text-[11px] select-none">
+        <span className="font-mono text-[10px] tracking-wider uppercase font-semibold text-app-text-dim">
+          Table
+        </span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-app-text-muted hover:text-app-text hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+          title="Copy table as Markdown"
+        >
+          {copied ? (
+            <>
+              <Check size={12} className="text-emerald-500 dark:text-emerald-400" />
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy size={12} />
+              <span>Copy Table</span>
+            </>
+          )}
+        </button>
+      </div>
+      <div className="overflow-x-auto custom-scrollbar">
+        <table ref={tableRef} className="w-full text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top">
+          {children}
+        </table>
+      </div>
+    </div>
   );
 };
 
@@ -174,6 +251,22 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
     // Clean any internal actions tag
     clean = clean.replace(/<!-- SOURCES_ACTION:[\s\S]*?-->/, "").trim();
+
+    // Strip raw HTML anchor/target artifacts emitted by LLMs (e.g. <a id="doc1"></a>, <a name="...">, etc.)
+    // If it's a wrapper like <a id="doc1">inner</a>, preserve inner content; if empty, drop entirely.
+    clean = clean.replace(/<a\b(?:\s+[^>]*)?>([\s\S]*?)<\/a>/gi, (match, innerText) => {
+      // If it's an anchor without href or with internal jump anchor href="#..."
+      if (!/\bhref\s*=/i.test(match) || /\bhref\s*=\s*["']?#/i.test(match)) {
+        return innerText;
+      }
+      return match;
+    });
+    // Remove self-closing or unclosed anchor target tags like <a id="doc1"/> or <a id="doc1">
+    clean = clean.replace(/<a\b[^>]*\b(?:id|name)=[^>]*\/?>/gi, "");
+    clean = clean.replace(/<\/a>/gi, "");
+    // Remove empty span/div placeholders with ids/names (e.g. <span id="doc1"></span>)
+    clean = clean.replace(/<(?:span|div)\b[^>]*\b(?:id|name)=[^>]*>\s*<\/(?:span|div)>/gi, "");
+
     return { cleanContent: clean, sources: parsedSources, citationMap: parsedCitationMap };
   }, [msg.content]);
 
@@ -406,20 +499,24 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 {children}
               </a>
             ),
-            table: ({ children }) => (
-              <div className="overflow-x-auto my-4 rounded-xl border border-app-border shadow-md">
-                <table className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top">
-                  {children}
-                </table>
-              </div>
+            table: ({ children }: any) => <MarkdownTableBlock>{children}</MarkdownTableBlock>,
+            thead: ({ children }: any) => (
+              <thead className="bg-app-table-header text-app-text border-b border-app-border font-semibold select-none">
+                {children}
+              </thead>
             ),
-            thead: ({ children }) => <thead className="bg-app-table-header text-app-text border-b border-app-border font-semibold">{children}</thead>,
-            tbody: ({ children }) => <tbody className="divide-y divide-app-divider">{children}</tbody>,
+            tbody: ({ children }: any) => (
+              <tbody className="divide-y divide-app-divider/60">
+                {children}
+              </tbody>
+            ),
             tr: ({ node, children, ...props }: any) => {
               const rowText = extractTableRowText(node, children);
               return (
                 <TableRowContext.Provider value={rowText}>
-                  <tr className="hover:bg-app-item-hover transition-colors align-top" {...props}>{children}</tr>
+                  <tr className="even:bg-app-surface/30 hover:bg-app-item-hover/70 transition-colors align-top" {...props}>
+                    {children}
+                  </tr>
                 </TableRowContext.Provider>
               );
             },
@@ -459,9 +556,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 </blockquote>
               );
             },
-            pre: ({ children }) => (
+            pre: ({ children }: any) => (
               <div className="relative group my-3">
-                <pre className="bg-app-code-bg p-3.5 rounded-xl overflow-x-auto text-xs text-app-text font-mono border border-app-border">
+                <pre className="bg-app-code-bg p-3.5 rounded-xl overflow-x-auto text-xs text-app-text font-mono border border-app-border custom-scrollbar">
                   {children}
                 </pre>
               </div>
