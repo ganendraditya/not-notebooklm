@@ -10,6 +10,14 @@ def normalize_title_str(t: str) -> str:
     t = re.sub(r'[^a-zA-Z0-9\s]', ' ', t).lower()
     return " ".join(t.split())
 
+GENERIC_TITLE_BLACKLIST = {
+    "article in press", "in press", "journal pre-proof", "uncorrected proof",
+    "corrected proof", "original article", "research article", "full length article",
+    "short communication", "review article", "full paper", "research paper",
+    "accepted manuscript", "author's copy", "analytical index", "index",
+    "abstract", "abstrak", "overview", "paper", "document",
+}
+
 def is_valid_academic_title(title: str) -> bool:
     """Quality filter to exclude non-scholarly publication artifacts, covers, and TOCs."""
     t = title.lower().strip()
@@ -23,15 +31,7 @@ def is_valid_academic_title(title: str) -> bool:
     ]
     if any(j in t for j in junk_patterns):
         return False
-    # Reject generic publisher artifact headers that are not real paper titles
-    generic_exact = {
-        "article in press", "in press", "journal pre-proof", "uncorrected proof",
-        "corrected proof", "original article", "research article", "full length article",
-        "short communication", "review article", "full paper", "research paper",
-        "accepted manuscript", "author's copy", "analytical index", "index",
-        "abstract", "abstrak", "overview", "paper", "document",
-    }
-    if t in generic_exact:
+    if t in GENERIC_TITLE_BLACKLIST:
         return False
     return True
 
