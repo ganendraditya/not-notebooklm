@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { type ChatMessage, type Attachment } from "@/stores/chatStore";
 import { consumeSSEStream } from "@/lib/sse";
 import { sendSystemNotification } from "@/lib/notifications";
+import { createSmoothTextStreamer } from "@/lib/smoothStreamer";
 
 // Queue now needs to store attachments too
 export interface QueuedMessage {
@@ -96,51 +97,29 @@ export function useChatStream(
         signal: controller.signal
       });
 
-      await consumeSSEStream(res, (data: any) => {
-        if (data.type === "title_update" && data.title) {
-          const updatedTitle = data.title;
-          updateSessionsList(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
+      let latestAsstMsg: any = null;
+
+      const smoother = createSmoothTextStreamer({
+        onUpdate: (displayed) => {
           if (activeChatIdRef.current === targetChatId) {
-            document.title = `${updatedTitle} - NotbookLM`;
-          }
-        } else if (data.type === "status") {
-          const statusText = data.text || data.data;
-          if (statusText) {
-            job.status = statusText;
-            if (activeChatIdRef.current === targetChatId) {
-              setActiveStatus(statusText);
-            }
-          }
-        } else if (data.type === "clear_delta" || data.type === "reset_stream") {
-          if (activeChatIdRef.current === targetChatId) {
-            updateMessagesList(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-                return [...prev.slice(0, -1), { ...lastMsg, content: "" }];
-              }
-              return prev;
-            });
-          }
-        } else if (data.type === "delta") {
-          const chunkText = data.text ?? data.data ?? "";
-          if (chunkText && activeChatIdRef.current === targetChatId) {
             updateMessagesList(prev => {
               const lastMsg = prev[prev.length - 1];
               if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
                 return [
                   ...prev.slice(0, -1),
-                  { ...lastMsg, content: lastMsg.content + chunkText }
+                  { ...lastMsg, content: displayed }
                 ];
               } else {
                 return [
                   ...prev,
-                  { role: "assistant", content: chunkText, created_at: new Date().toISOString(), isStreaming: true }
+                  { role: "assistant", content: displayed, created_at: new Date().toISOString(), isStreaming: true }
                 ];
               }
             });
           }
-        } else if (data.type === "done") {
-          const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
+        },
+        onDone: () => {
+          const asstMsg = latestAsstMsg || { role: "assistant", content: "", created_at: new Date().toISOString() };
           if (activeChatIdRef.current === targetChatId) {
             updateMessagesList(prev => {
               const lastMsg = prev[prev.length - 1];
@@ -180,7 +159,36 @@ export function useChatStream(
               console.error("Failed to parse sources action:", e);
             }
           }
+        }
+      });
+
+      await consumeSSEStream(res, (data: any) => {
+        if (data.type === "title_update" && data.title) {
+          const updatedTitle = data.title;
+          updateSessionsList(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
+          if (activeChatIdRef.current === targetChatId) {
+            document.title = `${updatedTitle} - NotbookLM`;
+          }
+        } else if (data.type === "status") {
+          const statusText = data.text || data.data;
+          if (statusText) {
+            job.status = statusText;
+            if (activeChatIdRef.current === targetChatId) {
+              setActiveStatus(statusText);
+            }
+          }
+        } else if (data.type === "clear_delta" || data.type === "reset_stream") {
+          smoother.reset("");
+        } else if (data.type === "delta") {
+          const chunkText = data.text ?? data.data ?? "";
+          if (chunkText) {
+            smoother.pushDelta(chunkText);
+          }
+        } else if (data.type === "done") {
+          latestAsstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
+          smoother.finish();
         } else if (data.type === "error") {
+          smoother.stop();
           const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
           if (activeChatIdRef.current === targetChatId) {
             updateMessagesList(prev => [...prev, errorMsg]);
@@ -344,6 +352,69 @@ export function useChatStream(
       updateMessagesList(prev => [...prev.slice(0, messageIndex), updatedUserMsg, assistantPlaceholder]);
     }
 
+    let latestAsstMsg: any = null;
+
+    const smoother = createSmoothTextStreamer({
+      onUpdate: (displayed) => {
+        if (activeChatIdRef.current === currentChatId) {
+          updateMessagesList(prev => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+              return [
+                ...prev.slice(0, -1),
+                { ...lastMsg, content: displayed }
+              ];
+            } else {
+              return [
+                ...prev,
+                { role: "assistant", content: displayed, created_at: new Date().toISOString(), isStreaming: true }
+              ];
+            }
+          });
+        }
+      },
+      onDone: () => {
+        const asstMsg = latestAsstMsg || { role: "assistant", content: "", created_at: new Date().toISOString() };
+        if (activeChatIdRef.current === currentChatId) {
+          updateMessagesList(prev => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+              return [...prev.slice(0, -1), { ...asstMsg, isStreaming: false }];
+            }
+            return [...prev, asstMsg];
+          });
+        }
+
+        const cleanPreview = (asstMsg.content || "")
+          .replace(/<!--[\s\S]*?-->/g, "")
+          .replace(/\[\^(\d+)\]/g, "")
+          .trim();
+        sendSystemNotification({
+          category: "responses",
+          title: "NotbookLM: Edit Selesai",
+          body: cleanPreview || "Pesan telah berhasil diperbarui."
+        });
+
+        const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
+        if (actionMatch) {
+          try {
+            const actionObj = JSON.parse(actionMatch[1]);
+            if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
+              const idSet = new Set(actionObj.deleted_doc_ids);
+              if (activeChatIdRef.current === currentChatId) {
+                updateDocumentsList(prev => {
+                  const remaining = prev.filter(d => !idSet.has(d.id));
+                  return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                });
+              }
+            }
+          } catch (e) {
+            console.error("Failed to parse sources action:", e);
+          }
+        }
+      }
+    });
+
     try {
       const res = await fetch(`${backendUrl}/chats/${currentChatId}/edit_message_stream`, {
         method: "POST",
@@ -365,73 +436,17 @@ export function useChatStream(
             }
           }
         } else if (data.type === "clear_delta" || data.type === "reset_stream") {
-          if (activeChatIdRef.current === currentChatId) {
-            updateMessagesList(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-                return [...prev.slice(0, -1), { ...lastMsg, content: "" }];
-              }
-              return prev;
-            });
-          }
+          smoother.reset("");
         } else if (data.type === "delta") {
           const chunkText = data.text ?? data.data ?? "";
-          if (chunkText && activeChatIdRef.current === currentChatId) {
-            updateMessagesList(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-                return [
-                  ...prev.slice(0, -1),
-                  { ...lastMsg, content: lastMsg.content + chunkText }
-                ];
-              } else {
-                return [
-                  ...prev,
-                  { role: "assistant", content: chunkText, created_at: new Date().toISOString(), isStreaming: true }
-                ];
-              }
-            });
+          if (chunkText) {
+            smoother.pushDelta(chunkText);
           }
         } else if (data.type === "done") {
-          const asstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
-          if (activeChatIdRef.current === currentChatId) {
-            updateMessagesList(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-                return [...prev.slice(0, -1), { ...asstMsg, isStreaming: false }];
-              }
-              return [...prev, asstMsg];
-            });
-          }
-
-          const cleanPreview = (asstMsg.content || "")
-            .replace(/<!--[\s\S]*?-->/g, "")
-            .replace(/\[\^(\d+)\]/g, "")
-            .trim();
-          sendSystemNotification({
-            category: "responses",
-            title: "NotbookLM: Edit Selesai",
-            body: cleanPreview || "Pesan telah berhasil diperbarui."
-          });
-
-          const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
-          if (actionMatch) {
-            try {
-              const actionObj = JSON.parse(actionMatch[1]);
-              if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
-                const idSet = new Set(actionObj.deleted_doc_ids);
-                if (activeChatIdRef.current === currentChatId) {
-                  updateDocumentsList(prev => {
-                    const remaining = prev.filter(d => !idSet.has(d.id));
-                    return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                  });
-                }
-              }
-            } catch (e) {
-              console.error("Failed to parse sources action:", e);
-            }
-          }
+          latestAsstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
+          smoother.finish();
         } else if (data.type === "error") {
+          smoother.stop();
           const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
           if (activeChatIdRef.current === currentChatId) {
             updateMessagesList(prev => [...prev, errorMsg]);
@@ -444,6 +459,7 @@ export function useChatStream(
         }
       });
     } catch (err: any) {
+      smoother.stop();
       if (err?.name === "AbortError") {
         console.log(`Edit request aborted for chat ${currentChatId}`);
       } else {
@@ -499,6 +515,71 @@ export function useChatStream(
 
     bumpSessionToTop(currentChatId);
 
+    let latestAsstMsg: any = null;
+
+    const smoother = createSmoothTextStreamer({
+      onUpdate: (displayed) => {
+        if (activeChatIdRef.current === currentChatId) {
+          updateMessagesList(prev => {
+            const next = [...prev];
+            const target = next[messageIndex];
+            if (target && target.role === "assistant") {
+              next[messageIndex] = { ...target, content: displayed, isStreaming: true };
+            } else {
+              next[messageIndex] = { role: "assistant", content: displayed, created_at: new Date().toISOString(), isStreaming: true };
+            }
+            return next;
+          });
+        }
+      },
+      onDone: () => {
+        const asstMsg = latestAsstMsg || {
+          role: "assistant",
+          content: "",
+          created_at: new Date().toISOString()
+        };
+        if (activeChatIdRef.current === currentChatId) {
+          updateMessagesList(prev => {
+            const next = prev.slice(0, messageIndex + 1);
+            if (next[messageIndex]) {
+              next[messageIndex] = { ...asstMsg, isStreaming: false };
+            } else {
+              next.push(asstMsg);
+            }
+            return next;
+          });
+        }
+
+        const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
+        if (actionMatch) {
+          try {
+            const actionObj = JSON.parse(actionMatch[1]);
+            if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
+              const idSet = new Set(actionObj.deleted_doc_ids);
+              if (activeChatIdRef.current === currentChatId) {
+                updateDocumentsList(prev => {
+                  const remaining = prev.filter(d => !idSet.has(d.id));
+                  return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+                });
+              }
+            }
+          } catch (e) {
+            console.error("Failed to parse SOURCES_ACTION in regenerated response:", e);
+          }
+        }
+
+        const cleanPreview = (asstMsg.content || "")
+          .replace(/<!--[\s\S]*?-->/g, "")
+          .replace(/\[\^(\d+)\]/g, "")
+          .trim();
+        sendSystemNotification({
+          category: "responses",
+          title: "NotbookLM: Regenerate Selesai",
+          body: cleanPreview || "Jawaban baru telah berhasil di-generate."
+        });
+      }
+    });
+
     try {
       const res = await fetch(`${backendUrl}/chats/${currentChatId}/regenerate_stream`, {
         method: "POST",
@@ -519,80 +600,25 @@ export function useChatStream(
             }
           }
         } else if (data.type === "clear_delta" || data.type === "reset_stream") {
-          if (activeChatIdRef.current === currentChatId) {
-            updateMessagesList(prev => {
-              const next = [...prev];
-              const target = next[messageIndex];
-              if (target && target.role === "assistant") {
-                next[messageIndex] = { ...target, content: "" };
-              }
-              return next;
-            });
-          }
+          smoother.reset("");
         } else if (data.type === "delta") {
           const chunkText = data.text ?? data.data ?? "";
-          if (chunkText && activeChatIdRef.current === currentChatId) {
-            updateMessagesList(prev => {
-              const next = [...prev];
-              const target = next[messageIndex];
-              if (target && target.role === "assistant") {
-                next[messageIndex] = { ...target, content: target.content + chunkText, isStreaming: true };
-              } else {
-                next[messageIndex] = { role: "assistant", content: chunkText, created_at: new Date().toISOString(), isStreaming: true };
-              }
-              return next;
-            });
+          if (chunkText) {
+            smoother.pushDelta(chunkText);
           }
         } else if (data.type === "done") {
-          const asstMsg = data.message || {
+          latestAsstMsg = data.message || {
             role: "assistant",
             content: data.data || "",
             variants: data.variants,
             active_variant_index: data.active_variant_index,
             created_at: new Date().toISOString()
           };
-          if (activeChatIdRef.current === currentChatId) {
-            updateMessagesList(prev => {
-              const next = prev.slice(0, messageIndex + 1);
-              if (next[messageIndex]) {
-                next[messageIndex] = { ...asstMsg, isStreaming: false };
-              } else {
-                next.push(asstMsg);
-              }
-              return next;
-            });
-          }
-
-          const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
-          if (actionMatch) {
-            try {
-              const actionObj = JSON.parse(actionMatch[1]);
-              if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
-                const idSet = new Set(actionObj.deleted_doc_ids);
-                if (activeChatIdRef.current === currentChatId) {
-                  updateDocumentsList(prev => {
-                    const remaining = prev.filter(d => !idSet.has(d.id));
-                    return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                  });
-                }
-              }
-            } catch (e) {
-              console.error("Failed to parse SOURCES_ACTION in regenerated response:", e);
-            }
-          }
-
-          const cleanPreview = (asstMsg.content || "")
-            .replace(/<!--[\s\S]*?-->/g, "")
-            .replace(/\[\^(\d+)\]/g, "")
-            .trim();
-          sendSystemNotification({
-            category: "responses",
-            title: "NotbookLM: Regenerate Selesai",
-            body: cleanPreview || "Jawaban baru telah berhasil di-generate."
-          });
+          smoother.finish();
         }
       });
     } catch (err: any) {
+      smoother.stop();
       if (err?.name === "AbortError") {
         console.log(`Regenerate request aborted for chat ${currentChatId}`);
       } else {

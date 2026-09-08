@@ -255,25 +255,6 @@ def get_candidate_llm_chain():
     return candidate_llms
 
 
-async def _emit_tokens_progressively(chunk: str, on_delta: Callable[[str], Any]):
-    """Smooths out token bursts from proxy/gateway buffering to achieve a fluid, frontier-model typewriter effect."""
-    if not chunk:
-        return
-    words = chunk.split(" ")
-    if len(words) <= 2 or len(chunk) < 15:
-        res = on_delta(chunk)
-        if inspect.isawaitable(res):
-            await res
-        return
-
-    for idx, w in enumerate(words):
-        piece = w if idx == len(words) - 1 else w + " "
-        res = on_delta(piece)
-        if inspect.isawaitable(res):
-            await res
-        await asyncio.sleep(0.015)
-
-
 async def astream_llm_response(
     target_llm: Any,
     chat_msgs: list,
@@ -291,7 +272,9 @@ async def astream_llm_response(
                 token = chunk.delta or ""
                 if token:
                     full_content += token
-                    await _emit_tokens_progressively(token, on_delta)
+                    res = on_delta(token)
+                    if inspect.isawaitable(res):
+                        await res
             if full_content:
                 return full_content
         except Exception as e:
@@ -300,5 +283,7 @@ async def astream_llm_response(
     resp = await target_llm.achat(chat_msgs)
     full_content = resp.message.content or ""
     if on_delta and full_content:
-        await _emit_tokens_progressively(full_content, on_delta)
+        res = on_delta(full_content)
+        if inspect.isawaitable(res):
+            await res
     return full_content
