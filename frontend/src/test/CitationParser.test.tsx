@@ -99,4 +99,25 @@ describe("CitationParser", () => {
     expect(container.textContent).not.toContain("1]]");
     expect(container.textContent).not.toContain("[[1");
   });
+
+  it("parses Dokumen [X] syntax without leaving trailing square brackets", () => {
+    const docs = [
+      { id: 1, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" },
+      { id: 8, index: 8, filename: "Paper8.pdf", title: "Paper 8", created_at: "2026-01-01T00:00:00Z" },
+      { id: 10, index: 10, filename: "Paper10.pdf", title: "Paper 10", created_at: "2026-01-01T00:00:00Z" },
+    ];
+    const text = "Penerapan IndoBERT: Dokumen [8], [10], & [1]. Di bab kesimpulan, Dokumen [1] merekomendasikan.";
+    const result = parseCitationsInReactNode(text, docs);
+
+    const { container } = render(<div>{result}</div>);
+    const buttons = container.querySelectorAll("button");
+    expect(buttons.length).toBe(4);
+
+    // Text content must NOT have stray ']' after any button
+    expect(container.textContent).not.toContain("8] ]");
+    expect(container.textContent).not.toContain("[8] ]");
+    expect(container.textContent).not.toContain("1] ]");
+    expect(container.textContent).not.toContain("[1] ]");
+    expect(container.textContent).toBe("Penerapan IndoBERT: [8], [10], & [1]. Di bab kesimpulan, [1] merekomendasikan.");
+  });
 });

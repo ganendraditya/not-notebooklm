@@ -39,7 +39,7 @@ export function parseCitationsInReactNode(
     // Support standard and double bracket citations: [1], [[1]], [1]], [1, 2], [1]-[3], [Dokumen 1], [Document 1]
     // Also support fallback prefixes like [M-01], [T-01], [M-1], [T-1], [ref-1], [P-01], Dokumen [1], Dokumen 1:, Paper 1, Source 1, and isolated numbers in parenthesis like (1), (2)
     // Citation numbers correspond to document indices (1 to 500)
-    const regex = /(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*\[?(\d{1,3})\]?(?:\s*:|\b)|\bDokumen\s+(\d{1,3})\b|\((\d{1,3})\))/gi;
+    const regex = /(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}(\d{1,3})\s*\]{1,2}|(\d{1,3})(?::|\b))|\((\d{1,3})\))/gi;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
@@ -62,7 +62,7 @@ export function parseCitationsInReactNode(
           .map(c => c.trim())
           .filter(c => c.length > 0 && !/^\d+$/.test(c))
           .join(" . ")
-          .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
+          .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
           .replace(/<[^>]+>/g, " ")
           .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
           .trim();
@@ -99,7 +99,7 @@ export function parseCitationsInReactNode(
         
         contextSentence = searchBase
           .substring(sentenceStart, sentenceEnd)
-          .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
+          .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
           .replace(/<[^>]+>/g, " ")
           .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
           .trim();
@@ -108,7 +108,7 @@ export function parseCitationsInReactNode(
       // Fallback: If contextSentence is still too short or empty, fallback to effectiveFullText
       if (!contextSentence || contextSentence.length < 3) {
         contextSentence = effectiveFullText
-          .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
+          .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
           .replace(/<[^>]+>/g, " ")
           .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
           .trim();
