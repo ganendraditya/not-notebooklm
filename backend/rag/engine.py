@@ -5,26 +5,17 @@ import asyncio
 import inspect
 import logging
 from typing import List, Optional, Callable, Any
-import requests
-import pymupdf4llm
-from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 
 logger = logging.getLogger("uvicorn.error")
 
-from llama_index.core import VectorStoreIndex, Settings
-from llama_index.core.vector_stores.types import MetadataFilter, MetadataFilters, FilterOperator
-from llama_index.core.tools import FunctionTool
-from llama_index.core.agent import ReActAgent
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
 from .parsers import parse_document_to_markdown
-from .search import search_academic_papers
 from .intent import (
     is_simple_conversational,
     classify_user_intent
 )
-from .prompts import get_agentic_system_prompt
 from .formatters import format_clean_response
 from .vector_store import (
     embed_model,
@@ -50,93 +41,6 @@ from .pipelines import (
 )
 
 load_dotenv()
-
-# Setup variables
-Settings.embed_model = embed_model
-
-def web_search_and_ingest(query: str, chat_id: str) -> str:
-    """Searches scholarly databases (OpenAlex) and the web for research papers and articles."""
-    logger.info(f"[Agent] Searching papers/web for: {query}")
-    output_snippets = []
-    
-    academic_results = search_academic_papers(query, limit=5)
-    if academic_results:
-        for res in academic_results:
-            title = res.get('title', 'Untitled')
-            year = res.get('year', 'N/A')
-            url = res.get('url', '')
-            doi = res.get('doi', '')
-            snippet = res.get('snippet', '')
-            output_snippets.append(
-                f"- **Judul:** {title} ({year})\n"
-                f"  **DOI / URL:** {url or doi}\n"
-                f"  **Ringkasan / Abstrak:** {snippet}"
-            )
-            
-    if len(output_snippets) < 3:
-        try:
-            results = list(DDGS(timeout=4).text(query, max_results=3))
-            for res in results:
-                title = res.get('title', 'Untitled')
-                url = res.get('href', '')
-                snippet = res.get('body', '')
-                output_snippets.append(f"- **{title}**\n  URL: {url}\n  Snippet: {snippet}")
-        except Exception as e:
-            logger.debug(f"[Agent] Note: DDGS search skipped or timed out: {e}")
-        
-    if not output_snippets:
-        return f"No results found for query: '{query}'."
-                
-    return "Temuan paper dan artikel web:\n\n" + "\n\n".join(output_snippets)
-
-def fetch_and_ingest_doi(doi: str, chat_id: str) -> str:
-    """Uses OpenAlex API to find an Open Access PDF for a given DOI, downloads it, and ingests it."""
-    logger.info(f"[Agent] Fetching DOI: {doi}")
-    
-    match = re.search(r'10\.\d{4,9}/[-._;()/:A-Z0-9]+', doi, re.I)
-    if not match:
-        return f"Invalid DOI format: {doi}"
-    clean_doi = match.group(0)
-    
-    api_url = f"https://api.openalex.org/works/doi:{clean_doi}"
-    try:
-        resp = requests.get(api_url, timeout=10)
-        if resp.status_code != 200:
-            return f"Failed to fetch metadata for DOI {clean_doi}. (Status: {resp.status_code})"
-        
-        data = resp.json()
-        oa_info = data.get("open_access", {})
-        if not oa_info.get("is_oa"):
-            return f"The paper for DOI {clean_doi} is not Open Access (paywalled). Please upload the PDF manually."
-        
-        pdf_url = oa_info.get("oa_url")
-        if not pdf_url:
-            return f"Open Access URL not found for DOI {clean_doi}."
-            
-        logger.info(f"[Agent] Downloading PDF from {pdf_url}")
-        pdf_resp = requests.get(pdf_url, timeout=20, headers={"User-Agent": "NotbookLM-Research/1.0"})
-        if pdf_resp.status_code != 200:
-            return f"Failed to download PDF from {pdf_url}."
-
-        # Safety Check: Verify Content-Type & Authentic PDF Magic Bytes
-        from utils.pdf_utils import is_authentic_pdf_bytes
-        if not is_authentic_pdf_bytes(pdf_resp.content[:2048], min_size=1000):
-            return f"The Open Access URL for DOI {clean_doi} did not return a valid binary PDF (possible HTML landing page redirect)."
-            
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(pdf_resp.content)
-            tmp_path = tmp.name
-            
-        filename = f"{clean_doi.replace('/', '_')}.pdf"
-        md_text = pymupdf4llm.to_markdown(tmp_path)
-        ingest_document_text(md_text, filename, chat_id)
-        
-        os.remove(tmp_path)
-        return f"Successfully downloaded and saved Open Access paper for DOI: {clean_doi}. The user can now ask questions about it."
-        
-    except Exception as e:
-        return f"An error occurred while fetching DOI {clean_doi}: {str(e)}"
 
 async def generate_chat_title(first_user_message: str) -> str:
     """
@@ -247,35 +151,6 @@ def format_llama_history(chat_history: Optional[list] = None) -> List[LlamaChatM
         formatted_history.append(LlamaChatMessage(role=role, content=content))
     return formatted_history
 
-def build_rag_tools(chat_id: str, has_local_docs: bool, query_engine: Any) -> List[FunctionTool]:
-    """Builds FunctionTools for ReAct agentic execution."""
-    def search_local_documents(q: str) -> str:
-        """Use this tool ONLY if the user asks questions about content inside their uploaded PDF/documents."""
-        if not has_local_docs or not query_engine:
-            return "Tidak ada dokumen yang diunggah di chat ini. Silakan gunakan search_web_tool untuk mencari paper atau informasi di internet."
-        try:
-            result = str(query_engine.query(q))
-            if not result or result.strip() == "Empty Response":
-                return "Tidak ditemukan informasi spesifik di dokumen yang diunggah."
-            return result
-        except Exception as e:
-            return f"Tidak dapat membaca dokumen lokal: {str(e)}"
-        
-    local_search_tool = FunctionTool.from_defaults(fn=search_local_documents)
-    
-    def search_web_tool(q: str) -> str:
-        """Use this tool to search the web or find research papers, journal articles, and information online."""
-        return web_search_and_ingest(q, chat_id)
-        
-    web_tool = FunctionTool.from_defaults(fn=search_web_tool)
-    
-    def search_doi_tool(doi: str) -> str:
-        """Use this tool when the user provides a DOI to download and ingest the full paper."""
-        return fetch_and_ingest_doi(doi, chat_id)
-        
-    doi_tool = FunctionTool.from_defaults(fn=search_doi_tool)
-    return [local_search_tool, web_tool, doi_tool]
-
 async def dispatch_intent_pipeline(
     intent: str,
     chat_id: str,
@@ -284,8 +159,8 @@ async def dispatch_intent_pipeline(
     formatted_history: list,
     target_llm: Any,
     report_status: Callable,
-    tools: List[FunctionTool],
-    doc_context_info: str,
+    tools: Optional[List[Any]] = None,
+    doc_context_info: str = "",
     timeout_sec: float = 60.0,
     on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
@@ -297,7 +172,9 @@ async def dispatch_intent_pipeline(
             raw_res = await chat_pipeline.handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
             return format_clean_response(raw_res)
 
-        if intent == "REMOVE_SOURCES" and has_local_docs:
+        if intent == "REMOVE_SOURCES":
+            if not has_local_docs:
+                return "Tidak ada dokumen yang diimpor di sesi ini untuk dihapus."
             return await source_action_pipeline.handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
 
         if intent == "SEARCH_NEW":
@@ -308,7 +185,9 @@ async def dispatch_intent_pipeline(
                 return f"{cleaned_text}\n\n<!-- SOURCES_DATA:{parts[1]}"
             return format_clean_response(raw_res)
 
-        if intent == "ANALYZE_WORKSPACE" and has_local_docs:
+        if intent == "ANALYZE_WORKSPACE":
+            if not has_local_docs:
+                return "Sesi percakapan ini belum memiliki dokumen referensi. Silakan unggah dokumen PDF atau gunakan fitur pencarian paper untuk menambahkan referensi terlebih dahulu."
             return await workspace_pipeline.handle_workspace_analysis_pipeline(
                 chat_id=chat_id,
                 query=query,
@@ -319,19 +198,9 @@ async def dispatch_intent_pipeline(
                 on_delta=on_delta
             )
 
-        # Agentic fallback path
-        await report_status("Executing agent reasoning & searching academic sources...")
-        agent = ReActAgent(
-            tools=tools, 
-            llm=target_llm, 
-            verbose=False,
-            streaming=False,
-            max_iterations=6,
-            timeout=timeout_sec,
-            system_prompt=get_agentic_system_prompt(doc_context_info)
-        )
-        res = await agent.run(user_msg=query, chat_history=formatted_history if formatted_history else None)
-        return format_clean_response(str(res))
+        # Clean fallback path to general chat
+        raw_res = await chat_pipeline.handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
+        return format_clean_response(raw_res)
 
     if timeout_sec and timeout_sec > 0:
         try:
@@ -387,29 +256,6 @@ async def query_chat(
         db.close()
         
     has_local_docs = len(local_docs) > 0
-    if has_local_docs:
-        doc_list_str = "\n".join([f"  [{i+1}] {fname}" for i, fname in enumerate(local_docs)])
-        doc_context_info = (
-            f"INFORMASI SUMBER REFERENSI SESI INI:\n"
-            f"- Sesi chat ini memiliki total {len(local_docs)} dokumen referensi aktif yang diimpor:\n"
-            f"{doc_list_str}\n"
-            f"- Selalu gunakan fakta ini secara akurat saat menjawab pertanyaan pengguna mengenai jumlah, relevansi judul, atau daftar dokumen yang tersedia."
-        )
-    else:
-        doc_context_info = "INFORMASI SUMBER REFERENSI: Sesi percakapan ini saat ini belum memiliki dokumen referensi yang diunggah/diimpor."
-        
-    query_engine = None
-    if has_local_docs:
-        try:
-            index = VectorStoreIndex.from_vector_store(vector_store)
-            filters = MetadataFilters(
-                filters=[MetadataFilter(key="chat_id", operator=FilterOperator.EQ, value=chat_id)]
-            )
-            query_engine = index.as_query_engine(filters=filters)
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Could not init local query engine: {e}")
-    
-    tools = build_rag_tools(chat_id, has_local_docs, query_engine)
     formatted_history = format_llama_history(chat_history)
     candidate_llms = get_candidate_llm_chain()
 
@@ -434,8 +280,6 @@ async def query_chat(
                 formatted_history=formatted_history,
                 target_llm=curr_llm,
                 report_status=report_status,
-                tools=tools,
-                doc_context_info=doc_context_info,
                 timeout_sec=60.0,
                 on_delta=emit_delta
             )

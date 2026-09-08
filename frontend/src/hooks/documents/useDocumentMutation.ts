@@ -105,22 +105,30 @@ export function useDocumentMutation({
 
   const handleCleanDuplicates = async () => {
     if (!activeChatId || isCleaningDuplicates || documents.length === 0) return;
+    if (documents.length <= 1) {
+      setCleanFeedback("No duplicates found");
+      setTimeout(() => setCleanFeedback(null), 3000);
+      return;
+    }
     setIsCleaningDuplicates(true);
     setCleanFeedback(null);
     
     try {
       const res = await fetch(`${backendUrl}/chats/${activeChatId}/documents/clean-duplicates`, { method: "POST" });
       if (res.ok) {
-        const { deleted_count, deleted_ids } = await res.json();
-        if (deleted_count > 0 && deleted_ids && deleted_ids.length > 0) {
-          onBulkDocumentsDeleted?.(deleted_ids);
-          setCleanFeedback(`Removed ${deleted_count} duplicate file${deleted_count > 1 ? 's' : ''}`);
+        const data = await res.json();
+        const deletedCount = data.deleted_count ?? data.cleaned_count ?? 0;
+        const deletedIds = data.deleted_ids ?? data.cleaned_doc_ids ?? [];
+        if (deletedCount > 0 && deletedIds.length > 0) {
+          onBulkDocumentsDeleted?.(deletedIds);
+          setCleanFeedback(`Removed ${deletedCount} duplicate file${deletedCount > 1 ? 's' : ''}`);
         } else {
           setCleanFeedback("No duplicates found");
         }
         setTimeout(() => setCleanFeedback(null), 4000);
       } else {
-        setCleanFeedback("Failed to check duplicates");
+        const errData = await res.json().catch(() => null);
+        setCleanFeedback(errData?.detail || "Failed to check duplicates");
         setTimeout(() => setCleanFeedback(null), 3000);
       }
     } catch (err) {

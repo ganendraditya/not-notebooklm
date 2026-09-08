@@ -494,5 +494,27 @@ def test_commit_with_retry():
     mock_db.rollback.assert_called_once()
 
 
+def test_clean_duplicate_documents_endpoints():
+    """Verify clean_duplicate_documents responds properly on both URL conventions."""
+    # 1. Create a chat session
+    res = client.post("/chats", json={"title": "Dup Test"})
+    assert res.status_code == 200
+    chat_id = res.json()["id"]
+
+    # 2. Test hyphenated endpoint: /documents/clean-duplicates
+    res_hyphen = client.post(f"/chats/{chat_id}/documents/clean-duplicates")
+    assert res_hyphen.status_code == 200
+    data = res_hyphen.json()
+    assert data["status"] == "success"
+    assert "deleted_count" in data
+    assert "cleaned_count" in data
+
+    # 3. Test underscored endpoint: /documents/clean_duplicates
+    res_under = client.post(f"/chats/{chat_id}/documents/clean_duplicates")
+    assert res_under.status_code == 200
+    assert res_under.json()["status"] == "success"
+
+
+
 
 

@@ -44,7 +44,6 @@ from .prompts import (
     get_source_deletion_prompt,
     get_search_synthesis_prompt,
     get_workspace_analysis_system_prompt,
-    get_agentic_system_prompt
 )
 
 from .intent import (
@@ -80,8 +79,6 @@ from .llm_factory import (
 )
 
 from .engine import (
-    web_search_and_ingest,
-    fetch_and_ingest_doi,
     query_chat,
     generate_chat_title,
 )
@@ -115,7 +112,6 @@ __all__ = [
     "get_source_deletion_prompt",
     "get_search_synthesis_prompt",
     "get_workspace_analysis_system_prompt",
-    "get_agentic_system_prompt",
     # Intent
     "is_simple_conversational",
     "is_technical_discussion",
@@ -141,8 +137,6 @@ __all__ = [
     "ingest_document_text",
     "ingest_documents_batch",
     "ingest_document",
-    "web_search_and_ingest",
-    "fetch_and_ingest_doi",
     "query_chat",
     "generate_chat_title",
 ]

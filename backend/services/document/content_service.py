@@ -157,20 +157,9 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         if new_md_content:
             res_data["content"] = new_md_content
         elif os.path.exists(file_path):
-            ext = os.path.splitext(doc.filename)[1].lower()
             try:
-                if ext == ".pdf":
-                    if is_authentic_pdf:
-                        import pymupdf4llm
-                        res_data["content"] = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
-                    else:
-                        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                            res_data["content"] = f.read()
-                elif ext in (".docx", ".doc"):
-                    res_data["content"] = await asyncio.to_thread(rag.parse_docx_file, file_path)
-                else:
-                    with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                        res_data["content"] = f.read()
+                from rag.parsers import parse_document_to_markdown
+                res_data["content"] = await asyncio.to_thread(parse_document_to_markdown, file_path)
             except Exception as e:
                 res_data["content"] = f"Error reading document: {str(e)}"
         else:
@@ -223,94 +212,24 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         res_data["abstract"] = "Document content is registered in the source index."
         return res_data
         
-    ext = os.path.splitext(doc.filename)[1].lower()
     raw_content = ""
     try:
-        if ext == ".pdf":
-            with open(file_path, "rb") as f:
-                header = f.read(5)
-            if header.startswith(b"%PDF"):
-                import pymupdf4llm
-                raw_content = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
-            else:
-                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                    raw_content = f.read()
-        elif ext in (".docx", ".doc"):
-            raw_content = await asyncio.to_thread(rag.parse_docx_file, file_path)
-        elif ext in (".bib", ".bibtex"):
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = await asyncio.to_thread(rag.parse_bibtex_text, f.read())
-        elif ext == ".ris":
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = await asyncio.to_thread(rag.parse_ris_text, f.read())
-        elif ext in (".csv", ".tsv"):
-            raw_content = await asyncio.to_thread(rag.parse_csv_file, file_path)
-        else:
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                raw_content = f.read()
+        from rag.parsers import parse_document_to_markdown
+        raw_content = await asyncio.to_thread(parse_document_to_markdown, file_path)
     except Exception as e:
         raw_content = f"Error reading document: {str(e)}"
         
     res_data["content"] = raw_content
     
-    _GENERIC_HEADERS = {
-        "abstract", "abstrak", "overview", "paper", "document", "introduction", "keywords",
-        "article in press", "in press", "journal pre-proof", "uncorrected proof",
-        "corrected proof", "original article", "research article", "full length article",
-        "short communication", "review article", "full paper", "research paper",
-        "accepted manuscript", "author's copy",
-    }
-    
-    res_data["title"] = clean_filename_title
-    title_match = re.search(r"#+\s*\**([^\n\*]+)\**", raw_content)
-    if title_match:
-        cand_title = title_match.group(1).strip()
-        year_in_title = re.search(r"\((\d{4})\)$", cand_title)
-        if year_in_title:
-            res_data["year"] = year_in_title.group(1)
-            cand_title = cand_title[:year_in_title.start()].strip()
-        cand_title = re.sub(r'<[^>]+>', '', cand_title).strip()
-        if cand_title and cand_title.lower() not in _GENERIC_HEADERS:
-            res_data["title"] = cand_title
-
-    clean_filename_title = re.sub(r'<[^>]+>', '', clean_filename_title).strip()
-    if not res_data["title"] or res_data["title"].lower() in _GENERIC_HEADERS:
-        res_data["title"] = clean_filename_title
-            
-    header_scope = raw_content[:2500] if len(raw_content) > 2500 else raw_content
-    doi_match = re.search(r"DOI:\*?\*?\s*([^\s\n\*\)]+)", header_scope, re.I)
-    extracted_doi = doi_match.group(1).strip() if doi_match else ""
-    if not extracted_doi:
-        doi_regex_match = re.search(r"10\.\d{4,9}/[^\s\n<>\"'{}|\\^`]+", header_scope)
-        if doi_regex_match:
-            extracted_doi = doi_regex_match.group(0).strip()
-
-    if extracted_doi:
-        extracted_doi = extracted_doi.replace("**", "").replace("*", "").replace("__", "")
-        extracted_doi = re.sub(r'[;.,:)\s]+$', '', extracted_doi).strip()
+    from utils.metadata_extractor import extract_heuristic_metadata, _GENERIC_HEADERS
+    heuristics = extract_heuristic_metadata(raw_content, doc.filename)
+    res_data["title"] = heuristics["title"]
+    res_data["year"] = heuristics["year"]
+    extracted_doi = heuristics["doi"]
     res_data["doi"] = extracted_doi
-    
-    url_match = re.search(r"URL:\*?\*?\s*([^\s\n\*\)]+)", header_scope, re.I)
-    if url_match:
-        res_data["url"] = url_match.group(1).strip()
-    elif extracted_doi:
-        res_data["url"] = f"https://doi.org/{extracted_doi}"
-        
-    local_abstract = ""
-    try:
-        doc_sections = rag.split_markdown_into_academic_sections(raw_content, filename=doc.filename)
-        abs_sec = next((s for s in doc_sections if s.get("canonical_section") == "abstract"), None)
-        if abs_sec and abs_sec.get("raw_text"):
-            local_abstract = abs_sec.get("raw_text").strip()
-    except Exception:
-        local_abstract = ""
-
-    if not local_abstract:
-        abs_match = re.search(r'(?:##\s*Abstract|\*\*ABSTRAK\*\*|ABSTRAK|\*\*Abstract\*\*|Abstract|Ringkasan)[^\n]*\n+([\s\S]*?)(?:Kata\s*Kunci|Keywords|I\.\s*PENDAHULUAN|1\.\s*Pendahuluan|##|$)', raw_content, re.I)
-        local_abstract = abs_match.group(1).strip() if abs_match else ""
-        if not local_abstract:
-            abs_match_fb = re.search(r'##\s*Abstract[^\n]*\n+([\s\S]+)', raw_content)
-            local_abstract = abs_match_fb.group(1).strip() if abs_match_fb else ""
+    res_data["url"] = heuristics["url"]
+    local_abstract = heuristics["abstract"]
+    clean_filename_title = heuristics["clean_filename_title"]
 
     if local_abstract and rag.is_valid_abstract_content(local_abstract):
         res_data["abstract"] = rag.clean_academic_abstract(local_abstract)

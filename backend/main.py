@@ -8,7 +8,14 @@ from fastapi.staticfiles import StaticFiles
 from database import engine, Base, SessionLocal, Document
 
 from helpers import UPLOAD_DIR, TEMP_ZIPS_DIR, CHAT_MEDIA_DIR
-from routers import chats_router, documents_router, papers_router, settings_router, storage_router
+from routers import (
+    chats_router,
+    messages_router,
+    documents_router,
+    papers_router,
+    settings_router,
+    storage_router,
+)
 
 import pdf_exporter
 
@@ -90,6 +97,7 @@ app.add_middleware(
 
 # Include Routers
 app.include_router(chats_router)
+app.include_router(messages_router)
 app.include_router(documents_router)
 app.include_router(papers_router)
 app.include_router(settings_router)

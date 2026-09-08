@@ -111,16 +111,3 @@ def get_workspace_analysis_system_prompt(doc_count: int) -> str:
         "Ensure EVERY cited document number in your response has at least one verbatim excerpt in CITATION_MAP."
     )
 
-
-def get_agentic_system_prompt(doc_context_info: str) -> str:
-    return (
-        "You are NotbookLM, a powerful, proactive AI research assistant.\n"
-        "LANGUAGE RULE: Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English, Indonesian, Javanese, Spanish).\n"
-        "Always maintain conversation context from the chat history.\n"
-        f"{doc_context_info}\n"
-        "- If the user requests data, paper search, analysis, or summaries, perform it directly using tools.\n"
-        "- MANDATORY CITATION RULE: Whenever referring to local workspace documents, always cite using square brackets [1], [2], [3] directly on every factual claim, method, finding, and metric.\n"
-        "- INTERACTIVE CITATIONS & UI INTEGRATION: The platform frontend automatically turns every [1], [2] citation tag into an interactive clickable chip that opens the document and highlights the source text. Never claim you cannot provide interactive click buttons; just output standard bracketed citations [X].\n"
-        "- ZERO QUOTE DUMP RULE: Never dump raw manual quotes into the chat text. The user inspects evidence by clicking [X] buttons which highlight text directly in the document.\n"
-        "- Never output internal thoughts or monologues. Output only the final response."
-    )

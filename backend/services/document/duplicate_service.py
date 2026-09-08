@@ -48,7 +48,14 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
     """
     docs = db.query(Document).filter(Document.chat_id == chat_id).all()
     if not docs or len(docs) <= 1:
-        return {"status": "success", "cleaned_count": 0, "remaining_count": len(docs), "cleaned_doc_ids": []}
+        return {
+            "status": "success",
+            "cleaned_count": 0,
+            "deleted_count": 0,
+            "remaining_count": len(docs),
+            "cleaned_doc_ids": [],
+            "deleted_ids": []
+        }
 
     groups: List[List[Document]] = []
 
@@ -197,6 +204,10 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
                         os.remove(dup_fp)
                     except Exception as e:
                         logger.error(f"[CleanDuplicates Error] Failed to delete file {dup_fp}: {e}")
+                try:
+                    rag.delete_document_vectors(chat_id, dup.filename)
+                except Exception as ve:
+                    logger.debug(f"[CleanDuplicates] Failed vector delete for {dup.filename}: {ve}")
                 db.delete(dup)
 
             if needs_db_update:
@@ -209,6 +220,8 @@ async def clean_chat_duplicates(chat_id: str, db: Session) -> Dict[str, Any]:
     return {
         "status": "success",
         "cleaned_count": len(cleaned_doc_ids),
+        "deleted_count": len(cleaned_doc_ids),
         "remaining_count": remaining,
-        "cleaned_doc_ids": cleaned_doc_ids
+        "cleaned_doc_ids": cleaned_doc_ids,
+        "deleted_ids": cleaned_doc_ids
     }

@@ -6,7 +6,7 @@ import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./
 import { useDocumentManager } from "@/hooks/useDocumentManager";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Plus, X, Check } from "lucide-react";
+import { Plus, X, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
@@ -326,12 +326,23 @@ export default function RightSidebar({
         </div>
 
         {/* Dynamic Clean Feedback Notification */}
-        {cleanFeedback && (
-          <div className="w-full px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
-            <Check size={13} className="text-emerald-400 shrink-0" />
-            <span className="text-[12px]">{cleanFeedback}</span>
-          </div>
-        )}
+        {cleanFeedback && (() => {
+          const isError = cleanFeedback.toLowerCase().includes("fail") || cleanFeedback.toLowerCase().includes("error");
+          return (
+            <div className={`w-full px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150 ${
+              isError
+                ? "bg-rose-500/10 border border-rose-500/20 text-rose-300"
+                : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
+            }`}>
+              {isError ? (
+                <AlertCircle size={13} className="text-rose-400 shrink-0" />
+              ) : (
+                <Check size={13} className="text-emerald-400 shrink-0" />
+              )}
+              <span className="text-[12px]">{cleanFeedback}</span>
+            </div>
+          );
+        })()}
 
         <SourcesToolbar
           documents={documents}
