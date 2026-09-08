@@ -272,8 +272,8 @@ async def handle_workspace_analysis_pipeline(
                 context_msg,
                 LlamaChatMessage(role=MessageRole.USER, content=query)
             ]
-            revised_resp = await target_llm.achat(revised_chat_msgs)
-            return format_clean_response(revised_resp.message.content)
+            revised_content = await astream_llm_response(target_llm, revised_chat_msgs, on_delta=on_delta)
+            return format_clean_response(revised_content)
         else:
             logger.debug("[Workspace Pipeline] Rubric audit produced no revision instruction; using draft content.")
     except Exception as grade_err:

@@ -71,9 +71,13 @@ export function useChatStream(
         created_at: new Date().toISOString(),
         attachments: nextMessage.attachments
       };
-      // We read the current length, technically this should use a state setter callback if rapid,
-      // but standard sequential updates works fine here for user messages.
-      setMessages([...messages, newMsg]);
+      const assistantPlaceholder: ChatMessage = {
+        role: "assistant",
+        content: "",
+        created_at: new Date().toISOString(),
+        isStreaming: true
+      };
+      updateMessagesList(prev => [...prev, newMsg, assistantPlaceholder]);
     }
 
     const controller = new AbortController();
@@ -335,8 +339,9 @@ export function useChatStream(
 
     // Optimistically update message list: keep messages up to messageIndex, replace at messageIndex, remove subsequent responses
     const updatedUserMsg: ChatMessage = { role: "user", content: newContent, created_at: new Date().toISOString() };
+    const assistantPlaceholder: ChatMessage = { role: "assistant", content: "", created_at: new Date().toISOString(), isStreaming: true };
     if (activeChatIdRef.current === currentChatId) {
-      updateMessagesList(prev => [...prev.slice(0, messageIndex), updatedUserMsg]);
+      updateMessagesList(prev => [...prev.slice(0, messageIndex), updatedUserMsg, assistantPlaceholder]);
     }
 
     try {

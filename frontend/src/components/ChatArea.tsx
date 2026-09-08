@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { 
   Sparkles, 
   FileText, 
@@ -140,6 +140,13 @@ export default function ChatArea({
   const [showScrollBottom, setShowScrollBottom] = useState<boolean>(false);
 
   const isChatEmpty = messages.length === 0;
+
+  // Once the assistant has started generating tokens, hide the bottom thinking text
+  const isGeneratingContent = useMemo(() => {
+    if (!isLoading || messages.length === 0) return false;
+    const lastMsg = messages[messages.length - 1];
+    return lastMsg.role === "assistant" && Boolean(lastMsg.content?.trim());
+  }, [isLoading, messages]);
 
   // Track user scroll position: if within 80px from bottom, keep auto-scroll active
   const handleScroll = useCallback(() => {
@@ -494,7 +501,7 @@ export default function ChatArea({
                   ) : (
                     <div className="flex items-start">
                       <div className="flex-1 min-w-0">
-                        {isLoading && regeneratingMessageIdx === idx ? (
+                        {isLoading && regeneratingMessageIdx === idx && !msg.content ? (
                           <div className="flex items-center gap-2.5 text-app-text-muted text-sm py-2 px-1 animate-in fade-in duration-200">
                             <Loader2 size={16} className="text-blue-500 animate-spin shrink-0" />
                             <span>{activeStatus || "Regenerating response..."}</span>
@@ -513,8 +520,8 @@ export default function ChatArea({
                             activeCitationKey={activeCitationKey}
                           />
                         ) : null}
-                        {msg.content && (
-                          <div className="mt-1 flex items-center gap-1.5">
+                        {!msg.isStreaming && msg.content && (
+                          <div className="mt-1 flex items-center gap-1.5 animate-in fade-in duration-200">
                             {/* Pagination for response variants (e.g. 1/2, 2/2) */}
                             {msg.variants && msg.variants.length > 1 && (
                               <div className="flex items-center gap-0.5 text-xs text-gray-400 font-mono select-none bg-white/5 px-2 py-0.5 rounded-lg border border-white/5 mr-1">
@@ -577,7 +584,7 @@ export default function ChatArea({
                 </div>
               ))}
 
-              {isLoading && regeneratingMessageIdx === null && (
+              {isLoading && regeneratingMessageIdx === null && !isGeneratingContent && (
                 <div className="flex items-center gap-2.5 text-app-text-muted text-sm py-1.5 animate-in fade-in duration-200">
                   <Loader2 size={16} className="text-blue-500 animate-spin shrink-0" />
                   <span>{activeStatus || "Analyzing and generating response..."}</span>
