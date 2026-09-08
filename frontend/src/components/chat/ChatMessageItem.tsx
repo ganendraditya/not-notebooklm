@@ -302,12 +302,12 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   }, [sources, isDuplicateSource, isSourceChecked]);
 
   return (
-    <div className={`mb-3 flex ${isUser ? "justify-end" : "justify-start"} font-sans group`}>
+    <div className={`mb-3 flex ${isUser ? "justify-end" : "justify-start w-full"} font-sans group`}>
       <div 
-        className={`relative inline-block max-w-[95%] sm:max-w-[85%] leading-relaxed tracking-wide ${
+        className={`relative leading-relaxed tracking-wide ${
           isUser 
-            ? "bg-app-user-bubble border border-app-border text-app-text px-5 py-3.5 rounded-[1.5rem] rounded-tr-sm shadow-md"
-            : "text-app-text w-full"
+            ? "inline-block max-w-[95%] sm:max-w-[85%] bg-app-user-bubble border border-app-border text-app-text px-5 py-3.5 rounded-[1.5rem] rounded-tr-sm shadow-md"
+            : "w-full max-w-full text-app-text"
         }`}
       >
         {isUser && msg.attachments && msg.attachments.length > 0 && (
