@@ -1,6 +1,13 @@
 import re
 from typing import List, Dict, Any
 
+import re
+import logging
+from typing import List, Dict, Any, Optional
+import numpy as np
+
+logger = logging.getLogger("uvicorn.error")
+
 CANONICAL_SECTION_PATTERNS = {
     "abstract": [
         re.compile(r'\b(?:abstract|abstrak|resumen|resume|overview|executive\s+summary)\b', re.IGNORECASE)
@@ -31,18 +38,135 @@ CANONICAL_SECTION_PATTERNS = {
     ]
 }
 
-def classify_canonical_section(header_title: str) -> str:
-    """Classifies a section header into canonical academic IMRaD taxonomy."""
+CANONICAL_SEMANTIC_ANCHORS = {
+    "abstract": "passage: academic research paper abstract executive summary synopsis brief overview of the study",
+    "introduction": "passage: introduction research background study motivation problem statement research scope",
+    "literature_review": "passage: literature review related work theoretical framework prior research studies state of the art",
+    "methodology": "passage: research methodology scientific methods materials and methods experimental setup data collection study design algorithm architecture procedure implementation proposed method",
+    "results": "passage: experimental results findings empirical evaluation performance metrics data analysis benchmark results ablation study ablation experiments findings of the study testing",
+    "discussion": "passage: discussion interpretation of results implications comparative analysis practical implications critical discussion",
+    "conclusion": "passage: conclusion concluding remarks summary of findings final conclusion take away lessons closing remarks",
+    "limitations": "passage: study limitations threats to validity research constraints weaknesses ethical considerations",
+    "references": "passage: references bibliography literature cited citations works cited publication list",
+    "general": "passage: chapter heading section preface foreword table of contents legal clause fiction general document title appendix"
+}
+
+_CATEGORY_CENTROIDS_CACHE: Optional[Dict[str, np.ndarray]] = None
+_HEADER_CLASSIFICATION_CACHE: Dict[str, str] = {}
+
+
+def strip_heading_numbering(title: str) -> str:
+    """Removes leading section numbering like '1.', '3.2', 'IV.', 'Bab 2:', 'Section 1.1 -'."""
+    cleaned = re.sub(
+        r'^(?:(?:(?:chapter|section|bab|part)\s+)?[0-9]+(?:\.[0-9]+)*[A-Za-z]?|[IVXLCDM]+)[\.\s\-:]+\s*',
+        '',
+        title,
+        flags=re.IGNORECASE
+    ).strip()
+    return cleaned if len(cleaned) >= 3 else title
+
+
+def get_default_embed_model():
+    """Lazily retrieves the application-wide embedding model from vector_store if loaded."""
+    try:
+        from .vector_store import embed_model
+        return embed_model
+    except Exception:
+        try:
+            from rag.vector_store import embed_model
+            return embed_model
+        except Exception:
+            return None
+
+
+def init_semantic_centroids(embed_model: Any) -> Optional[Dict[str, np.ndarray]]:
+    """Precomputes normalized vector centroids for canonical categories once."""
+    global _CATEGORY_CENTROIDS_CACHE
+    if _CATEGORY_CENTROIDS_CACHE is not None:
+        return _CATEGORY_CENTROIDS_CACHE
+    if embed_model is None or not hasattr(embed_model, "get_text_embedding"):
+        return None
+    try:
+        centroids = {}
+        for cat, text in CANONICAL_SEMANTIC_ANCHORS.items():
+            vec = np.array(embed_model.get_text_embedding(text), dtype=np.float32)
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                centroids[cat] = vec / norm
+        _CATEGORY_CENTROIDS_CACHE = centroids
+        return _CATEGORY_CENTROIDS_CACHE
+    except Exception as e:
+        logger.warning(f"[Academic Chunker] Failed to initialize semantic centroids: {e}")
+        return None
+
+
+def classify_canonical_section(
+    header_title: str,
+    embed_model: Optional[Any] = None,
+    threshold: float = 0.815,
+    min_margin: float = 0.003
+) -> str:
+    """
+    Hybrid 2-Tier Classifier for Academic Sections:
+    - Tier 1: Fast-Path Regex (0 ms) for standard IMRaD taxonomy in EN/ID/ES/FR.
+    - Tier 2: Multilingual Semantic Cosine Similarity (E5 Embedding) for non-standard/creative titles and 93+ languages.
+    - Tier 3: General Fallback for non-academic or low-confidence headers.
+    """
     if not header_title:
         return "general"
-    clean_h = header_title.strip().lower()
+
+    clean_h = header_title.strip()
+    clean_lower = clean_h.lower()
+
+    # Tier 1: Fast-Path Regex Matcher
     for cat, compiled_patterns in CANONICAL_SECTION_PATTERNS.items():
         for pat in compiled_patterns:
-            if pat.search(clean_h):
+            if pat.search(clean_lower):
                 return cat
+
+    # Check cache for previously classified header string
+    if clean_lower in _HEADER_CLASSIFICATION_CACHE:
+        return _HEADER_CLASSIFICATION_CACHE[clean_lower]
+
+    # Tier 2: Semantic Embedding Matcher (Multilingual E5)
+    active_embed_model = embed_model if embed_model is not None else get_default_embed_model()
+    if active_embed_model is not None:
+        try:
+            centroids = init_semantic_centroids(active_embed_model)
+            if centroids:
+                norm_title = strip_heading_numbering(clean_h)
+                query_text = f"query: {norm_title}"
+                query_vec = np.array(active_embed_model.get_text_embedding(query_text), dtype=np.float32)
+                q_norm = np.linalg.norm(query_vec)
+                if q_norm > 0:
+                    query_vec /= q_norm
+                    scores = {cat: float(np.dot(query_vec, c_vec)) for cat, c_vec in centroids.items()}
+                    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+                    top1, s1 = sorted_scores[0]
+                    top2, s2 = sorted_scores[1]
+                    margin = s1 - s2
+
+                    # Confidence criteria:
+                    # If top match is 'general', or confidence is below threshold, or margin is ambiguous:
+                    if top1 != "general" and s1 >= threshold and margin >= min_margin:
+                        _HEADER_CLASSIFICATION_CACHE[clean_lower] = top1
+                        return top1
+                    else:
+                        _HEADER_CLASSIFICATION_CACHE[clean_lower] = "general"
+                        return "general"
+        except Exception as e:
+            logger.debug(f"[Academic Chunker] Semantic classification skipped ({e})")
+
+    # Tier 3: Fallback
+    _HEADER_CLASSIFICATION_CACHE[clean_lower] = "general"
     return "general"
 
-def split_markdown_into_academic_sections(markdown_text: str, filename: str = "") -> List[Dict[str, Any]]:
+
+def split_markdown_into_academic_sections(
+    markdown_text: str,
+    filename: str = "",
+    embed_model: Optional[Any] = None
+) -> List[Dict[str, Any]]:
     """
     Parses Markdown extracted from PDFs/documents into hierarchical, section-aware chunks.
     Preserves tables, LaTeX formulas, breadcrumbs (Parent > Child), and canonical IMRaD tags.
@@ -72,10 +196,10 @@ def split_markdown_into_academic_sections(markdown_text: str, filename: str = ""
         primary_header = header_stack[-1][1] if header_stack else "Overview"
         
         # Check canonical tag from primary header, or inherit from ancestor breadcrumbs
-        canonical_tag = classify_canonical_section(primary_header)
+        canonical_tag = classify_canonical_section(primary_header, embed_model=embed_model)
         if canonical_tag == "general" and header_stack:
             for ancestor in reversed(header_stack[:-1]):
-                ancestor_tag = classify_canonical_section(ancestor[1])
+                ancestor_tag = classify_canonical_section(ancestor[1], embed_model=embed_model)
                 if ancestor_tag != "general":
                     canonical_tag = ancestor_tag
                     break

@@ -209,7 +209,7 @@ def ingest_documents_batch(doc_items: list) -> bool:
 
     docs = []
     for text, filename, chat_id in doc_items:
-        sections = split_markdown_into_academic_sections(text, filename=filename)
+        sections = split_markdown_into_academic_sections(text, filename=filename, embed_model=embed_model)
         for sec in sections:
             docs.append(
                 Document(

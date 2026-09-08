@@ -10,6 +10,7 @@ from .format_parsers import (
 )
 from .academic_chunker import (
     CANONICAL_SECTION_PATTERNS,
+    CANONICAL_SEMANTIC_ANCHORS,
     classify_canonical_section,
     split_markdown_into_academic_sections,
 )
@@ -101,6 +102,7 @@ __all__ = [
     "parse_ris_text",
     "parse_csv_file",
     "CANONICAL_SECTION_PATTERNS",
+    "CANONICAL_SEMANTIC_ANCHORS",
     "classify_canonical_section",
     "split_markdown_into_academic_sections",
     "get_file_cache_key",

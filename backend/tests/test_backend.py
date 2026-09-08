@@ -147,6 +147,34 @@ The treatment group demonstrated a 34% decrease in muscular reinjury rates.
     assert "| Sample Size (n) |" in demo_sec["text"]
     assert "Section: AI in Sports Medicine (2024) > 2. Methods > 2.1 Participant Demographics" in demo_sec["text"]
 
+def test_hybrid_semantic_section_classifier():
+    """Verify Tier 1 regex fast path and Tier 2 semantic E5 embedding classification."""
+    from rag.academic_chunker import classify_canonical_section, strip_heading_numbering
+    from rag.vector_store import embed_model
+
+    # Heading cleaner
+    assert strip_heading_numbering("3. Proposed Dynamic Architecture") == "Proposed Dynamic Architecture"
+    assert strip_heading_numbering("4.2 Benchmarking & Ablation Study") == "Benchmarking & Ablation Study"
+    assert strip_heading_numbering("Chapter 3: Metodología Experimental") == "Metodología Experimental"
+    assert strip_heading_numbering("Bab 2: Tinjauan Pustaka") == "Tinjauan Pustaka"
+
+    # Tier 1: Regex Fast-Path (Standard English / Indonesian)
+    assert classify_canonical_section("1. Introduction") == "introduction"
+    assert classify_canonical_section("Bab 2: Tinjauan Pustaka") == "literature_review"
+    assert classify_canonical_section("References & Bibliography") == "references"
+
+    # Tier 2: Multilingual Semantic Classification via local E5 embeddings
+    assert classify_canonical_section("3. Proposed Dynamic Architecture", embed_model=embed_model) == "methodology"
+    assert classify_canonical_section("4.2 Benchmarking & Ablation Study", embed_model=embed_model) == "results"
+    assert classify_canonical_section("研究方法", embed_model=embed_model) == "methodology"
+    assert classify_canonical_section("Metodología Experimental", embed_model=embed_model) == "methodology"
+    assert classify_canonical_section("Discussion and Practical Implications", embed_model=embed_model) == "discussion"
+    assert classify_canonical_section("Closing Thoughts and Takeaways", embed_model=embed_model) == "conclusion"
+
+    # Tier 3: Non-academic fallback
+    assert classify_canonical_section("Chapter 1: The Boy Who Lived", embed_model=embed_model) == "general"
+    assert classify_canonical_section("Pasal 4: Ketentuan Peralihan", embed_model=embed_model) == "general"
+
 def test_lru_cache_eviction():
     """Verify LRUMetadataCache bounded capacity works and evicts oldest items."""
     from services.search.metadata_resolver_service import LRUMetadataCache
