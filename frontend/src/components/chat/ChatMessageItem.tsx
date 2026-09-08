@@ -80,6 +80,7 @@ function extractTableRowText(node: any, children: any): string {
 
 interface TableCellRendererProps {
   isHeader?: boolean;
+  node?: any;
   documents?: DocType[];
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
   activeCitationKey?: string | null;
@@ -90,6 +91,7 @@ interface TableCellRendererProps {
 
 const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   isHeader = false,
+  node,
   documents,
   onOpenDocument,
   activeCitationKey,
@@ -110,16 +112,20 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   const isGenericOrEmpty = !cellClean || cellClean.length < 3 || /^(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?$/i.test(cellClean);
   const contextToPass = isGenericOrEmpty ? rowContext : cellRawText;
 
+  // Compute unique AST cell offset to ensure citation keys in different columns never collide
+  const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
+  const cellPrefix = isHeader ? `th_${offset ?? "h"}` : `td_${offset ?? "d"}`;
+
   if (isHeader) {
     return (
       <th className="py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase" {...props}>
-        {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, "th")}
+        {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
       </th>
     );
   }
   return (
     <td className="py-2.5 px-3 text-app-text-muted text-xs leading-relaxed" {...props}>
-      {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, "td")}
+      {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
     </td>
   );
 };
@@ -340,33 +346,41 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           components={{
             p: ({ node, children, ...props }: any) => {
               const fullText = extractNodeText(node || children);
+              const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
+              const prefix = offset !== undefined ? `p_${offset}` : "p";
               return (
                 <p className="mb-2 last:mb-0 text-app-text leading-[1.65]" {...props}>
-                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "p")}
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, prefix)}
                 </p>
               );
             },
             h1: ({ node, children, ...props }: any) => {
               const fullText = extractNodeText(node || children);
+              const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
+              const prefix = offset !== undefined ? `h1_${offset}` : "h1";
               return (
                 <h1 className="text-2xl font-bold text-app-text mt-5 mb-2.5 tracking-tight" {...props}>
-                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "h1")}
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, prefix)}
                 </h1>
               );
             },
             h2: ({ node, children, ...props }: any) => {
               const fullText = extractNodeText(node || children);
+              const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
+              const prefix = offset !== undefined ? `h2_${offset}` : "h2";
               return (
                 <h2 className="text-xl font-bold text-app-text mt-4 mb-2 tracking-tight" {...props}>
-                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "h2")}
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, prefix)}
                 </h2>
               );
             },
             h3: ({ node, children, ...props }: any) => {
               const fullText = extractNodeText(node || children);
+              const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
+              const prefix = offset !== undefined ? `h3_${offset}` : "h3";
               return (
                 <h3 className="text-lg font-semibold text-app-text mt-3 mb-1.5" {...props}>
-                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "h3")}
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, prefix)}
                 </h3>
               );
             },
@@ -374,9 +388,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             ol: ({ node, ...props }: any) => <ol className="list-decimal pl-8 my-2.5 space-y-1.5 text-app-text" {...props} />,
             li: ({ node, children, ...props }: any) => {
               const fullText = extractNodeText(node || children);
+              const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
+              const prefix = offset !== undefined ? `li_${offset}` : "li";
               return (
                 <li className="leading-[1.65]" {...props}>
-                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "li")}
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, prefix)}
                 </li>
               );
             },
@@ -409,9 +425,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 </TableRowContext.Provider>
               );
             },
-            th: ({ children, ...props }: any) => (
+            th: ({ node, children, ...props }: any) => (
               <TableCellRenderer
                 isHeader={true}
+                node={node}
                 documents={documents}
                 onOpenDocument={onOpenDocument}
                 activeCitationKey={activeCitationKey}
@@ -421,9 +438,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 {children}
               </TableCellRenderer>
             ),
-            td: ({ children, ...props }: any) => (
+            td: ({ node, children, ...props }: any) => (
               <TableCellRenderer
                 isHeader={false}
+                node={node}
                 documents={documents}
                 onOpenDocument={onOpenDocument}
                 activeCitationKey={activeCitationKey}
@@ -435,9 +453,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             ),
             blockquote: ({ node, children, ...props }: any) => {
               const fullText = extractNodeText(node || children);
+              const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
+              const prefix = offset !== undefined ? `bq_${offset}` : "bq";
               return (
                 <blockquote className="border-l-2 border-blue-500 pl-4 py-1.5 my-3 text-app-text-muted bg-blue-500/5 rounded-r-lg italic" {...props}>
-                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, "blockquote")}
+                  {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, fullText, citationMap, prefix)}
                 </blockquote>
               );
             },

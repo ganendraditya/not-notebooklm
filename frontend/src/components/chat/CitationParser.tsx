@@ -132,9 +132,9 @@ export function parseCitationsInReactNode(
               const docTitle = doc?.title || doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
               const aiQuotesForDoc = citationMap?.[num.toString()] || citationMap?.[`[${num}]`];
 
-              // Key includes elementPrefix & unique matchIndex to ensure ONLY the clicked citation turns amber/active
-              const citeUniqueKey = `cite-${elementPrefix}-${num}-${matchIndex}-${i}`;
-              const isSelected = activeCitationKey === citeUniqueKey;
+              // Key includes elementPrefix, sentenceSnippet, num, matchIndex & i to ensure ONLY the clicked citation turns amber/active
+              const citeUniqueKey = `cite-${elementPrefix}-${sentenceSnippet}-${num}-${matchIndex}-${i}`;
+              const isSelected = Boolean(activeCitationKey && activeCitationKey === citeUniqueKey);
               return (
                 <button
                   key={citeUniqueKey}
