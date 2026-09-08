@@ -4,8 +4,7 @@ Contains prompt builders for conversational chat, workspace document analysis,
 academic search synthesis, deletion intent evaluation, and citation grounding rules.
 """
 
-from typing import List, Optional
-from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
+from typing import List
 
 
 def get_general_chat_system_prompt() -> str:

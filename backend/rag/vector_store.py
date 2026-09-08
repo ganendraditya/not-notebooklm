@@ -91,9 +91,23 @@ def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
             qmodels.FieldCondition(key="chat_id", match=qmodels.MatchValue(value=chat_id))
         ]
         if doc_filename:
-            conditions.append(qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=doc_filename)))
-            
-        filter_obj = qmodels.Filter(must=conditions)
+            # Support both 'filename' (standard across engine.py) and 'file_name', plus legacy prefixed names
+            prefixed_name = f"{chat_id}_{doc_filename}"
+            filter_obj = qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(key="chat_id", match=qmodels.MatchValue(value=chat_id)),
+                    qmodels.Filter(
+                        should=[
+                            qmodels.FieldCondition(key="filename", match=qmodels.MatchValue(value=doc_filename)),
+                            qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=doc_filename)),
+                            qmodels.FieldCondition(key="filename", match=qmodels.MatchValue(value=prefixed_name)),
+                            qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=prefixed_name)),
+                        ]
+                    )
+                ]
+            )
+        else:
+            filter_obj = qmodels.Filter(must=conditions)
         
         collections = []
         try:
@@ -116,6 +130,20 @@ embed_model, vector_store = init_embedding_and_vector_store()
 
 # Backward-compatibility alias
 delete_qdrant_vectors = delete_document_vectors
+
+_flashrank_ranker = None
+
+def get_flashrank_ranker(model_name: str = "ms-marco-TinyBERT-L-2-v2"):
+    """Singleton getter for FlashRank cross-encoder to prevent disk reload per query."""
+    global _flashrank_ranker
+    if _flashrank_ranker is None:
+        try:
+            from flashrank import Ranker
+            _flashrank_ranker = Ranker(model_name=model_name)
+        except Exception as e:
+            logger.warning(f"[FlashRank] Failed to initialize Ranker ({model_name}): {e}")
+            return None
+    return _flashrank_ranker
 
 
 def ingest_documents_batch(doc_items: list) -> bool:

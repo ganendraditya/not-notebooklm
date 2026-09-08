@@ -11,7 +11,6 @@ from utils.file_utils import (
 from utils.pdf_utils import (
     is_authentic_pdf_bytes,
     get_authentic_document_pdf,
-    get_or_generate_document_pdf,
 )
 from utils.text_processing import (
     clean_doi,
@@ -27,6 +26,5 @@ __all__ = [
     "get_doc_file_path",
     "is_authentic_pdf_bytes",
     "get_authentic_document_pdf",
-    "get_or_generate_document_pdf",
     "clean_doi",
 ]

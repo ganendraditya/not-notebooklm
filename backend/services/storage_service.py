@@ -74,9 +74,10 @@ def delete_document_by_id(db: Session, chat_id: str, doc_id: int) -> bool:
     return True
 
 def delete_multiple_documents(db: Session, chat_id: str, doc_ids: List[int]) -> int:
-    """Bulk deletes physical files, vector embeddings, and database records."""
+    """Bulk deletes physical files, vector embeddings, and database records using batch SQL deletion."""
     docs = db.query(Document).filter(Document.id.in_(doc_ids), Document.chat_id == chat_id).all()
     deleted_count = 0
+    valid_ids = []
     for doc in docs:
         file_path = get_doc_file_path(chat_id, doc.filename)
         if os.path.exists(file_path):
@@ -89,11 +90,83 @@ def delete_multiple_documents(db: Session, chat_id: str, doc_ids: List[int]) -> 
         except Exception as e:
             logger.error(f"[Bulk Delete Vector Error] Failed to delete vectors for {doc.filename}: {e}")
             
-        db.delete(doc)
+        valid_ids.append(doc.id)
         deleted_count += 1
         
-    commit_with_retry(db)
+    if valid_ids:
+        db.query(Document).filter(Document.id.in_(valid_ids)).delete(synchronize_session=False)
+        commit_with_retry(db)
     return deleted_count
+
+def delete_storage_file_and_records(db: Session, file_path: str) -> bool:
+    """
+    Single Source of Truth: Deletes a physical file in storage and cascades cleanup to
+    matching Document records and Qdrant vector embeddings, resolving chat_id prefix if present.
+    """
+    abs_path = file_path if os.path.isabs(file_path) else os.path.join(UPLOAD_DIR, file_path)
+    if not os.path.exists(abs_path):
+        return False
+
+    try:
+        if os.path.isfile(abs_path):
+            os.remove(abs_path)
+    except Exception as e:
+        logger.error(f"[Storage Delete Error] Failed to delete file {abs_path}: {e}")
+        return False
+
+    raw_filename = os.path.basename(abs_path)
+    docs = []
+
+    # Case 1: Exact raw filename match
+    docs = db.query(Document).filter(Document.filename == raw_filename).all()
+
+    # Case 2: Standard "None_" unassigned prefix
+    if not docs and raw_filename.startswith("None_"):
+        remainder = raw_filename[5:]
+        docs = db.query(Document).filter(
+            (Document.filename == remainder) & ((Document.chat_id == "None") | (Document.chat_id.is_(None)) | (Document.chat_id == ""))
+        ).all()
+
+    # Case 3: Canonical 36-char UUID prefix "{uuid}_{filename}"
+    if not docs and len(raw_filename) > 37 and raw_filename[36] == "_":
+        cid = raw_filename[:36]
+        rem = raw_filename[37:]
+        docs = db.query(Document).filter(
+            Document.chat_id == cid,
+            Document.filename == rem
+        ).all()
+
+    # Case 4: General prefix resolution across all potential "_" delimiters
+    if not docs and "_" in raw_filename:
+        parts = raw_filename.split("_")
+        for i in range(1, len(parts)):
+            candidate_cid = "_".join(parts[:i])
+            candidate_fn = "_".join(parts[i:])
+            matching = db.query(Document).filter(
+                Document.chat_id == candidate_cid,
+                Document.filename == candidate_fn
+            ).all()
+            if matching:
+                docs.extend(matching)
+                break
+
+    # Case 5: Remainder fallback if chat_id in disk path no longer exists in DB
+    if not docs and "_" in raw_filename:
+        _, remainder = raw_filename.split("_", 1)
+        docs = db.query(Document).filter(Document.filename == remainder).all()
+
+    valid_doc_ids = []
+    for doc in docs:
+        try:
+            rag.delete_document_vectors(doc.chat_id, doc.filename)
+        except Exception as ve:
+            logger.warning(f"[Storage Delete] Vector cleanup error for {doc.filename}: {ve}")
+        valid_doc_ids.append(doc.id)
+
+    if valid_doc_ids:
+        db.query(Document).filter(Document.id.in_(valid_doc_ids)).delete(synchronize_session=False)
+
+    return True
 
 def cleanup_orphan_files_on_disk(active_chat_ids: Set[str]) -> tuple:
     """Single Source of Truth: Scans and removes orphan upload files and expired temporary zip archives."""
@@ -166,7 +239,6 @@ def get_unified_storage_summary(db_path: str) -> dict:
     Single Source of Truth: Computes comprehensive disk usage breakdown.
     Covers uploaded documents, chat media attachments, sqlite database (including WAL/SHM), and Qdrant vectors.
     """
-    uploads_size = get_directory_total_size(UPLOAD_DIR)
     uploads_count = 0
     categories = {"images": 0, "documents": 0, "others": 0}
     category_counts = {"images": 0, "documents": 0, "others": 0}
@@ -190,6 +262,8 @@ def get_unified_storage_summary(db_path: str) -> dict:
                         category_counts["others"] += 1
                 except Exception:
                     pass
+
+    uploads_size = sum(categories.values())
 
     qdrant_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "qdrant_data"))
     qdrant_size = get_directory_total_size(qdrant_dir)

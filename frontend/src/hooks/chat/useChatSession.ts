@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { type ChatSession, type ChatMessage } from "@/stores/chatStore";
 import { type Document, type PendingSourceItem, type TargetedSource } from "@/stores/documentStore";
 import { type ChatJobState } from "./useChatStream";
@@ -30,7 +30,7 @@ export function useChatSession(
   const pendingSessionCreationRef = useRef<Promise<string> | null>(null);
   const handleSelectChatRef = useRef<(id: string) => void>(() => {});
 
-  const handleSelectChat = (id: string) => {
+  const handleSelectChat = useCallback((id: string) => {
     setCurrentView("chat");
     if (activeChatId === id) return;
 
@@ -74,7 +74,22 @@ export function useChatSession(
               }
             });
         });
-  };
+  }, [
+    activeChatId,
+    backendUrl,
+    setCurrentView,
+    setActiveChatId,
+    setViewingDoc,
+    setPendingSources,
+    getChatJob,
+    setIsLoading,
+    setActiveStatus,
+    setQueuedPrompts,
+    activeChatIdRef,
+    setDocuments,
+    setMessages,
+    setSessions
+  ]);
 
   useEffect(() => {
     handleSelectChatRef.current = handleSelectChat;

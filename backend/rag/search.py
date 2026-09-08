@@ -1,27 +1,13 @@
 import os
 import re
-import json
-import html
 import logging
-import urllib.request
-import urllib.parse
 from typing import List, Optional, Dict, Any
-import requests
-from duckduckgo_search import DDGS
-from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole, LLM
-import journal_indexer
-from collections import OrderedDict
-import concurrent.futures
 
-from helpers import clean_doi as _clean_doi
+from llama_index.core.llms import LLM
 from utils.text_processing import (
     normalize_title_str,
     is_valid_academic_title,
-    clean_academic_abstract,
-    is_valid_abstract_content,
-    extract_abstract_from_html,
-    is_title_match,
-    is_ai_synthesized_overview
+    clean_doi,
 )
 from providers.academic import fetch_europe_pmc, fetch_openalex, fetch_crossref
 from services.search import (
@@ -32,41 +18,11 @@ from services.search import (
 
 logger = logging.getLogger("uvicorn.error")
 
-class LRUMetadataCache:
-    """Thread-safe bounded in-memory cache to avoid unbounded RAM leak."""
-    def __init__(self, capacity: int = 500):
-        self.capacity = capacity
-        self.cache: OrderedDict[str, dict] = OrderedDict()
-
-    def get(self, key: str) -> Optional[dict]:
-        if key not in self.cache:
-            return None
-        self.cache.move_to_end(key)
-        return self.cache[key]
-
-    def set(self, key: str, value: dict):
-        if key in self.cache:
-            self.cache.move_to_end(key)
-        self.cache[key] = value
-        if len(self.cache) > self.capacity:
-            self.cache.popitem(last=False)
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.cache
-
-    def __getitem__(self, key: str) -> dict:
-        return self.get(key) or {}
-
-    def __setitem__(self, key: str, value: dict):
-        self.set(key, value)
-
-_PAPER_METADATA_CACHE = LRUMetadataCache(capacity=500)
-
 def get_existing_notebook_sources_signatures(chat_id: str) -> dict:
     """
-    Scans all existing documents in this chat (from DB and disk) and returns
+    Scans existing documents in this chat directly from DB and returns
     comprehensive signatures (DOIs, full titles, filenames, token sets)
-    to prevent recommending or importing duplicate papers.
+    to prevent recommending or importing duplicate papers without disk I/O.
     """
     from database import SessionLocal, Document as DBDocument
     db = SessionLocal()
@@ -78,32 +34,19 @@ def get_existing_notebook_sources_signatures(chat_id: str) -> dict:
     try:
         db_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all()
         for doc in db_docs:
-            filenames.add(doc.filename)
-            clean_fn = doc.filename.replace(".pdf", "").strip()
-            titles.add(clean_fn)
+            if doc.filename:
+                filenames.add(doc.filename)
+                clean_fn = doc.filename.replace(".pdf", "").replace(".txt", "").strip()
+                if clean_fn:
+                    titles.add(clean_fn)
+            if doc.title:
+                titles.add(doc.title.strip())
+            if doc.doi:
+                c_d = clean_doi(doc.doi).lower()
+                if c_d:
+                    dois.add(c_d)
     finally:
         db.close()
-
-    from helpers import get_doc_file_path
-    for fn in filenames:
-        fpath = get_doc_file_path(chat_id, fn)
-        if os.path.exists(fpath):
-                try:
-                    with open(fpath, "r", encoding="utf-8", errors="ignore") as fp:
-                        header = fp.readline().strip()
-                        if header.startswith("# "):
-                            full_t = re.sub(r'^\#\s*', '', header).strip()
-                            full_t = re.sub(r'\s*\(\d{4}\)$', '', full_t).strip()
-                            if full_t:
-                                titles.add(full_t)
-                        # Read next 2 lines for DOI
-                        first_block = header + " " + fp.readline() + " " + fp.readline()
-                        doi_m = re.search(r'(?:DOI:|\*\*DOI:\*\*|doi\.org/)\s*(10\.\d{4,9}/[^\s\)]+)', first_block, re.I)
-                        if doi_m:
-                            clean_d = doi_m.group(1).lower().strip()
-                            dois.add(clean_d)
-                except Exception:
-                    pass
 
     for t in titles:
         norm = normalize_title_str(t)
@@ -131,9 +74,9 @@ def is_paper_duplicate(
 
     # 1. DOI Matching (100% Exact)
     if candidate_doi:
-        c_doi = candidate_doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+        c_doi = clean_doi(candidate_doi).lower()
         for ex_doi in existing_signatures.get("dois", set()):
-            e_doi = ex_doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+            e_doi = clean_doi(ex_doi).lower()
             if c_doi and e_doi and c_doi == e_doi:
                 return True
 
@@ -199,7 +142,7 @@ def search_academic_papers_planned(
         if not c_norm:
             return True
         if doi:
-            c_doi = doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+            c_doi = clean_doi(doi).lower()
             if c_doi in seen_dois:
                 return True
         c_tokens = set(c_norm.split())
@@ -219,8 +162,9 @@ def search_academic_papers_planned(
         if c_norm:
             seen_token_signatures.append((c_norm, set(c_norm.split())))
         if doi:
-            c_doi = doi.lower().replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
-            seen_dois.add(c_doi)
+            c_doi = clean_doi(doi).lower()
+            if c_doi:
+                seen_dois.add(c_doi)
 
     # Build domain-agnostic search keywords from queries and plan
     raw_query_texts = [en_query, id_query, plan.get("native_query", "")]
@@ -321,8 +265,11 @@ def search_academic_papers_planned(
     # 4. Semantic Reranking with FlashRank (Cross-Encoder)
     if len(results) > limit:
         try:
-            from flashrank import Ranker, RerankRequest
-            ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+            from flashrank import RerankRequest
+            from rag.vector_store import get_flashrank_ranker
+            ranker = get_flashrank_ranker()
+            if not ranker:
+                raise RuntimeError("FlashRank Ranker unavailable")
             passages = [
                 {
                     "id": idx,
@@ -345,15 +292,6 @@ def search_academic_papers_planned(
             logger.debug(f"[Search Rerank Fallback]: {rerank_err}")
 
     return results[:limit]
-
-async def judge_and_filter_papers_with_llm(
-    query: str,
-    candidates: List[dict],
-    target_count: int,
-    llm: Optional[LLM] = None
-) -> List[dict]:
-    from services.search.llm_evaluator_service import judge_and_filter_papers_with_llm
-    return await judge_and_filter_papers_with_llm(query, candidates, target_count, llm)
 
 def search_academic_papers(query: str, limit: int = 10) -> List[dict]:
     """Standard entrypoint for academic paper search with synchronous fallback planning."""

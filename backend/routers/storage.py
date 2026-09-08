@@ -1,16 +1,17 @@
 import os
-import shutil
+import io
+import zipfile
 import logging
-import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from pydantic import BaseModel
-from database import get_db, Document
-from helpers import UPLOAD_DIR
-from routers.chats import ChatSession  # For DB context if needed
+import rag
+from database import get_db, Document, ChatSession, commit_with_retry, DB_PATH
+from utils.file_utils import UPLOAD_DIR, make_content_disposition
+from services.storage_service import get_unified_storage_summary, delete_storage_file_and_records
 
 router = APIRouter(prefix="/storage", tags=["storage"])
 logger = logging.getLogger("uvicorn.error")
@@ -35,8 +36,6 @@ class FileItem(BaseModel):
 
 @router.get("/summary", response_model=StorageSummary)
 def get_storage_summary(db: Session = Depends(get_db)):
-    from services.storage_service import get_unified_storage_summary
-    from database import DB_PATH
     data = get_unified_storage_summary(DB_PATH)
     
     return StorageSummary(
@@ -154,19 +153,15 @@ def delete_files(req: DeleteRequest, db: Session = Depends(get_db)):
             continue
 
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            if delete_storage_file_and_records(db, file_path):
                 deleted += 1
-                
-                # Also delete DB document if it exists (assuming filename match for simplicity)
-                filename = os.path.basename(file_path)
-                db.query(Document).filter(Document.filename == filename).delete()
             else:
                 failed += 1
-        except Exception:
+        except Exception as e:
+            logger.error(f"[Storage Delete] Error deleting {file_id}: {e}")
             failed += 1
             
-    db.commit()
+    commit_with_retry(db)
     return {"status": "success", "deleted": deleted, "failed": failed}
 
 class DownloadRequest(BaseModel):
@@ -176,11 +171,6 @@ class DownloadRequest(BaseModel):
 def download_storage_files(req: DownloadRequest):
     if not req.file_ids:
         raise HTTPException(status_code=400, detail="No files selected for download")
-    
-    from fastapi.responses import FileResponse, Response
-    import io
-    import zipfile
-    from helpers import make_content_disposition
 
     # Single file direct download
     if len(req.file_ids) == 1:
@@ -236,44 +226,3 @@ def download_storage_files(req: DownloadRequest):
         media_type="application/zip",
         headers={"Content-Disposition": make_content_disposition("attachment", zip_filename)}
     )
-
-@router.post("/upload")
-async def upload_file(
-    file: UploadFile = File(...), 
-    category: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
-):
-    try:
-        # Ensure upload dir exists
-        os.makedirs(UPLOAD_DIR, exist_ok=True)
-        
-        # Determine subfolder based on category (optional)
-        target_dir = UPLOAD_DIR
-        if category and category in ["images", "documents"]:
-            target_dir = os.path.join(UPLOAD_DIR, category)
-            os.makedirs(target_dir, exist_ok=True)
-            
-        file_id = f"{uuid.uuid4()}_{file.filename}"
-        file_path = os.path.join(target_dir, file_id)
-        
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        size = os.path.getsize(file_path)
-        ext = file.filename.split('.')[-1].lower() if '.' in file.filename else ''
-        file_cat = category or ("images" if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else "documents")
-        
-        rel_path = os.path.relpath(file_path, UPLOAD_DIR)
-        
-        return {
-            "status": "success", 
-            "file": {
-                "id": rel_path,
-                "filename": file.filename,
-                "size": size,
-                "category": file_cat,
-                "url": f"/uploads/{rel_path}" # Assuming static mount
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

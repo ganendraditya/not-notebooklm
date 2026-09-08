@@ -4,9 +4,10 @@ import urllib.request
 import urllib.parse
 import re
 from typing import Optional
+from collections import OrderedDict
 
-from helpers import clean_doi as _clean_doi
 from utils.text_processing import (
+    clean_doi as _clean_doi,
     clean_academic_abstract,
     is_valid_abstract_content,
     extract_abstract_from_html,
@@ -18,17 +19,50 @@ import journal_indexer
 
 logger = logging.getLogger("uvicorn.error")
 
+class LRUMetadataCache:
+    """Thread-safe bounded in-memory cache to avoid unbounded RAM leak."""
+    def __init__(self, capacity: int = 500):
+        self.capacity = capacity
+        self.cache: OrderedDict[str, dict] = OrderedDict()
+
+    def get(self, key: str) -> Optional[dict]:
+        if key not in self.cache:
+            return None
+        self.cache.move_to_end(key)
+        return self.cache[key]
+
+    def set(self, key: str, value: dict):
+        if key in self.cache:
+            self.cache.move_to_end(key)
+        self.cache[key] = value
+        if len(self.cache) > self.capacity:
+            self.cache.popitem(last=False)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.cache
+
+    def __getitem__(self, key: str) -> dict:
+        return self.get(key) or {}
+
+    def __setitem__(self, key: str, value: dict):
+        self.set(key, value)
+
+_GLOBAL_METADATA_CACHE = LRUMetadataCache(capacity=500)
+
 def resolve_paper_metadata_by_doi(
     doi: str = "", 
     title_fallback: str = "", 
     paper_title: str = "", 
     fast_only: bool = False,
-    cache: dict = None
+    cache: Optional[dict] = None
 ) -> Optional[dict]:
     """
     Fetches complete Consensus-style academic metadata from OpenAlex, Crossref, HTML meta/semantic tags,
     Semantic Scholar, SCImago Master DB, and AI Academic Auditor with a multi-tier fallback engine and caching.
     """
+    if cache is None:
+        cache = _GLOBAL_METADATA_CACHE
+
     if paper_title and not title_fallback:
         title_fallback = paper_title
     if not doi and not title_fallback:
@@ -351,72 +385,9 @@ def resolve_paper_metadata_by_doi(
     return result
 
 def fetch_full_abstract_by_doi(doi: str) -> str:
-    """Fetches the full, authentic academic abstract from OpenAlex / Crossref / Semantic Scholar / Landing HTML using DOI."""
+    """Fetches the full, authentic academic abstract using DOI via the unified metadata resolver."""
     if not doi:
         return ""
-    clean_doi = doi.replace("https://doi.org/", "").strip()
-    
-    # 1. Try OpenAlex by DOI
-    try:
-        oa_url = f"https://api.openalex.org/works/https://doi.org/{clean_doi}"
-        req = urllib.request.Request(oa_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            inverted_index = data.get("abstract_inverted_index")
-            if inverted_index:
-                word_positions = []
-                for word, positions in inverted_index.items():
-                    for pos in positions:
-                        word_positions.append((pos, word))
-                word_positions.sort()
-                cand = " ".join([w[1] for w in word_positions]).strip()
-                if is_valid_abstract_content(cand):
-                    return cand
-    except Exception as e:
-        logger.debug(f"[Abstract by DOI - OpenAlex] Error for {clean_doi}: {e}")
-        
-    # 2. Try Crossref by DOI
-    try:
-        cr_url = f"https://api.crossref.org/works/{clean_doi}"
-        req = urllib.request.Request(cr_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            c_data = json.loads(resp.read().decode("utf-8"))
-            msg = c_data.get("message", {})
-            raw_abstract = msg.get("abstract", "")
-            if raw_abstract:
-                clean_abs = clean_academic_abstract(raw_abstract)
-                if is_valid_abstract_content(clean_abs):
-                    return clean_abs
-    except Exception as e:
-        logger.debug(f"[Abstract by DOI - Crossref] Error for {clean_doi}: {e}")
-
-    # 3. Try Semantic Scholar
-    try:
-        s2_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean_doi}?fields=abstract"
-        req = urllib.request.Request(s2_url, headers={"User-Agent": "NotbookLM/1.0 (mailto:dev@notbooklm.local)"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            s2_data = json.loads(resp.read().decode("utf-8"))
-            s2_abs = s2_data.get("abstract")
-            if s2_abs:
-                cand = clean_academic_abstract(s2_abs)
-                if is_valid_abstract_content(cand):
-                    return cand
-    except Exception as e:
-        logger.debug(f"[Abstract by DOI - S2] Error for {clean_doi}: {e}")
-
-    # 4. Try DOI Landing Page HTML Scraper
-    try:
-        doi_landing_url = f"https://doi.org/{clean_doi}"
-        req = urllib.request.Request(doi_landing_url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        })
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            html_text = resp.read().decode("utf-8", errors="ignore")
-            extracted = extract_abstract_from_html(html_text)
-            if extracted and is_valid_abstract_content(extracted):
-                return extracted
-    except Exception as e:
-        logger.debug(f"[Abstract by DOI - HTML] Error for {clean_doi}: {e}")
-        
-    return ""
+    clean_doi = _clean_doi(doi)
+    meta = resolve_paper_metadata_by_doi(doi=clean_doi, fast_only=False)
+    return (meta.get("abstract") or "") if meta else ""

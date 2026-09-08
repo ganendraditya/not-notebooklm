@@ -85,22 +85,13 @@ class SelectVariantRequest(BaseModel):
 class BulkDeleteRequest(BaseModel):
     doc_ids: List[int]
 
+class BulkDownloadRequest(BaseModel):
+    doc_ids: List[int]
+
 class BulkDeleteChatsRequest(BaseModel):
     chat_ids: List[str]
 
-class StorageSummaryResponse(BaseModel):
-    uploads_bytes: int
-    uploads_count: int
-    qdrant_bytes: int
-    database_bytes: int
-    total_bytes: int
-
 class RenameDocumentRequest(BaseModel):
     title: str
-
-class SelectLLMRequest(BaseModel):
-    provider: Optional[str] = None
-    model_name: Optional[str] = None
-    model_id: Optional[str] = None
 
 

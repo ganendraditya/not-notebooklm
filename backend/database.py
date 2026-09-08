@@ -60,7 +60,7 @@ class Document(Base):
     __tablename__ = "documents"
     
     id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column(String, ForeignKey("chat_sessions.id"))
+    chat_id = Column(String, ForeignKey("chat_sessions.id"), index=True)
     filename = Column(String, index=True)
     created_at = Column(DateTime, default=get_utc_now)
     
@@ -88,7 +88,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
     
     id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column(String, ForeignKey("chat_sessions.id"))
+    chat_id = Column(String, ForeignKey("chat_sessions.id"), index=True)
     role = Column(String) # 'user' or 'assistant'
     content = Column(Text)
     attachments_json = Column(Text, nullable=True) # store attachments JSON
@@ -149,6 +149,10 @@ def auto_migrate_schema():
                 conn.execute(text("ALTER TABLE chat_messages ADD COLUMN variants_json TEXT"))
             if "active_variant_index" not in msg_cols:
                 conn.execute(text("ALTER TABLE chat_messages ADD COLUMN active_variant_index INTEGER DEFAULT 0"))
+
+            # Ensure foreign key indexes for performance
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_documents_chat_id ON documents (chat_id)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_chat_messages_chat_id ON chat_messages (chat_id)"))
 
     except Exception as e:
         logger.warning(f"[DB Migration Warning]: {e}")

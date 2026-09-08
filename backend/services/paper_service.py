@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from database import Document, ChatSession, SessionLocal, commit_with_retry
 import models
 import rag
-import pdf_exporter
+from providers.academic import resolve_and_fetch_authentic_pdf
 from utils.file_utils import (
     UPLOAD_DIR,
     MAX_SOURCES_PER_CHAT,
@@ -20,7 +20,7 @@ from utils.text_processing import clean_doi
 
 logger = logging.getLogger("uvicorn.error")
 
-def prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> Tuple[str, str, str, models.PaperCandidate, str, bool]:
+def prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> Tuple[str, str, str, bool]:
     """Prepares paper file on disk, attempting authentic OA download or markdown fallback."""
     filename = sanitize_paper_filename(paper.title)
     abstract_text = (paper.snippet or "").strip()
@@ -40,7 +40,7 @@ def prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> Tuple
 
     if c_doi or paper.pdf_url or paper.url:
         try:
-            fetched_oa = pdf_exporter.resolve_and_fetch_authentic_pdf(
+            fetched_oa = resolve_and_fetch_authentic_pdf(
                 doi=c_doi,
                 title=paper.title,
                 direct_url=paper.url or "",
@@ -58,6 +58,7 @@ def prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> Tuple
             with open(txt_save_path, "w", encoding="utf-8") as f:
                 f.write(doc_text)
             filename = filename.replace('.pdf', '') + '.txt'
+            save_path = txt_save_path
         except Exception as e:
             logger.warning(f"[Doc text save Warning]: {e}")
     else:
@@ -68,7 +69,7 @@ def prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> Tuple
         except Exception as e:
             logger.warning(f"[Parse full text for embedding warning]: {e}")
 
-    return (doc_text, filename, chat_id, paper, c_doi, has_downloaded_pdf)
+    return (doc_text, filename, c_doi, has_downloaded_pdf)
 
 async def search_academic_papers(query: str, limit: int = 10) -> List[models.PaperCandidate]:
     """Orchestrates query planning and academic paper search."""
@@ -123,7 +124,7 @@ async def import_sources_progressive_stream(
     total_to_import = len(allowed_sources)
     
     for idx, paper in enumerate(allowed_sources, start=1):
-        doc_text, filename, _, _, c_doi, has_downloaded_pdf = await asyncio.to_thread(prepare_paper_file_sync, chat_id, paper)
+        doc_text, filename, c_doi, has_downloaded_pdf = await asyncio.to_thread(prepare_paper_file_sync, chat_id, paper)
         abstract_text = (paper.snippet or "").strip()
 
         local_db = SessionLocal()
@@ -161,7 +162,7 @@ async def import_sources_progressive_stream(
 
         batch_docs_for_embedding.append((doc_text, filename, chat_id))
 
-        yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': created_doc_id, 'filename': filename, 'created_at': created_at_str, 'index': current_doc_count + idx}})}\n\n"
+        yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': created_doc_id, 'filename': filename, 'title': db_doc.title or filename.replace('.pdf', '').replace('_', ' ').strip(), 'created_at': created_at_str, 'index': current_doc_count + idx, 'has_full_pdf': has_downloaded_pdf, 'is_oa': db_doc.is_oa if db_doc.is_oa is not None else True}})}\n\n"
 
     if batch_docs_for_embedding:
         try:
@@ -173,16 +174,16 @@ async def import_sources_progressive_stream(
 
 async def import_sources_batch(chat_id: str, allowed_sources: List[models.PaperCandidate], db: Session) -> List[models.DocumentResponse]:
     """Batch imports sources synchronously, preparing files, saving to DB, and vectorizing."""
-    docs_to_ingest = await asyncio.gather(*(asyncio.to_thread(prepare_paper_file_sync, chat_id, p) for p in allowed_sources))
+    prepared_results = await asyncio.gather(*(asyncio.to_thread(prepare_paper_file_sync, chat_id, p) for p in allowed_sources))
 
-    embedding_tuples = [(d[0], d[1], d[2]) for d in docs_to_ingest]
+    embedding_tuples = [(item[0], item[1], chat_id) for item in prepared_results]
     try:
         await asyncio.to_thread(rag.ingest_documents_batch, embedding_tuples)
     except Exception as e:
         logger.warning(f"[Batch Vector Ingestion Warning]: {e}")
 
     created_docs = []
-    for doc_text, fname, _cid, paper, c_doi, _has_pdf in docs_to_ingest:
+    for (doc_text, fname, c_doi, _has_pdf), paper in zip(prepared_results, allowed_sources):
         abstract_text = (paper.snippet or "").strip()
         authors_json = json.dumps(paper.authors or [], ensure_ascii=False)
         db_doc = Document(
@@ -219,8 +220,11 @@ async def import_sources_batch(chat_id: str, allowed_sources: List[models.PaperC
         models.DocumentResponse(
             id=d.id,
             filename=d.filename,
+            title=d.title or d.filename.replace(".pdf", "").replace("_", " ").strip(),
             created_at=d.created_at,
-            index=id_to_index.get(d.id, 1)
+            index=id_to_index.get(d.id, 1),
+            has_full_pdf=d.filename.endswith(".pdf"),
+            is_oa=d.is_oa if d.is_oa is not None else True
         )
         for d in created_docs
     ]
@@ -248,7 +252,7 @@ async def import_single_doi_source(chat_id: str, clean_doi_val: str, db: Session
 
     try:
         fetched_oa = await asyncio.to_thread(
-            pdf_exporter.resolve_and_fetch_authentic_pdf,
+            resolve_and_fetch_authentic_pdf,
             doi=clean_doi_val,
             title=title,
             direct_url=url,
@@ -272,7 +276,7 @@ async def import_single_doi_source(chat_id: str, clean_doi_val: str, db: Session
             logger.warning(f"[Doc text save Warning]: {e}")
 
     try:
-        await asyncio.to_thread(rag.ingest_document, save_path, chat_id)
+        await asyncio.to_thread(rag.ingest_document, save_path, chat_id, filename)
     except Exception as e:
         logger.warning(f"[DOI Ingest Vector Warning]: {e}")
 

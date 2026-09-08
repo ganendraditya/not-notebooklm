@@ -321,13 +321,10 @@ def audit_paper_metadata_with_ai(
     Uses Gemini / active LLM to audit candidate metadata, extract the true abstract,
     filter out garbage category names, and determine Scopus/SINTA quartile and quality_tier.
     """
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key and not gemini_key.startswith("your_"):
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=gemini_key)
-            model = genai.GenerativeModel("models/gemini-flash-latest")
-            
+    try:
+        from rag.engine import get_fast_llm, get_main_llm
+        active_llm = get_fast_llm() or get_main_llm()
+        if active_llm:
             prompt = f"""
 You are an expert Senior Academic Research Indexer and Metadata Auditor (like Scopus, Web of Science, Consensus.app, and SINTA).
 
@@ -368,13 +365,12 @@ Output ONLY valid JSON matching:
   "abstract_type": "official" or "ai_summary"
 }}
 """
-            res = model.generate_content(
-                prompt,
-                generation_config={"response_mime_type": "application/json"},
-                request_options={"timeout": 5}
-            )
-            if res.text:
-                parsed = json.loads(res.text)
+            res = active_llm.complete(prompt)
+            if res and res.text:
+                clean_json_str = res.text.strip()
+                clean_json_str = re.sub(r'^```(?:json)?\s*', '', clean_json_str, flags=re.I)
+                clean_json_str = re.sub(r'\s*```$', '', clean_json_str)
+                parsed = json.loads(clean_json_str)
                 if parsed.get("abstract"):
                     if is_ai_synthesized_overview(parsed.get("abstract")):
                         parsed["abstract_type"] = "ai_summary"
@@ -382,8 +378,8 @@ Output ONLY valid JSON matching:
                         if not parsed.get("abstract_type"):
                             parsed["abstract_type"] = "official"
                     return parsed
-        except Exception as e:
-            logger.debug(f"[AI Auditor] Audit failed for '{paper_title}': {e}")
+    except Exception as e:
+        logger.debug(f"[AI Auditor] Audit failed for '{paper_title}': {e}")
 
     j_low = (raw_journal or "").lower()
     if any(p in j_low for p in ["sportrxiv", "arxiv", "biorxiv", "medrxiv", "ssrn", "osf", "repec", "research square", "preprint"]):

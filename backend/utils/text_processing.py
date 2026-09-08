@@ -161,7 +161,8 @@ def clean_doi(raw_doi: Optional[str]) -> str:
         return ""
     doi = raw_doi.strip()
     doi = doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
-    doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "").strip()
+    doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "")
+    doi = doi.replace("https://dx.doi.org/", "").replace("http://dx.doi.org/", "").replace("dx.doi.org/", "").strip()
     doi = re.sub(r'[;.,:)\s]+$', '', doi).strip()
     return doi
 

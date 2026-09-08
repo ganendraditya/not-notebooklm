@@ -1,6 +1,9 @@
+import logging
 import requests
 import re
 from typing import List, Optional
+
+logger = logging.getLogger("uvicorn.error")
 
 def fetch_crossref(
     term: str, 
@@ -74,8 +77,6 @@ def fetch_crossref(
             else:
                 break
         except Exception as e:
-            import logging
-            logger = logging.getLogger("uvicorn.error")
             logger.warning(f"Crossref API err: {e}")
             break
     return fetched

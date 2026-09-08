@@ -8,18 +8,15 @@ import {
   Loader2, 
   Copy, 
   Pencil, 
-  Clock,
   MoreHorizontal,
   Pin,
   PinOff,
   Trash2,
-  X,
   RotateCw,
   ChevronLeft,
   ChevronRight,
   ChevronDown
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Portal } from "@/components/ui/Portal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { RenameDialog } from "@/components/ui/RenameDialog";

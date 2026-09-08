@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Document, PendingSourceItem } from "@/stores/documentStore";
-import { consumeSSEStream } from "@/lib/sse";
 
 export function useDocumentDoi({
   activeChatId,
@@ -34,15 +33,9 @@ export function useDocumentDoi({
         throw new Error(err.detail || "Failed to process DOI.");
       }
 
-      await consumeSSEStream(res, (event) => {
-        if (event.event === "complete") {
-          const doc = JSON.parse(event.data);
-          onDocumentAdded?.(doc, chatId);
-          setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
-        } else if (event.event === "error") {
-          throw new Error(event.data);
-        }
-      });
+      const doc = await res.json();
+      onDocumentAdded?.(doc, chatId);
+      setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
     } catch (error: any) {
       setDoiPendingSources(prev => prev.map(p => 
         p.id === sourceId ? { ...p, status: "error", error: error.message || "Import failed" } : p

@@ -84,7 +84,17 @@ def test_flashrank_reranker():
     """Verify FlashRank cross-encoder loads and ranks passages properly (if installed)."""
     try:
         from flashrank import Ranker, RerankRequest
-        ranker = Ranker(model_name="ms-marco-TinyBERT-L-2-v2")
+        from rag.vector_store import get_flashrank_ranker
+
+        ranker = get_flashrank_ranker()
+        if ranker is None:
+            import pytest
+            pytest.skip("flashrank is not installed in the current environment")
+
+        # Test singleton caching
+        ranker2 = get_flashrank_ranker()
+        assert ranker is ranker2
+
         passages = [
             {"id": 1, "text": "Deep learning and LSTM for precipitation and rainfall forecasting."},
             {"id": 2, "text": "Recipe for chocolate cake and vanilla cupcakes."}
@@ -139,7 +149,7 @@ The treatment group demonstrated a 34% decrease in muscular reinjury rates.
 
 def test_lru_cache_eviction():
     """Verify LRUMetadataCache bounded capacity works and evicts oldest items."""
-    from rag.search import LRUMetadataCache
+    from services.search.metadata_resolver_service import LRUMetadataCache
     cache = LRUMetadataCache(capacity=3)
     cache.set("a", {"title": "Paper A"})
     cache.set("b", {"title": "Paper B"})
@@ -152,6 +162,19 @@ def test_lru_cache_eviction():
     assert "b" in cache
     assert "c" in cache
     assert "a" not in cache
+
+def test_metadata_resolver_caching():
+    """Verify resolve_paper_metadata_by_doi populates and hits the global cache."""
+    from services.search.metadata_resolver_service import resolve_paper_metadata_by_doi, _GLOBAL_METADATA_CACHE
+    
+    test_doi = "10.1109/access.test.999"
+    res1 = resolve_paper_metadata_by_doi(test_doi, title_fallback="IEEE Access Test", fast_only=True)
+    assert res1 is not None
+    assert test_doi in _GLOBAL_METADATA_CACHE
+    
+    # Second call should hit the cache
+    res2 = resolve_paper_metadata_by_doi(test_doi, fast_only=True)
+    assert res2 == res1
 
 def test_document_service_quality_calculator(tmp_path):
     """Verify document quality calculator prioritizes full PDFs with DOI and high citations."""
@@ -301,9 +324,9 @@ def test_storage_path_traversal_protection():
     res_uploads_root = client.get("/uploads/")
     assert res_uploads_root.status_code == 404
 
-@pytest.mark.asyncio
-async def test_workspace_pipeline_execution():
+def test_workspace_pipeline_execution():
     """Verify workspace analysis pipeline executes without DetachedInstanceError or import errors."""
+    import asyncio
     from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
     from unittest.mock import AsyncMock, MagicMock
     from database import SessionLocal, Document as DBDocument
@@ -325,7 +348,7 @@ async def test_workspace_pipeline_execution():
     finally:
         db.close()
 
-    try:
+    async def _run():
         mock_llm = MagicMock()
         mock_response = MagicMock()
         mock_response.message.content = "Hasil analisis sintesis dokumen."
@@ -334,7 +357,7 @@ async def test_workspace_pipeline_execution():
         async def mock_status(text):
             pass
 
-        result = await handle_workspace_analysis_pipeline(
+        return await handle_workspace_analysis_pipeline(
             chat_id=dummy_chat_id,
             query="Bandingkan metode paper",
             local_docs=["test_paper.pdf"],
@@ -342,6 +365,9 @@ async def test_workspace_pipeline_execution():
             target_llm=mock_llm,
             report_status=mock_status
         )
+
+    try:
+        result = asyncio.run(_run())
         assert "Hasil analisis sintesis" in result
     finally:
         db = SessionLocal()
@@ -356,8 +382,7 @@ def test_rag_exports_and_aliases():
     assert hasattr(rag, "delete_qdrant_vectors")
     assert rag.delete_qdrant_vectors is rag.delete_document_vectors
 
-@pytest.mark.asyncio
-async def test_dispatch_intent_pipeline_timeout_protection(monkeypatch):
+def test_dispatch_intent_pipeline_timeout_protection(monkeypatch):
     """Verify dispatch_intent_pipeline enforces timeout protection on intent pipelines."""
     import asyncio
     from rag.engine import dispatch_intent_pipeline
@@ -372,8 +397,8 @@ async def test_dispatch_intent_pipeline_timeout_protection(monkeypatch):
     async def mock_status(text):
         pass
 
-    with pytest.raises(TimeoutError) as exc_info:
-        await dispatch_intent_pipeline(
+    async def _run():
+        return await dispatch_intent_pipeline(
             intent="GENERAL_CHAT",
             chat_id="dummy_chat",
             query="Hello",
@@ -385,6 +410,9 @@ async def test_dispatch_intent_pipeline_timeout_protection(monkeypatch):
             doc_context_info="",
             timeout_sec=0.05
         )
+
+    with pytest.raises(TimeoutError) as exc_info:
+        asyncio.run(_run())
     assert "melebihi batas waktu" in str(exc_info.value)
 
 def test_rubric_grader_parse_error_handling():
@@ -403,9 +431,9 @@ def test_rubric_grader_parse_error_handling():
     assert res_valid.is_grounded is True
     assert res_valid.grounding_score == 0.92
 
-@pytest.mark.asyncio
-async def test_workspace_pipeline_hybrid_retrieval_scaling():
+def test_workspace_pipeline_hybrid_retrieval_scaling():
     """Verify workspace pipeline uses hybrid retrieval and catalog when docs > 4."""
+    import asyncio
     from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
     from unittest.mock import AsyncMock, MagicMock
     from database import SessionLocal, Document as DBDocument
@@ -431,7 +459,7 @@ async def test_workspace_pipeline_hybrid_retrieval_scaling():
     finally:
         db.close()
 
-    try:
+    async def _run():
         mock_llm = MagicMock()
         mock_response = MagicMock()
         mock_response.message.content = "Sintesis perbandingan 5 dokumen."
@@ -441,7 +469,7 @@ async def test_workspace_pipeline_hybrid_retrieval_scaling():
         async def mock_status(text):
             status_logs.append(text)
 
-        result = await handle_workspace_analysis_pipeline(
+        return await handle_workspace_analysis_pipeline(
             chat_id=dummy_chat_id,
             query="Bandingkan kontribusi 5 paper ini",
             local_docs=[f"paper_{i}.pdf" for i in range(1, 6)],
@@ -449,6 +477,9 @@ async def test_workspace_pipeline_hybrid_retrieval_scaling():
             target_llm=mock_llm,
             report_status=mock_status
         )
+
+    try:
+        result = asyncio.run(_run())
         assert "Sintesis perbandingan 5 dokumen" in result
     finally:
         db = SessionLocal()
@@ -492,6 +523,60 @@ def test_commit_with_retry():
         commit_with_retry(mock_db, max_retries=3, initial_delay=0.01)
     mock_db.commit.assert_called_once()
     mock_db.rollback.assert_called_once()
+
+def test_storage_delete_files_cleans_vectors(monkeypatch):
+    """Verify deleting files via /storage/delete purges Qdrant vector embeddings and database record."""
+    from database import SessionLocal, Document as DBDocument
+    from helpers import UPLOAD_DIR
+    import rag
+
+    dummy_chat_id = "test_storage_del_chat"
+    dummy_fn = f"test_delete_vector_{dummy_chat_id}.txt"
+    file_path = os.path.join(UPLOAD_DIR, dummy_fn)
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write("temporary test content for storage delete")
+
+    db = SessionLocal()
+    try:
+        doc = DBDocument(
+            chat_id=dummy_chat_id,
+            filename=dummy_fn,
+            title="Temp Storage Delete Doc"
+        )
+        db.add(doc)
+        db.commit()
+    finally:
+        db.close()
+
+    deleted_vector_calls = []
+    def mock_delete_vectors(chat_id, filename=None):
+        deleted_vector_calls.append((chat_id, filename))
+
+    monkeypatch.setattr(rag, "delete_document_vectors", mock_delete_vectors)
+
+    try:
+        res = client.post("/storage/delete", json={"file_ids": [dummy_fn]})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["deleted"] == 1
+        assert not os.path.exists(file_path)
+        assert (dummy_chat_id, dummy_fn) in deleted_vector_calls
+
+        db = SessionLocal()
+        remaining = db.query(DBDocument).filter(DBDocument.filename == dummy_fn).first()
+        db.close()
+        assert remaining is None
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+def test_bulk_download_request_schema():
+    """Verify BulkDownloadRequest schema is defined and validated in models."""
+    import models
+    req = models.BulkDownloadRequest(doc_ids=[101, 102])
+    assert req.doc_ids == [101, 102]
+
 
 
 def test_clean_duplicate_documents_endpoints():
