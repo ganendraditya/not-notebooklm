@@ -11,6 +11,19 @@ export interface CitationContext {
   aiQuotes?: string[];
 }
 
+function renderTextWithLineBreaks(text: string, keyPrefix: string): React.ReactNode {
+  if (!/<br\s*\/?>/i.test(text)) {
+    return text;
+  }
+  const segments = text.split(/<br\s*\/?>/gi);
+  return segments.map((seg, sIdx) => (
+    <React.Fragment key={`${keyPrefix}-br-${sIdx}`}>
+      {sIdx > 0 && <br />}
+      {seg}
+    </React.Fragment>
+  ));
+}
+
 export function parseCitationsInReactNode(
   node: React.ReactNode, 
   documents?: DocType[], 
@@ -23,10 +36,10 @@ export function parseCitationsInReactNode(
   if (typeof node === "string") {
     // Determine the full text available (use parent/container text if node is a partial string)
     const effectiveFullText = parentFullText || node;
-    // Support standard bracket citations: [1], [2], [1, 2], [1]-[3], [Dokumen 1], [Document 1]
+    // Support standard and double bracket citations: [1], [[1]], [1]], [1, 2], [1]-[3], [Dokumen 1], [Document 1]
     // Also support fallback prefixes like [M-01], [T-01], [M-1], [T-1], [ref-1], [P-01], Dokumen [1], Dokumen 1:, Paper 1, Source 1, and isolated numbers in parenthesis like (1), (2)
     // Citation numbers correspond to document indices (1 to 500)
-    const regex = /(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\]|(?:Dokumen|Document|Paper|Source)\s*\[?(\d{1,3})\]?(?:\s*:|\b)|\bDokumen\s+(\d{1,3})\b|\((\d{1,3})\))/gi;
+    const regex = /(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*\[?(\d{1,3})\]?(?:\s*:|\b)|\bDokumen\s+(\d{1,3})\b|\((\d{1,3})\))/gi;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
@@ -34,7 +47,7 @@ export function parseCitationsInReactNode(
     while ((match = regex.exec(node)) !== null) {
       const matchIndex = match.index;
       if (matchIndex > lastIndex) {
-        parts.push(node.substring(lastIndex, matchIndex));
+        parts.push(renderTextWithLineBreaks(node.substring(lastIndex, matchIndex), `${elementPrefix}-pre-${lastIndex}`));
       }
 
       // Extract precise context sentence/cell text for grounding
@@ -173,7 +186,11 @@ export function parseCitationsInReactNode(
     }
 
     if (lastIndex < node.length) {
-      parts.push(node.substring(lastIndex));
+      parts.push(renderTextWithLineBreaks(node.substring(lastIndex), `${elementPrefix}-post-${lastIndex}`));
+    }
+
+    if (parts.length === 0) {
+      return renderTextWithLineBreaks(node, `${elementPrefix}-plain`);
     }
 
     return parts.length === 1 ? parts[0] : parts;

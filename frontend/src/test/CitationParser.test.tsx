@@ -77,4 +77,26 @@ describe("CitationParser", () => {
     expect(activeBtn2.className).toContain("text-blue-300");
     expect(activeBtn2.className).not.toContain("bg-amber-400");
   });
+
+  it("converts <br> tags into real line breaks and parses double brackets cleanly without trailing brackets", () => {
+    const docs = [{ id: 1, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }];
+    const text = "• Data: 1.000 sampel [1].<br>• Preprocessing: Cleaning [[1]]<br>(Tyas, 2024)";
+    const result = parseCitationsInReactNode(text, docs);
+
+    const { container } = render(<div>{result}</div>);
+    const buttons = container.querySelectorAll("button");
+    expect(buttons.length).toBe(2);
+    expect(buttons[0].textContent).toContain("1");
+    expect(buttons[1].textContent).toContain("1");
+
+    // Must render real <br> elements instead of literal "<br>" text string
+    const brs = container.querySelectorAll("br");
+    expect(brs.length).toBe(2);
+    expect(container.innerHTML).not.toContain("&lt;br&gt;");
+    expect(container.textContent).not.toContain("<br>");
+
+    // Ensure double brackets [[1]] or [1]] don't leave trailing ']' in text
+    expect(container.textContent).not.toContain("1]]");
+    expect(container.textContent).not.toContain("[[1");
+  });
 });

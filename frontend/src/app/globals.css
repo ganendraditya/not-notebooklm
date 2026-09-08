@@ -232,3 +232,10 @@ input[type="number"]::-webkit-outer-spin-button {
   opacity: 0.8;
   cursor: pointer;
 }
+
+/* Ensure all markdown prose table cells are strictly top-aligned */
+.prose table td,
+.prose table th,
+.prose table tr {
+  vertical-align: top !important;
+}

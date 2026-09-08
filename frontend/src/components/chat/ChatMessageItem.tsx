@@ -118,13 +118,13 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
 
   if (isHeader) {
     return (
-      <th className="py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase" {...props}>
+      <th className="py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase align-top text-left" {...props}>
         {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
       </th>
     );
   }
   return (
-    <td className="py-2.5 px-3 text-app-text-muted text-xs leading-relaxed" {...props}>
+    <td className="py-2.5 px-3 text-app-text-muted text-xs leading-relaxed align-top" {...props}>
       {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
     </td>
   );
@@ -410,7 +410,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             ),
             table: ({ children }) => (
               <div className="overflow-x-auto my-4 rounded-xl border border-app-border shadow-md">
-                <table className="w-full text-left text-sm border-collapse bg-app-table-bg">
+                <table className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top">
                   {children}
                 </table>
               </div>
@@ -421,7 +421,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
               const rowText = extractTableRowText(node, children);
               return (
                 <TableRowContext.Provider value={rowText}>
-                  <tr className="hover:bg-app-item-hover transition-colors" {...props}>{children}</tr>
+                  <tr className="hover:bg-app-item-hover transition-colors align-top" {...props}>{children}</tr>
                 </TableRowContext.Provider>
               );
             },
