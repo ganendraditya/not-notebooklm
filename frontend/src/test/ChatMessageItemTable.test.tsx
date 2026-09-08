@@ -161,4 +161,39 @@ describe("ChatMessageItem Table & Cleanliness", () => {
     expect(copiedText).not.toContain("</blockquote>");
     expect(copiedText).toContain('"Sistem analisis sentimen dibagi 5 tahap."');
   });
+
+  it("converts markdown citation links like [[1]](#doc1) into interactive buttons instead of new-tab links", () => {
+    const rawContent = `| Dokumen | Metode |
+|:---|:---|
+| [[1]](#doc1) | Pipeline 5 tahap [1] |`;
+
+    const msg = {
+      role: "assistant" as const,
+      content: rawContent,
+      created_at: new Date().toISOString(),
+    };
+
+    const documents = [
+      { id: 1, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }
+    ];
+
+    const { container } = renderWithI18n(
+      <InChatMessageComponent
+        msg={msg}
+        activeChatId="test-chat"
+        backendUrl="http://localhost:8000"
+        documents={documents}
+      />
+    );
+
+    // Must NOT contain any <a target="_blank"> linking to #doc1
+    const anchorLinks = container.querySelectorAll("a");
+    expect(anchorLinks.length).toBe(0);
+
+    // Must render interactive buttons for the citations
+    const buttons = container.querySelectorAll("button");
+    // At least 2 citation buttons (one in col 1, one in col 2) plus the copy button
+    const citationButtons = Array.from(buttons).filter(b => b.textContent?.includes("1"));
+    expect(citationButtons.length).toBeGreaterThanOrEqual(2);
+  });
 });

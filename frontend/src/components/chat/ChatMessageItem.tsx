@@ -266,6 +266,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     // Remove empty span/div placeholders with ids/names (e.g. <span id="doc1"></span>)
     clean = clean.replace(/<(?:span|div)\b[^>]*\b(?:id|name)=[^>]*>\s*<\/(?:span|div)>/gi, "");
 
+    // Strip fake citation markdown links emitted by LLMs (e.g. [[1]](#doc1), [1](#doc1), [(1)](#doc1), [[M-01]](#ref-01), [1](url))
+    // Converts them to clean standard bracketed citations: [1], [M-01], [Dokumen 1] so they never render as <a target="_blank">
+    clean = clean.replace(/\[{0,2}\(?((?:Dokumen|Document|Doc|Paper|Source|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3})*)\)?\]{0,2}\((?:#[^)]*|https?:\/\/[^)]*)\)/gi, "[$1]");
+
     // Strip raw HTML quote/highlight artifacts emitted by LLMs (e.g. <blockquote><mark>"..."</mark></blockquote>, </mark>, etc.)
     // Preserves the inner text verbatim while stripping the HTML tags
     clean = clean.replace(/<\/?(?:mark|blockquote|q|cite|font|center|small|big)\b[^>]*>/gi, "");
@@ -492,16 +496,28 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             },
             em: ({ children }) => <em className="italic">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "em")}</em>,
             strong: ({ children }) => <strong className="font-semibold text-app-text">{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "strong")}</strong>,
-            a: ({ href, children }) => (
-              <a 
-                href={href} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium break-all"
-              >
-                {children}
-              </a>
-            ),
+            a: ({ href, children, ...props }: any) => {
+              const isInternalAnchor = !href || href.startsWith("#");
+              const linkText = extractNodeText(children).trim();
+              const isCitationLike = /(?:\[{1,2}|\()?(?:Dokumen|Document|Doc|Paper|Source|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3})*(?:\]{1,2}|\))?/i.test(linkText);
+
+              // If it's a citation link or internal anchor, unwrap it completely so no <a> target="_blank" wraps it!
+              if (isCitationLike || isInternalAnchor) {
+                return <>{parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, undefined, citationMap, "a")}</>;
+              }
+
+              return (
+                <a 
+                  href={href} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline font-medium break-all"
+                  {...props}
+                >
+                  {children}
+                </a>
+              );
+            },
             table: ({ children }: any) => <MarkdownTableBlock>{children}</MarkdownTableBlock>,
             thead: ({ children }: any) => (
               <thead className="bg-app-table-header text-app-text border-b border-app-border font-semibold select-none">

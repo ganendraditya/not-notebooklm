@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 import { parseCitationsInReactNode } from "../components/chat/CitationParser";
@@ -139,5 +139,32 @@ describe("CitationParser", () => {
 
     // Must have accessible aria-label
     expect(btn.getAttribute("aria-label")).toContain("Source [5]");
+  });
+
+  it("unwraps <a> tags wrapping citations so buttons are never nested inside links that open a new tab", () => {
+    const docs = [{ id: 1, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }];
+    const onOpen = vi.fn();
+
+    // Simulate an anchor tag wrapping a citation node: <a href="#doc1" target="_blank">[1]</a>
+    const linkNode = React.createElement(
+      "a",
+      { href: "#doc1", target: "_blank" },
+      "[1]"
+    );
+
+    const result = parseCitationsInReactNode(linkNode, docs, onOpen);
+    const { container } = render(<div>{result}</div>);
+
+    // Must NOT render any <a> tag
+    expect(container.querySelector("a")).toBeNull();
+
+    // Must render the citation button directly
+    const btn = container.querySelector("button")!;
+    expect(btn).toBeTruthy();
+    expect(btn.textContent).toContain("1");
+
+    // Clicking the button should call onOpen, NOT open a new window/tab
+    btn.click();
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 });
