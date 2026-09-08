@@ -18,8 +18,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { Portal } from "@/components/ui/Portal";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { RenameDialog } from "@/components/ui/RenameDialog";
+import { Button } from "@/components/ui/button";
 import { ChatMessage, useChatStore } from "@/stores/chatStore";
 import { Document as DocType, TargetedSource, useDocumentStore } from "@/stores/documentStore";
 import { InChatMessageComponent } from "./chat/ChatMessageItem";
@@ -120,6 +119,7 @@ export default function ChatArea({
   const [editContent, setEditContent] = useState("");
   const [isTopMenuOpen, setIsTopMenuOpen] = useState(false);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameTitleInput, setRenameTitleInput] = useState("");
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   // Clear regenerating indicator once global loading stops
@@ -222,12 +222,34 @@ export default function ChatArea({
   // Focus rename input
   useEffect(() => {
     if (isRenameOpen) {
+      setRenameTitleInput(chatTitle || "");
       setTimeout(() => {
         renameInputRef.current?.focus();
         renameInputRef.current?.select();
       }, 50);
     }
-  }, [isRenameOpen]);
+  }, [isRenameOpen, chatTitle]);
+
+  const handleSaveRename = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onRenameChat && activeChatId && renameTitleInput.trim()) {
+      onRenameChat(activeChatId, renameTitleInput.trim());
+      setIsRenameOpen(false);
+      setRenameTitleInput("");
+    }
+  };
+
+  const handleCancelRename = () => {
+    setIsRenameOpen(false);
+    setRenameTitleInput("");
+  };
+
+  const handleConfirmDelete = () => {
+    if (onDeleteChat && activeChatId) {
+      onDeleteChat(activeChatId);
+    }
+    setIsDeleteConfirmOpen(false);
+  };
 
   // Reset scroll to bottom on chat switch
   useEffect(() => {
@@ -333,6 +355,7 @@ export default function ChatArea({
                   <button
                     onClick={() => {
                       setIsTopMenuOpen(false);
+                      setRenameTitleInput(chatTitle || "");
                       setIsRenameOpen(true);
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-app-item-hover hover:text-app-text transition-colors cursor-pointer"
@@ -373,7 +396,7 @@ export default function ChatArea({
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-red-500 hover:bg-red-500/10 hover:text-red-600 transition-colors cursor-pointer"
                   >
                     <Trash2 size={13} />
-                    <span>{t('action.delete')}</span>
+                    <span>{t('action.deleteChat')}</span>
                   </button>
                 </div>
               )}
@@ -676,42 +699,108 @@ export default function ChatArea({
         </div>
       )}
 
-      {/* Modal for Rename Chat */}
+      {/* Centered Modal for Rename Chat */}
       {isRenameOpen && activeChatId && (
-        <RenameDialog
-          isOpen={isRenameOpen}
-          title={t('left.renameConversation') || "Rename Conversation"}
-          initialValue={chatTitle || ""}
-          placeholder={t('left.renamePlaceholder') || "Enter title..."}
-          confirmLabel={t('action.save') || "Save"}
-          cancelLabel={t('action.cancel') || "Cancel"}
-          onClose={() => setIsRenameOpen(false)}
-          onConfirm={(newTitle) => {
-            if (onRenameChat && activeChatId) {
-              onRenameChat(activeChatId, newTitle);
-            }
-            setIsRenameOpen(false);
-          }}
-        />
+        <Portal>
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCancelRename();
+            }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
+            >
+              <div className="space-y-1.5">
+                <h3 className="text-base font-semibold text-app-text">{t('left.renameConversation')}</h3>
+                <p className="text-xs text-app-text-muted">
+                  {t('left.renameDesc')}
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveRename} className="space-y-4">
+                <input
+                  ref={renameInputRef}
+                  type="text"
+                  value={renameTitleInput}
+                  onChange={(e) => setRenameTitleInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") handleCancelRename();
+                  }}
+                  placeholder={t('left.renamePlaceholder')}
+                  className="w-full bg-app-input-surface border border-app-border focus:border-blue-500 rounded-xl px-3 py-2 text-xs text-app-text outline-none transition-colors"
+                />
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelRename}
+                    className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
+                  >
+                    {t('action.cancel')}
+                  </Button>
+
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={!renameTitleInput.trim()}
+                    className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow"
+                  >
+                    {t('action.save')}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </Portal>
       )}
 
-      {/* Confirmation Modal for Delete Chat */}
+      {/* Centered Confirmation Modal for Delete Chat */}
       {isDeleteConfirmOpen && activeChatId && (
-        <ConfirmDialog
-          isOpen={isDeleteConfirmOpen}
-          title={t('ui.deleteConfirmTitle') || "Delete Chat"}
-          description={t('ui.deleteConfirmDesc')?.replace('{title}', chatTitle || "conversation") || "Are you sure you want to delete this chat?"}
-          confirmLabel={t('action.delete') || "Delete"}
-          cancelLabel={t('action.cancel') || "Cancel"}
-          isDestructive={true}
-          onClose={() => setIsDeleteConfirmOpen(false)}
-          onConfirm={() => {
-            if (onDeleteChat && activeChatId) {
-              onDeleteChat(activeChatId);
-            }
-            setIsDeleteConfirmOpen(false);
-          }}
-        />
+        <Portal>
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsDeleteConfirmOpen(false);
+            }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-app-modal border border-app-border-strong rounded-2xl w-full max-w-sm p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150 text-app-text"
+            >
+              <div className="space-y-1.5">
+                <h3 className="text-base font-semibold text-app-text">{t('ui.deleteConfirmTitle')}</h3>
+                <p className="text-xs text-app-text-muted leading-relaxed">
+                  {t('ui.deleteConfirmDesc').replace('{title}', chatTitle || "conversation")}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-app-divider">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                  className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg px-3.5 h-8 cursor-pointer"
+                >
+                  {t('action.cancel')}
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={handleConfirmDelete}
+                  className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg px-4 h-8 cursor-pointer shadow"
+                >
+                  {t('action.delete')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Portal>
       )}
     </div>
   );
