@@ -92,55 +92,6 @@ LLM_FALLBACK_MODEL=gpt-4o-mini
 
 ---
 
-### Quick Setup Presets
-
-Copy and paste the template that matches your preferred AI provider:
-
-#### Preset A: 9Router or Local AI Gateway (Default)
-```env
-LLM_BASE_URL=http://localhost:20128/v1
-LLM_API_KEY=your_api_key_here
-LLM_MODEL=ag/gemini-3.7-flash-high
-LLM_FAST_MODEL=ag/gemini-3.8-flash-low
-LLM_FALLBACK_MODEL=ag/gemini-pro-agent
-```
-
-#### Preset B: Local Offline via Ollama (No API Key Required)
-```env
-LLM_BASE_URL=http://localhost:11434/v1
-LLM_API_KEY=ollama
-LLM_MODEL=llama3.3:70b
-LLM_FAST_MODEL=llama3.2:3b
-```
-
-#### Preset C: OpenRouter (Claude, DeepSeek, Llama)
-```env
-LLM_BASE_URL=https://openrouter.ai/api/v1
-LLM_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxx
-LLM_MODEL=anthropic/claude-3.5-sonnet
-LLM_FAST_MODEL=anthropic/claude-3.5-haiku
-LLM_FALLBACK_MODEL=deepseek/deepseek-chat
-```
-
-#### Preset D: Official OpenAI
-```env
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxx
-LLM_MODEL=gpt-4o
-LLM_FAST_MODEL=gpt-4o-mini
-LLM_FALLBACK_MODEL=gpt-4o-mini
-```
-
-#### Preset E: Single-Model Mode (Super Simple)
-If you only have or want to use **one model**, you only need to specify `LLM_MODEL`. The system will automatically use it for both heavy reasoning and fast triage tasks:
-```env
-LLM_BASE_URL=https://api.openai.com/v1
-LLM_API_KEY=your_api_key_here
-LLM_MODEL=gpt-4o
-```
-
----
-
 ## Architecture & Tech Stack
 
 * **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS, Zustand State Management, Base UI.
