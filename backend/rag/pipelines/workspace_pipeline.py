@@ -253,10 +253,10 @@ async def handle_workspace_analysis_pipeline(
             llm=auditor_llm
         )
 
-        if rubric_res.is_grounded and rubric_res.grounding_score >= 0.85:
+        if rubric_res.is_grounded and rubric_res.grounding_score >= 0.80:
             return draft_content
 
-        if rubric_res.revision_instruction:
+        if (not rubric_res.is_grounded or rubric_res.hallucinated_claims) and rubric_res.revision_instruction:
             await report_status("Refining and correcting factual citations...")
             revision_prompt = (
                 f"{system_prompt_text}\n\n"

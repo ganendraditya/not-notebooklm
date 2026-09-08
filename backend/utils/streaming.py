@@ -19,6 +19,10 @@ class SSEStreamEmitter:
         """Emits an incremental token / text delta during streaming."""
         await self._queue.put({"type": "delta", "text": chunk_text, "data": chunk_text})
 
+    async def emit_clear_delta(self):
+        """Notifies the client to reset partial streaming text buffer if a cascade/retry occurs."""
+        await self._queue.put({"type": "clear_delta"})
+
     async def emit_event(self, event_data: dict):
         """Emits a custom structured event payload."""
         await self._queue.put(event_data)

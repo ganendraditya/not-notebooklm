@@ -112,7 +112,8 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
             query.message, 
             chat_history=chat_history, 
             status_callback=emitter.emit_status,
-            delta_callback=emitter.emit_delta
+            delta_callback=emitter.emit_delta,
+            reset_callback=emitter.emit_clear_delta
         )
 
         if title_task and not title_task.done():
@@ -145,22 +146,38 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
         
-    all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
-    if req.message_index < 0 or req.message_index >= len(all_msgs):
-        raise HTTPException(status_code=400, detail="Invalid message index")
+    all_msgs = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.chat_id == chat_id)
+        .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+        .all()
+    )
+    if not all_msgs:
+        raise HTTPException(status_code=400, detail="No messages found in this chat session")
         
-    target_msg = all_msgs[req.message_index]
+    target_idx = req.message_index
+    if target_idx < 0:
+        target_idx = 0
+    elif target_idx >= len(all_msgs):
+        target_idx = len(all_msgs) - 1
+
+    target_msg = all_msgs[target_idx]
     if target_msg.role != "user":
-        raise HTTPException(status_code=400, detail="Only user messages can be edited")
-        
+        # Gracefully resolve to the intended user message to prevent index drift errors
+        user_indices = [i for i, m in enumerate(all_msgs) if m.role == "user"]
+        if not user_indices:
+            raise HTTPException(status_code=400, detail="Only user messages can be edited")
+        target_idx = min(user_indices, key=lambda i: abs(i - target_idx))
+        target_msg = all_msgs[target_idx]
+
     target_msg.content = req.message
-    for msg_to_del in all_msgs[req.message_index + 1:]:
+    for msg_to_del in all_msgs[target_idx + 1:]:
         db.delete(msg_to_del)
         
     chat.updated_at = get_utc_now()
     commit_with_retry(db)
     
-    truncated_history = extract_chat_history_from_db_messages(all_msgs[:req.message_index + 1])
+    truncated_history = extract_chat_history_from_db_messages(all_msgs[:target_idx + 1])
     
     async def stream_worker(emitter: SSEStreamEmitter):
         resp_text = await rag.query_chat(
@@ -168,7 +185,8 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
             req.message, 
             chat_history=truncated_history, 
             status_callback=emitter.emit_status,
-            delta_callback=emitter.emit_delta
+            delta_callback=emitter.emit_delta,
+            reset_callback=emitter.emit_clear_delta
         )
         save_stream_assistant_response(chat_id, resp_text)
 
@@ -192,7 +210,12 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
         
-    all_msgs = db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).order_by(ChatMessage.created_at.asc()).all()
+    all_msgs = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.chat_id == chat_id)
+        .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+        .all()
+    )
     if req.message_index < 0 or req.message_index >= len(all_msgs):
         raise HTTPException(status_code=400, detail="Invalid message index")
         
@@ -217,7 +240,8 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
             user_prompt, 
             chat_history=truncated_history, 
             status_callback=emitter.emit_status,
-            delta_callback=emitter.emit_delta
+            delta_callback=emitter.emit_delta,
+            reset_callback=emitter.emit_clear_delta
         )
         from database import SessionLocal
         bg_db = SessionLocal()

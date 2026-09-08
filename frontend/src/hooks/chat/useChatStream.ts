@@ -107,6 +107,16 @@ export function useChatStream(
               setActiveStatus(statusText);
             }
           }
+        } else if (data.type === "clear_delta" || data.type === "reset_stream") {
+          if (activeChatIdRef.current === targetChatId) {
+            updateMessagesList(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+                return [...prev.slice(0, -1), { ...lastMsg, content: "" }];
+              }
+              return prev;
+            });
+          }
         } else if (data.type === "delta") {
           const chunkText = data.text ?? data.data ?? "";
           if (chunkText && activeChatIdRef.current === targetChatId) {
@@ -349,6 +359,16 @@ export function useChatStream(
               setActiveStatus(statusText);
             }
           }
+        } else if (data.type === "clear_delta" || data.type === "reset_stream") {
+          if (activeChatIdRef.current === currentChatId) {
+            updateMessagesList(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+                return [...prev.slice(0, -1), { ...lastMsg, content: "" }];
+              }
+              return prev;
+            });
+          }
         } else if (data.type === "delta") {
           const chunkText = data.text ?? data.data ?? "";
           if (chunkText && activeChatIdRef.current === currentChatId) {
@@ -492,6 +512,17 @@ export function useChatStream(
             if (activeChatIdRef.current === currentChatId) {
               setActiveStatus(statusText);
             }
+          }
+        } else if (data.type === "clear_delta" || data.type === "reset_stream") {
+          if (activeChatIdRef.current === currentChatId) {
+            updateMessagesList(prev => {
+              const next = [...prev];
+              const target = next[messageIndex];
+              if (target && target.role === "assistant") {
+                next[messageIndex] = { ...target, content: "" };
+              }
+              return next;
+            });
           }
         } else if (data.type === "delta") {
           const chunkText = data.text ?? data.data ?? "";

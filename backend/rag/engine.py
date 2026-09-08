@@ -216,12 +216,13 @@ async def query_chat(
     query: str, 
     chat_history: list = None,
     status_callback: Optional[Callable[[str], Any]] = None,
-    delta_callback: Optional[Callable[[str], Any]] = None
+    delta_callback: Optional[Callable[[str], Any]] = None,
+    reset_callback: Optional[Callable[[], Any]] = None
 ):
     """
     Orchestrates chat queries through intent classification and modular pipelines.
     Automatically handles attachment parsing, history formatting, and multi-LLM cascading fallback.
-    Supports real-time token streaming via delta_callback.
+    Supports real-time token streaming via delta_callback and clean buffer reset via reset_callback.
     """
     from database import SessionLocal, Document as DBDocument
     
@@ -236,8 +237,12 @@ async def query_chat(
             except Exception as e:
                 logger.debug(f"[Status Callback Error]: {e}")
 
+    has_emitted_tokens = False
+
     async def emit_delta(token: str):
-        if delta_callback:
+        nonlocal has_emitted_tokens
+        if delta_callback and token:
+            has_emitted_tokens = True
             try:
                 res = delta_callback(token)
                 if inspect.isawaitable(res):
@@ -267,6 +272,9 @@ async def query_chat(
     intent = await classify_user_intent(query, has_local_docs, len(local_docs), fast_instance)
     logger.info(f"[RAG Engine] Fast LLM Semantic Intent: {intent}")
 
+    # Dynamic timeout: complex comparative workspace queries need up to 150s
+    pipeline_timeout = 150.0 if intent == "ANALYZE_WORKSPACE" else 75.0
+
     last_err = None
     for cand_idx, (curr_llm, curr_name) in enumerate(candidate_llms):
         try:
@@ -280,7 +288,7 @@ async def query_chat(
                 formatted_history=formatted_history,
                 target_llm=curr_llm,
                 report_status=report_status,
-                timeout_sec=60.0,
+                timeout_sec=pipeline_timeout,
                 on_delta=emit_delta
             )
         except Exception as e:
@@ -289,6 +297,17 @@ async def query_chat(
             if cand_idx + 1 < len(candidate_llms):
                 next_name = candidate_llms[cand_idx+1][1]
                 logger.info(f"[RAG Fallback] -> Automatically cascading to {next_name}...")
+                
+                # If this model had already streamed partial tokens, instruct client to reset the buffer
+                if has_emitted_tokens and reset_callback:
+                    try:
+                        res = reset_callback()
+                        if inspect.isawaitable(res):
+                            await res
+                    except Exception as reset_err:
+                        logger.debug(f"[Reset Callback Error]: {reset_err}")
+                has_emitted_tokens = False
+
                 await report_status(f"Switching AI provider to {next_name}...")
                 continue
             else:
