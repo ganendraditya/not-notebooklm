@@ -57,7 +57,7 @@ describe("ChatMessageItem Table & Cleanliness", () => {
     );
 
     // Should render table and copy button
-    const copyBtn = screen.getByTitle("Copy table as Markdown");
+    const copyBtn = screen.getByTitle("Copy table");
     expect(copyBtn).toBeTruthy();
 
     const thElements = container.querySelectorAll("th");
@@ -103,7 +103,7 @@ describe("ChatMessageItem Table & Cleanliness", () => {
       />
     );
 
-    const copyBtn = screen.getByTitle("Copy table as Markdown");
+    const copyBtn = screen.getByTitle("Copy table");
     await act(async () => {
       fireEvent.click(copyBtn);
     });

@@ -124,7 +124,7 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   if (isHeader) {
     return (
       <th 
-        className={`py-3 px-3.5 font-semibold text-app-text text-xs tracking-wider uppercase align-top whitespace-nowrap ${alignClass}`} 
+        className={`py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase align-top whitespace-nowrap last:pr-9 ${alignClass}`} 
         {...props}
       >
         {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
@@ -133,7 +133,7 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   }
   return (
     <td 
-      className={`py-2.5 px-3.5 text-app-text-muted text-xs leading-relaxed align-top ${alignClass}`} 
+      className={`py-2.5 px-3 text-app-text-muted text-xs leading-relaxed align-top ${alignClass}`} 
       {...props}
     >
       {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
@@ -172,32 +172,30 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <div className="relative my-4 rounded-xl border border-app-border bg-app-table-bg shadow-sm overflow-hidden group/tbl">
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-app-table-header/80 border-b border-app-border text-[11px] select-none">
-        <span className="font-mono text-[10px] tracking-wider uppercase font-semibold text-app-text-dim">
-          Table
-        </span>
+    <div className="relative my-4 group/tbl">
+      {/* Top right corner copy button */}
+      <div className="absolute top-2 right-2 z-10 flex items-center">
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2 py-0.5 rounded text-xs text-app-text-muted hover:text-app-text hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-          title="Copy table as Markdown"
+          aria-label="Copy table"
+          title="Copy table"
+          className="relative group/btn p-1.5 rounded-md text-app-text-muted hover:text-app-text hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
         >
           {copied ? (
-            <>
-              <Check size={12} className="text-emerald-500 dark:text-emerald-400" />
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
-            </>
+            <Check size={14} className="text-emerald-500 dark:text-emerald-400" />
           ) : (
-            <>
-              <Copy size={12} />
-              <span>Copy Table</span>
-            </>
+            <Copy size={14} />
           )}
+          {/* Tooltip on hover */}
+          <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover/btn:flex items-center px-2 py-0.5 text-[11px] font-medium text-white bg-neutral-900 dark:bg-neutral-800 rounded shadow-md whitespace-nowrap pointer-events-none z-30 transition-opacity">
+            {copied ? "Copied!" : "Copy table"}
+          </div>
         </button>
       </div>
-      <div className="overflow-x-auto custom-scrollbar">
-        <table ref={tableRef} className="w-full text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top">
+
+      <div className="overflow-x-auto rounded-xl border border-app-border shadow-md custom-scrollbar">
+        <table ref={tableRef} className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top">
           {children}
         </table>
       </div>
@@ -506,7 +504,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
               </thead>
             ),
             tbody: ({ children }: any) => (
-              <tbody className="divide-y divide-app-divider/60">
+              <tbody className="divide-y divide-app-divider">
                 {children}
               </tbody>
             ),
@@ -514,7 +512,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
               const rowText = extractTableRowText(node, children);
               return (
                 <TableRowContext.Provider value={rowText}>
-                  <tr className="even:bg-app-surface/30 hover:bg-app-item-hover/70 transition-colors align-top" {...props}>
+                  <tr className="hover:bg-app-item-hover transition-colors align-top" {...props}>
                     {children}
                   </tr>
                 </TableRowContext.Provider>
