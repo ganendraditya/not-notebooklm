@@ -148,14 +148,56 @@ export default function ChatArea({
     return lastMsg.role === "assistant" && Boolean(lastMsg.content?.trim());
   }, [isLoading, messages]);
 
-  // Track user scroll position: if within 80px from bottom, keep auto-scroll active
+  // Immediate wheel interception (Crucial for Mac trackpads & mouse wheels):
+  // As soon as the user gestures UP, immediately release scroll lock
+  // BEFORE the fast streaming token updates can yank the user back down!
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (e.deltaY < 0) {
+      // User is scrolling up
+      isAtBottomRef.current = false;
+      setShowScrollBottom(true);
+    } else if (e.deltaY > 0) {
+      // User is scrolling down
+      const container = scrollContainerRef.current;
+      if (container) {
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+        if (distanceFromBottom <= 30) {
+          isAtBottomRef.current = true;
+          setShowScrollBottom(false);
+        }
+      }
+    }
+  }, []);
+
+  // Track touch gestures on mobile/tablets
+  const touchStartYRef = useRef<number | null>(null);
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartYRef.current = e.touches[0].clientY;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartYRef.current === null) return;
+    const currentY = e.touches[0].clientY;
+    const deltaY = touchStartYRef.current - currentY;
+    if (deltaY < 0) {
+      // Swiping down to scroll content up
+      isAtBottomRef.current = false;
+      setShowScrollBottom(true);
+    }
+  }, []);
+
+  // General scroll handler for scrollbar dragging, momentum finish, and keyboard nav
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    const atBottom = distanceFromBottom <= 80;
-    isAtBottomRef.current = atBottom;
-    setShowScrollBottom(!atBottom && !isChatEmpty);
+    if (distanceFromBottom > 30) {
+      isAtBottomRef.current = false;
+      setShowScrollBottom(!isChatEmpty);
+    } else {
+      isAtBottomRef.current = true;
+      setShowScrollBottom(false);
+    }
   }, [isChatEmpty]);
 
   const scrollToBottom = useCallback(() => {
@@ -363,6 +405,9 @@ export default function ChatArea({
       <div 
         ref={scrollContainerRef}
         onScroll={handleScroll}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         className={`flex-1 overflow-y-auto w-full min-h-0 custom-scrollbar overflow-x-hidden ${
           isChatEmpty ? "flex items-center justify-center pt-0 pb-0" : "pt-12 lg:pt-14 pb-36"
         }`}
