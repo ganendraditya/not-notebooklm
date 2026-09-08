@@ -153,9 +153,12 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode }> = ({ children
       if (rows.length === 0) return;
 
       const matrix = rows.map((r) =>
-        Array.from(r.querySelectorAll("th, td")).map((cell) =>
-          (cell.textContent || "").replace(/\s+/g, " ").replace(/\|/g, "\\|").trim()
-        )
+        Array.from(r.querySelectorAll("th, td")).map((cell) => {
+          let text = cell.textContent || "";
+          // Strip any stray HTML tags (e.g. </mark>, </blockquote>) that might leak into textContent
+          text = text.replace(/<\/?[a-z0-9]+(?:\s+[^>]*)?>/gi, "");
+          return text.replace(/\s+/g, " ").replace(/\|/g, "\\|").trim();
+        })
       );
 
       // Construct clean Markdown table string
@@ -262,6 +265,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     clean = clean.replace(/<\/a>/gi, "");
     // Remove empty span/div placeholders with ids/names (e.g. <span id="doc1"></span>)
     clean = clean.replace(/<(?:span|div)\b[^>]*\b(?:id|name)=[^>]*>\s*<\/(?:span|div)>/gi, "");
+
+    // Strip raw HTML quote/highlight artifacts emitted by LLMs (e.g. <blockquote><mark>"..."</mark></blockquote>, </mark>, etc.)
+    // Preserves the inner text verbatim while stripping the HTML tags
+    clean = clean.replace(/<\/?(?:mark|blockquote|q|cite|font|center|small|big)\b[^>]*>/gi, "");
 
     return { cleanContent: clean, sources: parsedSources, citationMap: parsedCitationMap };
   }, [msg.content]);

@@ -113,4 +113,52 @@ describe("ChatMessageItem Table & Cleanliness", () => {
     expect(copiedText).toContain("| Item | Price |");
     expect(copiedText).toContain("| Book | $20 |");
   });
+
+  it("strips <blockquote> and <mark> HTML tags from table cells and rendered text", async () => {
+    const rawContent = `| Metrik | Bukti Teks |
+|:---|:---|
+| Akurasi | 💬 Bukti Teks: <blockquote><mark>"Sistem analisis sentimen dibagi 5 tahap."</mark></blockquote> |
+| Limitasi | 💬 Bukti Teks: <blockquote><mark>"Data diperoleh dari twitter."</mark></blockquote> |`;
+
+    const msg = {
+      role: "assistant" as const,
+      content: rawContent,
+      created_at: new Date().toISOString(),
+    };
+
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    const { container } = renderWithI18n(
+      <InChatMessageComponent
+        msg={msg}
+        activeChatId="test-chat"
+        backendUrl="http://localhost:8000"
+      />
+    );
+
+    // Rendered text content must NOT contain raw "<blockquote>" or "</mark>" strings
+    expect(container.innerHTML).not.toContain("&lt;mark&gt;");
+    expect(container.innerHTML).not.toContain("&lt;blockquote&gt;");
+    expect(container.innerHTML).not.toContain("&lt;/mark&gt;");
+    expect(container.innerHTML).not.toContain("&lt;/blockquote&gt;");
+    expect(container.textContent).toContain('"Sistem analisis sentimen dibagi 5 tahap."');
+    expect(container.textContent).not.toContain("</mark></blockquote>");
+
+    // Copied table must NOT contain HTML tags either
+    const copyBtn = screen.getByLabelText("Copy table");
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
+
+    expect(writeTextMock).toHaveBeenCalled();
+    const copiedText = writeTextMock.mock.calls[0][0];
+    expect(copiedText).not.toContain("</mark>");
+    expect(copiedText).not.toContain("</blockquote>");
+    expect(copiedText).toContain('"Sistem analisis sentimen dibagi 5 tahap."');
+  });
 });
