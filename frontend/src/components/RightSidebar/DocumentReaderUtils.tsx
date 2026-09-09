@@ -203,27 +203,39 @@ export function getHighlightedContent(
           {rawSentences.map((sentence, idx) => {
             const isHighlighted = aiHighlightedIndices.has(idx);
             if (isHighlighted) {
+              const match = sentence.match(/^(\s*)([\s\S]*?)(\s*)$/);
+              const leadingSpace = match ? match[1] : "";
+              const coreText = match ? match[2] : sentence;
+              const trailingSpace = match ? match[3] : "";
+
+              if (!coreText) {
+                return <span key={idx}>{sentence}</span>;
+              }
+
               const clusterIdx = indexToClusterMap.get(idx) ?? 0;
               const isClusterAnchor = aiClusters[clusterIdx]?.[0] === idx;
               const isActiveCluster = clusterIdx === activeMatchIndex;
 
               return (
-                <mark
-                  key={idx}
-                  ref={(el) => {
-                    if (el && isClusterAnchor && highlightRefsMap) {
-                      highlightRefsMap.current.set(clusterIdx, el);
-                    }
-                  }}
-                  className={`font-medium px-1 py-0.5 rounded inline leading-relaxed transition-all box-decoration-clone ${
-                    isActiveCluster
-                      ? "bg-amber-300 dark:bg-amber-500/40 text-amber-950 dark:text-amber-100 ring-2 ring-amber-500 shadow-sm"
-                      : "bg-amber-200/80 dark:bg-amber-500/25 text-amber-950 dark:text-amber-100 border-b-2 border-amber-500/50"
-                  }`}
-                  title={`AI Grounded Evidence ${clusterIdx + 1} of ${aiClusters.length}`}
-                >
-                  {sentence}
-                </mark>
+                <React.Fragment key={idx}>
+                  {leadingSpace && <span>{leadingSpace}</span>}
+                  <mark
+                    ref={(el) => {
+                      if (el && isClusterAnchor && highlightRefsMap) {
+                        highlightRefsMap.current.set(clusterIdx, el);
+                      }
+                    }}
+                    className={`font-medium px-0.5 py-0 rounded-none inline transition-colors ${
+                      isActiveCluster
+                        ? "bg-amber-400/50 dark:bg-amber-400/35 text-amber-950 dark:text-amber-100 font-semibold"
+                        : "bg-amber-200/60 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
+                    }`}
+                    title={`AI Grounded Evidence ${clusterIdx + 1} of ${aiClusters.length}`}
+                  >
+                    {coreText}
+                  </mark>
+                  {trailingSpace && <span>{trailingSpace}</span>}
+                </React.Fragment>
               );
             }
             return <span key={idx}>{sentence}</span>;
@@ -516,27 +528,39 @@ export function getHighlightedContent(
       {rawSentences.map((sentence, idx) => {
         const isHighlighted = highlightedIndices.has(idx);
         if (isHighlighted) {
+          const match = sentence.match(/^(\s*)([\s\S]*?)(\s*)$/);
+          const leadingSpace = match ? match[1] : "";
+          const coreText = match ? match[2] : sentence;
+          const trailingSpace = match ? match[3] : "";
+
+          if (!coreText) {
+            return <span key={idx}>{sentence}</span>;
+          }
+
           const clusterIdx = indexToClusterMap.get(idx) ?? 0;
           const isClusterAnchor = clusters[clusterIdx]?.[0] === idx;
           const isActiveCluster = clusterIdx === activeMatchIndex;
 
           return (
-            <mark
-              key={idx}
-              ref={(el) => {
-                if (el && isClusterAnchor && highlightRefsMap) {
-                  highlightRefsMap.current.set(clusterIdx, el);
-                }
-              }}
-              className={`font-medium px-1 py-0.5 rounded inline leading-relaxed transition-all box-decoration-clone ${
-                isActiveCluster
-                  ? "bg-amber-300 dark:bg-amber-500/40 text-amber-950 dark:text-amber-100 ring-2 ring-amber-500 shadow-sm"
-                  : "bg-amber-200/80 dark:bg-amber-500/25 text-amber-950 dark:text-amber-100 border-b-2 border-amber-500/50"
-              }`}
-              title={`Evidence Match ${clusterIdx + 1} of ${clusters.length}`}
-            >
-              {sentence}
-            </mark>
+            <React.Fragment key={idx}>
+              {leadingSpace && <span>{leadingSpace}</span>}
+              <mark
+                ref={(el) => {
+                  if (el && isClusterAnchor && highlightRefsMap) {
+                    highlightRefsMap.current.set(clusterIdx, el);
+                  }
+                }}
+                className={`font-medium px-0.5 py-0 rounded-none inline transition-colors ${
+                  isActiveCluster
+                    ? "bg-amber-400/50 dark:bg-amber-400/35 text-amber-950 dark:text-amber-100 font-semibold"
+                    : "bg-amber-200/60 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
+                }`}
+                title={`Evidence Match ${clusterIdx + 1} of ${clusters.length}`}
+              >
+                {coreText}
+              </mark>
+              {trailingSpace && <span>{trailingSpace}</span>}
+            </React.Fragment>
           );
         }
         return <span key={idx}>{sentence}</span>;
