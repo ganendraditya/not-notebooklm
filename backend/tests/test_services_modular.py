@@ -296,4 +296,30 @@ def test_clean_chat_duplicates_normalizes_doi_formats():
         db.close()
 
 
+def test_delete_chat_physical_files_cleans_sources_and_media():
+    """Verify delete_chat_physical_files removes files in both UPLOAD_DIR and CHAT_MEDIA_DIR."""
+    import os
+    import uuid
+    from services.storage_service import delete_chat_physical_files
+    from utils.file_utils import UPLOAD_DIR, CHAT_MEDIA_DIR
+
+    test_cid = f"test_purge_{uuid.uuid4().hex}"
+    source_file = os.path.join(UPLOAD_DIR, f"{test_cid}_paper.pdf")
+    media_file = os.path.join(CHAT_MEDIA_DIR, f"{test_cid}_image.png")
+
+    with open(source_file, "w") as f:
+        f.write("dummy source content")
+    with open(media_file, "w") as f:
+        f.write("dummy media content")
+
+    assert os.path.exists(source_file)
+    assert os.path.exists(media_file)
+
+    deleted_count = delete_chat_physical_files(test_cid)
+    assert deleted_count == 2
+    assert not os.path.exists(source_file)
+    assert not os.path.exists(media_file)
+
+
+
 

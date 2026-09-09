@@ -4,7 +4,7 @@ from typing import List, Optional, Set
 from sqlalchemy.orm import Session
 
 from database import Document, ChatSession, ChatMessage, commit_with_retry
-from utils.file_utils import get_doc_file_path, UPLOAD_DIR, TEMP_ZIPS_DIR
+from utils.file_utils import get_doc_file_path, UPLOAD_DIR, TEMP_ZIPS_DIR, CHAT_MEDIA_DIR
 import rag
 
 logger = logging.getLogger("uvicorn.error")
@@ -12,21 +12,38 @@ logger = logging.getLogger("uvicorn.error")
 def delete_chat_physical_files(chat_id: str) -> int:
     """Single Source of Truth: Deletes all physical upload and media files associated with a chat_id."""
     deleted_files = 0
-    if not os.path.exists(UPLOAD_DIR):
-        return 0
-    try:
-        prefix = f"{chat_id}_"
-        for fname in os.listdir(UPLOAD_DIR):
-            if fname.startswith(prefix):
-                fp = os.path.join(UPLOAD_DIR, fname)
-                try:
-                    if os.path.isfile(fp):
-                        os.remove(fp)
-                        deleted_files += 1
-                except Exception as e:
-                    logger.warning(f"[Storage] Failed to remove chat file {fp}: {e}")
-    except Exception as e:
-        logger.error(f"[Storage] Error scanning upload dir for chat {chat_id}: {e}")
+    prefix = f"{chat_id}_"
+
+    # 1. Clean source document files in UPLOAD_DIR
+    if os.path.exists(UPLOAD_DIR):
+        try:
+            for fname in os.listdir(UPLOAD_DIR):
+                if fname.startswith(prefix):
+                    fp = os.path.join(UPLOAD_DIR, fname)
+                    try:
+                        if os.path.isfile(fp):
+                            os.remove(fp)
+                            deleted_files += 1
+                    except Exception as e:
+                        logger.warning(f"[Storage] Failed to remove chat file {fp}: {e}")
+        except Exception as e:
+            logger.error(f"[Storage] Error scanning upload dir for chat {chat_id}: {e}")
+
+    # 2. Clean in-chat media attachments in CHAT_MEDIA_DIR
+    if os.path.exists(CHAT_MEDIA_DIR):
+        try:
+            for fname in os.listdir(CHAT_MEDIA_DIR):
+                if fname.startswith(prefix):
+                    fp = os.path.join(CHAT_MEDIA_DIR, fname)
+                    try:
+                        if os.path.isfile(fp):
+                            os.remove(fp)
+                            deleted_files += 1
+                    except Exception as e:
+                        logger.warning(f"[Storage] Failed to remove chat media file {fp}: {e}")
+        except Exception as e:
+            logger.error(f"[Storage] Error scanning chat media dir for chat {chat_id}: {e}")
+
     return deleted_files
 
 def delete_chat_session_cascade(db: Session, chat_id: str) -> bool:
@@ -204,18 +221,21 @@ def cleanup_orphan_files_on_disk(active_chat_ids: Set[str]) -> tuple:
                 logger.warning(f"[Storage] Failed to remove temp zip {fp}: {e}")
 
     # 3. Clean orphan chat media
-    chat_media_dir = os.path.join(UPLOAD_DIR, "chat_media")
-    if os.path.exists(chat_media_dir):
-        for fname in os.listdir(chat_media_dir):
-            fp = os.path.join(chat_media_dir, fname)
-            try:
-                if os.path.isfile(fp):
-                    sz = os.path.getsize(fp)
-                    os.remove(fp)
-                    deleted_files += 1
-                    freed_bytes += sz
-            except Exception as e:
-                logger.warning(f"[Storage] Failed to remove media file {fp}: {e}")
+    if os.path.exists(CHAT_MEDIA_DIR):
+        for fname in os.listdir(CHAT_MEDIA_DIR):
+            fp = os.path.join(CHAT_MEDIA_DIR, fname)
+            if not os.path.isfile(fp):
+                continue
+            if "_" in fname:
+                cid = fname.split("_", 1)[0]
+                if cid not in active_chat_ids and len(cid) >= 32:
+                    try:
+                        sz = os.path.getsize(fp)
+                        os.remove(fp)
+                        deleted_files += 1
+                        freed_bytes += sz
+                    except Exception as e:
+                        logger.warning(f"[Storage] Failed to remove orphan chat media {fp}: {e}")
 
     return deleted_files, freed_bytes
 
