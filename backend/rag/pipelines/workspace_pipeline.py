@@ -230,11 +230,18 @@ async def handle_workspace_analysis_pipeline(
         role=MessageRole.SYSTEM,
         content=f"BERIKUT ADALAH SELURUH DATA & TEKS DOKUMEN REFERENSI YANG DIIMPOR ({total_doc_count} DOKUMEN):\n\n{full_docs_context}"
     )
+    augmented_user_query = (
+        f"{query}\n\n"
+        "[PETUNJUK FORMAT PENTING: Wajib cantumkan tag sitasi bracket [1], [2], dst. pada SETIAP baris temuan/metrik dan DI DALAM SETIAP SEL TABEL (jangan hanya di judul/header kolom). "
+        "Setiap temuan, metode, angka metrik harus memiliki tag [X] agar tombol bukti interaktif muncul. "
+        "Di baris paling akhir respon, sertakan blok <!-- CITATION_MAP: {\"1\": [\"...\"], \"2\": [\"...\"]} --> dengan kutipan kalimat persis dari naskah sumber.]"
+    )
+
     chat_msgs = [
         system_msg,
         *(formatted_history if formatted_history else []),
         context_msg,
-        LlamaChatMessage(role=MessageRole.USER, content=query)
+        LlamaChatMessage(role=MessageRole.USER, content=augmented_user_query)
     ]
     
     await report_status("Synthesizing comparative findings and formatting response...")
@@ -253,18 +260,31 @@ async def handle_workspace_analysis_pipeline(
             llm=auditor_llm
         )
 
-        if rubric_res.is_grounded and rubric_res.grounding_score >= 0.80:
+        if rubric_res.is_grounded and rubric_res.grounding_score >= 0.80 and rubric_res.citation_accuracy:
             return draft_content
 
-        if (not rubric_res.is_grounded or rubric_res.hallucinated_claims) and rubric_res.revision_instruction:
+        needs_revision = (
+            not rubric_res.is_grounded
+            or not rubric_res.citation_accuracy
+            or rubric_res.grounding_score < 0.80
+            or bool(rubric_res.hallucinated_claims)
+        )
+
+        if needs_revision:
+            instruction = rubric_res.revision_instruction or (
+                "Ensure all factual claims, metrics, and table cells/bullets have precise [X] bracket citations, "
+                "and include the mandatory <!-- CITATION_MAP: ... --> block with exact verbatim quotes at the end."
+            )
             await report_status("Refining and correcting factual citations...")
             revision_prompt = (
                 f"{system_prompt_text}\n\n"
                 "CRITICAL AUDIT FEEDBACK (SELF-CORRECTION REQUIRED):\n"
-                f"Your previous draft failed the academic grounding rubric:\n"
+                f"Your previous draft failed the academic grounding & citation rubric:\n"
+                f"- Grounding Score: {rubric_res.grounding_score}\n"
+                f"- Citation Accuracy & Coverage: {rubric_res.citation_accuracy}\n"
                 f"- Issues: {json.dumps(rubric_res.hallucinated_claims, ensure_ascii=False)}\n"
-                f"- Revision Instruction: {rubric_res.revision_instruction}\n\n"
-                "Please rewrite the response to be 100% truthful, strictly aligned with the provided documents, and fix all citation tags."
+                f"- Revision Instruction: {instruction}\n\n"
+                "Please rewrite the response to be 100% truthful, strictly aligned with the provided documents, attach [X] citations to all claims and table cells/bullets, and ensure the <!-- CITATION_MAP --> block is present at the end."
             )
             revised_chat_msgs = [
                 LlamaChatMessage(role=MessageRole.SYSTEM, content=revision_prompt),
@@ -275,7 +295,7 @@ async def handle_workspace_analysis_pipeline(
             revised_content = await astream_llm_response(target_llm, revised_chat_msgs, on_delta=on_delta)
             return format_clean_response(revised_content)
         else:
-            logger.debug("[Workspace Pipeline] Rubric audit produced no revision instruction; using draft content.")
+            logger.debug("[Workspace Pipeline] Rubric audit passed; using draft content.")
     except Exception as grade_err:
         logger.warning(f"[Workspace Pipeline] Rubric audit bypassed due to error: {grade_err}")
 

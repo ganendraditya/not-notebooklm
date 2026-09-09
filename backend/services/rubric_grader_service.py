@@ -27,7 +27,7 @@ class RubricEvaluationResult(BaseModel):
     )
     citation_accuracy: bool = Field(
         default=True, 
-        description="True if all document citation tags (e.g. [1], [2]) correspond to factual statements present in the cited document."
+        description="True if all document citation tags (e.g. [1], [2]) correspond to factual statements present in the cited document, and inline citation coverage & CITATION_MAP are fully provided."
     )
     hallucinated_claims: List[str] = Field(
         default_factory=list, 
@@ -57,9 +57,11 @@ def build_grounding_rubric_prompt(query: str, sources_context: str, draft_respon
         "   - Every claim, statistic, empirical result, or methodological statement in the draft MUST be explicitly stated in or directly inferred from the SOURCE DOCUMENTS.\n"
         "   - If the user asks for facts/methods that ARE PRESENT in the source documents, the draft MUST NOT falsely claim they are missing or unavailable.\n"
         "   - If the draft brings in outside general knowledge not present in sources as if it were from the documents, mark it as ungrounded.\n"
-        "2. CITATION & CITATION_MAP VERBATIM AUDIT:\n"
-        "   - If the draft cites Document [X] (e.g. [1], [2]), verify that the cited statement actually exists in Document [X] and not in Document [Y] or nowhere.\n"
-        "   - Check the <!-- CITATION_MAP: ... --> payload at the end: the quotes MUST be authentic verbatim extracts directly from the source text, matching the cited claims.\n"
+        "2. CITATION COVERAGE & INTERACTIVE EVIDENCE BUTTONS AUDIT:\n"
+        "   - Factual claims, metrics, dataset counts, and table rows/cells MUST have granular bracketed citation tags [X] (e.g. [1], [2]) directly beside them.\n"
+        "   - STRICT CHECK: If the draft contains a comparison table or list, but ONLY places [1], [2] in the headers/column titles while leaving individual table cells or bullet points uncited, mark citation_accuracy: false. The platform UI requires [X] tags inside each cell/bullet to render clickable evidence buttons!\n"
+        "   - Check that cited Document [X] actually contains the specific claim or metric.\n"
+        "   - Check the <!-- CITATION_MAP: ... --> payload at the end: If documents are cited, the draft MUST include this block with authentic verbatim sentence extracts from the source text. If missing, empty, or malformed, mark citation_accuracy: false.\n"
         "3. NO SPECULATION AS FACT:\n"
         "   - If source documents do not contain certain information requested by the user, the draft should acknowledge this rather than fabricating details.\n\n"
         "OUTPUT FORMAT REQUIREMENTS:\n"
@@ -69,7 +71,7 @@ def build_grounding_rubric_prompt(query: str, sources_context: str, draft_respon
         '  "grounding_score": 0.95,\n'
         '  "citation_accuracy": true,\n'
         '  "hallucinated_claims": ["claim 1 if any"],\n'
-        '  "revision_instruction": "Instruction on what to remove/fix if is_grounded is false, else null"\n'
+        '  "revision_instruction": "Instruction on what to remove/fix if is_grounded or citation_accuracy is false, else null"\n'
         "}"
     )
 

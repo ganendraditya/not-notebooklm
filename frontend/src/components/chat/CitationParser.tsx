@@ -12,6 +12,95 @@ export interface CitationContext {
   aiQuotes?: string[];
 }
 
+export function isNegativeOrEmptyCitation(val: string): boolean {
+  const clean = val.toLowerCase().replace(/[\(\)\[\]]/g, "").trim();
+  return (
+    !clean ||
+    /^(tidak\s+(disebutkan|ada|eksplisit|tersedia)|belum\s+disebutkan|n\/?a|-|\s*)$/i.test(clean) ||
+    clean.includes("tidak disebutkan") ||
+    clean.includes("tidak terdapat")
+  );
+}
+
+export function enhanceTableCitations(markdown: string): string {
+  if (!markdown || !markdown.includes("|")) return markdown;
+
+  const tagContent = (val: string, docNum: string): string => {
+    if (!val.trim() || isNegativeOrEmptyCitation(val) || val.includes(`[${docNum}]`)) {
+      return val;
+    }
+    if (/<br\s*\/?>/i.test(val)) {
+      const parts = val.split(/(<br\s*\/?>)/i);
+      return parts.map(p => {
+        if (/^<br\s*\/?>$/i.test(p)) return p;
+        if (p.trim() && !isNegativeOrEmptyCitation(p) && !p.includes(`[${docNum}]`)) {
+          return tagContent(p, docNum);
+        }
+        return p;
+      }).join("");
+    }
+    if (val.includes("•")) {
+      const items = val.split("•");
+      return items.map(it => {
+        if (!it.trim()) return it;
+        if (!isNegativeOrEmptyCitation(it) && !it.includes(`[${docNum}]`)) {
+          return `${it.trimEnd()} [${docNum}] `;
+        }
+        return it;
+      }).join("•").trimEnd();
+    }
+    return `${val.trimEnd()} [${docNum}]`;
+  };
+
+  const lines = markdown.split("\n");
+  let inTable = false;
+  let colDocMap: Record<number, string> = {};
+  const resultLines: string[] = [];
+
+  for (const line of lines) {
+    const stripped = line.trim();
+    if (stripped.startsWith("|") && stripped.endsWith("|")) {
+      const cells = stripped.slice(1, -1).split("|").map(c => c.trim());
+      if (!inTable) {
+        inTable = true;
+        colDocMap = {};
+        cells.forEach((c, idx) => {
+          const m = c.match(/\[(\d{1,3})\]/);
+          if (m) colDocMap[idx] = m[1];
+        });
+        resultLines.push(line);
+      } else if (cells.every(c => /^:?-+:?$/.test(c))) {
+        resultLines.push(line);
+      } else {
+        if (Object.keys(colDocMap).length > 0) {
+          const newCells = cells.map((c, idx) => {
+            if (colDocMap[idx]) return tagContent(c, colDocMap[idx]);
+            return c;
+          });
+          resultLines.push(`| ${newCells.join(" | ")} |`);
+        } else {
+          const m = cells[0]?.match(/\[(\d{1,3})\]/);
+          if (m) {
+            const docNum = m[1];
+            const newCells = cells.map((c, idx) => {
+              if (idx === 0) return c;
+              return tagContent(c, docNum);
+            });
+            resultLines.push(`| ${newCells.join(" | ")} |`);
+          } else {
+            resultLines.push(line);
+          }
+        }
+      }
+    } else {
+      inTable = false;
+      colDocMap = {};
+      resultLines.push(line);
+    }
+  }
+  return resultLines.join("\n");
+}
+
 function renderTextWithLineBreaks(text: string, keyPrefix: string): React.ReactNode {
   if (!/<br\s*\/?>/i.test(text)) {
     return text;

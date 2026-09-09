@@ -102,3 +102,9 @@ def test_evaluate_academic_writing_quality_with_mock():
     res = asyncio.run(evaluate_academic_writing_quality("Medical Imaging Classification", draft, mock_llm))
     assert res.is_academic_ready is True
     assert res.quality_score == 0.92
+
+def test_build_grounding_rubric_prompt_checks_citation_coverage():
+    prompt = build_grounding_rubric_prompt("Bandingkan metode", "Doc 1 data", "Draft table")
+    assert "CITATION COVERAGE & INTERACTIVE EVIDENCE BUTTONS AUDIT" in prompt
+    assert "CITATION_MAP" in prompt
+    assert "table cells" in prompt.lower()

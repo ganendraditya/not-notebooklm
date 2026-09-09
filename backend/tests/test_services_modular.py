@@ -118,6 +118,23 @@ def test_rag_formatters():
     assert clean_text == "Here is the synthesized analysis of the papers [1]."
     assert citations == {"1": ["Exact quote from document 1"]}
 
+def test_enhance_table_citations():
+    """Verify that table cells under document-mapped columns or rows automatically receive granular citation tags."""
+    table_raw = (
+        "| Parameter | [1] Doc A | [2] Doc B |\n"
+        "| :--- | :--- | :--- |\n"
+        "| Metode | • Model BiLSTM • Dataset 1000 | • Model Naive Bayes • Dataset 2000 |\n"
+        "| Limitasi | Tidak disebutkan secara eksplisit | • Hanya data teks umum |\n"
+        "| Temuan | Akurasi 72.25% | Akurasi 82.54% |"
+    )
+    formatted = format_clean_response(table_raw)
+    assert "BiLSTM [1]" in formatted
+    assert "Dataset 1000 [1]" in formatted
+    assert "Naive Bayes [2]" in formatted
+    assert "Akurasi 72.25% [1]" in formatted
+    assert "Akurasi 82.54% [2]" in formatted
+    assert "Tidak disebutkan secara eksplisit [1]" not in formatted
+
 def test_paper_service_prepare_and_document_response():
     """Verify prepare_paper_file_sync return signature and DocumentResponse model contracts."""
     import models

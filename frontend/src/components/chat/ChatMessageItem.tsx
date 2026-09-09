@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { ChatMessage } from "@/stores/chatStore";
 import { Document as DocType } from "@/stores/documentStore";
-import { parseCitationsInReactNode, CitationContext } from "./CitationParser";
+import { parseCitationsInReactNode, CitationContext, enhanceTableCitations } from "./CitationParser";
 import { useTranslation } from "@/lib/i18n";
 import { consumeSSEStream } from "@/lib/sse";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -250,7 +250,6 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
     // Clean any internal actions tag
     clean = clean.replace(/<!-- SOURCES_ACTION:[\s\S]*?-->/, "").trim();
-
     // Strip raw HTML anchor/target artifacts emitted by LLMs (e.g. <a id="doc1"></a>, <a name="...">, etc.)
     // If it's a wrapper like <a id="doc1">inner</a>, preserve inner content; if empty, drop entirely.
     clean = clean.replace(/<a\b(?:\s+[^>]*)?>([\s\S]*?)<\/a>/gi, (match, innerText) => {
@@ -274,6 +273,8 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     // Preserves the inner text verbatim while stripping the HTML tags
     clean = clean.replace(/<\/?(?:mark|blockquote|q|cite|font|center|small|big)\b[^>]*>/gi, "");
 
+    // Ensure all table cells mapped to documents have granular clickable citations
+    clean = enhanceTableCitations(clean);
     return { cleanContent: clean, sources: parsedSources, citationMap: parsedCitationMap };
   }, [msg.content]);
 
