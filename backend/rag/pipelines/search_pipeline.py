@@ -11,6 +11,7 @@ from rag.search import (
 )
 from rag.prompts import get_search_synthesis_prompt
 from rag.llm_factory import get_fast_llm, astream_llm_response
+from utils.text_processing import clean_doi, normalize_title_str
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -22,31 +23,71 @@ async def handle_academic_search_pipeline(
     report_status,
     on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
-    """Discovers, filters, audits, and synthesizes scholarly literature."""
+    """Discovers, filters, audits, and synthesizes scholarly literature with iterative batch replenishment."""
     fast_llm = get_fast_llm() or target_llm
 
-    await report_status("Planning academic query parameters & search terms...")
+    await report_status("Analyzing query parameters, constraints, and language...")
     plan = await plan_academic_search(query, formatted_history, fast_llm)
     
-    target_count = plan.get('target_count', 15)
-    # Request 2x candidate pool so AI Judge has plenty of candidates to audit & filter
-    search_plan = dict(plan)
-    search_plan['target_count'] = max(target_count * 2, 20)
+    target_count = plan.get('target_count', 12)
+    user_requested_count = plan.get('user_requested_count')
+    is_capped = plan.get('is_capped', False)
+    cap_limit = plan.get('cap_limit', 25)
+    filter_conflicts = plan.get('filter_conflicts', [])
 
-    await report_status("Searching verified academic repositories for candidate papers...")
+    # Multiplier: always 2x pool candidates (capped at 50 to protect API latency and memory)
+    pool_target = min(max(target_count * 2, 10), 50)
+    search_plan = dict(plan)
+    search_plan['target_count'] = pool_target
+
+    await report_status(f"Searching {pool_target} candidate papers from global academic index...")
     existing_sigs = get_existing_notebook_sources_signatures(chat_id)
     raw_papers = await asyncio.to_thread(search_academic_papers_planned, search_plan, existing_sigs)
     
     if not raw_papers:
         return f"Maaf, tidak ditemukan paper ilmiah yang cocok dengan kriteria pencarian untuk topik: '{query}'."
 
-    # Fast AI Relevance Judge: Evaluate paper summaries, audit domain relevance, and discard any noise
-    await report_status("AI Auditor evaluating paper relevance & filtering noise...")
-    papers = await judge_and_filter_papers_with_llm(query, raw_papers, target_count, fast_llm)
-    if not papers:
-        papers = raw_papers[:target_count]
+    # Stage 1 AI Quality Auditor: Strict domain & methodology verification
+    await report_status(f"AI Auditor evaluating relevance across {len(raw_papers)} candidates...")
+    verified_papers = await judge_and_filter_papers_with_llm(query, raw_papers, target_count, fast_llm)
+    if not verified_papers:
+        verified_papers = raw_papers[:target_count]
 
-    await report_status("Synthesizing research landscape and structuring sources...")
+    # Stage 2 Iterative Batch Loop: If noise was discarded and we undershot target_count, fetch Batch 2
+    if len(verified_papers) < target_count and len(raw_papers) >= pool_target:
+        needed = target_count - len(verified_papers)
+        await report_status(f"Verified {len(verified_papers)}/{target_count} papers, retrieving second batch to complete quota...")
+
+        # Track all seen papers from Batch 1 to prevent duplicates
+        seen_dois_batch = set(existing_sigs.get("dois", set()))
+        seen_titles_batch = list(existing_sigs.get("titles", []))
+        for p in raw_papers:
+            if p.get("doi"):
+                seen_dois_batch.add(clean_doi(p["doi"]).lower())
+            if p.get("title"):
+                t_norm = normalize_title_str(p["title"])
+                if t_norm:
+                    seen_titles_batch.append((t_norm, set(t_norm.split())))
+        batch2_sigs = {"dois": seen_dois_batch, "titles": seen_titles_batch}
+
+        batch2_pool = min(max(needed * 2, 10), 30)
+        batch2_plan = dict(plan)
+        batch2_plan['target_count'] = batch2_pool
+
+        try:
+            batch2_raw = await asyncio.to_thread(search_academic_papers_planned, batch2_plan, batch2_sigs)
+            if batch2_raw:
+                await report_status(f"AI Auditor evaluating {len(batch2_raw)} second-batch candidates...")
+                batch2_verified = await judge_and_filter_papers_with_llm(query, batch2_raw, needed, fast_llm)
+                for bp in batch2_verified:
+                    if len(verified_papers) < target_count:
+                        verified_papers.append(bp)
+        except Exception as batch2_err:
+            logger.debug(f"[SearchPipeline Batch 2 Warning]: {batch2_err}")
+
+    papers = verified_papers[:target_count]
+
+    await report_status(f"Synthesizing literature review for {len(papers)} verified papers...")
     
     # Format candidate papers for synthesis
     paper_bullet_list = []
@@ -59,7 +100,15 @@ async def handle_academic_search_pipeline(
         )
     papers_context = "\n\n".join(paper_bullet_list)
 
-    synthesis_prompt = get_search_synthesis_prompt(query, len(papers), papers_context)
+    synthesis_prompt = get_search_synthesis_prompt(
+        user_query=query, 
+        paper_count=len(papers), 
+        papers_context=papers_context,
+        user_requested_count=user_requested_count,
+        is_capped=is_capped,
+        cap_limit=cap_limit,
+        filter_conflicts=filter_conflicts
+    )
 
     synth_msgs = [
         LlamaChatMessage(role=MessageRole.SYSTEM, content=synthesis_prompt),

@@ -84,7 +84,8 @@ async def plan_academic_search(
         "open_access_only": False,
         "scopus_quartiles": [],
         "sinta_tiers": [],
-        "exclude_preprints": False
+        "exclude_preprints": False,
+        "filter_conflicts": []
     }
     
     default_min_year = None
@@ -152,9 +153,11 @@ async def plan_academic_search(
             "2. 'en_query': Pure English academic search term for global scholarly databases.\n"
             "3. 'native_query': Academic search term translated into the target language(s).\n"
             "4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n"
-            "   - Priority 1: If '[Filter Preferences: ... languages: ja, zh]' is explicitly present in the query, strictly use those codes!\n"
-            "   - Priority 2: If the user wrote their prompt in Japanese, Chinese, etc., add its code.\n"
-            "   - Priority 3: Leave as empty [] if global English.\n"
+            "   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n"
+            "   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n"
+            "   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n"
+            "   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n"
+            "   - Priority 4: Leave as empty [] if global English.\n"
             "5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n"
             "   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n"
             "   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n"
@@ -166,7 +169,8 @@ async def plan_academic_search(
             "10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n"
             "11. 'min_year': Integer representing minimum publication year, otherwise null.\n"
             "12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n"
-            "13. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\n"
+            "13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n"
+            "14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\n"
             "Example Output:\n"
             "{\n"
             "  \"en_query\": \"psychology clinical therapy\",\n"
@@ -179,7 +183,8 @@ async def plan_academic_search(
             "  \"exclude_preprints\": false,\n"
             "  \"user_requested_count\": null,\n"
             "  \"min_year\": 2021,\n"
-            "  \"min_citations\": 0\n"
+            "  \"min_citations\": 0,\n"
+            "  \"filter_conflicts\": []\n"
             "}"
         )
         
@@ -244,6 +249,10 @@ async def plan_academic_search(
             scopus_q = parsed.get("scopus_quartiles") or default_plan["scopus_quartiles"]
             sinta_t = parsed.get("sinta_tiers") or default_plan["sinta_tiers"]
             ex_prep = bool(parsed.get("exclude_preprints", default_plan["exclude_preprints"])) or default_plan["exclude_preprints"]
+            conflicts = parsed.get("filter_conflicts")
+            filter_conflicts: List[str] = []
+            if isinstance(conflicts, list):
+                filter_conflicts = [str(c).strip() for c in conflicts if str(c).strip()]
             
             return {
                 "en_query": en_q,
@@ -258,6 +267,7 @@ async def plan_academic_search(
                 "scopus_quartiles": scopus_q,
                 "sinta_tiers": sinta_t,
                 "exclude_preprints": ex_prep,
+                "filter_conflicts": filter_conflicts,
                 "min_year": m_year,
                 "min_citations": m_cit,
                 "language_preference": lang

@@ -14,6 +14,9 @@ def get_general_chat_system_prompt() -> str:
         "- Always respond in the EXACT same language or dialect as the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese -> Basa Jawa, Spanish -> Spanish).\n"
         "- When the user asks you to extract, draft, write, or explain chapters, sections, methods, or details from documents in the workspace, FULFILL IT DIRECTLY and thoroughly.\n"
         "- NEVER hallucinate excuses, policies, or copyright restrictions claiming you cannot output text or chapters. NEVER invent fake technical constraints (such as 'file belum di-embed di Qdrant' or 'hanya abstrak'). If the context is in the prompt, synthesize and provide the requested section immediately.\n\n"
+        "PREVIOUS SEARCH QUESTIONS & ANTI-HALLUCINATION (CRITICAL):\n"
+        "- If the user asks why a previous search returned fewer papers than requested (e.g. 'why did you only give me 6?', 'kenapa cuma dapet 5?'): Politely and transparently explain that the academic search engine retrieved multiple candidates from global registries, and the AI Auditor strictly filtered out off-topic noise or weak methodology studies to ensure only verified, high-quality papers were presented.\n"
+        "- STRICTLY FORBIDDEN: DO NOT invent, hallucinate, or fabricate new paper titles, authors, or DOIs in chat text to make up for missing numbers! Simply explain the rigorous quality filtering honestly, and proactively offer to perform a broader search if the user wants (e.g. 'If you'd like me to search for more papers with wider keywords, date ranges, or preprints, simply ask and I will fetch them!').\n\n"
         "OUTPUT CLEANLINESS CONSTRAINTS (STRICT):\n"
         "- DO NOT output internal ReAct reasoning traces (e.g. 'Thought:', 'Action:', 'Observation:', 'Answer:'). Output only clean, direct markdown for the user.\n"
         "- DO NOT invent fake interactive HTML or pseudo-buttons (such as '[Lihat Bukti]' or '🔍 Bukti').\n"
@@ -37,11 +40,49 @@ def get_source_deletion_prompt(user_query: str, doc_summaries: List[str]) -> str
     )
 
 
-def get_search_synthesis_prompt(user_query: str, paper_count: int, papers_context: str) -> str:
+def get_search_synthesis_prompt(
+    user_query: str, 
+    paper_count: int, 
+    papers_context: str,
+    user_requested_count: Optional[int] = None,
+    is_capped: bool = False,
+    cap_limit: int = 25,
+    filter_conflicts: Optional[List[str]] = None
+) -> str:
+    quota_directives = []
+    if is_capped and user_requested_count:
+        quota_directives.append(
+            f"1. HARD CAP TRANSPARENCY NOTICE (MANDATORY IN OPENING):\n"
+            f"   - The user asked for {user_requested_count} papers, but NotbookLM enforces a strict maximum cap of {cap_limit} papers per query to ensure high-depth verification and prevent system timeouts.\n"
+            f"   - In your opening sentence/paragraph, ALWAYS state this politely in the user's language: acknowledge their request for {user_requested_count} papers, explain the {cap_limit} cap, and advise them that they can request another batch (e.g. 'tambah {cap_limit} paper lagi') whenever needed."
+        )
+    elif user_requested_count and paper_count < user_requested_count:
+        quota_directives.append(
+            f"1. QUOTA DISCREPANCY TRANSPARENCY (MANDATORY IN OPENING):\n"
+            f"   - The user asked for {user_requested_count} papers, but after auditing all candidate records from academic registries, only {paper_count} papers strictly passed quality and domain relevance criteria.\n"
+            f"   - In your opening sentence, ALWAYS state this honestly in the user's language: do not pretend {paper_count} was what they asked for; explain that from the global registry, these {paper_count} were the authentic verified matches found."
+        )
+    else:
+        quota_directives.append(
+            f"1. Friendly Opening & Thematic Synthesis:\n"
+            f"   - State clearly in the user's language that the system has retrieved {paper_count} papers matching their research topic.\n"
+            f"   - Synthesize the key trends, methodologies, and findings based ON THE ACTUAL PAPERS RETRIEVED BELOW."
+        )
+
+    if filter_conflicts:
+        conflicts_str = "; ".join(filter_conflicts)
+        quota_directives.append(
+            f"- FILTER PREFERENCE OVERRIDE ACKNOWLEDGMENT:\n"
+            f"  The user's prompt text conflicted with active UI filters ({conflicts_str}).\n"
+            f"  Briefly reassure the user in your opening that the search prioritized their prompt's explicit intent."
+        )
+
+    quota_section = "\n".join(quota_directives)
+
     return (
         "You are NotbookLM, an intelligent, proactive, and structured research curator & academic synthesis assistant (Google NotebookLM style).\n\n"
         "LANGUAGE RULE (CRITICAL):\n"
-        "- Match the exact language of the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, etc.).\n\n"
+        "- Match the exact language of the user's latest prompt (e.g. English -> English, Indonesian -> Indonesian, Javanese/Basa Jawa -> Basa Jawa, Spanish -> Spanish, Korean -> Korean, etc.).\n\n"
         f"User Request: \"{user_query}\"\n\n"
         f"Verified Academic Search Results: Successfully retrieved and filtered {paper_count} verified and reputable Open Access papers.\n\n"
         f"EXACT PAPERS RETRIEVED FROM ACADEMIC REGISTRY (YOU MUST ONLY USE AND DESCRIBE THESE EXACT PAPERS):\n"
@@ -50,9 +91,7 @@ def get_search_synthesis_prompt(user_query: str, paper_count: int, papers_contex
         "- When listing or detailing the papers in your response, YOU MUST ONLY LIST THE EXACT PAPERS PROVIDED ABOVE. DO NOT INVENT OR HALLUCINATE EXTERNAL PAPERS (like Arya et al., Wang et al., Chen et al.) IF THEY ARE NOT IN THE RETRIEVED LIST ABOVE.\n"
         "- Ensure the titles, authors, and findings in your text match 100% with the Core Paper Samples provided.\n\n"
         "RESPONSE STRUCTURE TO FOLLOW:\n"
-        "1. Friendly Opening & Thematic Synthesis:\n"
-        f"   - State clearly that the system has retrieved {paper_count} papers matching the requested topic.\n"
-        "   - Synthesize the key trends, methodologies, and findings based ON THE ACTUAL PAPERS RETRIEVED ABOVE.\n"
+        f"{quota_section}\n"
         "2. Accurate Paper List:\n"
         "   - Provide the concise summary for each of the retrieved papers from the list above.\n"
         "3. Call-to-Action & Sources Report:\n"
