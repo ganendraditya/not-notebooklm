@@ -38,6 +38,20 @@ No need to install Python, Node.js, or local database dependencies.
 ### Option 2: Local Development (Bare-Metal)
 For active development without running Docker.
 
+> **💡 Understanding the Bare-Metal Default Stack:**
+> By default in bare-metal mode, NotbookLM operates on an **embedded, zero-setup local stack**:
+> * **Relational DB:** SQLite (`backend/not_notebooklm.db`)
+> * **Object Storage:** Local file system (`uploads/` and `uploads/chat_media/`)
+> * **Vector Engine:** Embedded in-process Qdrant (`backend/qdrant_data/`)
+>
+> *Why this default?* It allows instant development on any machine without installing Docker or external database servers.
+>
+> **⚡ Upgrading to the Optimal / Production Stack:**
+> If you plan to deploy to a server or want optimal multi-user performance and cloud persistence:
+> 1. **S3 Object Storage:** Switch `STORAGE_TYPE=s3` in `backend/.env` and connect to **Cloudflare R2** (recommended, 10GB free cloud storage with zero egress fees) or **MinIO**. This ensures research PDFs and in-chat attachments persist permanently across server redeployments without disk bloat.
+> 2. **Dedicated Vector Server:** Start a standalone Qdrant container (`docker run -d -p 6333:6333 qdrant/qdrant`) and configure `QDRANT_URL=http://localhost:6333` in `backend/.env` for faster HNSW vector indexing and lower Python process memory consumption.
+> 3. **Or run via Docker Compose (Option 1):** Orchestrates all optimal services automatically out of the box.
+
 #### 1. Backend Setup (FastAPI)
 ```bash
 cd backend
