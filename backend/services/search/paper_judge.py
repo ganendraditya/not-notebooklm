@@ -41,18 +41,21 @@ async def judge_and_filter_papers_with_llm(
             "You are a Senior Academic Peer Reviewer and Scientific Literature Selection Judge.\n"
             "Your objective: Strictly evaluate each retrieved research candidate against the user's research query using a multi-criteria rubric.\n\n"
             f"User Research Query:\n\"{query}\"\n\n"
-            f"Candidate Papers to Audit:\n{eval_context}\n\n"
+            f"Candidate Papers to Audit ({len(candidates)} candidates):\n{eval_context}\n\n"
             "ACADEMIC EVALUATION RUBRIC:\n"
             "1. CORE DOMAIN ALIGNMENT:\n"
             "   - Accept papers that directly investigate the specific target domain.\n"
             "   - Strictly reject keyword coincidence (e.g. if query is 'AI in road crack detection', REJECT medical crack, dental crack, building wall crack, train rail track).\n"
             "2. METHODOLOGICAL & PROBLEM MATCH:\n"
             "   - The paper must address the research questions or methods requested (e.g. classification, prediction, empirical experiment, survey).\n"
-            "3. RANKING:\n"
-            "   - Rank accepted papers from highest scientific relevance to lowest.\n\n"
+            "3. RANKING & QUOTA FULFILLMENT:\n"
+            f"   - Target requested: {target_count} papers.\n"
+            f"   - Evaluate all candidates. Include ALL candidate indices that genuinely match the research domain, ranked from highest scientific relevance to lowest.\n"
+            f"   - If there are at least {target_count} genuine matching candidates that pass the rubric, return at least {target_count} indices.\n"
+            f"   - DO NOT arbitrarily stop or truncate to fewer than {target_count} if valid relevant candidates are available.\n"
+            "   - ONLY exclude candidate indices if they are genuine noise, off-topic, or keyword coincidences.\n\n"
             "OUTPUT FORMAT:\n"
             "Return ONLY a JSON list of integer indices of accepted papers in ranked order (best matches first).\n"
-            f"Select up to {target_count} best papers.\n"
             "Example format: [2, 0, 4, 1]"
         )
 
@@ -62,8 +65,10 @@ async def judge_and_filter_papers_with_llm(
 
         if isinstance(valid_indices, list):
             filtered_papers = []
+            seen_indices = set()
             for idx in valid_indices:
-                if isinstance(idx, int) and 0 <= idx < len(candidates):
+                if isinstance(idx, int) and 0 <= idx < len(candidates) and idx not in seen_indices:
+                    seen_indices.add(idx)
                     filtered_papers.append(candidates[idx])
             
             if filtered_papers:
