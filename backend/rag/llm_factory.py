@@ -18,11 +18,11 @@ _CACHED_CONFIG_HASH = None
 def _get_env_config_signature():
     """Generates a snapshot of active LLM environment variables to detect config changes."""
     return (
-        os.getenv("LLM_BASE_URL", ""),
-        os.getenv("LLM_API_KEY", ""),
-        os.getenv("LLM_MODEL", ""),
-        os.getenv("LLM_FAST_MODEL", ""),
-        os.getenv("LLM_FALLBACK_MODEL", ""),
+        os.getenv("LLM_BASE_URL", "") or os.getenv("NINEROUTER_BASE_URL", ""),
+        os.getenv("LLM_API_KEY", "") or os.getenv("NINEROUTER_API_KEY", ""),
+        os.getenv("LLM_MODEL", "") or os.getenv("NINEROUTER_MODEL", ""),
+        os.getenv("LLM_FAST_MODEL", "") or os.getenv("NINEROUTER_FAST_MODEL", ""),
+        os.getenv("LLM_FALLBACK_MODEL", "") or os.getenv("NINEROUTER_FALLBACK_MODEL", ""),
     )
 
 
@@ -35,14 +35,30 @@ def _get_gateway_credentials():
     - LLM_MODEL: Primary model for heavy reasoning & document synthesis
     - LLM_FAST_MODEL: (Optional) Lightweight model for rapid micro-tasks (defaults to LLM_MODEL)
     - LLM_FALLBACK_MODEL: (Optional) Safety fallback model if primary fails
+    Also supports backward-compatible NINEROUTER_* configuration variables.
     """
-    api_key = os.getenv("LLM_API_KEY", "").strip()
-    base_url = os.getenv("LLM_BASE_URL", "http://localhost:20128/v1").strip() or "http://localhost:20128/v1"
-    model = os.getenv("LLM_MODEL", "gpt-4o").strip() or "gpt-4o"
+    api_key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
+    base_url = (
+        os.getenv("LLM_BASE_URL", "").strip()
+        or os.getenv("NINEROUTER_BASE_URL", "").strip()
+        or "http://localhost:20128/v1"
+    )
+    model = (
+        os.getenv("LLM_MODEL", "").strip()
+        or os.getenv("NINEROUTER_MODEL", "").strip()
+        or "gpt-4o"
+    )
 
     # If fast_model is not explicitly set, gracefully default to main model (supports 1-model setups)
-    fast_model = os.getenv("LLM_FAST_MODEL", "").strip() or model
-    fallback_model = os.getenv("LLM_FALLBACK_MODEL", "").strip()
+    fast_model = (
+        os.getenv("LLM_FAST_MODEL", "").strip()
+        or os.getenv("NINEROUTER_FAST_MODEL", "").strip()
+        or model
+    )
+    fallback_model = (
+        os.getenv("LLM_FALLBACK_MODEL", "").strip()
+        or os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
+    )
 
     has_gateway = bool(api_key and not api_key.startswith("your_") and api_key != "dummy_key")
     return base_url, api_key, model, fast_model, fallback_model, has_gateway
