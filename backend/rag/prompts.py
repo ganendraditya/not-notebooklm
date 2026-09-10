@@ -4,7 +4,7 @@ Contains prompt builders for conversational chat, workspace document analysis,
 academic search synthesis, deletion intent evaluation, and citation grounding rules.
 """
 
-from typing import List
+from typing import List, Optional
 
 
 def get_general_chat_system_prompt() -> str:

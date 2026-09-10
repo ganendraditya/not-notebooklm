@@ -19,16 +19,16 @@ CANONICAL_SECTION_PATTERNS = {
         re.compile(r'\b(?:literature\s+review|related\s+work|kajian\s+pustaka|tinjauan\s+pustaka|theoretical\s+framework|state\s+of\s+the\s+art)\b', re.IGNORECASE)
     ],
     "methodology": [
-        re.compile(r'\b(?:methods?|methodology|materials?\s+and\s+methods?|metode|metodologi|experimental\s+setup|study\s+design|protocol|data\s+collection|procedures?)\b', re.IGNORECASE)
+        re.compile(r'\b(?:methods?|methodology|materials?\s+and\s+methods?|metode|metodologi|metodología|méthodologie|experimental\s+setup|study\s+design|protocol|data\s+collection|procedures?|proposed\s+(?:\w+\s+)*(?:method|architecture|framework|approach|model|system)|(?:system|model|network)\s+architecture|architectures?)\b|研究方法|調査方法', re.IGNORECASE)
     ],
     "results": [
-        re.compile(r'\b(?:results?|findings?|hasil|hasil\s+penelitian|data\s+analysis|experimental\s+results?)\b', re.IGNORECASE)
+        re.compile(r'\b(?:results?|findings?|hasil|hasil\s+penelitian|data\s+analysis|experimental\s+results?|benchmarks?|benchmarking|ablation(?:\s+study)?|evaluations?)\b', re.IGNORECASE)
     ],
     "discussion": [
         re.compile(r'\b(?:discussion|pembahasan|interpretation|implications?)\b', re.IGNORECASE)
     ],
     "conclusion": [
-        re.compile(r'\b(?:conclusions?|kesimpulan|concluding\s+remarks|summary\s+and\s+conclusion|penutup)\b', re.IGNORECASE)
+        re.compile(r'\b(?:conclusions?|kesimpulan|concluding\s+remarks|summary\s+and\s+conclusion|penutup|takeaways?|closing\s+thoughts?)\b', re.IGNORECASE)
     ],
     "limitations": [
         re.compile(r'\b(?:limitations?|threats\s+to\s+validity|future\s+works?|limitasi|keterbatasan)\b', re.IGNORECASE)

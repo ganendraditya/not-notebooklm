@@ -36,12 +36,13 @@ def get_s3_client():
     Returns None if boto3 is not installed or S3 is not configured.
     """
     global _S3_CLIENT, _S3_INITIALIZED
-    if _S3_INITIALIZED:
+    if not is_s3_enabled():
+        return None
+
+    if _S3_INITIALIZED and _S3_CLIENT is not None:
         return _S3_CLIENT
 
     _S3_INITIALIZED = True
-    if not is_s3_enabled():
-        return None
 
     try:
         import boto3
@@ -162,6 +163,9 @@ def ensure_local_copy(s3_key: str, target_local_path: str) -> bool:
 
 def delete_file(s3_key: str) -> bool:
     """Deletes an object from S3 storage bucket."""
+    if not is_s3_enabled():
+        return False
+
     client = get_s3_client()
     if not client:
         return False
@@ -178,6 +182,9 @@ def delete_file(s3_key: str) -> bool:
 
 def delete_files_with_prefix(prefix: str) -> int:
     """Bulk deletes all objects matching the specified key prefix."""
+    if not is_s3_enabled():
+        return 0
+
     client = get_s3_client()
     if not client:
         return 0
