@@ -40,7 +40,7 @@ async def handle_academic_search_pipeline(
     search_plan = dict(plan)
     search_plan['target_count'] = pool_target
 
-    await report_status(f"Searching {pool_target} candidate papers from global academic index...")
+    await report_status("Searching verified global academic repositories...")
     existing_sigs = get_existing_notebook_sources_signatures(chat_id)
     raw_papers = await asyncio.to_thread(search_academic_papers_planned, search_plan, existing_sigs)
     
@@ -48,7 +48,7 @@ async def handle_academic_search_pipeline(
         return f"Maaf, tidak ditemukan paper ilmiah yang cocok dengan kriteria pencarian untuk topik: '{query}'."
 
     # Stage 1 AI Quality Auditor: Strict domain & methodology verification
-    await report_status(f"AI Auditor evaluating relevance across {len(raw_papers)} candidates...")
+    await report_status("Auditing paper relevance, domain alignment, and methodology...")
     verified_papers = await judge_and_filter_papers_with_llm(query, raw_papers, target_count, fast_llm)
     if not verified_papers:
         verified_papers = raw_papers[:target_count]
@@ -56,7 +56,7 @@ async def handle_academic_search_pipeline(
     # Stage 2 Iterative Batch Loop: If noise was discarded and we undershot target_count, fetch Batch 2
     if len(verified_papers) < target_count and len(raw_papers) >= pool_target:
         needed = target_count - len(verified_papers)
-        await report_status(f"Verified {len(verified_papers)}/{target_count} papers, retrieving second batch to complete quota...")
+        await report_status("Expanding academic search for additional verified studies...")
 
         # Track all seen papers from Batch 1 to prevent duplicates
         seen_dois_batch = set(existing_sigs.get("dois", set()))
@@ -77,7 +77,7 @@ async def handle_academic_search_pipeline(
         try:
             batch2_raw = await asyncio.to_thread(search_academic_papers_planned, batch2_plan, batch2_sigs)
             if batch2_raw:
-                await report_status(f"AI Auditor evaluating {len(batch2_raw)} second-batch candidates...")
+                await report_status("Screening additional literature candidates for quality...")
                 batch2_verified = await judge_and_filter_papers_with_llm(query, batch2_raw, needed, fast_llm)
                 for bp in batch2_verified:
                     if len(verified_papers) < target_count:
@@ -87,8 +87,6 @@ async def handle_academic_search_pipeline(
 
     papers = verified_papers[:target_count]
 
-    await report_status(f"Synthesizing literature review for {len(papers)} verified papers...")
-    
     # Format candidate papers for synthesis
     paper_bullet_list = []
     for p in papers[:25]:
@@ -116,7 +114,7 @@ async def handle_academic_search_pipeline(
         LlamaChatMessage(role=MessageRole.USER, content=query)
     ]
     
-    await report_status("Synthesizing literature review and citation insights...")
+    await report_status("Synthesizing literature review and preparing verified source cards...")
     text_response = await astream_llm_response(target_llm, synth_msgs, on_delta=on_delta)
     
     # Append structured SOURCES_DATA payload for frontend ChatMessageItem interactive import card
