@@ -44,6 +44,14 @@ def delete_chat_physical_files(chat_id: str) -> int:
         except Exception as e:
             logger.error(f"[Storage] Error scanning chat media dir for chat {chat_id}: {e}")
 
+    # 3. Clean S3 bucket objects matching chat prefix if configured
+    try:
+        from services import storage_adapter
+        storage_adapter.delete_files_with_prefix(prefix)
+        storage_adapter.delete_files_with_prefix(f"chat_media/{prefix}")
+    except Exception as se:
+        logger.debug(f"[StorageAdapter Chat Purge Warning]: {se}")
+
     return deleted_files
 
 def delete_chat_session_cascade(db: Session, chat_id: str) -> bool:
@@ -85,6 +93,12 @@ def delete_document_by_id(db: Session, chat_id: str, doc_id: int) -> bool:
         rag.delete_document_vectors(chat_id, doc.filename)
     except Exception as e:
         logger.error(f"[Delete Vector Error] Failed to delete vectors for {doc.filename}: {e}")
+
+    try:
+        from services import storage_adapter
+        storage_adapter.delete_file(f"{chat_id}_{doc.filename}")
+    except Exception as se:
+        logger.debug(f"[StorageAdapter Doc Delete Warning]: {se}")
         
     db.delete(doc)
     commit_with_retry(db)
@@ -106,6 +120,12 @@ def delete_multiple_documents(db: Session, chat_id: str, doc_ids: List[int]) -> 
             rag.delete_document_vectors(chat_id, doc.filename)
         except Exception as e:
             logger.error(f"[Bulk Delete Vector Error] Failed to delete vectors for {doc.filename}: {e}")
+
+        try:
+            from services import storage_adapter
+            storage_adapter.delete_file(f"{chat_id}_{doc.filename}")
+        except Exception as se:
+            logger.debug(f"[StorageAdapter Batch Delete Warning]: {se}")
             
         valid_ids.append(doc.id)
         deleted_count += 1
@@ -182,6 +202,13 @@ def delete_storage_file_and_records(db: Session, file_path: str) -> bool:
 
     if valid_doc_ids:
         db.query(Document).filter(Document.id.in_(valid_doc_ids)).delete(synchronize_session=False)
+
+    try:
+        from services import storage_adapter
+        storage_adapter.delete_file(raw_filename)
+        storage_adapter.delete_file(f"chat_media/{raw_filename}")
+    except Exception as se:
+        logger.debug(f"[StorageAdapter Storage File Delete Warning]: {se}")
 
     return True
 

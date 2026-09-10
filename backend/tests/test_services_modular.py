@@ -321,5 +321,31 @@ def test_delete_chat_physical_files_cleans_sources_and_media():
     assert not os.path.exists(media_file)
 
 
+def test_storage_adapter_configuration_and_fallback():
+    """Verify storage adapter correctly detects S3 credentials and falls back gracefully when disabled."""
+    import os
+    from services.storage_adapter import is_s3_enabled, get_bucket_name, upload_file, delete_file
+
+    # Save original env
+    orig_type = os.environ.get("STORAGE_TYPE")
+    try:
+        os.environ["STORAGE_TYPE"] = "local"
+        assert is_s3_enabled() is False
+
+        # When local, upload/delete functions should gracefully return without crashing
+        assert upload_file("/nonexistent/file.pdf", "file.pdf") is False
+        assert delete_file("file.pdf") is False
+
+        # Verify bucket name default
+        os.environ["S3_BUCKET_NAME"] = "test-bucket"
+        assert get_bucket_name() == "test-bucket"
+    finally:
+        if orig_type is not None:
+            os.environ["STORAGE_TYPE"] = orig_type
+        else:
+            os.environ.pop("STORAGE_TYPE", None)
+
+
+
 
 

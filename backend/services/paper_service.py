@@ -69,6 +69,13 @@ def prepare_paper_file_sync(chat_id: str, paper: models.PaperCandidate) -> Tuple
         except Exception as e:
             logger.warning(f"[Parse full text for embedding warning]: {e}")
 
+    # Sync downloaded paper or text summary to S3 storage bucket if configured
+    try:
+        from services import storage_adapter
+        storage_adapter.upload_file(save_path, s3_key=f"{chat_id}_{filename}")
+    except Exception as se:
+        logger.debug(f"[StorageAdapter Paper Sync Warning]: {se}")
+
     return (doc_text, filename, c_doi, has_downloaded_pdf)
 
 async def search_academic_papers(query: str, limit: int = 10) -> List[models.PaperCandidate]:
@@ -279,6 +286,13 @@ async def import_single_doi_source(chat_id: str, clean_doi_val: str, db: Session
         await asyncio.to_thread(rag.ingest_document, save_path, chat_id, filename)
     except Exception as e:
         logger.warning(f"[DOI Ingest Vector Warning]: {e}")
+
+    # Sync imported paper to S3 storage bucket if configured
+    try:
+        from services import storage_adapter
+        storage_adapter.upload_file(save_path, s3_key=f"{chat_id}_{filename}")
+    except Exception as se:
+        logger.debug(f"[StorageAdapter DOI Sync Warning]: {se}")
 
     authors_json = json.dumps(authors, ensure_ascii=False)
     db_doc = Document(

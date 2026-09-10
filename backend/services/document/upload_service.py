@@ -83,6 +83,10 @@ def handle_document_upload(chat_id: str, file: UploadFile, db: Session) -> Tuple
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # Sync to S3 storage bucket if configured
+    from services import storage_adapter
+    storage_adapter.upload_file(file_path, s3_key=f"{clean_chat_id}_{clean_fname}")
+
     enriched = extract_and_enrich_uploaded_file(file_path, file.filename or clean_fname)
 
     authors_json = json.dumps(enriched.get("authors", []), ensure_ascii=False) if enriched.get("authors") else None

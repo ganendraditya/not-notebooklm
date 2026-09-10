@@ -201,6 +201,13 @@ async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
     
     with open(file_path, "wb") as f:
         f.write(file_content)
+
+    # Sync chat media to S3 storage bucket if configured
+    try:
+        from services import storage_adapter
+        storage_adapter.upload_file(file_path, s3_key=f"chat_media/{safe_filename}")
+    except Exception as se:
+        logger.debug(f"[StorageAdapter Media Sync Warning]: {se}")
         
     file_size = len(file_content)
 

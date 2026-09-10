@@ -70,5 +70,22 @@ def get_doc_file_path(chat_id: str, filename: str) -> str:
         if os.path.exists(p):
             return p
 
+    # If file not found locally on disk, attempt to download from S3 storage adapter if enabled
+    try:
+        from services import storage_adapter
+        if storage_adapter.is_s3_enabled():
+            default_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
+            for candidate_key in [
+                f"{raw_chat_id}_{raw_fname}",
+                f"{clean_chat_id}_{raw_fname}",
+                f"{clean_chat_id}_{clean_fname}",
+                raw_fname,
+                clean_fname
+            ]:
+                if storage_adapter.ensure_local_copy(candidate_key, default_path):
+                    return default_path
+    except Exception as se:
+        pass
+
     # Default fallback
     return os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")

@@ -181,6 +181,9 @@ def download_storage_files(req: DownloadRequest):
         if not is_safe_upload_path(file_path):
             raise HTTPException(status_code=400, detail="Invalid file path location")
         if not os.path.exists(file_path):
+            from services import storage_adapter
+            storage_adapter.ensure_local_copy(safe_id, file_path)
+        if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="File not found")
         
         filename = os.path.basename(file_path)
@@ -204,6 +207,9 @@ def download_storage_files(req: DownloadRequest):
             if safe_id.startswith('..') or os.path.isabs(safe_id):
                 continue
             file_path = os.path.join(UPLOAD_DIR, safe_id)
+            if not os.path.exists(file_path):
+                from services import storage_adapter
+                storage_adapter.ensure_local_copy(safe_id, file_path)
             if os.path.exists(file_path) and os.path.isfile(file_path):
                 base_name = os.path.basename(file_path)
                 if "_" in base_name:

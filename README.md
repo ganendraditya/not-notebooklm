@@ -92,10 +92,53 @@ LLM_FALLBACK_MODEL=gpt-4o-mini
 
 ---
 
+## Storage Configuration (Local Disk & S3 Object Storage)
+
+NotbookLM supports a **hybrid decoupled storage architecture**. You can run purely on local disk (zero setup, 100% offline) or seamlessly sync with any S3-compatible Object Storage (**Cloudflare R2**, **MinIO**, or **AWS S3**) so your research PDFs and media attachments persist across cloud deployments and server restarts.
+
+### Configuration (`backend/.env`)
+
+#### Option 1: Local Disk Storage (Default - Zero Setup)
+```env
+STORAGE_TYPE=local
+```
+*Files are stored directly in `uploads/` and `uploads/chat_media/` on your machine. Best for personal laptops and offline research.*
+
+#### Option 2: Cloudflare R2 (Recommended Cloud Provider - 10GB Free, $0 Egress)
+```env
+STORAGE_TYPE=s3
+S3_ENDPOINT_URL=https://<your_account_id>.r2.cloudflarestorage.com
+S3_ACCESS_KEY_ID=your_r2_access_key_id
+S3_SECRET_ACCESS_KEY=your_r2_secret_access_key
+S3_BUCKET_NAME=not-notebooklm
+S3_REGION=auto
+```
+*How to obtain credentials:*
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/) → **R2 Object Storage** → **Create bucket** (e.g. `not-notebooklm`, standard storage class).
+2. Go to **Manage R2 API Tokens** → **Create API token** with **Object Read & Write** permissions.
+3. Copy your Account ID endpoint URL, Access Key ID, and Secret Access Key.
+
+#### Option 3: MinIO (Self-Hosted S3 for Homelabs / Intranets)
+```env
+STORAGE_TYPE=s3
+S3_ENDPOINT_URL=http://localhost:9000
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_BUCKET_NAME=not-notebooklm
+S3_REGION=us-east-1
+```
+*Run MinIO locally via Docker:*
+```bash
+docker run -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+```
+
+---
+
 ## Architecture & Tech Stack
 
 * **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS, Zustand State Management, Base UI.
 * **Backend:** FastAPI, SQLAlchemy (SQLite), LlamaIndex.
+* **Storage:** Unified Storage Adapter supporting Local Disk, Cloudflare R2, MinIO, and AWS S3.
 * **Vector Store:** Qdrant (supports remote Docker instance or embedded local disk fallback).
 * **Embeddings:** Local offline multilingual embeddings (`intfloat/multilingual-e5-small`) with automatic local caching, or Google Gemini embeddings.
 * **LLM Engine:** Vendor-neutral OpenAI-compatible adapter (`OpenAILike`) with dynamic multi-tier routing and cascading fallback.
