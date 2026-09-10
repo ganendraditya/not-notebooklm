@@ -26,6 +26,11 @@ backend/qdrant_data/
 qdrant_data/
 scratch/
 
+# Secret Managers (Local caches & state)
+.doppler/
+.doppler.json
+.infisical/
+
 # Agent instructions, docs & rules
 .agents/
 notes/

@@ -148,6 +148,39 @@ docker run -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-addre
 
 ---
 
+## Secret Management (Environment Variables & Zero-Disk-Secrets)
+
+NotbookLM supports three flexible tiers of secret management, scaling from effortless local development to enterprise security compliance:
+
+| Tier | Provider | Best For | Storage on Disk | Command |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tier 1 (Default)** | Conventional `.env` | Solo development, offline, zero-setup | Stored in `backend/.env` (git-ignored) | `./start.sh` |
+| **Tier 2 (Cloud)** | **Doppler** | Teams, startups, cloud deployments | **Zero** secrets stored on disk (injected directly to RAM) | `doppler run -- ./start.sh` |
+| **Tier 3 (Self-Hosted)** | **Infisical** | Air-gapped homelabs & strict compliance | **Zero** secrets stored on disk (self-hosted vault) | `infisical run -- ./start.sh` |
+
+### Using Doppler (Zero Secrets on Disk)
+1. **Install Doppler CLI:**
+   ```bash
+   brew install dopplerhq/cli/doppler
+   doppler login
+   ```
+2. **Link the repository:**
+   ```bash
+   doppler setup
+   ```
+   *(Select project `not-notebooklm` and config `dev`)*.
+3. **Upload your secrets (one-time):**
+   ```bash
+   doppler secrets upload backend/.env
+   ```
+4. **Run NotbookLM:**
+   ```bash
+   doppler run -- ./start.sh
+   ```
+   *Note: `./start.sh` is intelligent: if `backend/.env` is absent, it will automatically fallback to Doppler secret injection if configured.*
+
+---
+
 ## Architecture & Tech Stack
 
 * **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS, Zustand State Management, Base UI.
