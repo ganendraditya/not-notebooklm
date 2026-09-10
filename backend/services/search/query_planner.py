@@ -8,6 +8,9 @@ from utils.text_processing import extract_json_from_llm
 
 logger = logging.getLogger("uvicorn.error")
 
+MAX_SEARCH_CAP = 25
+DEFAULT_SEARCH_TARGET = 12
+
 async def plan_academic_search(
     query: str, 
     history: Optional[List[LlamaChatMessage]] = None, 
@@ -16,6 +19,7 @@ async def plan_academic_search(
     """
     Stage 1: LLM-Powered Academic Query Planner (Consensus.app / Elicit / Perplexity style)
     Uses the AI model to understand conversational intent, context, multi-lingual requirements, and exact quantities.
+    Enforces a strict MAX_SEARCH_CAP of 25 with user requested count tracking.
     """
     clean_text = re.sub(
         r'\b(cariin|carikan|cari|search|find|tentang|about|paper|jurnal|artikel|sumber|sources|buah|biji|referensi|makalah|dong|ya|tolong|minta|lagi|bos|bro|nih|deh|aja|sih|buat|ke|max|maksimal|tahun|terakhir|ke\s*belakang|jangan|lebih|dari|itu|gw|gua|gue|aku|saya|lu|lo|kamu)\b',
@@ -40,11 +44,41 @@ async def plan_academic_search(
         raw_langs = [l.strip().lower() for l in raw_lang_str.split(",") if l.strip()]
         default_languages = [l for l in raw_langs if l != "all" and len(l) <= 10]
 
+    user_requested_count = None
+    is_capped = False
+    target_count = DEFAULT_SEARCH_TARGET
+
+    # Enhanced pattern matching for count extraction (handles "10 research papers", "500 articles", etc.)
+    num_match = re.search(
+        r'(\d+)\s*(?:buah\s+|biji\s+)?(?:research\s+|academic\s+|scholarly\s+)?(?:paper|jurnal|journal|artikel|article|sumber|sources|studi|studies|referensi|makalah|references)',
+        query,
+        re.I
+    )
+    if not num_match:
+        # Fallback pattern for numbers followed by general keywords or 'lagi'
+        num_match = re.search(r'(\d+)\s*(?:lagi|more)', query, re.I)
+
+    if num_match:
+        try:
+            p_num = int(num_match.group(1))
+            if p_num > 0:
+                user_requested_count = p_num
+                if p_num > MAX_SEARCH_CAP:
+                    target_count = MAX_SEARCH_CAP
+                    is_capped = True
+                else:
+                    target_count = p_num
+        except Exception:
+            pass
+
     default_plan = {
         "en_query": clean_text if len(clean_text) >= 3 else query.strip(),
         "id_query": clean_text if len(clean_text) >= 3 else query.strip(),
         "native_query": clean_text if len(clean_text) >= 3 else query.strip(),
-        "target_count": 12,
+        "target_count": target_count,
+        "user_requested_count": user_requested_count,
+        "is_capped": is_capped,
+        "cap_limit": MAX_SEARCH_CAP,
         "languages": default_languages,
         "language_preference": default_lang,
         "open_access_only": False,
@@ -53,24 +87,12 @@ async def plan_academic_search(
         "exclude_preprints": False
     }
     
-    user_requested_count = None
     default_min_year = None
     if any(k in query.lower() for k in ["5 tahun", "lima tahun", "terbaru", "recent"]):
         default_min_year = 2020
     year_match = re.search(r'\b(201\d|202\d)\b', query)
     if year_match and not default_min_year:
         default_min_year = int(year_match.group(1))
-
-    num_match = re.search(r'(\d+)\s*(?:paper|jurnal|artikel|sumber|sources|buah|biji|referensi|makalah|lagi)', query, re.I)
-    if num_match:
-        try:
-            p_num = int(num_match.group(1))
-            user_requested_count = p_num
-            default_plan["target_count"] = min(max(p_num, 1), 100)
-            if p_num > 100:
-                default_plan["user_requested_count"] = p_num
-        except Exception:
-            pass
 
     if any(k in query.lower() for k in ["open access", "open-access", "oa only", "open access only", "free pdf", "gratis", "free full text"]):
         default_plan["open_access_only"] = True
@@ -124,6 +146,7 @@ async def plan_academic_search(
             f"\"{query}\"\n\n"
             "Rules for extraction:\n"
             "1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n"
+            "   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n"
             "   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n"
             "   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n"
             "2. 'en_query': Pure English academic search term for global scholarly databases.\n"
@@ -132,14 +155,15 @@ async def plan_academic_search(
             "   - Priority 1: If '[Filter Preferences: ... languages: ja, zh]' is explicitly present in the query, strictly use those codes!\n"
             "   - Priority 2: If the user wrote their prompt in Japanese, Chinese, etc., add its code.\n"
             "   - Priority 3: Leave as empty [] if global English.\n"
-            "5. 'target_count': Integer representing how many papers to search for.\n"
-            "   - If specified (e.g. 10, 30, 50), set it exactly.\n"
-            "   - If NOT specified, set to a natural relevant size between 8 and 15.\n"
+            "5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n"
+            "   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n"
+            "   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n"
+            "   - If NOT specified, set to default 12.\n"
             "6. 'open_access_only': Boolean true if free PDF requested, else false.\n"
             "7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n"
             "8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n"
             "9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n"
-            "10. 'user_requested_count': Exact integer if user specified a number (e.g. 30, 50), otherwise null.\n"
+            "10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n"
             "11. 'min_year': Integer representing minimum publication year, otherwise null.\n"
             "12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n"
             "13. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\n"
@@ -172,9 +196,16 @@ async def plan_academic_search(
                     req_cnt = int(req_cnt)
                 except Exception:
                     req_cnt = None
-            if user_requested_count and user_requested_count > 100:
-                req_cnt = user_requested_count
-            cnt = min(max(cnt, 1), 100)
+
+            final_req_cnt = req_cnt if req_cnt is not None else user_requested_count
+            final_is_capped = False
+            if final_req_cnt and final_req_cnt > MAX_SEARCH_CAP:
+                final_is_capped = True
+                cnt = MAX_SEARCH_CAP
+            elif final_req_cnt is not None:
+                cnt = min(max(final_req_cnt, 1), MAX_SEARCH_CAP)
+            else:
+                cnt = min(max(cnt, 1), MAX_SEARCH_CAP)
             
             m_year = parsed.get("min_year") or default_min_year
             if m_year is not None:
@@ -220,11 +251,13 @@ async def plan_academic_search(
                 "native_query": native_q,
                 "languages": target_langs,
                 "target_count": cnt,
+                "user_requested_count": final_req_cnt,
+                "is_capped": final_is_capped,
+                "cap_limit": MAX_SEARCH_CAP,
                 "open_access_only": oa_only,
                 "scopus_quartiles": scopus_q,
                 "sinta_tiers": sinta_t,
                 "exclude_preprints": ex_prep,
-                "user_requested_count": req_cnt,
                 "min_year": m_year,
                 "min_citations": m_cit,
                 "language_preference": lang
