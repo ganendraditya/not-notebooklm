@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, memo } from "react";
+import React, { useState, useRef, useEffect, useMemo, memo } from "react";
 import { 
   ArrowUp, 
   FileText, 
@@ -64,8 +64,100 @@ export const ChatInputBox = memo(function ChatInputBox({
   const [isUploading, setIsUploading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [storageWarningFile, setStorageWarningFile] = useState<{ filename: string; size: number } | null>(null);
+  const [containerWidth, setContainerWidth] = useState(760);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!textareaRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(textareaRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const targetedPlaceholder = useMemo(() => {
+    if (!targetedSource) return "";
+    const rawTitle = (targetedSource.title || targetedSource.filename || "").trim();
+    
+    // Pixel-perfect dynamic fitting: measure exact rendered DOM text width
+    if (typeof window !== "undefined" && textareaRef.current) {
+      try {
+        const availableWidth = textareaRef.current.clientWidth - 40; // 40px safe margin before the right edge
+
+        let measurer = document.getElementById("placeholder-width-measurer") as HTMLSpanElement;
+        if (!measurer) {
+          measurer = document.createElement("span");
+          measurer.id = "placeholder-width-measurer";
+          measurer.style.position = "absolute";
+          measurer.style.visibility = "hidden";
+          measurer.style.whiteSpace = "nowrap";
+          measurer.style.top = "-9999px";
+          measurer.style.left = "-9999px";
+          document.body.appendChild(measurer);
+        }
+
+        const style = window.getComputedStyle(textareaRef.current);
+        measurer.style.fontFamily = style.fontFamily;
+        measurer.style.fontSize = style.fontSize;
+        measurer.style.fontWeight = style.fontWeight;
+        measurer.style.letterSpacing = style.letterSpacing;
+
+        const measure = (text: string) => {
+          measurer.textContent = text;
+          return measurer.offsetWidth;
+        };
+
+        if (availableWidth > 200) {
+          // If the entire title fits, use it completely without cutting off!
+          const fullText = t('chat.inputPlaceholderTargeted').replace('{title}', rawTitle).replace(/\.{3}"\s*\.{3}/g, '..."');
+          if (measure(fullText) <= availableWidth) {
+            return fullText;
+          }
+
+          // Otherwise, binary search the maximum title length that fits on a clean word boundary
+          let low = 10;
+          let high = rawTitle.length;
+          let bestTitle = rawTitle.slice(0, 30);
+
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            // Snap to word boundary so it ends on a complete word without broken syllables like "re..."
+            let sliceText = rawTitle.slice(0, mid);
+            const lastSpace = sliceText.lastIndexOf(" ");
+            if (lastSpace > 20 && mid < rawTitle.length) {
+              sliceText = sliceText.slice(0, lastSpace);
+            }
+            const testTitle = sliceText.trimEnd() + "...";
+            let testStr = t('chat.inputPlaceholderTargeted').replace('{title}', testTitle);
+            testStr = testStr.replace(/\.{3}"\s*\.{3}/g, '..."');
+
+            if (measure(testStr) <= availableWidth) {
+              bestTitle = testTitle;
+              low = mid + 1; // Try longer
+            } else {
+              high = mid - 1; // Too wide, shrink
+            }
+          }
+
+          const finalText = t('chat.inputPlaceholderTargeted').replace('{title}', bestTitle);
+          return finalText.replace(/\.{3}"\s*\.{3}/g, '..."');
+        }
+      } catch {}
+    }
+
+    // Fallback for SSR or environments without DOM measurer
+    const maxLen = 85;
+    const isTruncated = rawTitle.length > maxLen;
+    const displayTitle = isTruncated ? `${rawTitle.slice(0, maxLen).trimEnd()}...` : rawTitle;
+    let text = t('chat.inputPlaceholderTargeted').replace('{title}', displayTitle);
+    return text.replace(/\.{3}"\s*\.{3}/g, '..."');
+  }, [targetedSource, t, containerWidth]);
 
   const showAttachmentError = (msg: string) => {
     setAttachmentError(msg);
@@ -363,7 +455,7 @@ export const ChatInputBox = memo(function ChatInputBox({
               handleSend();
             }
           }}
-          placeholder={targetedSource ? t('chat.inputPlaceholderTargeted').replace('{title}', targetedSource.title || targetedSource.filename) : t('chat.inputPlaceholder')}
+          placeholder={targetedSource ? targetedPlaceholder : t('chat.inputPlaceholder')}
           rows={1}
           className="w-full bg-transparent text-app-text placeholder-app-text-dim text-[15px] focus:outline-none resize-none px-3 py-2 leading-relaxed custom-scrollbar max-h-[180px]"
         />

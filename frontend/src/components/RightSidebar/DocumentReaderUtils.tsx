@@ -227,8 +227,8 @@ export function getHighlightedContent(
                     }}
                     className={`font-medium px-0.5 py-0 rounded-none inline transition-colors ${
                       isActiveCluster
-                        ? "bg-amber-400/50 dark:bg-amber-400/35 text-amber-950 dark:text-amber-100 font-semibold"
-                        : "bg-amber-200/60 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
+                        ? "bg-amber-400/60 dark:bg-amber-400/40 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/60 dark:ring-amber-400/50"
+                        : "bg-amber-200/50 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
                     }`}
                     title={`AI Grounded Evidence ${clusterIdx + 1} of ${aiClusters.length}`}
                   >
@@ -552,8 +552,8 @@ export function getHighlightedContent(
                 }}
                 className={`font-medium px-0.5 py-0 rounded-none inline transition-colors ${
                   isActiveCluster
-                    ? "bg-amber-400/50 dark:bg-amber-400/35 text-amber-950 dark:text-amber-100 font-semibold"
-                    : "bg-amber-200/60 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
+                    ? "bg-amber-400/60 dark:bg-amber-400/40 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/60 dark:ring-amber-400/50"
+                    : "bg-amber-200/50 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
                 }`}
                 title={`Evidence Match ${clusterIdx + 1} of ${clusters.length}`}
               >

@@ -313,6 +313,12 @@ export function parseCitationsInReactNode(
   }
 
   if (React.isValidElement(node)) {
+    // If it's a KaTeX math element, do not traverse into its internal MathML/HTML spans
+    const className = (node.props as any)?.className;
+    if (typeof className === "string" && className.includes("katex")) {
+      return node;
+    }
+
     const children = (node.props as any)?.children;
     if (children !== undefined && children !== null) {
       const parsedChildren = parseCitationsInReactNode(

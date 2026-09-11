@@ -3,6 +3,8 @@
 import React, { useState, useMemo, useCallback, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { 
   ChevronDown, 
   Check, 
@@ -12,7 +14,8 @@ import {
   BookOpen, 
   Copy, 
   Pencil, 
-  FileText
+  FileText,
+  Table
 } from "lucide-react";
 import { ChatMessage } from "@/stores/chatStore";
 import { Document as DocType } from "@/stores/documentStore";
@@ -125,7 +128,7 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   if (isHeader) {
     return (
       <th 
-        className={`py-2.5 px-3 font-semibold text-app-text text-xs tracking-wider uppercase align-top whitespace-nowrap last:pr-9 ${alignClass}`} 
+        className={`py-2.5 px-3 font-semibold text-app-text text-xs align-top whitespace-nowrap ${alignClass}`} 
         {...props}
       >
         {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
@@ -176,26 +179,29 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <div className="relative my-4 group/tbl">
-      {/* Top right corner copy button */}
-      <div className="absolute top-2 right-2 z-10 flex items-center">
+    <div className="my-4 rounded-xl border border-app-border overflow-hidden shadow-sm bg-app-card/30">
+      {/* Top integrated mini-toolbar */}
+      <div className="flex items-center justify-between px-3 py-1 bg-app-surface/90 border-b border-app-border text-xs text-app-text-muted select-none">
+        <div className="flex items-center text-app-text-dim">
+          <Table size={13} className="text-app-text-dim shrink-0" />
+        </div>
         <Tooltip content={copied ? "Copied!" : "Copy table"} side="top">
           <button
             type="button"
             onClick={handleCopy}
             aria-label="Copy table"
-            className="p-1.5 rounded-md text-app-text-muted hover:text-app-text hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer focus:outline-none"
+            className="p-1 rounded-md text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
           >
             {copied ? (
-              <Check size={14} className="text-emerald-500 dark:text-emerald-400" />
+              <Check size={13} className="text-emerald-500 shrink-0" />
             ) : (
-              <Copy size={14} />
+              <Copy size={13} className="shrink-0" />
             )}
           </button>
         </Tooltip>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-app-border shadow-md custom-scrollbar">
+      <div className="overflow-x-auto custom-scrollbar">
         <table ref={tableRef} className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top">
           {children}
         </table>
@@ -441,7 +447,8 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       {/* 1. Main Markdown Text Content */}
       <div className="prose dark:prose-invert max-w-none text-[16px] leading-[1.65] break-words [word-break:break-word] text-app-text">
         <ReactMarkdown 
-          remarkPlugins={[remarkGfm]}
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
           components={{
             p: ({ node, children, ...props }: any) => {
               const fullText = extractNodeText(node || children);
