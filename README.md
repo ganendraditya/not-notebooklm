@@ -2,6 +2,8 @@
 
 An open-source academic research assistant and document workspace designed to run locally on your own machine. Inspired by tools like Google Notebook (previously NotebookLM), Consensus, and Elicit, NotbookLM bridges conversational AI with verifiable academic literature synthesis.
 
+![NotbookLM Workspace](docs/assets/workspace-preview.png)
+
 Instead of relying on proprietary cloud lock-in, NotbookLM operates locally by default—combining embedded relational storage (SQLite), in-process vector indexing (Qdrant), and local file processing. It autonomously retrieves, filters, and synthesizes scholarly publications from global academic repositories—including **OpenAlex**, **Crossref**, **arXiv**, **Unpaywall**, and scholarly web fallbacks—delivering structured comparative matrices and grounded citations linked directly to source manuscripts.
 
 Internet connectivity is utilized for live academic searches, external LLM APIs, and optional cloud services (Cloudflare R2, Doppler). However, the workspace can also run completely offline for self-uploaded documents when paired with a local model engine (such as Ollama) and the built-in local embedding model.
@@ -13,6 +15,32 @@ Internet connectivity is utilized for live academic searches, external LLM APIs,
 * **Grounded Synthesis & Matrix Tables:** Produces comparative literature review matrices with cell-level citation tagging, mitigating hallucinations by grounding claims directly in retrieved excerpts.
 * **Interactive Document Reader:** Split-pane interface featuring bidirectional citation navigation—click any citation badge to jump to and highlight the exact passage in the source PDF or document.
 * **Local-First with Modular Scale:** Runs on a personal workstation with zero required cloud accounts. Operates offline for uploaded documents and local LLMs, while supporting live academic discovery, S3 storage (Cloudflare R2, MinIO), and Doppler secret management when online.
+
+---
+
+## Workflow & Core Capabilities
+
+### 1. Literature Discovery & Candidate Acquisition
+Search across OpenAlex, Crossref, and academic sources. NotbookLM filters candidates based on relevance rubrics and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select and batch-import papers directly into the workspace.
+
+![Literature Discovery](docs/assets/academic-discovery.png)
+
+### 2. Intelligent Source Management & Dual Ingestion
+Imported papers appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
+* **`PDF` badge:** The authentic, open-access full-text manuscript was successfully discovered and downloaded via concurrent resolvers (arXiv, Unpaywall, OpenAlex).
+* **`TXT` badge:** Full-text PDF was behind paywalls or unavailable; NotbookLM gracefully acquired and indexed verified metadata and abstracts to maintain comprehensive coverage.
+
+![Sources Management](docs/assets/sources-panel.png)
+
+### 3. Integrated Document & PDF Viewer
+Inspect full manuscripts without leaving the workspace. The built-in document reader renders original publications—including multi-column formatting, figures, and publication venues (such as *Nature Communications*)—alongside structured plain-text extracts.
+
+![Original Document Reader](docs/assets/original-pdf-reader.png)
+
+### 4. Grounded Synthesis & Bidirectional Citation Highlighting
+Synthesize multiple papers into comparative review matrices. Each finding is tagged with traceable citation badges (`[6]`, `[7]`, `[8]`). Clicking any citation opens the document reader and automatically scrolls to highlight the exact supporting sentence in the source text.
+
+![Grounded Citation Highlighting](docs/assets/citation-grounding.png)
 
 ---
 

@@ -32,6 +32,9 @@ export function useChatSession(
 
   const handleSelectChat = useCallback((id: string) => {
     setCurrentView("chat");
+    try {
+      localStorage.setItem("last_active_chat_id", id);
+    } catch {}
     if (activeChatId === id) return;
 
     setActiveChatId(id);
@@ -95,7 +98,7 @@ export function useChatSession(
     handleSelectChatRef.current = handleSelectChat;
   }, [handleSelectChat]);
 
-  // Fetch all sessions on mount & auto-select the latest active chat if none selected
+  // Fetch all sessions on mount & restore the last active chat (or New Chat)
   useEffect(() => {
     fetch(`${backendUrl}/chats`)
       .then(res => res.json())
@@ -105,8 +108,22 @@ export function useChatSession(
           is_pinned: Boolean(s.is_pinned)
         }));
         setSessions(hydrated);
-        if (hydrated.length > 0 && !activeChatId && handleSelectChatRef.current) {
-          handleSelectChatRef.current(hydrated[0].id);
+
+        if (!activeChatId && handleSelectChatRef.current) {
+          let savedChatId: string | null = null;
+          try {
+            savedChatId = localStorage.getItem("last_active_chat_id");
+          } catch {}
+
+          if (savedChatId && hydrated.some((s: ChatSession) => s.id === savedChatId)) {
+            // Restore the exact chat the user was viewing before refresh
+            handleSelectChatRef.current(savedChatId);
+          } else if (savedChatId === "") {
+            // User was intentionally on New Chat before refresh, stay on New Chat
+          } else if (hydrated.length > 0) {
+            // Fallback for first-time visitors who haven't selected anything yet
+            handleSelectChatRef.current(hydrated[0].id);
+          }
         }
       })
       .catch(err => console.error("Failed to fetch sessions:", err));
@@ -153,6 +170,9 @@ export function useChatSession(
           body: JSON.stringify({ title })
         });
         const newChat = await res.json();
+        try {
+          localStorage.setItem("last_active_chat_id", newChat.id);
+        } catch {}
         activeChatIdRef.current = newChat.id;
         updateSessionsList(prev => [newChat, ...prev.filter(s => s.id !== newChat.id)]);
         setActiveChatId(newChat.id);
@@ -169,6 +189,9 @@ export function useChatSession(
   };
 
   const handleCreateChat = () => {
+    try {
+      localStorage.setItem("last_active_chat_id", "");
+    } catch {}
     activeChatIdRef.current = null;
     pendingSessionCreationRef.current = null;
     setActiveChatId(null);
