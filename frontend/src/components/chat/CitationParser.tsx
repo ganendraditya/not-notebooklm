@@ -79,17 +79,8 @@ export function enhanceTableCitations(markdown: string): string {
           });
           resultLines.push(`| ${newCells.join(" | ")} |`);
         } else {
-          const m = cells[0]?.match(/\[(\d{1,3})\]/);
-          if (m) {
-            const docNum = m[1];
-            const newCells = cells.map((c, idx) => {
-              if (idx === 0) return c;
-              return tagContent(c, docNum);
-            });
-            resultLines.push(`| ${newCells.join(" | ")} |`);
-          } else {
-            resultLines.push(line);
-          }
+          // Row-mapped document table: preserve cells as authored without forced tagging
+          resultLines.push(line);
         }
       }
     } else {
@@ -121,9 +112,12 @@ export function parseCitationsInReactNode(
   activeCitationKey?: string | null,
   parentFullText?: string,
   citationMap?: Record<string, string[]>,
-  elementPrefix: string = "node"
+  elementPrefix: string = "node",
+  isDocColumn: boolean = false
 ): React.ReactNode {
   if (typeof node === "string") {
+    // Track document numbers seen in this cell to deduplicate repeated badges in document columns
+    const seenDocNumsInCell = new Set<number>();
     // Determine the full text available (use parent/container text if node is a partial string)
     const effectiveFullText = parentFullText || node;
     // Support standard and double bracket citations: [1], [[1]], [1]], [1, 2], [1]-[3], [Dokumen 1], [Document 1]
@@ -143,15 +137,22 @@ export function parseCitationsInReactNode(
       // Extract precise context sentence/cell text for grounding
       let contextSentence = "";
 
-      if (effectiveFullText.includes("|")) {
-        // Inside whole row fallback: extract the row without citations
+      if (!node.includes("|") && node.length <= 300) {
+        // node is already an isolated cell or local text segment: extract from node directly
+        contextSentence = node
+          .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
+          .trim();
+      } else if (effectiveFullText.includes("|")) {
+        // Extract ONLY the specific cell text containing this match, NOT the entire multi-column row!
         const lines = effectiveFullText.split("\n");
         const matchingLine = lines.find(l => l.includes(match![0])) || effectiveFullText;
-        contextSentence = matchingLine
+        const matchingCell = matchingLine
           .split("|")
           .map(c => c.trim())
-          .filter(c => c.length > 0 && !/^\d+$/.test(c))
-          .join(" . ")
+          .find(c => c.includes(match![0])) || "";
+        contextSentence = matchingCell
           .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
           .replace(/<[^>]+>/g, " ")
           .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
@@ -222,7 +223,19 @@ export function parseCitationsInReactNode(
         });
       }
 
-      if (nums.length > 0) {
+      // In Document/Identity column (Col 0), deduplicate: only render the FIRST button for each document number!
+      let effectiveNums = nums;
+      if (isDocColumn) {
+        effectiveNums = nums.filter(n => !seenDocNumsInCell.has(n));
+        effectiveNums.forEach(n => seenDocNumsInCell.add(n));
+        if (effectiveNums.length === 0) {
+          // Skip redundant trailing duplicate in document identity cell
+          lastIndex = regex.lastIndex;
+          continue;
+        }
+      }
+
+      if (effectiveNums.length > 0) {
         // Create context hash from cell/sentence text so each citation button has a globally unique key
         const sentenceSnippet = contextSentence
           ? contextSentence.slice(0, 20).replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()
@@ -230,7 +243,7 @@ export function parseCitationsInReactNode(
 
         parts.push(
           <span key={`cite-grp-${elementPrefix}-${matchIndex}-${sentenceSnippet}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline not-italic font-normal">
-            {nums.map((num, i) => {
+            {effectiveNums.map((num, i) => {
               const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
               const docTitle = doc?.title || doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
               const aiQuotesForDoc = citationMap?.[num.toString()] || citationMap?.[`[${num}]`];
@@ -246,7 +259,9 @@ export function parseCitationsInReactNode(
                     <span>{docTitle}</span>
                   </div>
                   <div className="text-[10px] text-neutral-400 font-normal leading-tight">
-                    Click to view source and highlight AI-verified evidence
+                    {isDocColumn 
+                      ? "Click to open and read document"
+                      : "Click to view source and highlight AI-verified evidence"}
                   </div>
                 </div>
               );
@@ -264,12 +279,17 @@ export function parseCitationsInReactNode(
                     onClick={(e) => {
                       e.stopPropagation();
                       if (doc && onOpenDocument) {
-                        onOpenDocument(doc, {
-                          sentence: contextSentence,
-                          num: num,
-                          citationKey: citeUniqueKey,
-                          aiQuotes: aiQuotesForDoc
-                        });
+                        if (isDocColumn) {
+                          // In Document Identity column: open document cleanly with zero highlights
+                          onOpenDocument(doc, undefined);
+                        } else {
+                          onOpenDocument(doc, {
+                            sentence: contextSentence,
+                            num: num,
+                            citationKey: citeUniqueKey,
+                            aiQuotes: aiQuotesForDoc
+                          });
+                        }
                       }
                     }}
                     className={`inline-flex items-center justify-center min-w-6 px-1 h-5 text-[10px] font-mono font-bold not-italic normal-case tracking-normal rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-none shadow-sm ${
@@ -308,7 +328,7 @@ export function parseCitationsInReactNode(
 
   if (Array.isArray(node)) {
     return node.map((child, idx) => (
-      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap, `${elementPrefix}-${idx}`)}</React.Fragment>
+      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap, `${elementPrefix}-${idx}`, isDocColumn)}</React.Fragment>
     ));
   }
 
@@ -328,7 +348,8 @@ export function parseCitationsInReactNode(
         activeCitationKey,
         parentFullText,
         citationMap,
-        elementPrefix
+        elementPrefix,
+        isDocColumn
       );
 
       // Check if parsedChildren actually contains an interactive citation button

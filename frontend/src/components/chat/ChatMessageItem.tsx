@@ -82,6 +82,7 @@ function extractTableRowText(node: any, children: any): string {
 
 interface TableCellRendererProps {
   isHeader?: boolean;
+  colIndex?: number;
   node?: any;
   documents?: DocType[];
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
@@ -93,6 +94,7 @@ interface TableCellRendererProps {
 
 const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   isHeader = false,
+  colIndex = 0,
   node,
   documents,
   onOpenDocument,
@@ -101,7 +103,6 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   children,
   ...props
 }) => {
-  const rowContext = React.useContext(TableRowContext);
   const cellRawText = extractNodeText(children);
   const cellClean = cellRawText
     .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
@@ -109,10 +110,13 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
     .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
     .trim();
 
-  // If this cell has specific content (e.g. "1.500 ulasan produk", "Naïve Bayes + TF-IDF", "77,78%"), pass cellRawText!
-  // If this cell has NO factual text (e.g. it's just "[1]" in the Source column or generic "Doc 1"), pass rowContext!
-  const isGenericOrEmpty = !cellClean || cellClean.length < 3 || /^(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?$/i.test(cellClean);
-  const contextToPass = isGenericOrEmpty ? rowContext : cellRawText;
+  // Column 0 is the document identity column (e.g. Doc # & Citation, Dokumen / Judul)
+  const isDocColumn = !isHeader && colIndex === 0;
+
+  // Never pass the entire multi-column rowContext as search context!
+  // If this cell is the doc column or has no factual text, pass "" so no random highlighting occurs.
+  const isGenericOrEmpty = isDocColumn || !cellClean || cellClean.length < 3 || /^(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?$/i.test(cellClean);
+  const contextToPass = isGenericOrEmpty ? "" : cellRawText;
 
   // Compute unique AST cell offset to ensure citation keys in different columns never collide
   const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
@@ -131,7 +135,7 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
         className={`py-2.5 px-3 font-semibold text-app-text text-xs align-top whitespace-nowrap ${alignClass}`} 
         {...props}
       >
-        {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
+        {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix, isDocColumn)}
       </th>
     );
   }
@@ -140,7 +144,7 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
       className={`py-2.5 px-3 text-app-text-muted text-xs leading-relaxed align-top ${alignClass}`} 
       {...props}
     >
-      {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix)}
+      {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix, isDocColumn)}
     </td>
   );
 };
@@ -539,17 +543,24 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             ),
             tr: ({ node, children, ...props }: any) => {
               const rowText = extractTableRowText(node, children);
+              const indexedChildren = React.Children.map(children, (child, colIndex) => {
+                if (React.isValidElement(child)) {
+                  return React.cloneElement(child as React.ReactElement<any>, { colIndex });
+                }
+                return child;
+              });
               return (
                 <TableRowContext.Provider value={rowText}>
                   <tr className="hover:bg-app-item-hover transition-colors align-top" {...props}>
-                    {children}
+                    {indexedChildren}
                   </tr>
                 </TableRowContext.Provider>
               );
             },
-            th: ({ node, children, ...props }: any) => (
+            th: ({ node, children, colIndex, ...props }: any) => (
               <TableCellRenderer
                 isHeader={true}
+                colIndex={colIndex}
                 node={node}
                 documents={documents}
                 onOpenDocument={onOpenDocument}
@@ -560,9 +571,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 {children}
               </TableCellRenderer>
             ),
-            td: ({ node, children, ...props }: any) => (
+            td: ({ node, children, colIndex, ...props }: any) => (
               <TableCellRenderer
                 isHeader={false}
+                colIndex={colIndex}
                 node={node}
                 documents={documents}
                 onOpenDocument={onOpenDocument}

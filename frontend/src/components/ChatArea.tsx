@@ -134,10 +134,46 @@ export default function ChatArea({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const inputWrapperRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef<boolean>(true);
   const [showScrollBottom, setShowScrollBottom] = useState<boolean>(false);
+  const [inputHeight, setInputHeight] = useState<number>(144);
 
   const isChatEmpty = messages.length === 0;
+
+  // Dynamically observe input bar height changes (e.g. multi-row prompt expansions, attachments, or collapses)
+  // Ensures messages are NEVER obscured by the floating input bar at the bottom, just like ChatGPT/Claude.
+  useEffect(() => {
+    const el = inputWrapperRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.target.getBoundingClientRect().height;
+        if (h > 0) {
+          setInputHeight((prevH) => {
+            const newH = Math.round(h);
+            if (newH !== prevH) {
+              const container = scrollContainerRef.current;
+              if (container && isAtBottomRef.current) {
+                const diff = newH - prevH;
+                requestAnimationFrame(() => {
+                  if (container && isAtBottomRef.current) {
+                    container.scrollTop += diff;
+                  }
+                });
+              }
+              return newH;
+            }
+            return prevH;
+          });
+        }
+      }
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isChatEmpty]);
 
   // Once the assistant has started generating tokens, hide the bottom thinking text
   const isGeneratingContent = useMemo(() => {
@@ -436,8 +472,9 @@ export default function ChatArea({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         className={`flex-1 overflow-y-auto w-full min-h-0 custom-scrollbar overflow-x-hidden ${
-          isChatEmpty ? "flex items-center justify-center pt-0 pb-0" : "pt-12 lg:pt-14 pb-36"
+          isChatEmpty ? "flex items-center justify-center pt-0 pb-0" : "pt-12 lg:pt-14"
         }`}
+        style={!isChatEmpty ? { paddingBottom: `${Math.max(120, inputHeight + 16)}px` } : undefined}
       >
         <div className="w-full max-w-3xl mx-auto pl-[19px] pr-[13px] sm:pl-[27px] sm:pr-[21px] md:pl-[35px] md:pr-[29px] space-y-6">
           {isChatEmpty ? (
@@ -683,7 +720,10 @@ export default function ChatArea({
 
       {/* Floating Gradient Backdrop for Input (width capped to input box width only, zero side overflow) */}
       {!isChatEmpty && (
-        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-10">
+        <div 
+          ref={inputWrapperRef}
+          className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-10"
+        >
           <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pointer-events-auto min-w-0 relative">
             <div className="absolute inset-x-0 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             {showScrollBottom && (

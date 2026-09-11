@@ -188,4 +188,43 @@ describe("CitationParser", () => {
     expect(link.textContent).toBe("Documentation");
     expect(container.querySelector("button")).toBeNull();
   });
+
+  it("deduplicates repeated document citation buttons in document identity column and opens with zero highlights", () => {
+    const docs = [{ id: 2, index: 2, filename: "Paper2.pdf", title: "Hyper-RAG", created_at: "2026-01-01T00:00:00Z" }];
+    const onOpen = vi.fn();
+
+    // In Document Identity column (isDocColumn = true), redundant duplicate [2] must be filtered out
+    const cellText = "[2] Feng et al. (2026) Nature Communications [2]";
+    const result = parseCitationsInReactNode(cellText, docs, onOpen, null, undefined, undefined, "td_0", true);
+    const { container } = render(<div>{result}</div>);
+
+    const buttons = container.querySelectorAll("button");
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].textContent).toContain("2");
+
+    // Clicking document column button must open with zero highlights (undefined context)
+    buttons[0].click();
+    expect(onOpen).toHaveBeenCalledWith(docs[0], undefined);
+  });
+
+  it("extracts only the specific cell context in table rows instead of the entire multi-column row", () => {
+    const docs = [{ id: 2, index: 2, filename: "Paper2.pdf", title: "Hyper-RAG", created_at: "2026-01-01T00:00:00Z" }];
+    let capturedCtx: any = null;
+    const onOpen = (_doc: any, ctx: any) => {
+      capturedCtx = ctx;
+    };
+
+    const rowMarkdown = "| [2] Feng et al. | High Stakes Domain | 35% reduction in KMR [2] | Indexing overhead [2] |";
+    const cellContent = "35% reduction in KMR [2]";
+    const result = parseCitationsInReactNode(cellContent, docs, onOpen, null, rowMarkdown, undefined, "td_2", false);
+    const { container } = render(<div>{result}</div>);
+
+    const btn = container.querySelector("button")!;
+    btn.click();
+    expect(capturedCtx).toBeTruthy();
+    expect(capturedCtx.sentence).toContain("35% reduction in KMR");
+    // Must NOT contain text from adjacent columns
+    expect(capturedCtx.sentence).not.toContain("High Stakes Domain");
+    expect(capturedCtx.sentence).not.toContain("Indexing overhead");
+  });
 });

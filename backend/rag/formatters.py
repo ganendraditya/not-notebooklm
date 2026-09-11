@@ -92,16 +92,8 @@ def enhance_table_citations(text: str) -> str:
                             new_cells.append(c)
                     result_lines.append('| ' + ' | '.join(new_cells) + ' |')
                 else:
-                    # Row-mapped document table (Col 0 has [X])
-                    m = re.search(r'\[(\d{1,3})\]', cells[0]) if cells else None
-                    if m:
-                        doc_num = m.group(1)
-                        new_cells = [cells[0]]
-                        for c in cells[1:]:
-                            new_cells.append(tag_cell_content(c, doc_num))
-                        result_lines.append('| ' + ' | '.join(new_cells) + ' |')
-                    else:
-                        result_lines.append(line)
+                    # Row-mapped document table: preserve cells as authored without forced tagging
+                    result_lines.append(line)
         else:
             in_table = False
             col_doc_map = {}
