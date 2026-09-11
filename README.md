@@ -23,8 +23,6 @@ Internet connectivity is utilized for live academic searches, external LLM APIs,
 ### 1. Literature Discovery & Candidate Acquisition
 Search across OpenAlex, Crossref, and academic sources. NotbookLM filters candidates based on relevance rubrics and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select and batch-import papers directly into the workspace.
 
-![Literature Discovery](docs/assets/academic-discovery.png)
-
 ### 2. Intelligent Source Management & Dual Ingestion
 Imported papers appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
 * **`PDF` badge:** The authentic, open-access full-text manuscript was successfully discovered and downloaded via concurrent resolvers (arXiv, Unpaywall, OpenAlex).
@@ -34,8 +32,6 @@ Imported papers appear in the right-hand **Sources** panel with permanent numeri
 
 ### 3. Integrated Document & PDF Viewer
 Inspect full manuscripts without leaving the workspace. The built-in document reader renders original publications—including multi-column formatting, figures, and publication venues (such as *Nature Communications*)—alongside structured plain-text extracts.
-
-![Original Document Reader](docs/assets/original-pdf-reader.png)
 
 ### 4. Grounded Synthesis & Bidirectional Citation Highlighting
 Synthesize multiple papers into comparative review matrices. Each finding is tagged with traceable citation badges (`[6]`, `[7]`, `[8]`). Clicking any citation opens the document reader and automatically scrolls to highlight the exact supporting sentence in the source text.
@@ -61,7 +57,7 @@ Runs all services in containers without requiring local Python or Node.js instal
    ```bash
    cp backend/.env.example backend/.env
    ```
-   *Configure your API key and model preferences in `backend/.env` (see [LLM Configuration](#llm-configuration) below).*
+   *Configure your API key and model preferences in `backend/.env`.*
 
 3. **Start services with Docker Compose:**
    ```bash
@@ -69,9 +65,9 @@ Runs all services in containers without requiring local Python or Node.js instal
    ```
 
 4. **Access the application:**
-   * **Frontend Web App:** [http://localhost:3000](http://localhost:3000)
-   * **Backend API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-   * **Qdrant Dashboard:** [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
+   * **Frontend Web App:** `http://localhost:3000`
+   * **Backend API Docs:** `http://localhost:8000/docs`
+   * **Qdrant Dashboard:** `http://localhost:6333/dashboard`
 
 ---
 
@@ -115,7 +111,7 @@ cd frontend
 npm install
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open `http://localhost:3000` in your browser.
 
 ---
 
