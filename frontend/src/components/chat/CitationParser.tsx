@@ -313,15 +313,37 @@ export function parseCitationsInReactNode(
   }
 
   if (React.isValidElement(node)) {
-    // If the node is an <a> tag and its children contain citations, unwrap the <a> tag!
-    // This prevents invalid HTML like <a target="_blank"><button>...</button></a> which opens a new tab when clicked.
-    if (typeof node.type === "string" && node.type.toLowerCase() === "a") {
-      return parseCitationsInReactNode((node.props as any)?.children, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap, elementPrefix);
-    }
+    const children = (node.props as any)?.children;
+    if (children !== undefined && children !== null) {
+      const parsedChildren = parseCitationsInReactNode(
+        children,
+        documents,
+        onOpenDocument,
+        activeCitationKey,
+        parentFullText,
+        citationMap,
+        elementPrefix
+      );
 
-    if ((node.props as any)?.children) {
+      // Check if parsedChildren actually contains an interactive citation button
+      const hasCitation = (n: React.ReactNode): boolean => {
+        if (!n) return false;
+        if (Array.isArray(n)) return n.some(hasCitation);
+        if (React.isValidElement(n)) {
+          if (typeof n.key === "string" && (n.key.startsWith("cite-grp-") || n.key.startsWith("cite-"))) return true;
+          if ((n.props as any)?.["aria-label"]?.startsWith?.("Source [")) return true;
+          return hasCitation((n.props as any)?.children);
+        }
+        return false;
+      };
+
+      // If this is an <a> tag AND it contains citation button(s), unwrap it to prevent invalid <a target="_blank"><button>
+      if (typeof node.type === "string" && node.type.toLowerCase() === "a" && hasCitation(parsedChildren)) {
+        return parsedChildren;
+      }
+
       return React.cloneElement(node as React.ReactElement<any>, {
-        children: parseCitationsInReactNode((node.props as any).children, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap, elementPrefix)
+        children: parsedChildren
       });
     }
   }

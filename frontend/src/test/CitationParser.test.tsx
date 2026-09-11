@@ -167,4 +167,25 @@ describe("CitationParser", () => {
     btn.click();
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
+
+  it("preserves regular markdown <a> hyperlinks when they do not wrap citations", () => {
+    const docs = [{ id: 1, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }];
+    const onOpen = vi.fn();
+
+    // Legitimate markdown link: <a href="https://example.com" target="_blank">Documentation</a>
+    const regularLinkNode = React.createElement(
+      "a",
+      { href: "https://example.com", target: "_blank", rel: "noopener noreferrer" },
+      "Documentation"
+    );
+
+    const result = parseCitationsInReactNode(regularLinkNode, docs, onOpen);
+    const { container } = render(<div>{result}</div>);
+
+    const link = container.querySelector("a")!;
+    expect(link).toBeTruthy();
+    expect(link.getAttribute("href")).toBe("https://example.com");
+    expect(link.textContent).toBe("Documentation");
+    expect(container.querySelector("button")).toBeNull();
+  });
 });

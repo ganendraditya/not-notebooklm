@@ -23,6 +23,8 @@ Internet connectivity is utilized for live academic searches, external LLM APIs,
 ### 1. Literature Discovery & Candidate Acquisition
 Search across OpenAlex, Crossref, and academic sources. NotbookLM filters candidates based on relevance rubrics and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select and batch-import papers directly into the workspace.
 
+![Literature Discovery](docs/assets/literature-discovery.png)
+
 ### 2. Intelligent Source Management & Dual Ingestion
 Imported papers appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
 * **`PDF` badge:** The authentic, open-access full-text manuscript was successfully discovered and downloaded via concurrent resolvers (arXiv, Unpaywall, OpenAlex).
