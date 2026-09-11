@@ -26,8 +26,21 @@ export function createSmoothTextStreamer({
       // Adaptive velocity:
       // If backlog is high (> 80 chars), advance faster so we never lag behind
       // If close to frontier, step in gentle 2-3 char increments
-      const step = diff > 80 ? Math.ceil(diff / 4) : (diff > 30 ? Math.ceil(diff / 6) : Math.min(diff, 2));
-      displayed += target.slice(displayed.length, displayed.length + step);
+      let step = Math.min(diff, 2);
+      if (diff > 80) {
+        step = Math.ceil(diff / 4);
+      } else if (diff > 30) {
+        step = Math.ceil(diff / 6);
+      }
+
+      let nextIndex = displayed.length + step;
+      // Prevent splitting UTF-16 surrogate pairs (e.g. emojis or math symbols) across ticks
+      const code = target.charCodeAt(nextIndex - 1);
+      if (code >= 0xD800 && code <= 0xDBFF && nextIndex < target.length) {
+        nextIndex++;
+      }
+
+      displayed = target.slice(0, nextIndex);
       onUpdate(displayed);
     } else if (isStreamDone) {
       if (intervalId !== null) {
@@ -50,6 +63,11 @@ export function createSmoothTextStreamer({
       ensureRunning();
     },
     reset(newText: string = "") {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+      isStreamDone = false;
       target = newText;
       displayed = newText;
       onUpdate(displayed);
