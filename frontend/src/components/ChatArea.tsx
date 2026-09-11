@@ -724,36 +724,38 @@ export default function ChatArea({
           ref={inputWrapperRef}
           className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-10"
         >
-          <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pointer-events-auto min-w-0 relative">
+          <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pointer-events-none min-w-0 relative">
             <div className="absolute inset-x-0 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             {showScrollBottom && (
-              <div className="flex justify-center mb-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="flex justify-center mb-2 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-200">
                 <button
                   type="button"
                   onClick={scrollToBottom}
-                  className="px-3 py-1.5 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text text-xs font-medium flex items-center gap-1.5 shadow-md cursor-pointer transition-colors"
+                  className="pointer-events-auto px-3 py-1.5 rounded-full bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text text-xs font-medium flex items-center gap-1.5 shadow-md cursor-pointer transition-colors"
                 >
                   <ChevronDown size={13} className="text-blue-500" />
                   <span>Scroll to bottom</span>
                 </button>
               </div>
             )}
-            <ChatInputBox 
-              isLoading={isLoading}
-              documentsCount={documents.length}
-              onToggleRightSidebar={onToggleRightSidebar}
-              onSubmit={handleSendMessage}
-              onStopGeneration={onStopGeneration}
-              queuedPrompts={queuedPrompts}
-              onRemoveQueuedPrompt={onRemoveQueuedPrompt}
-              onPromoteQueuedPrompt={onPromoteQueuedPrompt}
-              backendUrl={backendUrl}
-              chatId={activeChatId}
-              onEnsureChatSession={onEnsureChatSession}
-              targetedSource={targetedSource}
-              onClearTargetedSource={onClearTargetedSource}
-              onOpenStorage={onOpenStorage}
-            />
+            <div className="pointer-events-auto">
+              <ChatInputBox 
+                isLoading={isLoading}
+                documentsCount={documents.length}
+                onToggleRightSidebar={onToggleRightSidebar}
+                onSubmit={handleSendMessage}
+                onStopGeneration={onStopGeneration}
+                queuedPrompts={queuedPrompts}
+                onRemoveQueuedPrompt={onRemoveQueuedPrompt}
+                onPromoteQueuedPrompt={onPromoteQueuedPrompt}
+                backendUrl={backendUrl}
+                chatId={activeChatId}
+                onEnsureChatSession={onEnsureChatSession}
+                targetedSource={targetedSource}
+                onClearTargetedSource={onClearTargetedSource}
+                onOpenStorage={onOpenStorage}
+              />
+            </div>
           </div>
         </div>
       )}
