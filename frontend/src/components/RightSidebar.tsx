@@ -238,39 +238,74 @@ export default function RightSidebar({
     const landingUrl = paperDetails?.url || (doiStr ? `https://doi.org/${doiStr}` : "");
 
     return (
-      <DocumentReader
-        viewingDoc={viewingDoc}
-        paperDetails={paperDetails}
-        isLoadingDetails={isLoadingDetails}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onClose={onClose}
-        setViewingDoc={setViewingDoc}
-        onClearViewingDoc={onClearViewingDoc}
-        onAskAboutDocument={onAskAboutDocument}
-        backendUrl={backendUrl}
-        activeChatId={activeChatId}
-        totalMatches={totalMatches}
-        activeMatchIndex={activeMatchIndex}
-        navigateMatch={(dir) => {
-          if (dir === "next") {
-            setActiveMatchIndex(prev => prev < totalMatches - 1 ? prev + 1 : 0);
-          } else {
-            setActiveMatchIndex(prev => prev > 0 ? prev - 1 : totalMatches - 1);
-          }
-        }}
-        getHighlightedContent={() => highlightResult.nodes}
-        cleanAbstract={cleanAbstract}
-        authorsStr={authorsStr}
-        pubDateStr={pubDateStr}
-        journalName={journalName}
-        citationsCount={citationsCount}
-        landingUrl={landingUrl}
-        title={title}
-        copiedLink={copiedLink}
-        copyToClipboard={copyToClipboard}
-        setIsCiteModalOpen={setIsCiteModalOpen}
-      />
+      <>
+        <DocumentReader
+          viewingDoc={viewingDoc}
+          paperDetails={paperDetails}
+          isLoadingDetails={isLoadingDetails}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          onClose={onClose}
+          setViewingDoc={setViewingDoc}
+          onClearViewingDoc={onClearViewingDoc}
+          onAskAboutDocument={onAskAboutDocument}
+          backendUrl={backendUrl}
+          activeChatId={activeChatId}
+          totalMatches={totalMatches}
+          activeMatchIndex={activeMatchIndex}
+          navigateMatch={(dir) => {
+            if (dir === "next") {
+              setActiveMatchIndex(prev => prev < totalMatches - 1 ? prev + 1 : 0);
+            } else {
+              setActiveMatchIndex(prev => prev > 0 ? prev - 1 : totalMatches - 1);
+            }
+          }}
+          getHighlightedContent={() => highlightResult.nodes}
+          cleanAbstract={cleanAbstract}
+          authorsStr={authorsStr}
+          pubDateStr={pubDateStr}
+          journalName={journalName}
+          citationsCount={citationsCount}
+          landingUrl={landingUrl}
+          title={title}
+          copiedLink={copiedLink}
+          copyToClipboard={copyToClipboard}
+          setIsCiteModalOpen={setIsCiteModalOpen}
+        />
+
+        {/* Modals Composition - Mounted in Reader Mode as well */}
+        <RightSidebarModals
+          isAddSourcesModalOpen={isAddSourcesModalOpen}
+          setIsAddSourcesModalOpen={setIsAddSourcesModalOpen}
+          doiInput={doiInput}
+          setDoiInput={setDoiInput}
+          handleImportDoi={handleImportDoi}
+          fileInputRef={fileInputRef}
+          isDraggingOver={isDraggingOver}
+          setIsDraggingOver={setIsDraggingOver}
+          handleUploadBatch={handleUploadBatch}
+          documentsLength={documents.length}
+          pendingSourcesLength={pendingSources.length}
+          isCiteModalOpen={isCiteModalOpen}
+          setIsCiteModalOpen={setIsCiteModalOpen}
+          paperDetails={paperDetails}
+          viewingDoc={viewingDoc}
+          showBulkDeleteConfirm={showBulkDeleteConfirm}
+          docToDelete={docToDelete}
+          selectedCount={selectedCount}
+          isBulkDeleting={isBulkDeleting}
+          setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
+          setDocToDelete={setDocToDelete}
+          handleConfirmBulkDelete={handleConfirmBulkDelete}
+          isRenameModalOpen={isRenameModalOpen}
+          renamingDoc={renamingDoc}
+          renameTitleInput={renameTitleInput}
+          isSavingRename={isSavingRename}
+          setRenameTitleInput={setRenameTitleInput}
+          setIsRenameModalOpen={setIsRenameModalOpen}
+          handleSaveRename={handleSaveRename}
+        />
+      </>
     );
   }
 

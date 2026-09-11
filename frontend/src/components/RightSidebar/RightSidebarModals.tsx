@@ -107,7 +107,7 @@ export const RightSidebarModals: React.FC<RightSidebarModalsProps> = ({
           paperDetails?.year || new Date().getFullYear().toString(),
           paperDetails?.journal || "",
           paperDetails?.doi || "",
-          paperDetails?.url || (paperDetails?.doi ? "https://doi.org/$" : "")
+          paperDetails?.url || (paperDetails?.doi ? `https://doi.org/${paperDetails.doi}` : "")
         )}
         doiStr={paperDetails?.doi || ""}
       />
