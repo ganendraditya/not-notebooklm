@@ -19,11 +19,13 @@ services:
     environment:
       - QDRANT_URL=http://qdrant:6333
       - LLM_PROVIDER=gemini
+      - DATABASE_URL=sqlite:////app/data/not_notebooklm.db
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     volumes:
       - backend_uploads:/app/uploads
-      - backend_db:/app
+      - backend_data:/app/data
     depends_on:
       - qdrant
 
@@ -43,4 +45,4 @@ services:
 volumes:
   qdrant_storage:
   backend_uploads:
-  backend_db:
+  backend_data:
