@@ -1,16 +1,15 @@
 import os
-import io
+import uuid
 import zipfile
 import logging
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse, Response
+from typing import List, Dict, Optional
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-import rag
-from database import get_db, Document, ChatSession, commit_with_retry, DB_PATH
-from utils.file_utils import UPLOAD_DIR, make_content_disposition
+from database import get_db, ChatSession, commit_with_retry, DB_PATH
+from utils.file_utils import UPLOAD_DIR, TEMP_ZIPS_DIR, make_content_disposition
 from services.storage_service import get_unified_storage_summary, delete_storage_file_and_records
 
 router = APIRouter(prefix="/storage", tags=["storage"])
@@ -35,7 +34,7 @@ class FileItem(BaseModel):
     chat_title: Optional[str] = None
 
 @router.get("/summary", response_model=StorageSummary)
-def get_storage_summary(db: Session = Depends(get_db)):
+def get_storage_summary():
     data = get_unified_storage_summary(DB_PATH)
     
     return StorageSummary(
@@ -64,17 +63,19 @@ def list_files(category: Optional[str] = None, db: Session = Depends(get_db)):
     try:
         sessions = db.query(ChatSession).all()
         chat_sessions_map = {str(s.id): s.title for s in sessions}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[Storage] Failed to pre-fetch chat sessions: {e}")
 
     if os.path.exists(UPLOAD_DIR):
         for root, dirs, files in os.walk(UPLOAD_DIR):
+            # Prune temporary directories so exports are not enumerated as library files
+            dirs[:] = [d for d in dirs if d != "temp_zips"]
             for file in files:
                 file_path = os.path.join(root, file)
                 try:
                     size = os.path.getsize(file_path)
                     mtime = os.path.getmtime(file_path)
-                    uploaded_at = datetime.fromtimestamp(mtime).isoformat() + "Z"
+                    uploaded_at = datetime.fromtimestamp(mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
                     
                     ext = file.split('.')[-1].lower() if '.' in file else ''
                     if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']:
@@ -124,11 +125,11 @@ def list_files(category: Optional[str] = None, db: Session = Depends(get_db)):
     return files_list
 
 def is_safe_upload_path(file_path: str) -> bool:
-    """Verifies that resolved absolute path is strictly contained within UPLOAD_DIR."""
+    """Verifies that resolved real path is strictly contained within UPLOAD_DIR and is not UPLOAD_DIR itself."""
     try:
-        abs_upload_dir = os.path.abspath(UPLOAD_DIR)
-        abs_target = os.path.abspath(file_path)
-        return os.path.commonpath([abs_upload_dir, abs_target]) == abs_upload_dir
+        real_upload_dir = os.path.realpath(UPLOAD_DIR)
+        real_target = os.path.realpath(file_path)
+        return real_target != real_upload_dir and os.path.commonpath([real_upload_dir, real_target]) == real_upload_dir
     except Exception:
         return False
 
@@ -167,8 +168,16 @@ def delete_files(req: DeleteRequest, db: Session = Depends(get_db)):
 class DownloadRequest(BaseModel):
     file_ids: List[str]
 
+def cleanup_file_safely(path: str):
+    """Background task to remove temporary exported archive."""
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception as e:
+        logger.debug(f"[Storage Download] Temp file cleanup notice: {e}")
+
 @router.post("/download")
-def download_storage_files(req: DownloadRequest):
+def download_storage_files(req: DownloadRequest, background_tasks: BackgroundTasks):
     if not req.file_ids:
         raise HTTPException(status_code=400, detail="No files selected for download")
 
@@ -183,7 +192,7 @@ def download_storage_files(req: DownloadRequest):
         if not os.path.exists(file_path):
             from services import storage_adapter
             storage_adapter.ensure_local_copy(safe_id, file_path)
-        if not os.path.exists(file_path):
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
             raise HTTPException(status_code=404, detail="File not found")
         
         filename = os.path.basename(file_path)
@@ -198,15 +207,19 @@ def download_storage_files(req: DownloadRequest):
             headers={"Content-Disposition": make_content_disposition("attachment", filename)}
         )
     
-    # Multiple files zipped download
-    zip_buffer = io.BytesIO()
+    # Multiple files zipped download using disk buffer to prevent RAM spikes
+    os.makedirs(TEMP_ZIPS_DIR, exist_ok=True)
+    temp_zip_path = os.path.join(TEMP_ZIPS_DIR, f"export_{uuid.uuid4().hex}.zip")
     count = 0
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+    
+    with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for file_id in req.file_ids:
             safe_id = os.path.normpath(file_id)
             if safe_id.startswith('..') or os.path.isabs(safe_id):
                 continue
             file_path = os.path.join(UPLOAD_DIR, safe_id)
+            if not is_safe_upload_path(file_path):
+                continue
             if not os.path.exists(file_path):
                 from services import storage_adapter
                 storage_adapter.ensure_local_copy(safe_id, file_path)
@@ -216,19 +229,30 @@ def download_storage_files(req: DownloadRequest):
                     prefix, remainder = base_name.split("_", 1)
                     if prefix == "None" or len(prefix) == 36:
                         base_name = remainder
+                
+                # Prevent silent file overwrites within the same ZIP archive
+                arcname = base_name
+                collision_idx = 1
+                while arcname in zf.namelist():
+                    name, ext = os.path.splitext(base_name)
+                    arcname = f"{name}_{collision_idx}{ext}"
+                    collision_idx += 1
+
                 try:
-                    zf.write(file_path, arcname=base_name)
+                    zf.write(file_path, arcname=arcname)
                     count += 1
                 except Exception:
                     pass
                     
     if count == 0:
+        cleanup_file_safely(temp_zip_path)
         raise HTTPException(status_code=404, detail="No valid files to download")
         
-    zip_buffer.seek(0)
     zip_filename = f"Library_Export_{count}_files.zip"
-    return Response(
-        content=zip_buffer.getvalue(),
+    background_tasks.add_task(cleanup_file_safely, temp_zip_path)
+    return FileResponse(
+        temp_zip_path,
         media_type="application/zip",
+        filename=zip_filename,
         headers={"Content-Disposition": make_content_disposition("attachment", zip_filename)}
     )
