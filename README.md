@@ -4,13 +4,15 @@ An open-source academic research assistant and document workspace designed to ru
 
 Instead of relying on proprietary cloud lock-in, NotbookLM operates locally by default—combining embedded relational storage (SQLite), in-process vector indexing (Qdrant), and local file processing. It autonomously retrieves, filters, and synthesizes scholarly publications from global academic repositories—including **OpenAlex**, **Crossref**, **arXiv**, **Unpaywall**, and scholarly web fallbacks—delivering structured comparative matrices and grounded citations linked directly to source manuscripts.
 
+Internet connectivity is utilized for live academic searches, external LLM APIs, and optional cloud services (Cloudflare R2, Doppler). However, the workspace can also run completely offline for self-uploaded documents when paired with a local model engine (such as Ollama) and the built-in local embedding model.
+
 ### Highlights
 
 * **Automated Literature Discovery:** Queries global academic registries (OpenAlex, Crossref, and web fallbacks) with iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
 * **Authentic PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent resolvers (arXiv, Unpaywall, OpenAlex) while enriching paper records with journal quartiles and citation counts.
 * **Grounded Synthesis & Matrix Tables:** Produces comparative literature review matrices with cell-level citation tagging, mitigating hallucinations by grounding claims directly in retrieved excerpts.
 * **Interactive Document Reader:** Split-pane interface featuring bidirectional citation navigation—click any citation badge to jump to and highlight the exact passage in the source PDF or document.
-* **Local-First with Modular Scale:** Runs out-of-the-box on a personal workstation with zero required cloud accounts, while supporting plug-and-play S3 storage (Cloudflare R2, MinIO) and Doppler secret management when scaling up.
+* **Local-First with Modular Scale:** Runs on a personal workstation with zero required cloud accounts. Operates offline for uploaded documents and local LLMs, while supporting live academic discovery, S3 storage (Cloudflare R2, MinIO), and Doppler secret management when online.
 
 ---
 
@@ -118,7 +120,7 @@ LLM_FALLBACK_MODEL=gpt-4o-mini
 
 ## Storage Configuration (Local Disk & S3 Object Storage)
 
-NotbookLM supports decoupled storage. Files can be stored on the local filesystem or synced with an S3-compatible Object Storage provider (such as Cloudflare R2, MinIO, or AWS S3).
+NotbookLM supports decoupled storage. Files can be stored on the local filesystem or synced with an S3-compatible Object Storage provider (such as Cloudflare R2 or MinIO).
 
 ### Configuration (`backend/.env`)
 
@@ -211,7 +213,7 @@ Store credentials in a self-hosted vault for air-gapped environments and strict 
 
 * **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS, Zustand State Management, Base UI.
 * **Backend:** FastAPI, SQLAlchemy (SQLite), LlamaIndex.
-* **Storage:** Unified Storage Adapter supporting Local Disk, Cloudflare R2, MinIO, and AWS S3.
+* **Storage:** Unified Storage Adapter supporting Local Disk and S3-compatible Object Storage (Cloudflare R2, MinIO).
 * **Vector Store:** Qdrant (supports remote Docker instance or embedded local disk fallback).
 * **Embeddings:** Local offline multilingual embeddings (`intfloat/multilingual-e5-small`) with automatic local caching, or Google Gemini embeddings.
 * **LLM Engine:** OpenAI-compatible adapter (`OpenAILike`) with dynamic multi-tier routing and cascading fallback.
