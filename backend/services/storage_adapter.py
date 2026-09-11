@@ -70,6 +70,24 @@ def get_s3_client():
             config=s3_config,
         )
         logger.info(f"[StorageAdapter] Successfully initialized S3 client for endpoint: {endpoint_url}")
+
+        # Automatically verify and create bucket if missing (ideal for local MinIO & testing)
+        try:
+            b_name = get_bucket_name()
+            _S3_CLIENT.head_bucket(Bucket=b_name)
+        except Exception:
+            try:
+                if region in ("us-east-1", "auto", ""):
+                    _S3_CLIENT.create_bucket(Bucket=b_name)
+                else:
+                    _S3_CLIENT.create_bucket(
+                        Bucket=b_name,
+                        CreateBucketConfiguration={"LocationConstraint": region},
+                    )
+                logger.info(f"[StorageAdapter] Automatically created S3 bucket '{b_name}' on {endpoint_url}")
+            except Exception as be:
+                logger.debug(f"[StorageAdapter] Bucket check/create note: {be}")
+
         return _S3_CLIENT
     except ImportError:
         logger.warning("[StorageAdapter] 'boto3' library is not installed. Run: pip install boto3")

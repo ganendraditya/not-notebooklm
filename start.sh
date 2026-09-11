@@ -8,20 +8,20 @@ cd "$ROOT_DIR"
 # Secret Management Resolution
 # ------------------------------------------------------------------------------
 if [ -n "$DOPPLER_ENVIRONMENT" ]; then
-    echo "🔒 Secret Management: Injected via Doppler (Config: $DOPPLER_CONFIG / Env: $DOPPLER_ENVIRONMENT)"
+    echo "[Security] Secrets injected via Doppler (Config: $DOPPLER_CONFIG / Env: $DOPPLER_ENVIRONMENT)"
 elif [ -n "$INFISICAL_PROJECT_ID" ] || [ -n "$INFISICAL_ENV" ]; then
-    echo "🔒 Secret Management: Injected via Infisical"
+    echo "[Security] Secrets injected via Infisical"
 elif [ -f "backend/.env" ]; then
-    echo "📄 Secret Management: Loaded from local backend/.env"
+    echo "[Config] Secrets loaded from local backend/.env"
 else
     # If no backend/.env exists, check if Doppler is installed and configured
     if command -v doppler &> /dev/null && [ -n "$(doppler configure get project --plain 2>/dev/null)" ]; then
-        echo "💡 No backend/.env found, but Doppler is configured."
-        echo "🔒 Starting application with Doppler secret injection..."
+        echo "[Notice] No backend/.env found, but Doppler is configured."
+        echo "[Security] Launching application with Doppler secret injection..."
         exec doppler run -- "$0" "$@"
     else
-        echo "⚠️  Notice: backend/.env not found and no Secret Manager active."
-        echo "   Please create backend/.env from backend/.env.example or run with 'doppler run -- ./start.sh'."
+        echo "[Notice] backend/.env not found and no Secret Manager active."
+        echo "         Please create backend/.env from backend/.env.example or run with 'doppler run -- ./start.sh'."
     fi
 fi
 
@@ -40,9 +40,9 @@ npm run dev &
 FRONTEND_PID=$!
 
 echo "========================================="
-echo "✅ Servers are starting up!"
-echo "➡️  Frontend (UI): http://localhost:3000"
-echo "➡️  Backend (API): http://localhost:8000"
+echo "Servers are starting up:"
+echo "- Frontend (UI): http://localhost:3000"
+echo "- Backend (API): http://localhost:8000"
 echo "========================================="
 
 # Wait for both processes to keep the script running
