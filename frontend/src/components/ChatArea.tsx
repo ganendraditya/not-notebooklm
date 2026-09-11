@@ -136,10 +136,21 @@ export default function ChatArea({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputWrapperRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef<boolean>(true);
+  const isAutoScrollingRef = useRef<boolean>(false);
+  const autoScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState<boolean>(false);
   const [inputHeight, setInputHeight] = useState<number>(144);
 
   const isChatEmpty = messages.length === 0;
+
+  // Clean up programmatic scroll timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoScrollTimeoutRef.current) {
+        clearTimeout(autoScrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Dynamically observe input bar height changes (e.g. multi-row prompt expansions, attachments, or collapses)
   // Ensures messages are NEVER obscured by the floating input bar at the bottom, just like ChatGPT/Claude.
@@ -154,11 +165,11 @@ export default function ChatArea({
           setInputHeight((prevH) => {
             const newH = Math.round(h);
             if (newH !== prevH) {
+              const diff = newH - prevH;
               const container = scrollContainerRef.current;
-              if (container && isAtBottomRef.current) {
-                const diff = newH - prevH;
+              if (container && isAtBottomRef.current && !isAutoScrollingRef.current && diff > 0) {
                 requestAnimationFrame(() => {
-                  if (container && isAtBottomRef.current) {
+                  if (container && isAtBottomRef.current && !isAutoScrollingRef.current) {
                     container.scrollTop += diff;
                   }
                 });
@@ -186,6 +197,8 @@ export default function ChatArea({
   // As soon as the user gestures UP, immediately release scroll lock
   // BEFORE the fast streaming token updates can yank the user back down!
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    isAutoScrollingRef.current = false;
+    if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
     if (e.deltaY < 0) {
       // User is scrolling up
       isAtBottomRef.current = false;
@@ -206,6 +219,8 @@ export default function ChatArea({
   // Track touch gestures on mobile/tablets
   const touchStartYRef = useRef<number | null>(null);
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    isAutoScrollingRef.current = false;
+    if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
     touchStartYRef.current = e.touches[0].clientY;
   }, []);
 
@@ -225,6 +240,17 @@ export default function ChatArea({
     const container = scrollContainerRef.current;
     if (!container) return;
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+
+    // During programmatic smooth scrolling to bottom, suppress button re-appearance
+    if (isAutoScrollingRef.current) {
+      if (distanceFromBottom <= 30) {
+        isAutoScrollingRef.current = false;
+        isAtBottomRef.current = true;
+        setShowScrollBottom(false);
+      }
+      return;
+    }
+
     if (distanceFromBottom > 30) {
       isAtBottomRef.current = false;
       setShowScrollBottom(!isChatEmpty);
@@ -235,14 +261,28 @@ export default function ChatArea({
   }, [isChatEmpty]);
 
   const scrollToBottom = useCallback(() => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({
-        top: scrollContainerRef.current.scrollHeight,
-        behavior: "smooth"
-      });
-      isAtBottomRef.current = true;
-      setShowScrollBottom(false);
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    isAutoScrollingRef.current = true;
+    setShowScrollBottom(false);
+
+    if (autoScrollTimeoutRef.current) {
+      clearTimeout(autoScrollTimeoutRef.current);
     }
+    // Safety release after smooth scrolling finishes
+    autoScrollTimeoutRef.current = setTimeout(() => {
+      isAutoScrollingRef.current = false;
+      if (scrollContainerRef.current) {
+        const c = scrollContainerRef.current;
+        isAtBottomRef.current = (c.scrollHeight - c.scrollTop - c.clientHeight) <= 30;
+      }
+    }, 800);
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth"
+    });
   }, []);
 
   // Close top menu on outside click
@@ -720,10 +760,7 @@ export default function ChatArea({
 
       {/* Floating Gradient Backdrop for Input (width capped to input box width only, zero side overflow) */}
       {!isChatEmpty && (
-        <div 
-          ref={inputWrapperRef}
-          className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-10"
-        >
+        <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-10">
           <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pointer-events-none min-w-0 relative">
             <div className="absolute inset-x-0 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             {showScrollBottom && (
@@ -738,7 +775,7 @@ export default function ChatArea({
                 </button>
               </div>
             )}
-            <div className="pointer-events-auto">
+            <div ref={inputWrapperRef} className="pointer-events-auto">
               <ChatInputBox 
                 isLoading={isLoading}
                 documentsCount={documents.length}
