@@ -4,36 +4,34 @@ An open-source academic research assistant and document workspace designed to ru
 
 ![NotbookLM Workspace](docs/assets/workspace-preview.png)
 
-Instead of relying on proprietary cloud lock-in, NotbookLM operates locally by default—combining embedded relational storage (SQLite), in-process vector indexing (Qdrant), and local file processing. It autonomously retrieves, filters, and synthesizes scholarly publications from global academic repositories—including **OpenAlex**, **Crossref**, **arXiv**, **Unpaywall**, and scholarly web fallbacks—delivering structured comparative matrices and grounded citations linked directly to source manuscripts.
+Instead of relying on proprietary cloud lock-in, NotbookLM operates locally by default—combining embedded relational storage (SQLite), in-process vector indexing (Qdrant), and local file processing. It streamlines retrieval, filtering, and synthesis of scholarly publications from global academic repositories—including **OpenAlex**, **Crossref**, **arXiv**, **Unpaywall**, and web fallbacks—delivering structured comparative matrices and grounded citations linked directly to source papers.
 
-Internet connectivity is utilized for live academic searches, external LLM APIs, and optional cloud services (Cloudflare R2, Doppler). However, the workspace can also run completely offline for self-uploaded documents when paired with a local model engine (such as Ollama) and the built-in local embedding model.
+Internet connectivity is required out-of-the-box for live academic discovery, PDF resolution, and external LLM APIs. If you need a fully offline or private setup for self-uploaded documents, you can manually configure your own local inference stack—such as pointing `LLM_BASE_URL` to a local runner (e.g., Ollama, vLLM) and caching embedding weights locally.
 
 ### Highlights
 
 * **Automated Literature Discovery:** Queries global academic registries (OpenAlex, Crossref, and web fallbacks) with iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
-* **Authentic PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent resolvers (arXiv, Unpaywall, OpenAlex) while enriching paper records with journal quartiles and citation counts.
+* **Full-Text PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent resolvers (arXiv, Unpaywall, OpenAlex) while enriching paper records with journal quartiles and citation counts.
 * **Grounded Synthesis & Matrix Tables:** Produces comparative literature review matrices with cell-level citation tagging, mitigating hallucinations by grounding claims directly in retrieved excerpts.
 * **Interactive Document Reader:** Split-pane interface featuring bidirectional citation navigation—click any citation badge to jump to and highlight the exact passage in the source PDF or document.
-* **Local-First with Modular Scale:** Runs on a personal workstation with zero required cloud accounts. Operates offline for uploaded documents and local LLMs, while supporting live academic discovery, S3 storage (Cloudflare R2, MinIO), and Doppler secret management when online.
+* **Local-First Architecture:** Runs on your local machine with zero mandatory cloud accounts. Supports bring-your-own local models (e.g., Ollama) or any OpenAI-compatible API endpoint, with optional S3 storage (Cloudflare R2, MinIO).
 
 ---
 
 ## Workflow & Core Capabilities
 
-### 1. Literature Discovery & Candidate Acquisition
-Search across OpenAlex, Crossref, and academic sources. NotbookLM filters candidates based on relevance rubrics and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select and batch-import papers directly into the workspace.
+### 1. Literature Discovery & Paper Retrieval
+Search across OpenAlex, Crossref, and academic sources. NotbookLM filters candidates based on relevance screening and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select and batch-import papers directly into the workspace.
 
 ![Literature Discovery](docs/assets/literature-discovery.png)
 
-### 2. Intelligent Source Management & Dual Ingestion
+### 2. Intelligent Source Management (PDF vs. Metadata)
 Imported papers appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
-* **`PDF` badge:** The authentic, open-access full-text manuscript was successfully discovered and downloaded via concurrent resolvers (arXiv, Unpaywall, OpenAlex).
-* **`TXT` badge:** Full-text PDF was behind paywalls or unavailable; NotbookLM gracefully acquired and indexed verified metadata and abstracts to maintain comprehensive coverage.
-
-![Sources Management](docs/assets/sources-panel.png)
+* **`PDF` badge:** The open-access full-text PDF was successfully located and downloaded via concurrent resolvers (arXiv, Unpaywall, OpenAlex).
+* **`TXT` badge:** Full-text PDF was behind paywalls or unavailable; NotbookLM indexed verified metadata and abstracts to maintain comprehensive coverage.
 
 ### 3. Integrated Document & PDF Viewer
-Inspect full manuscripts without leaving the workspace. The built-in document reader renders original publications—including multi-column formatting, figures, and publication venues (such as *Nature Communications*)—alongside structured plain-text extracts.
+Inspect full manuscripts directly within the workspace. The built-in document reader provides a dual-view experience: stream and read the authentic publication PDF, or switch to the extracted full-text view for citation navigation and quick reading.
 
 ### 4. Grounded Synthesis & Bidirectional Citation Highlighting
 Synthesize multiple papers into comparative review matrices. Each finding is tagged with traceable citation badges (`[6]`, `[7]`, `[8]`). Clicking any citation opens the document reader and automatically scrolls to highlight the exact supporting sentence in the source text.
@@ -146,7 +144,7 @@ LLM_FALLBACK_MODEL=gpt-4o-mini
 
 ## Storage Configuration (Local Disk & S3 Object Storage)
 
-NotbookLM supports decoupled storage. Files can be stored on the local filesystem or synced with an S3-compatible Object Storage provider (such as Cloudflare R2 or MinIO).
+Files can be stored directly on the local disk or synced to an S3-compatible Object Storage provider (such as Cloudflare R2, MinIO, or AWS S3).
 
 ### Configuration (`backend/.env`)
 
@@ -154,84 +152,27 @@ NotbookLM supports decoupled storage. Files can be stored on the local filesyste
 ```env
 STORAGE_TYPE=local
 ```
-Files are stored directly in `uploads/` and `uploads/chat_media/`. Suitable for local development and offline use.
+Files are stored directly in `uploads/` and `uploads/chat_media/`.
 
-#### Option 2: Cloudflare R2
+#### Option 2: S3-Compatible Storage (Cloudflare R2, MinIO, AWS S3)
 ```env
 STORAGE_TYPE=s3
-S3_ENDPOINT_URL=https://<your_account_id>.r2.cloudflarestorage.com
-S3_ACCESS_KEY_ID=your_r2_access_key_id
-S3_SECRET_ACCESS_KEY=your_r2_secret_access_key
+S3_ENDPOINT_URL=https://<account_id>.r2.cloudflarestorage.com  # or http://localhost:9000 for MinIO
+S3_ACCESS_KEY_ID=your_access_key_id
+S3_SECRET_ACCESS_KEY=your_secret_access_key
 S3_BUCKET_NAME=not-notebooklm
-S3_REGION=auto
-```
-*Setup instructions:*
-1. In Cloudflare Dashboard, navigate to **R2 Object Storage** and create a bucket (e.g., `not-notebooklm`).
-2. Go to **Manage R2 API Tokens** and create a token with **Object Read & Write** permissions.
-3. Copy the Account ID endpoint URL, Access Key ID, and Secret Access Key.
-
-#### Option 3: MinIO (Self-Hosted S3)
-```env
-STORAGE_TYPE=s3
-S3_ENDPOINT_URL=http://localhost:9000
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
-S3_BUCKET_NAME=not-notebooklm
-S3_REGION=us-east-1
-```
-*Run MinIO locally via Docker:*
-```bash
-docker run -d -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
+S3_REGION=auto  # or us-east-1
 ```
 
 ---
 
 ## Secret Management
 
-NotbookLM supports three methods for managing credentials and environment variables.
-
-#### Option 1: Standard `.env` File (Default)
+Populate your credentials into `backend/.env`:
 ```bash
 cp backend/.env.example backend/.env
 ```
-Populate your credentials directly into `backend/.env`. The application reads variables via standard environment lookups. Suitable for personal development and offline use.
-
-#### Option 2: Doppler (Cloud Secret Management)
-Store credentials in a cloud vault and inject them directly into process memory without keeping secret files on disk.
-
-1. **Install Doppler CLI:**
-   ```bash
-   brew install dopplerhq/cli/doppler
-   doppler login
-   ```
-2. **Link repository:**
-   ```bash
-   doppler setup
-   ```
-   Select project `not-notebooklm` and config `dev`.
-3. **Upload secrets:**
-   ```bash
-   doppler secrets upload backend/.env
-   ```
-4. **Run NotbookLM:**
-   ```bash
-   doppler run -- ./start.sh
-   ```
-   *Note: If `backend/.env` is not present, `./start.sh` automatically uses Doppler secret injection if configured.*
-
-#### Option 3: Infisical (Self-Hosted Secret Vault)
-Store credentials in a self-hosted vault for air-gapped environments and strict compliance.
-
-1. **Install Infisical CLI:**
-   ```bash
-   brew install infisical/get-cli/infisical
-   infisical login
-   ```
-2. **Link and run:**
-   ```bash
-   infisical init
-   infisical run -- ./start.sh
-   ```
+The application reads configuration through standard environment variables. If you prefer managing credentials without plaintext `.env` files, `./start.sh` also supports injecting secrets via external secret managers such as [Doppler](https://www.doppler.com) (`doppler run -- ./start.sh`) or [Infisical](https://infisical.com).
 
 ---
 
@@ -239,10 +180,10 @@ Store credentials in a self-hosted vault for air-gapped environments and strict 
 
 * **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS, Zustand State Management, Base UI.
 * **Backend:** FastAPI, SQLAlchemy (SQLite), LlamaIndex.
-* **Storage:** Unified Storage Adapter supporting Local Disk and S3-compatible Object Storage (Cloudflare R2, MinIO).
+* **Storage:** Unified Storage Adapter supporting Local Disk and S3-compatible Object Storage (Cloudflare R2, MinIO, AWS S3).
 * **Vector Store:** Qdrant (supports remote Docker instance or embedded local disk fallback).
-* **Embeddings:** Local offline multilingual embeddings (`intfloat/multilingual-e5-small`) with automatic local caching, or Google Gemini embeddings.
-* **LLM Engine:** OpenAI-compatible adapter (`OpenAILike`) with dynamic multi-tier routing and cascading fallback.
+* **Embeddings:** Local multilingual embeddings (`intfloat/multilingual-e5-small`) or Google Gemini embeddings.
+* **LLM Engine:** OpenAI-compatible adapter (`OpenAILike`) with tiered model roles and automatic error fallback.
 
 ---
 
