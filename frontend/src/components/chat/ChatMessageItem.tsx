@@ -19,7 +19,7 @@ import {
   Table
 } from "lucide-react";
 import { ChatMessage } from "@/stores/chatStore";
-import { Document as DocType, registerPendingCancelCallback, unregisterPendingCancelCallback } from "@/stores/documentStore";
+import { Document as DocType, registerPendingCancelCallback, unregisterPendingCancelCallback, useDocumentStore } from "@/stores/documentStore";
 import { parseCitationsInReactNode, CitationContext, enhanceTableCitations } from "./CitationParser";
 import { useTranslation } from "@/lib/i18n";
 import { consumeSSEStream } from "@/lib/sse";
@@ -400,16 +400,23 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   const activeItemControllersRef = useRef<Map<string, AbortController>>(new Map());
   const cancelledPendingIdsRef = useRef<Set<string>>(new Set());
   const isBatchCancelledRef = useRef<boolean>(false);
+  const pendingItemsRef = useRef<{ id: string }[]>([]);
 
   useEffect(() => {
     isMountedRef.current = true;
     const controllersMap = activeItemControllersRef.current;
     return () => {
       isMountedRef.current = false;
+      isBatchCancelledRef.current = true;
       controllersMap.forEach(c => c.abort());
       controllersMap.clear();
+      pendingItemsRef.current.forEach(p => {
+        unregisterPendingCancelCallback(p.id);
+        onResolvePendingSource?.(p.id);
+      });
+      pendingItemsRef.current = [];
     };
-  }, []);
+  }, [onResolvePendingSource]);
 
   const handleImport = async () => {
     const toImport = sources.filter((src, i) => !isDuplicateSource(src) && isSourceChecked(src, i));
@@ -430,6 +437,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       doi: src.doi,
       status: "uploading" as const,
     }));
+    pendingItemsRef.current = pendingItems;
     onAddPendingSources?.(pendingItems);
 
     let currentChatId = activeChatId;
@@ -503,23 +511,27 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             signal: itemController.signal
           });
 
-          if (res.ok) {
-            await consumeSSEStream(res, (data: any) => {
-              if (cancelledPendingIdsRef.current.has(pending.id) || isBatchCancelledRef.current) return;
-
-              if (data.type === "progress" && data.doc) {
-                createdDocId = data.doc.id;
-                if (!cancelledPendingIdsRef.current.has(pending.id) && !isBatchCancelledRef.current) {
-                  onDocumentAdded?.(data.doc as DocType, currentChatId || undefined);
-                }
-              }
-            });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => null);
+            throw new Error(errData?.detail || `Server returned ${res.status}`);
           }
+
+          await consumeSSEStream(res, (data: any) => {
+            if (cancelledPendingIdsRef.current.has(pending.id) || isBatchCancelledRef.current) return;
+
+            if (data.type === "progress" && data.doc) {
+              createdDocId = data.doc.id;
+              if (!cancelledPendingIdsRef.current.has(pending.id) && !isBatchCancelledRef.current) {
+                onDocumentAdded?.(data.doc as DocType, currentChatId || undefined);
+              }
+            }
+          });
         } catch (err: any) {
           if (err.name === "AbortError" || cancelledPendingIdsRef.current.has(pending.id)) {
             // If aborted, delete any created document from backend so zero trace remains
             if (createdDocId && currentChatId) {
               fetch(`${backendUrl}/chats/${currentChatId}/documents/${createdDocId}`, { method: "DELETE" }).catch(() => {});
+              useDocumentStore.getState().updateDocumentsList(prev => prev.filter(d => d.id !== createdDocId));
             }
           } else {
             console.error("Import source failed:", err);
@@ -544,6 +556,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         onResolvePendingSource?.(p.id);
         unregisterPendingCancelCallback(p.id);
       });
+      pendingItemsRef.current = [];
       activeItemControllersRef.current.clear();
       if (isMountedRef.current) {
         setIsImporting(false);

@@ -118,9 +118,13 @@ export function useDocumentManager({
   };
 
   const cancelPendingSource = (pendingId: string) => {
-    upload.cancelUpload(pendingId);
-    doi.cancelDoi(pendingId);
-    onCancelPendingSource?.(pendingId);
+    if (upload.internalPendingSources.some(p => p.id === pendingId)) {
+      upload.cancelUpload(pendingId);
+    } else if (doi.doiPendingSources.some(p => p.id === pendingId)) {
+      doi.cancelDoi(pendingId);
+    } else {
+      onCancelPendingSource?.(pendingId);
+    }
   };
 
   return {

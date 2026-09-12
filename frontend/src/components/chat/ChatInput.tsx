@@ -68,6 +68,27 @@ export const ChatInputBox = memo(function ChatInputBox({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const activeUploadControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const attachmentsRef = useRef<Attachment[]>([]);
+  attachmentsRef.current = attachments;
+
+  const revokeBlobUrl = (url?: string) => {
+    if (url && url.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  useEffect(() => {
+    const controllers = activeUploadControllersRef.current;
+    return () => {
+      attachmentsRef.current.forEach(a => revokeBlobUrl(a.previewUrl));
+      controllers.forEach(c => c.abort());
+      controllers.clear();
+    };
+  }, []);
 
   useEffect(() => {
     const controllers = activeUploadControllersRef.current;
@@ -302,6 +323,7 @@ export const ChatInputBox = memo(function ChatInputBox({
     }
     
     if (!targetChatId) {
+      stagedAttachments.forEach(s => revokeBlobUrl(s.previewUrl));
       setAttachments(prev => prev.filter(a => !stagedAttachments.some(s => s.id === a.id)));
       setIsUploading(false);
       return;
@@ -347,15 +369,17 @@ export const ChatInputBox = memo(function ChatInputBox({
               });
             }
           } else {
+            revokeBlobUrl(staged.previewUrl);
             setAttachments(prev => prev.filter(a => a.id !== staged.id));
             showAttachmentError(`Failed to upload "${file.name}".`);
           }
         } catch (e: any) {
+          revokeBlobUrl(staged.previewUrl);
           if (e.name !== "AbortError") {
             console.error("Failed to upload file:", e);
-            setAttachments(prev => prev.filter(a => a.id !== staged.id));
             showAttachmentError(`Failed to upload "${file.name}".`);
           }
+          setAttachments(prev => prev.filter(a => a.id !== staged.id));
         } finally {
           activeUploadControllersRef.current.delete(staged.id!);
         }
@@ -426,6 +450,7 @@ export const ChatInputBox = memo(function ChatInputBox({
     const readyAttachments = attachments.filter(a => !a.isUploading && Boolean(a.url));
     onSubmit(finalMessage, readyAttachments.length > 0 ? readyAttachments : undefined);
     setInput("");
+    attachments.forEach(a => revokeBlobUrl(a.previewUrl));
     setAttachments([]);
     onClearTargetedSource?.();
     if (textareaRef.current) {

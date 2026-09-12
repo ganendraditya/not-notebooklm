@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Document, PendingSourceItem } from "@/stores/documentStore";
 
 export function useDocumentUpload({
@@ -17,6 +17,16 @@ export function useDocumentUpload({
   const [internalPendingSources, setInternalPendingSources] = useState<PendingSourceItem[]>([]);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const cancelledIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const controllers = abortControllersRef.current;
+    const cancelled = cancelledIdsRef.current;
+    return () => {
+      controllers.forEach(controller => controller.abort());
+      controllers.clear();
+      cancelled.clear();
+    };
+  }, []);
 
   const cancelUpload = (sourceId: string) => {
     cancelledIdsRef.current.add(sourceId);
@@ -51,9 +61,9 @@ export function useDocumentUpload({
         signal: controller.signal
       });
       
-      if (res.ok && onDocumentAdded) {
+      if (res.ok) {
         const newDoc = await res.json();
-        onDocumentAdded(newDoc, chatId);
+        onDocumentAdded?.(newDoc, chatId);
         setInternalPendingSources(prev => prev.filter(p => p.id !== sourceId));
       } else {
         const errorData = await res.json().catch(() => ({}));
@@ -69,6 +79,7 @@ export function useDocumentUpload({
       ));
     } finally {
       abortControllersRef.current.delete(sourceId);
+      cancelledIdsRef.current.delete(sourceId);
     }
   };
 

@@ -73,16 +73,10 @@ function isInsideInnerScrollContainer(
   }
   let curr: Element | null = target;
   while (curr && curr !== rootContainer) {
-    if (curr instanceof HTMLElement) {
+    if (curr instanceof HTMLElement && curr.scrollHeight > curr.clientHeight) {
       const style = window.getComputedStyle(curr);
       const overflowY = style.overflowY;
-      const overflowX = style.overflowX;
-      if (
-        overflowY === "auto" ||
-        overflowY === "scroll" ||
-        overflowX === "auto" ||
-        overflowX === "scroll"
-      ) {
+      if (overflowY === "auto" || overflowY === "scroll") {
         return true;
       }
     }

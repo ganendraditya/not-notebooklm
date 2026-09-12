@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Document, PendingSourceItem } from "@/stores/documentStore";
 
 export function useDocumentDoi({
@@ -16,8 +16,20 @@ export function useDocumentDoi({
 }) {
   const [doiPendingSources, setDoiPendingSources] = useState<PendingSourceItem[]>([]);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const cancelledIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const controllers = abortControllersRef.current;
+    const cancelled = cancelledIdsRef.current;
+    return () => {
+      controllers.forEach(c => c.abort());
+      controllers.clear();
+      cancelled.clear();
+    };
+  }, []);
 
   const cancelDoi = (sourceId: string) => {
+    cancelledIdsRef.current.add(sourceId);
     const controller = abortControllersRef.current.get(sourceId);
     if (controller) {
       controller.abort();
@@ -27,6 +39,11 @@ export function useDocumentDoi({
   };
 
   const importDoi = async (chatId: string, doi: string, sourceId: string) => {
+    if (cancelledIdsRef.current.has(sourceId)) {
+      setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+      return;
+    }
+
     const controller = new AbortController();
     abortControllersRef.current.set(sourceId, controller);
 
@@ -47,11 +64,21 @@ export function useDocumentDoi({
         throw new Error(err.detail || "Failed to process DOI.");
       }
 
+      if (controller.signal.aborted || cancelledIdsRef.current.has(sourceId)) {
+        setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+        return;
+      }
+
       const doc = await res.json();
+      if (controller.signal.aborted || cancelledIdsRef.current.has(sourceId)) {
+        setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+        return;
+      }
+
       onDocumentAdded?.(doc, chatId);
       setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
     } catch (error: any) {
-      if (error.name === "AbortError") {
+      if (error.name === "AbortError" || controller.signal.aborted || cancelledIdsRef.current.has(sourceId)) {
         setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
         return;
       }
@@ -60,6 +87,7 @@ export function useDocumentDoi({
       ));
     } finally {
       abortControllersRef.current.delete(sourceId);
+      cancelledIdsRef.current.delete(sourceId);
     }
   };
 

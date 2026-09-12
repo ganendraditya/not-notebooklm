@@ -41,13 +41,14 @@ export const generateCitations = (
     return `${last}, ${initials}`;
   };
 
-  const apaAuthors = hasAuthors
-    ? validAuthors.length === 1
-      ? formatApaAuthor(validAuthors[0])
-      : validAuthors.length === 2
-      ? `${formatApaAuthor(validAuthors[0])}, & ${formatApaAuthor(validAuthors[1])}`
-      : `${validAuthors.slice(0, -1).map(formatApaAuthor).join(", ")}, & ${formatApaAuthor(validAuthors[validAuthors.length - 1])}`
-    : "";
+  const formatApaAuthorsList = (list: string[]) => {
+    if (list.length === 0) return "";
+    if (list.length === 1) return formatApaAuthor(list[0]);
+    if (list.length === 2) return `${formatApaAuthor(list[0])}, & ${formatApaAuthor(list[1])}`;
+    return `${list.slice(0, -1).map(formatApaAuthor).join(", ")}, & ${formatApaAuthor(list[list.length - 1])}`;
+  };
+
+  const apaAuthors = hasAuthors ? formatApaAuthorsList(validAuthors) : "";
 
   // Helper for IEEE authors (Initials Last)
   const formatIeeeAuthor = (a: string) => {
@@ -92,12 +93,14 @@ export const generateCitations = (
     : `${cleanTitle}, ${harvardYear}.${harvardJournalPart}${harvardUrlPart}`;
 
   // 4. MLA 9th Edition
-  const mlaYearPart = cleanYear ? ` ${cleanYear}` : "";
-  const mlaJournalPart = cleanJournal ? ` ${cleanJournal},` : "";
+  const mlaContainerParts: string[] = [];
+  if (cleanJournal) mlaContainerParts.push(cleanJournal);
+  if (cleanYear) mlaContainerParts.push(cleanYear);
+  const mlaMiddle = mlaContainerParts.length > 0 ? ` ${mlaContainerParts.join(", ")}.` : "";
   const mlaDoiPart = doiUrl ? ` ${doiUrl}.` : "";
   const mla = hasAuthors
-    ? `${fullAuthors}. "${cleanTitle}."${mlaJournalPart}${mlaYearPart}.${mlaDoiPart}`
-    : `"${cleanTitle}."${mlaJournalPart}${mlaYearPart}.${mlaDoiPart}`;
+    ? `${fullAuthors}. "${cleanTitle}."${mlaMiddle}${mlaDoiPart}`
+    : `"${cleanTitle}."${mlaMiddle}${mlaDoiPart}`;
 
   // 5. Chicago
   const chicagoYearPart = cleanYear ? ` (${cleanYear})` : " (n.d.)";
