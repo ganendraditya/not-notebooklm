@@ -11,7 +11,7 @@ import SearchChatsView from "@/components/SearchChatsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useTranslation } from "@/lib/i18n";
-import { useChatStore, type ChatSession, type ChatMessage } from "@/stores/chatStore";
+import { useChatStore } from "@/stores/chatStore";
 import { useDocumentStore, type Document, type PendingSourceItem } from "@/stores/documentStore";
 import { useUIStore } from "@/stores/uiStore";
 
@@ -33,7 +33,7 @@ export default function ChatClient() {
   const {
     documents, setDocuments, pendingSources, setPendingSources,
     targetedSource, setTargetedSource, viewingDoc, setViewingDoc,
-    groundingHighlight, setGroundingHighlight, addDocument,
+    groundingHighlight, setGroundingHighlight,
     updateDocumentsList, updatePendingSourcesList
   } = useDocumentStore();
 
@@ -46,7 +46,7 @@ export default function ChatClient() {
   const activeChatIdRef = useRef<string | null>(null);
 
   // Bridge getChatJob to useChatSession cleanly without cyclical dependency or object monkey-patching
-  const getChatJobRef = useRef<(id: string) => ChatJobState>((id: string) => ({
+  const getChatJobRef = useRef<(id: string) => ChatJobState>(() => ({
     controller: null,
     queue: [],
     isProcessing: false,

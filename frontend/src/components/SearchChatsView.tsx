@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, MessageSquare, Sidebar, X, ArrowUpDown, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Search, MessageSquare, Sidebar, X } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
 
 interface SearchChatsViewProps {
   sessions: ChatSession[];
-  backendUrl: string;
+  backendUrl?: string;
   isSidebarOpen: boolean;
   onOpenSidebar: () => void;
   onSelectChat: (chatId: string) => void;
@@ -17,7 +16,6 @@ interface SearchChatsViewProps {
 
 export default function SearchChatsView({
   sessions,
-  backendUrl,
   isSidebarOpen,
   onOpenSidebar,
   onSelectChat

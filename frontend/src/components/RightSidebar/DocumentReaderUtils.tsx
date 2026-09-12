@@ -1,5 +1,4 @@
-﻿import { ReactNode } from "react";
-import React from "react";
+﻿import React from "react";
 
 export const cleanHtmlAbstract = (raw?: string): string => {
   if (!raw) return "";
@@ -600,7 +599,7 @@ export const formatReadableDate = (dateStr?: string, yearFallback?: string) => {
         year: "numeric"
       });
     }
-  } catch (e) {
+  } catch {
     // fallback
   }
   return dateStr;

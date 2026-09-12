@@ -7,15 +7,13 @@ import {
   MoreHorizontal, 
   Pencil, 
   Trash2, 
-  Pin,
-  PinOff,
-  Check, 
-  X,
-  SquarePen,
-  Search,
-  Sparkles,
-  Settings,
-  FolderArchive
+  Pin, 
+  PinOff, 
+  SquarePen, 
+  Search, 
+  Sparkles, 
+  Settings, 
+  FolderArchive 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -56,11 +54,9 @@ export default function LeftSidebar({
   const [chatToRename, setChatToRename] = useState<ChatSession | null>(null);
   const [renameTitleInput, setRenameTitleInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<ChatSession | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -82,13 +78,6 @@ export default function LeftSidebar({
       }, 50);
     }
   }, [chatToRename]);
-
-  // Focus search input when search is opened
-  useEffect(() => {
-    if (isSearching) {
-      searchInputRef.current?.focus();
-    }
-  }, [isSearching]);
 
   const handleStartRename = (session: ChatSession, e: React.MouseEvent) => {
     e.stopPropagation();

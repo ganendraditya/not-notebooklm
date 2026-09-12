@@ -347,7 +347,7 @@
   "right.overviewTab": "Ikhtisar",
   "right.fullText": "Teks Lengkap",
   "right.originalDoc": "Dokumen Asli",
-  "right.originalDocNotAvail": "Pratinjau dokumen asli tidak tersedia untuk sumber ini (Hanya metadata & abstrak).",
+  "right.originalDocNotAvail": "Pratinjau dokumen asli tidak tersedia untuk sumber ini.",
   "right.originalDocNotFound": "Berkas dokumen asli tidak ditemukan.",
   "right.openInNewTab": "Buka di tab baru",
   "right.openOfficialPublisher": "Buka Halaman Resmi Penerbit",

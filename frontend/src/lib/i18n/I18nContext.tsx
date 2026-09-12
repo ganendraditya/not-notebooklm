@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { languages } from './languages';
 import enTranslations from './locales/en.json';
 
 type LocaleDict = Record<string, string>;
@@ -169,6 +168,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   };
 
   const t = useCallback((key: string, variables?: Record<string, string>) => {
+    if (activeLanguage || localeVersion) {
+      // Intentionally reference to recompute on language switch
+    }
     return getSystemTranslation(key, variables);
   }, [activeLanguage, localeVersion]);
 

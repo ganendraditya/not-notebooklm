@@ -1,7 +1,6 @@
 ﻿import React from "react";
 import {
   ArrowLeft,
-  X,
   PanelRight,
   MessageSquare,
   Quote,
@@ -36,15 +35,12 @@ export interface DocumentReaderProps {
   activeMatchIndex: number;
   navigateMatch: (direction: "next" | "prev") => void;
   getHighlightedContent: () => React.ReactNode;
-  cleanAbstract: string;
   authorsStr: string;
   pubDateStr: string;
-  journalName: string;
-  citationsCount: number;
   landingUrl: string;
   title: string;
   copiedLink: boolean;
-  copyToClipboard: (text: string, type: "doi" | "link" | "citation") => void;
+  copyToClipboard: (text: string, type?: "doi" | "link" | "citation") => void;
   setIsCiteModalOpen: (isOpen: boolean) => void;
 }
 
@@ -65,11 +61,8 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
   activeMatchIndex,
   navigateMatch,
   getHighlightedContent,
-  cleanAbstract,
   authorsStr,
   pubDateStr,
-  journalName,
-  citationsCount,
   landingUrl,
   title,
   copiedLink,
@@ -82,7 +75,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
   return (
     <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 z-10 transition-all relative text-app-text">
       {/* 1. Header Bar: Pinned Breadcrumb Header */}
-      <div className="w-full h-[52px] px-4 flex items-center justify-between border-b border-app-border shrink-0">
+      <div className="w-full h-[52px] pl-4 pr-3 flex items-center justify-between border-b border-app-border shrink-0">
         <button
           onClick={() => {
             setViewingDoc(null);
@@ -177,12 +170,6 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
               <div className="max-w-2xl mx-auto min-h-full p-4 space-y-4 animate-pulse">
                 {/* Skeleton Paper Card */}
                 <div className="p-4 sm:p-5 rounded-xl bg-app-card border border-app-border space-y-4">
-                  {/* Skeleton Top Status Banner */}
-                  <div className="p-3.5 rounded-lg bg-app-item-hover/50 space-y-2">
-                    <div className="h-4 w-40 rounded bg-app-divider/60" />
-                    <div className="h-3 w-5/6 rounded bg-app-divider/40" />
-                  </div>
-
                   {/* Paper Title & Badges */}
                   <div className="pb-3 border-b border-app-divider space-y-3">
                     <div className="flex items-center gap-2">
@@ -212,25 +199,6 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
             <div className="max-w-2xl mx-auto min-h-full p-4">
               {/* Top Meta Section */}
               <div className="bg-app-surface border border-app-border rounded-xl mb-4 overflow-hidden shadow-sm">
-                
-                {isAcademicPaper && (
-                  paperDetails?.has_full_pdf ? (
-                    <div className="px-5 py-4 border-b border-app-border bg-emerald-500/10">
-                      <div className="flex items-center gap-2 text-emerald-500 font-medium text-sm">
-                        <Check size={16} className="stroke-[2.5]" />
-                        <span>Full Manuscript Verified</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="px-5 py-4 border-b border-app-border bg-amber-500/10">
-                      <div className="flex items-center gap-2 text-amber-500 font-medium text-sm">
-                        <FileText size={16} className="stroke-[2.5]" />
-                        <span>Abstract & Metadata Only</span>
-                      </div>
-                    </div>
-                  )
-                )}
-
                 <div className="px-5 py-6 space-y-4">
                   <div className="flex flex-wrap items-center gap-3 text-xs mb-3">
                     <div className="flex items-center gap-2 text-app-text-muted">

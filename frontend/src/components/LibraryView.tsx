@@ -1,7 +1,6 @@
 "use client";
 
 import { Sidebar } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useTranslation } from "@/lib/i18n";
 import LibraryBrowser, { type LibraryItem } from "@/components/library/LibraryBrowser";

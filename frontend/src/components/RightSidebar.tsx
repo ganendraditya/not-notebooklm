@@ -1,12 +1,13 @@
-﻿import { DocumentReader } from "./RightSidebar/DocumentReader";
+﻿"use client";
+
+import { DocumentReader } from "./RightSidebar/DocumentReader";
 import { DocumentListPanel } from "./RightSidebar/DocumentListPanel";
 import { usePaperDetails } from "@/hooks/usePaperDetails";
-import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
-"use client";
+import { getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
 import { useDocumentManager } from "@/hooks/useDocumentManager";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Plus, X, Check, AlertCircle, PanelRight } from "lucide-react";
+import { Plus, Check, AlertCircle, PanelRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
@@ -50,7 +51,6 @@ export default function RightSidebar({
   externalViewingDoc, 
   onViewingDocChange,
   groundingHighlight,
-  onClearGroundingHighlight,
   onClearViewingDoc, 
   backendUrl, 
   onClose 
@@ -64,27 +64,27 @@ export default function RightSidebar({
     groundingHighlight 
   });
   const {
-    selectedDocs, setSelectedDocs,
+    selectedDocs,
     sortBy, setSortBy,
     sortDirection, setSortDirection,
     isSortMenuOpen, setIsSortMenuOpen,
     activeMenuId, setActiveMenuId,
-    isCleaningDuplicates, setIsCleaningDuplicates,
-    cleanFeedback, setCleanFeedback,
+    isCleaningDuplicates,
+    cleanFeedback,
     isAddSourcesModalOpen, setIsAddSourcesModalOpen,
     doiInput, setDoiInput,
-    internalPendingSources, setInternalPendingSources,
+    setInternalPendingSources,
     pendingSources,
     isDraggingOver, setIsDraggingOver,
     isRenameModalOpen, setIsRenameModalOpen,
     renamingDoc, setRenamingDoc,
     renameTitleInput, setRenameTitleInput,
-    isSavingRename, setIsSavingRename,
-    renameError, setRenameError,
+    isSavingRename,
+    setRenameError,
     docToDelete, setDocToDelete,
     showBulkDeleteConfirm, setShowBulkDeleteConfirm,
-    isBulkDeleting, setIsBulkDeleting,
-    isBulkDownloading, setIsBulkDownloading,
+    isBulkDeleting,
+    isBulkDownloading,
     downloadTask, setDownloadTask,
     selectedDocList, selectedCount,
     isAllSelected, isPartiallySelected,
@@ -92,7 +92,7 @@ export default function RightSidebar({
     toggleDocSelection, handleToggleSelectAll,
     getFileBadgeInfo, handleOpenRename, handleSaveRename,
     handleCleanDuplicates, handleBulkDownload, handleConfirmBulkDelete,
-    handleUploadBatch, handleImportDoi, downloadFileText
+    handleUploadBatch, handleImportDoi
   } = useDocumentManager({
     documents,
     externalPendingSources,
@@ -100,6 +100,7 @@ export default function RightSidebar({
     backendUrl,
     onDocumentAdded,
     onDocumentUpdated,
+    onDocumentDeleted,
     onBulkDocumentsDeleted,
     onEnsureChatSession,
     viewingDoc,
@@ -111,10 +112,6 @@ export default function RightSidebar({
 
   // Citation Modal State
   const [isCiteModalOpen, setIsCiteModalOpen] = useState<boolean>(false);
-  const [selectedCitationStyle, setSelectedCitationStyle] = useState<"apa" | "ieee" | "harvard" | "mla" | "chicago" | "bibtex" | "ris">("apa");
-  const [copiedCitationKey, setCopiedCitationKey] = useState<string | null>(null);
-
-  const [copiedDoi, setCopiedDoi] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,8 +138,8 @@ export default function RightSidebar({
     if (highlightResult.matchCount > 0) {
       if (highlightResult.initialActiveIndex !== undefined) {
         setActiveMatchIndex(highlightResult.initialActiveIndex);
-      } else if (activeMatchIndex >= highlightResult.matchCount) {
-        setActiveMatchIndex(0);
+      } else {
+        setActiveMatchIndex(prev => (prev >= highlightResult.matchCount ? 0 : prev));
       }
     }
   }, [highlightResult.matchCount, highlightResult.initialActiveIndex]);
@@ -188,7 +185,7 @@ export default function RightSidebar({
     return () => {
       window.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isSortMenuOpen, activeMenuId]);
+  }, [isSortMenuOpen, activeMenuId, setActiveMenuId, setIsSortMenuOpen]);
 
 
 
@@ -210,16 +207,11 @@ export default function RightSidebar({
 
 
 
-  const copyToClipboard = (text: string, type: "doi" | "link" | "citation") => {
+  const copyToClipboard = (text: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
-    if (type === "doi") {
-      setCopiedDoi(true);
-      setTimeout(() => setCopiedDoi(false), 2000);
-    } else if (type === "link") {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
-    }
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
 
@@ -237,7 +229,13 @@ export default function RightSidebar({
       title = filenameFallback;
     }
 
-    const isAcademicPaper = Boolean(
+    const isUserUpload = Boolean(
+      paperDetails?.is_uploaded ||
+      paperDetails?.journal_metric === "Uploaded Document" ||
+      paperDetails?.access_status === "Uploaded Document"
+    );
+
+    const isAcademicPaper = !isUserUpload && Boolean(
       paperDetails?.doi || 
       viewingDoc?.doi ||
       (paperDetails?.journal && !["uploaded document", "scholarly publication"].includes(paperDetails.journal.trim().toLowerCase())) ||
@@ -247,19 +245,14 @@ export default function RightSidebar({
 
     const authorsStr = paperDetails?.authors && paperDetails.authors.length > 0
       ? paperDetails.authors.join(", ")
-      : isAcademicPaper
-      ? t('right.academicResearchers')
       : "";
 
     const rawUploadDate = viewingDoc?.created_at || paperDetails?.created_at;
     const pubDateStr = isAcademicPaper
-      ? (formatReadableDate(paperDetails?.publication_date, paperDetails?.year) || (t('right.recentPublication') || "Recent publication"))
+      ? (formatReadableDate(paperDetails?.publication_date, paperDetails?.year) || "")
       : (rawUploadDate ? `Uploaded ${formatReadableDate(rawUploadDate)}` : "");
 
-    const journalName = paperDetails?.journal || t('right.scholarlyPublication');
-    const citationsCount = paperDetails?.citations !== undefined ? paperDetails.citations : 0;
     const doiStr = paperDetails?.doi || "";
-    const cleanAbstract = cleanHtmlAbstract(paperDetails?.abstract) || (isLoadingDetails ? "" : t('right.noAbstractProvided'));
     const landingUrl = paperDetails?.url || (doiStr ? `https://doi.org/${doiStr}` : "");
 
     return (
@@ -287,11 +280,8 @@ export default function RightSidebar({
             }
           }}
           getHighlightedContent={() => highlightResult.nodes}
-          cleanAbstract={cleanAbstract}
           authorsStr={authorsStr}
           pubDateStr={pubDateStr}
-          journalName={journalName}
-          citationsCount={citationsCount}
           landingUrl={landingUrl}
           title={title}
           copiedLink={copiedLink}
@@ -341,7 +331,7 @@ export default function RightSidebar({
   return (
     <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 z-10 transition-all relative text-app-text">
       {/* 1. Header Bar: Top Fixed Header */}
-      <div className="w-full h-[52px] px-4 flex items-center justify-between border-b border-app-border shrink-0">
+      <div className="w-full h-[52px] pl-4 pr-3 flex items-center justify-between border-b border-app-border shrink-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm text-app-text tracking-tight">{t('ui.sources') || "Sources"}</span>
         </div>
@@ -373,7 +363,7 @@ export default function RightSidebar({
       />
 
       {/* 2 & 3. Fixed Controls Area (Add Sources + Toolbar) */}
-      <div className="px-2 pt-3 pb-2.5 space-y-2.5 shrink-0 bg-app-sidebar z-10 border-b border-app-divider shadow-sm">
+      <div className="pl-2 pr-[18px] pt-3 pb-2.5 space-y-2.5 shrink-0 bg-app-sidebar z-10 border-b border-app-divider shadow-sm">
         {/* Prominent '+ Add sources' Button (NotebookLM Style) */}
         <div className="w-full">
           <Button

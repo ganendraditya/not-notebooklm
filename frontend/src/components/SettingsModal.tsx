@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   X, 
   HardDrive, 
@@ -61,7 +61,7 @@ export default function SettingsModal({
     }
   }, [isOpen]);
 
-  const fetchStorage = async () => {
+  const fetchStorage = useCallback(async () => {
     try {
       const res = await fetch(`${backendUrl}/storage/summary`);
       if (res.ok) {
@@ -71,13 +71,13 @@ export default function SettingsModal({
     } catch (e) {
       console.error("Failed to fetch storage summary:", e);
     }
-  };
+  }, [backendUrl]);
 
   useEffect(() => {
     if (isOpen) {
       fetchStorage();
     }
-  }, [isOpen]);
+  }, [isOpen, fetchStorage]);
 
   if (!isOpen) return null;
 

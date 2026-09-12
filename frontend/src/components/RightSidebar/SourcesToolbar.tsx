@@ -242,7 +242,7 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
       </div>
 
       {/* Select all label and checkbox */}
-      <div className={`flex items-center gap-2 pr-1.5 whitespace-nowrap select-none ${
+      <div className={`flex items-center gap-2 pr-0 whitespace-nowrap select-none ${
         documents.length === 0 ? "opacity-30 pointer-events-none" : ""
       }`}>
         <span className="text-[11px] font-medium text-app-text-muted select-none">{t('right.selectAll')}</span>

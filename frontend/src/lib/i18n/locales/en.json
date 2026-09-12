@@ -347,7 +347,7 @@
   "right.overviewTab": "Overview",
   "right.fullText": "Full Text",
   "right.originalDoc": "Original Document",
-  "right.originalDocNotAvail": "Original document preview is not available for this source (Metadata & abstract only).",
+  "right.originalDocNotAvail": "Original document preview is not available for this source.",
   "right.originalDocNotFound": "Original document file not found.",
   "right.openInNewTab": "Open in new tab",
   "right.openOfficialPublisher": "Open Official Publisher Page",

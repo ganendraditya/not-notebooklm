@@ -100,8 +100,8 @@ def handle_document_upload(chat_id: str, file: UploadFile, db: Session) -> Tuple
         url=enriched.get("url", ""),
         abstract=enriched.get("abstract", ""),
         abstract_type="official" if enriched.get("abstract") and len(enriched.get("abstract")) > 80 else "ai_summary",
-        is_oa=True if enriched.get("is_valid_pdf", False) else False,
-        access_status="Open Access (Full PDF Available)" if enriched.get("is_valid_pdf", False) else "Uploaded Document",
+        is_oa=False,
+        access_status="Uploaded Document",
         quality_tier=4
     )
     db.add(db_doc)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ChevronRight } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";

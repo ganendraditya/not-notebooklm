@@ -574,6 +574,7 @@ export default function ChatArea({
                                   <div className="flex items-center justify-between mb-2">
                                     {att.type === "image" ? (
                                       <div className="w-8 h-8 rounded-lg overflow-hidden bg-black/10 dark:bg-black/40">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
                                       </div>
                                     ) : isWord ? (

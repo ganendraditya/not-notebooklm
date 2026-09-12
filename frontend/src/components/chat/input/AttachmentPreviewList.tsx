@@ -41,6 +41,7 @@ export function AttachmentPreviewList({
         return (
           <div key={i} className="relative group flex items-center bg-app-card rounded-2xl p-2 pr-3.5 border border-app-border max-w-[260px] shadow-sm">
             {att.type === "image" && att.previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={att.previewUrl} alt={att.filename} className="w-8 h-8 object-cover rounded-xl mr-2.5 shrink-0" />
             ) : isWord ? (
               <div className="w-8 h-8 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 font-bold text-xs mr-2.5 shrink-0">

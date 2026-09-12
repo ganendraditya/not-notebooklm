@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Search, Trash2, Image as ImageIcon, 
   FileText, LayoutGrid, List as ListIcon, Download, Box,
@@ -66,11 +66,7 @@ export default function LibraryBrowser({
     setCategory(initialCategory);
   }, [initialCategory]);
 
-  useEffect(() => {
-    fetchItems(category, search, sort, sortOrder);
-  }, [category, search, sort, sortOrder]);
-
-  const fetchItems = async (
+  const fetchItems = useCallback(async (
     cat: string, 
     q: string, 
     sortBy: "date" | "size" | "name" | "chat", 
@@ -110,26 +106,19 @@ export default function LibraryBrowser({
             return order === "asc" ? timeA - timeB : timeB - timeA;
           });
         }
-        
-        const mappedItems: LibraryItem[] = filtered.map((item: any) => ({
-          id: item.id,
-          type: item.category === "images" ? "image" : "document",
-          name: item.filename,
-          raw_filename: item.raw_filename || item.filename,
-          size_bytes: item.size,
-          modified: item.uploaded_at,
-          path: item.id,
-          chat_id: item.chat_id || null,
-          chat_title: item.chat_title || null
-        }));
-        setItems(mappedItems);
+
+        setItems(filtered);
       }
     } catch (e) {
-      console.error("Failed to fetch library:", e);
+      console.error("Failed to load library items:", e);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [backendUrl]);
+
+  useEffect(() => {
+    fetchItems(category, search, sort, sortOrder);
+  }, [category, search, sort, sortOrder, fetchItems]);
 
   const handleDelete = async () => {
     if (selectedIds.size === 0 || isDeleting) return;

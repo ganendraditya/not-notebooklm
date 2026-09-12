@@ -88,7 +88,7 @@ export const ChatInputBox = memo(function ChatInputBox({
     // Pixel-perfect dynamic fitting: measure exact rendered DOM text width
     if (typeof window !== "undefined" && textareaRef.current) {
       try {
-        const availableWidth = textareaRef.current.clientWidth - 40; // 40px safe margin before the right edge
+        const availableWidth = (containerWidth || textareaRef.current.clientWidth) - 40; // 40px safe margin before the right edge
 
         let measurer = document.getElementById("placeholder-width-measurer") as HTMLSpanElement;
         if (!measurer) {
@@ -155,7 +155,7 @@ export const ChatInputBox = memo(function ChatInputBox({
     const maxLen = 85;
     const isTruncated = rawTitle.length > maxLen;
     const displayTitle = isTruncated ? `${rawTitle.slice(0, maxLen).trimEnd()}...` : rawTitle;
-    let text = t('chat.inputPlaceholderTargeted').replace('{title}', displayTitle);
+    const text = t('chat.inputPlaceholderTargeted').replace('{title}', displayTitle);
     return text.replace(/\.{3}"\s*\.{3}/g, '..."');
   }, [targetedSource, t, containerWidth]);
 

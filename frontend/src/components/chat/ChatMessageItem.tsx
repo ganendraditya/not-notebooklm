@@ -13,7 +13,6 @@ import {
   ExternalLink, 
   BookOpen, 
   Copy, 
-  Pencil, 
   FileText,
   Table
 } from "lucide-react";
@@ -499,6 +498,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 >
                   {att.type === "image" ? (
                     <div className="w-10 h-10 rounded shrink-0 overflow-hidden bg-black/10 dark:bg-black/60">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
                     </div>
                   ) : (
@@ -560,8 +560,8 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 </h3>
               );
             },
-            ul: ({ node, ...props }: any) => <ul className="list-disc pl-6 my-2.5 space-y-1.5 text-app-text" {...props} />,
-            ol: ({ node, ...props }: any) => <ol className="list-decimal pl-8 my-2.5 space-y-1.5 text-app-text" {...props} />,
+            ul: ({ children }: any) => <ul className="list-disc pl-6 my-2.5 space-y-1.5 text-app-text">{children}</ul>,
+            ol: ({ children }: any) => <ol className="list-decimal pl-8 my-2.5 space-y-1.5 text-app-text">{children}</ol>,
             li: ({ node, children, ...props }: any) => {
               const fullText = extractNodeText(node || children);
               const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);

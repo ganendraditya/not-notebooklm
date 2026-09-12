@@ -21,6 +21,7 @@ export interface PaperDetailData {
   abstract_type?: "official" | "ai_summary";
   is_oa?: boolean;
   access_status?: string;
+  is_uploaded?: boolean;
   has_full_pdf?: boolean;
   is_abstract_only?: boolean;
   content: string;
@@ -131,7 +132,7 @@ export function usePaperDetails({
     return () => {
       isMounted = false;
     };
-  }, [viewingDoc?.id, viewingDoc?.filename, activeChatId, backendUrl]);
+  }, [viewingDoc, activeChatId, backendUrl]);
 
   useEffect(() => {
     if (groundingHighlight?.sentence || (groundingHighlight?.aiQuotes && groundingHighlight.aiQuotes.length > 0)) {

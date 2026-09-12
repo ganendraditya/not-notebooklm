@@ -25,7 +25,7 @@ export function useChatSession(
 
   useEffect(() => {
     activeChatIdRef.current = activeChatId;
-  }, [activeChatId]);
+  }, [activeChatId, activeChatIdRef]);
 
   const pendingSessionCreationRef = useRef<Promise<string> | null>(null);
   const handleSelectChatRef = useRef<(id: string) => void>(() => {});
@@ -130,6 +130,8 @@ export function useChatSession(
         }
       })
       .catch(err => console.error("Failed to fetch sessions:", err));
+    // Intentionally run once on component mount to hydrate sessions from persistent storage
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Dynamically update document title based on active chat

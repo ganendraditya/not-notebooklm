@@ -152,7 +152,15 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         else:
             res_data["content"] = f"# {doc.title}\n\n*Document file is registered as a reference source.*"
 
-        if is_authentic_pdf:
+        is_user_upload = (doc.journal_metric == "Uploaded Document" or doc.access_status == "Uploaded Document")
+        res_data["is_uploaded"] = is_user_upload
+
+        if is_user_upload:
+            res_data["is_oa"] = False
+            res_data["access_status"] = "Uploaded Document"
+            res_data["has_full_pdf"] = is_authentic_pdf
+            res_data["is_abstract_only"] = False
+        elif is_authentic_pdf:
             res_data["is_oa"] = True
             res_data["access_status"] = "Open Access (Full PDF Available)"
             res_data["has_full_pdf"] = True
