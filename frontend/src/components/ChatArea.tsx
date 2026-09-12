@@ -3,18 +3,19 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { 
   Sparkles, 
+  Sidebar,
   FileText, 
   Check, 
   Loader2, 
   Copy, 
   Pencil, 
-  MoreHorizontal,
-  Pin,
-  PinOff,
-  Trash2,
-  RotateCw,
-  ChevronLeft,
-  ChevronRight,
+  MoreHorizontal, 
+  Pin, 
+  PinOff, 
+  Trash2, 
+  RotateCw, 
+  ChevronLeft, 
+  ChevronRight, 
   ChevronDown
 } from "lucide-react";
 import { Portal } from "@/components/ui/Portal";
@@ -392,37 +393,42 @@ export default function ChatArea({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-app-bg text-app-text overflow-hidden relative">
-      {/* Top Floating Action Controls (Transparent, no solid bar / height) */}
-      <div className="absolute top-3 inset-x-0 px-4 sm:px-6 md:px-8 hidden lg:flex items-center justify-between z-20 pointer-events-none">
-        {/* Left: Open Sidebar Button */}
-        <div className="flex items-center gap-2 pointer-events-auto">
+      {/* 1. Top Fixed Pane Header (NotebookLM Split-Pane Architecture) */}
+      <div className="w-full h-[52px] px-4 flex items-center justify-between border-b border-app-border bg-app-sidebar shrink-0 z-20 select-none">
+        {/* Left: Open Sidebar Button + "Chat" Title */}
+        <div className="flex items-center gap-2.5">
           {!isSidebarOpen && onOpenSidebar && (
             <Tooltip content={t('chat.openSidebar')} side="bottom">
               <button 
                 type="button"
                 onClick={onOpenSidebar}
-                className="h-8 w-8 text-app-text-muted hover:text-app-text bg-app-card hover:bg-app-card-hover border border-app-border rounded-lg shadow-md cursor-pointer flex items-center justify-center transition-colors"
+                className="w-7 h-7 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg cursor-pointer flex items-center justify-center transition-colors hidden lg:flex"
                 aria-label={t('chat.openSidebar')}
               >
-                <Sparkles size={16} />
+                <Sidebar size={15} />
               </button>
             </Tooltip>
           )}
+          <span className="font-semibold text-sm text-app-text tracking-tight">
+            {t('nav.chat') || "Chat"}
+          </span>
         </div>
 
         {/* Right: Context Menu & Sources Controls */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Three Dots Context Menu (Only when chat is not empty & activeChatId exists) */}
-          {!isChatEmpty && activeChatId && (
+        <div className="flex items-center gap-1.5">
+          {/* Three Dots Context Menu (When activeChatId exists) */}
+          {activeChatId && (
             <div className="relative" ref={topMenuRef}>
               <Tooltip content={t('left.options')} side="bottom">
                 <button
                   type="button"
                   onClick={() => setIsTopMenuOpen(prev => !prev)}
-                  className="h-8 w-8 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+                  className={`w-7 h-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center cursor-pointer transition-colors ${
+                    isTopMenuOpen ? "bg-app-item-hover text-app-text" : ""
+                  }`}
                   aria-label={t('left.options')}
                 >
-                  <MoreHorizontal size={16} />
+                  <MoreHorizontal size={15} />
                 </button>
               </Tooltip>
 
@@ -490,12 +496,13 @@ export default function ChatArea({
               <button 
                 type="button"
                 onClick={onToggleRightSidebar}
-                className="relative h-8 w-8 rounded-lg bg-app-card hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text flex items-center justify-center cursor-pointer shadow-md backdrop-blur transition-colors"
+                className="relative h-7 px-2 rounded-lg hover:bg-app-item-hover text-app-text-muted hover:text-app-text flex items-center gap-1.5 cursor-pointer transition-colors text-xs font-medium"
                 aria-label={t('chat.openSources') || "Open sources"}
               >
-                <FileText size={15} className="text-blue-500" />
+                <FileText size={14} className="text-blue-500" />
+                <span className="hidden sm:inline text-xs">{t('ui.sources') || "Sources"}</span>
                 {documents.length > 0 && (
-                  <span className="absolute -top-1 -right-1 px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center border border-app-card leading-none shadow">
+                  <span className="px-1 min-w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] font-mono flex items-center justify-center leading-none">
                     {documents.length}
                   </span>
                 )}
@@ -512,7 +519,7 @@ export default function ChatArea({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         className={`flex-1 overflow-y-auto w-full min-h-0 custom-scrollbar overflow-x-hidden ${
-          isChatEmpty ? "flex items-center justify-center pt-0 pb-0" : "pt-12 lg:pt-14"
+          isChatEmpty ? "flex items-center justify-center py-4" : "py-6"
         }`}
         style={!isChatEmpty ? { paddingBottom: `${Math.max(120, inputHeight + 16)}px` } : undefined}
       >

@@ -145,37 +145,36 @@ export default function LeftSidebar({
   return (
     <div className="w-full lg:w-[260px] bg-app-sidebar flex flex-col h-full text-sm border-r border-app-divider select-none shrink-0">
       {/* Top Header with NotbookLM Logo and Sidebar Toggle (Desktop Only) */}
-      <div className="w-full p-3.5 sm:p-4 items-center justify-between hidden lg:flex">
+      <div className="w-full h-[52px] px-4 items-center justify-between border-b border-app-border shrink-0 hidden lg:flex">
         {/* Logo NotbookLM (Clickable -> New Chat) */}
         <div 
           onClick={onCreateChat}
-          className="flex items-center gap-2 font-bold text-app-text tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2 font-semibold text-app-text tracking-tight cursor-pointer hover:opacity-90 transition-opacity"
         >
           <div className="p-1 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-sm flex items-center justify-center">
             <Sparkles size={14} />
           </div>
-          <span className="text-sm font-bold text-app-text">NotbookLM</span>
+          <span className="text-sm font-semibold text-app-text tracking-tight">NotbookLM</span>
         </div>
 
         {/* Hide Sidebar Button (Only visible on desktop) */}
         <Tooltip content={t('left.closeSidebar')} side="right">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer hidden lg:flex"
+          <button 
+            type="button"
+            className="w-7 h-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer flex items-center justify-center transition-colors"
             onClick={onToggleSidebar}
             aria-label={t('left.closeSidebar')}
           >
-            <Sidebar size={17} />
-          </Button>
+            <Sidebar size={15} />
+          </button>
         </Tooltip>
       </div>
 
       {/* Top Action Items: New chat, Search, & Library */}
-      <div className="w-full px-3 pt-3 lg:pt-1 pb-3 space-y-1 border-b border-app-divider">
+      <div className="w-full px-2 pt-2 pb-2.5 space-y-0.5 border-b border-app-divider">
         <Button 
           variant="ghost" 
-          className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
+          className={`w-full justify-start h-9 px-2 text-xs font-medium cursor-pointer transition-colors ${
             currentView === "chat" && !activeChatId
               ? "bg-app-item-active text-app-text font-semibold"
               : "text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
@@ -185,36 +184,39 @@ export default function LeftSidebar({
             onCreateChat();
           }}
         >
-          <SquarePen className="mr-2.5 text-app-text-dim" size={16} /> {t('ui.newChat')}
+          <SquarePen className="mr-2.5 text-app-text-dim shrink-0" size={16} /> 
+          <span>{t('ui.newChat')}</span>
         </Button>
 
         <Button 
           variant="ghost" 
-          className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
+          className={`w-full justify-start h-9 px-2 text-xs font-medium cursor-pointer transition-colors ${
             currentView === "library"
               ? "bg-app-item-active text-app-text font-semibold"
               : "text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
           }`}
           onClick={() => onOpenLibrary?.("all")}
         >
-          <FolderArchive className="mr-2.5 text-app-text-dim" size={16} /> {t('ui.library')}
+          <FolderArchive className="mr-2.5 text-app-text-dim shrink-0" size={16} /> 
+          <span>{t('ui.library')}</span>
         </Button>
 
         <Button 
           variant="ghost" 
-          className={`w-full justify-start h-9 text-xs font-medium cursor-pointer transition-colors ${
+          className={`w-full justify-start h-9 px-2 text-xs font-medium cursor-pointer transition-colors ${
             currentView === "search" 
               ? "bg-app-item-active text-app-text font-semibold" 
               : "text-app-text-muted hover:text-app-text hover:bg-app-item-hover"
           }`}
           onClick={() => onOpenSearch?.()}
         >
-          <Search className="mr-2.5 text-app-text-dim" size={16} /> {t('ui.searchChat')}
+          <Search className="mr-2.5 text-app-text-dim shrink-0" size={16} /> 
+          <span>{t('ui.searchChat')}</span>
         </Button>
       </div>
 
       {/* History List */}
-      <div className="w-full flex-1 overflow-y-auto px-2 sm:px-3 pt-3 space-y-4 min-h-0 custom-scrollbar">
+      <div className="w-full flex-1 overflow-y-auto px-2 pt-3 space-y-4 min-h-0 custom-scrollbar">
         {filteredSessions.length === 0 ? (
           <div className="text-center text-xs text-app-text-dim py-8 px-4">
             {searchQuery ? t('ui.noConversationsFound') : t('ui.noChatHistory')}
@@ -232,7 +234,7 @@ export default function LeftSidebar({
                 <div key={session.id} className="relative group">
                   <div
                     onClick={() => onSelectChat(session.id)}
-                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg transition-all cursor-pointer text-xs ${
+                    className={`w-full flex items-center justify-between px-2 py-2 rounded-lg transition-all cursor-pointer text-xs ${
                       isActive 
                         ? "bg-app-item-active text-app-text font-medium shadow-sm" 
                         : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
@@ -240,9 +242,9 @@ export default function LeftSidebar({
                   >
                     <div className="flex items-center gap-2.5 truncate mr-1">
                       {session.is_pinned ? (
-                        <Pin size={13} className="shrink-0 text-amber-500 fill-amber-500/20" />
+                        <Pin size={16} className="shrink-0 text-amber-500 fill-amber-500/20" />
                       ) : (
-                        <MessageSquare size={14} className="shrink-0 text-app-text-dim" />
+                        <MessageSquare size={16} className="shrink-0 text-app-text-dim" />
                       )}
                       <span className="truncate">{session.title}</span>
                     </div>

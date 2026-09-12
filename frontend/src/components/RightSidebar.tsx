@@ -6,7 +6,7 @@ import { cleanHtmlAbstract, getHighlightedContent, formatReadableDate } from "./
 import { useDocumentManager } from "@/hooks/useDocumentManager";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Plus, X, Check, AlertCircle } from "lucide-react";
+import { Plus, X, Check, AlertCircle, PanelRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
@@ -313,22 +313,19 @@ export default function RightSidebar({
   // VIEW MODE: STANDARD SOURCES LIST PANEL
   // ==========================================
   return (
-    <aside className="w-full lg:w-80 h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 z-10 transition-all relative text-app-text">
+    <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 z-10 transition-all relative text-app-text">
       {/* 1. Header Bar: Top Fixed Header */}
-      <div className="px-4 py-3 flex items-center justify-between shrink-0">
+      <div className="w-full h-[52px] px-4 flex items-center justify-between border-b border-app-border shrink-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm text-app-text tracking-tight">{t('ui.sources') || "Sources"}</span>
-          <span className="px-1.5 py-0.5 rounded-full text-[10.5px] font-mono font-medium bg-app-item-hover text-app-text-muted">
-            {documents.length}
-          </span>
         </div>
-        <Tooltip content={t('right.close') || "Hide sidebar"} side="left">
+        <Tooltip content={t('ui.closeSidebar') || "Close sidebar"} side="left">
           <button 
             onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer"
-            aria-label={t('right.close') || "Hide sidebar"}
+            className="w-7 h-7 rounded-lg hover:bg-app-item-hover text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer"
+            aria-label={t('ui.closeSidebar') || "Close sidebar"}
           >
-            <X size={15} />
+            <PanelRight size={15} />
           </button>
         </Tooltip>
       </div>

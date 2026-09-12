@@ -2,6 +2,7 @@
 import {
   ArrowLeft,
   X,
+  PanelRight,
   MessageSquare,
   Quote,
   Check,
@@ -76,26 +77,27 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
 
   return (
     <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 z-10 transition-all relative text-app-text">
-      {/* 1. Header Bar */}
-      <div className="px-4 py-3 flex items-center justify-between border-b border-app-divider">
+      {/* 1. Header Bar: Pinned Breadcrumb Header */}
+      <div className="w-full h-[52px] px-4 flex items-center justify-between border-b border-app-border shrink-0">
         <button
           onClick={() => {
             setViewingDoc(null);
             if (onClearViewingDoc) onClearViewingDoc();
           }}
-          className="flex items-center gap-2 text-xs font-semibold text-app-text hover:opacity-80 transition-colors cursor-pointer group"
+          className="flex items-center gap-1.5 text-xs font-semibold text-app-text hover:opacity-80 transition-colors cursor-pointer group"
+          aria-label={t('ui.sources') || "Sources"}
         >
           <ArrowLeft size={16} className="text-app-text-muted group-hover:text-app-text transition-transform group-hover:-translate-x-0.5" />
-          <span className="text-sm tracking-tight font-medium">Paper</span>
+          <span className="text-sm tracking-tight font-semibold">{t('ui.sources') || "Sources"}</span>
         </button>
 
-        <Tooltip content={t('right.close')} side="bottom">
+        <Tooltip content={t('ui.closeSidebar') || "Close sidebar"} side="left">
           <button 
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer hidden lg:flex"
-            aria-label={t('right.close')}
+            className="w-7 h-7 rounded-lg hover:bg-app-item-hover text-app-text-muted hover:text-app-text flex items-center justify-center transition-colors cursor-pointer"
+            aria-label={t('ui.closeSidebar') || "Close sidebar"}
           >
-            <X size={14} />
+            <PanelRight size={15} />
           </button>
         </Tooltip>
       </div>
