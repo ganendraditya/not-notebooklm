@@ -382,8 +382,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   const toggleSelectAll = () => {
     if (isImporting) return;
     const novelIndices = sources.map((s, i) => (!isDuplicateSource(s) ? i : -1)).filter(i => i !== -1);
-    const areAllNovelSelected = novelIndices.length > 0 && novelIndices.every(i => isSourceChecked(sources[i], i));
-    const nextState = !areAllNovelSelected;
+    if (novelIndices.length === 0) return;
+
+    // Mazhab A: if ALL or PARTIALLY selected, clicking deselects all. Only if 0 selected, clicking selects all.
+    const hasAnyNovelSelected = novelIndices.some(i => isSourceChecked(sources[i], i));
+    const nextState = !hasAnyNovelSelected;
     
     const updated = { ...userSelectionOverrides };
     novelIndices.forEach(i => {
@@ -779,7 +782,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                     }`}
                   >
                     <span className="text-[11px] font-medium text-app-text-muted group-hover/selectall:text-app-text transition-colors">
-                      {allNovelSelected ? "Deselect All" : "Select All"}
+                      {(allNovelSelected || isPartiallySelected)
+                        ? (t('right.unselectAll') || "Deselect All")
+                        : (t('right.selectAll') || "Select All")}
                     </span>
                     <button 
                       type="button"
@@ -791,7 +796,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                           ? "bg-blue-600 border-blue-600 text-white"
                           : "border-app-border-strong bg-transparent group-hover/selectall:border-gray-400"
                       }`}
-                      aria-label={allNovelSelected ? "Deselect All" : "Select All"}
+                      aria-label={(allNovelSelected || isPartiallySelected) ? (t('right.unselectAll') || "Deselect All") : (t('right.selectAll') || "Select All")}
                     >
                       {allNovelSelected ? (
                         <Check size={11} strokeWidth={3} />

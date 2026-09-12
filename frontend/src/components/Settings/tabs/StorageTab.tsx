@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ChevronRight } from "lucide-react";
+import { AlertTriangle, ChevronRight, Check, Minus } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
@@ -308,37 +308,58 @@ export default function StorageTab({
               {sessions.length > 0 ? (
                 <div className="border border-app-border rounded-xl overflow-hidden bg-transparent">
                   {/* Fixed Header Row */}
-                  <div className="flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted border-b border-app-border">
+                  <div className="flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted border-b border-app-border select-none">
                     <span>Conversations</span>
-                    <input 
-                      type="checkbox"
-                      checked={selectedChatIds.length === sessions.length && sessions.length > 0}
-                      ref={input => {
-                        if (input) {
-                          input.indeterminate = selectedChatIds.length > 0 && selectedChatIds.length < sessions.length;
-                        }
-                      }}
-                      onChange={toggleSelectAllChats}
-                      className="rounded cursor-pointer accent-blue-500 shrink-0"
-                    />
+                    {(() => {
+                      const isAllChatsSelected = selectedChatIds.length === sessions.length && sessions.length > 0;
+                      const isPartiallyChatsSelected = selectedChatIds.length > 0 && selectedChatIds.length < sessions.length;
+                      return (
+                        <div 
+                          onClick={toggleSelectAllChats}
+                          className="flex items-center gap-2 cursor-pointer group/selectall select-none"
+                        >
+                          <span className="text-[11px] font-medium text-app-text-muted group-hover/selectall:text-app-text transition-colors select-none">
+                            {(isAllChatsSelected || isPartiallyChatsSelected) ? t('right.unselectAll') : t('settings.selectAll')}
+                          </span>
+                          <button 
+                            type="button"
+                            className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
+                              isAllChatsSelected || isPartiallyChatsSelected
+                                ? "bg-blue-600 border-blue-600 text-white hover:bg-blue-700"
+                                : "border-app-border-strong bg-transparent group-hover/selectall:border-gray-500"
+                            }`}
+                            aria-label={(isAllChatsSelected || isPartiallyChatsSelected) ? t('right.unselectAll') : t('settings.selectAll')}
+                          >
+                            {isAllChatsSelected ? (
+                              <Check size={9} strokeWidth={3} />
+                            ) : isPartiallyChatsSelected ? (
+                              <Minus size={9} strokeWidth={3} />
+                            ) : null}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Scrollable Conversation Rows (Scrollbar strictly starts from header bottomline) */}
                   <div className="max-h-40 overflow-y-auto custom-scrollbar divide-y divide-app-divider">
-                    {sessions.map((s) => (
-                      <label 
-                        key={s.id} 
-                        className="flex items-center justify-between px-3 py-2 hover:bg-app-item-hover text-xs text-app-text cursor-pointer transition-colors"
-                      >
-                        <span className="truncate pr-3">{s.title}</span>
-                        <input 
-                          type="checkbox"
-                          checked={selectedChatIds.includes(s.id)}
-                          onChange={() => toggleChatSelection(s.id)}
-                          className="rounded cursor-pointer accent-blue-500 shrink-0"
-                        />
-                      </label>
-                    ))}
+                    {sessions.map((s) => {
+                      const isSelected = selectedChatIds.includes(s.id);
+                      return (
+                        <div 
+                          key={s.id} 
+                          onClick={() => toggleChatSelection(s.id)}
+                          className="flex items-center justify-between px-3 py-2 hover:bg-app-item-hover text-xs text-app-text cursor-pointer transition-colors select-none"
+                        >
+                          <span className="truncate pr-3">{s.title}</span>
+                          <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                            isSelected ? "bg-blue-600 border-blue-600 text-white" : "border-app-border-strong bg-transparent"
+                          }`}>
+                            {isSelected && <Check size={9} strokeWidth={3} />}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ) : (
