@@ -137,6 +137,7 @@
   "chat.clearTargeted": "Lepas fokus dokumen",
   "chat.sourcesCount": "{count} sumber",
   "chat.addToSources": "Tambah {count}ke sumber",
+  "chat.cancelAdding": "Batal menambahkan",
   "chat.previousResponse": "Tanggapan sebelumnya",
   "chat.nextResponse": "Tanggapan berikutnya",
   "chat.regenerateResponse": "Buat ulang tanggapan",

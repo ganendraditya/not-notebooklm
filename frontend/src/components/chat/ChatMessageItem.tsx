@@ -420,7 +420,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     activeItemControllersRef.current.clear();
 
     setIsImporting(true);
-    setImportProgress({ current: 0, total: toImport.length });
+    setImportProgress({ current: 1, total: toImport.length });
 
     // Register pending placeholder sources immediately in the sidebar so circular spinners appear
     const pendingItems = toImport.map((src, idx) => ({
@@ -445,14 +445,22 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         }
         onResolvePendingSource?.(p.id);
 
-        // If all items were cancelled by the user in the sidebar, terminate batch state immediately
-        const allCancelled = pendingItems.every(item => cancelledPendingIdsRef.current.has(item.id));
-        if (allCancelled) {
+        const activeItems = pendingItems.filter(item => !cancelledPendingIdsRef.current.has(item.id));
+        if (activeItems.length === 0) {
+          // If all items were cancelled by the user in the sidebar, terminate batch state immediately
           isBatchCancelledRef.current = true;
           if (isMountedRef.current) {
             setIsImporting(false);
             setImportProgress(null);
           }
+        } else if (isMountedRef.current) {
+          // Instantly adjust active total and current active index in the button counter (e.g. from x/5 to x/4)
+          setImportProgress(prev => {
+            if (!prev) return null;
+            const newTotal = activeItems.length;
+            const newCurrent = Math.min(Math.max(1, prev.current), newTotal);
+            return { current: newCurrent, total: newTotal };
+          });
         }
       });
     });
@@ -476,8 +484,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           continue;
         }
 
-        if (isMountedRef.current) {
-          setImportProgress({ current: i + 1, total: toImport.length });
+        const activeItems = pendingItems.filter(item => !cancelledPendingIdsRef.current.has(item.id));
+        const activeIndex = activeItems.findIndex(item => item.id === pending.id);
+
+        if (isMountedRef.current && activeIndex !== -1) {
+          setImportProgress({ current: activeIndex + 1, total: activeItems.length });
         }
 
         const itemController = new AbortController();
@@ -905,29 +916,29 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                   type="button"
                   onClick={isImporting ? handleCancelImport : handleImport}
                   disabled={!isImporting && selectedCount === 0}
-                  className={`h-8 px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors border-0 outline-none ${
+                  className={`h-8 w-[180px] shrink-0 rounded-full text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors border-0 outline-none select-none ${
                     isImporting
                       ? "bg-blue-600 hover:bg-red-600 text-white shadow-md group/cancelbtn"
                       : "bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   }`}
-                  title={isImporting ? (t('right.cancelUpload') || "Cancel adding") : undefined}
+                  title={isImporting ? (t('chat.cancelAdding') || "Cancel adding") : undefined}
                 >
                   {isImporting ? (
                     <>
-                      <span className="flex items-center gap-1.5 group-hover/cancelbtn:hidden">
-                        <Loader2 size={12} className="animate-spin" />
+                      <span className="flex items-center justify-center gap-1.5 group-hover/cancelbtn:hidden whitespace-nowrap">
+                        <Loader2 size={12} className="animate-spin shrink-0" />
                         <span>{importProgress ? `Adding ${importProgress.current}/${importProgress.total}...` : "Adding sources..."}</span>
                       </span>
-                      <span className="hidden group-hover/cancelbtn:flex items-center gap-1.5 text-white">
-                        <X size={12} strokeWidth={2.5} />
-                        <span>{t('right.cancelUpload') || "Cancel adding"}</span>
+                      <span className="hidden group-hover/cancelbtn:flex items-center justify-center gap-1.5 text-white whitespace-nowrap">
+                        <X size={12} strokeWidth={2.5} className="shrink-0" />
+                        <span>{t('chat.cancelAdding') || "Cancel adding"}</span>
                       </span>
                     </>
                   ) : (
-                    <>
-                      <Plus size={13} />
+                    <span className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                      <Plus size={13} className="shrink-0" />
                       <span>{t('chat.addToSources').replace('{count}', selectedCount > 0 ? `${selectedCount} ` : "")}</span>
-                    </>
+                    </span>
                   )}
                 </button>
               </div>
