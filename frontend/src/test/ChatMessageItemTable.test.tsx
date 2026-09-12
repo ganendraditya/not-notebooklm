@@ -244,4 +244,51 @@ describe("ChatMessageItem Table & Cleanliness", () => {
     // scrollLeft must remain preserved at 450 instead of resetting to 0
     expect(scrollContainer.scrollLeft).toBe(450);
   });
+
+  it("stops propagation on wheel and scroll events for tables and report sources to protect main canvas", () => {
+    const rawContent = `Berikut laporannya:
+<!-- SOURCES_DATA: [{"title":"Paper A","authors":"Auth A","year":2022,"venue":"Conf"}] -->
+| Col A | Col B |
+|:---|:---|
+| Val 1 | Val 2 |`;
+
+    const msg = {
+      role: "assistant" as const,
+      content: rawContent,
+      created_at: new Date().toISOString(),
+    };
+
+    const onParentWheel = vi.fn();
+    const onParentScroll = vi.fn();
+
+    const { container } = renderWithI18n(
+      <div onWheel={onParentWheel} onScroll={onParentScroll}>
+        <InChatMessageComponent
+          msg={msg}
+          activeChatId="test-chat"
+          backendUrl="http://localhost:8000"
+        />
+      </div>
+    );
+
+    // 1. Table scroll container
+    const tableScrollContainer = container.querySelector(".overflow-x-auto") as HTMLDivElement;
+    expect(tableScrollContainer).toBeTruthy();
+
+    fireEvent.wheel(tableScrollContainer, { deltaY: -50 });
+    expect(onParentWheel).not.toHaveBeenCalled();
+
+    fireEvent.scroll(tableScrollContainer, { target: { scrollLeft: 100 } });
+    expect(onParentScroll).not.toHaveBeenCalled();
+
+    // 2. Sources list container
+    const sourcesScrollContainer = container.querySelector(".overflow-y-auto") as HTMLDivElement;
+    expect(sourcesScrollContainer).toBeTruthy();
+
+    fireEvent.wheel(sourcesScrollContainer, { deltaY: -50 });
+    expect(onParentWheel).not.toHaveBeenCalled();
+
+    fireEvent.scroll(sourcesScrollContainer, { target: { scrollTop: 50 } });
+    expect(onParentScroll).not.toHaveBeenCalled();
+  });
 });

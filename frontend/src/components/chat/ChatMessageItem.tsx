@@ -235,7 +235,11 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode; [key: string]: 
 
       <div 
         ref={scrollContainerRef}
-        onScroll={handleScroll}
+        onScroll={(e) => {
+          e.stopPropagation();
+          handleScroll(e);
+        }}
+        onWheel={(e) => e.stopPropagation()}
         className="overflow-x-auto custom-scrollbar"
       >
         <table ref={tableRef} className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top" {...props}>
@@ -717,7 +721,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             },
             pre: ({ children }: any) => (
               <div className="relative group my-3">
-                <pre className="bg-app-code-bg p-3.5 rounded-xl overflow-x-auto text-xs text-app-text font-mono border border-app-border custom-scrollbar">
+                <pre 
+                  onScroll={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                  className="bg-app-code-bg p-3.5 rounded-xl overflow-x-auto text-xs text-app-text font-mono border border-app-border custom-scrollbar"
+                >
                   {children}
                 </pre>
               </div>
@@ -795,7 +803,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 )}
               </div>
 
-              <div className="max-h-[360px] overflow-y-auto divide-y divide-app-divider p-1 custom-scrollbar">
+              <div 
+                onScroll={(e) => e.stopPropagation()}
+                onWheel={(e) => e.stopPropagation()}
+                className="max-h-[360px] overflow-y-auto divide-y divide-app-divider p-1 custom-scrollbar"
+              >
                 {sources.map((src, i) => {
                   const isAlreadyAdded = isDuplicateSource(src);
                   const isChecked = isAlreadyAdded || isSourceChecked(src, i);

@@ -64,6 +64,33 @@ interface ChatAreaProps {
   onOpenStorage?: () => void;
 }
 
+function isInsideInnerScrollContainer(
+  target: EventTarget | null,
+  rootContainer: HTMLElement | null
+): boolean {
+  if (!target || !rootContainer || !(target instanceof Element) || typeof window === "undefined") {
+    return false;
+  }
+  let curr: Element | null = target;
+  while (curr && curr !== rootContainer) {
+    if (curr instanceof HTMLElement) {
+      const style = window.getComputedStyle(curr);
+      const overflowY = style.overflowY;
+      const overflowX = style.overflowX;
+      if (
+        overflowY === "auto" ||
+        overflowY === "scroll" ||
+        overflowX === "auto" ||
+        overflowX === "scroll"
+      ) {
+        return true;
+      }
+    }
+    curr = curr.parentElement;
+  }
+  return false;
+}
+
 export default function ChatArea({ 
   activeChatId, 
   messages: propMessages, 
@@ -195,15 +222,25 @@ export default function ChatArea({
   }, [isLoading, messages]);
 
   // Immediate wheel interception (Crucial for Mac trackpads & mouse wheels):
-  // As soon as the user gestures UP, immediately release scroll lock
+  // As soon as the user gestures UP on the main canvas, immediately release scroll lock
   // BEFORE the fast streaming token updates can yank the user back down!
   const handleWheel = useCallback((e: React.WheelEvent) => {
+    // Ignore wheel interactions on nested scrollable elements (e.g. report sources list, markdown tables, code blocks)
+    if (isInsideInnerScrollContainer(e.target, scrollContainerRef.current)) {
+      return;
+    }
     isAutoScrollingRef.current = false;
     if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
     if (e.deltaY < 0) {
-      // User is scrolling up
+      // User is scrolling up on the main canvas
       isAtBottomRef.current = false;
-      setShowScrollBottom(true);
+      const container = scrollContainerRef.current;
+      if (container) {
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+        if (distanceFromBottom > 30) {
+          setShowScrollBottom(!isChatEmpty);
+        }
+      }
     } else if (e.deltaY > 0) {
       // User is scrolling down
       const container = scrollContainerRef.current;
@@ -215,11 +252,12 @@ export default function ChatArea({
         }
       }
     }
-  }, []);
+  }, [isChatEmpty]);
 
   // Track touch gestures on mobile/tablets
   const touchStartYRef = useRef<number | null>(null);
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isInsideInnerScrollContainer(e.target, scrollContainerRef.current)) return;
     isAutoScrollingRef.current = false;
     if (autoScrollTimeoutRef.current) clearTimeout(autoScrollTimeoutRef.current);
     touchStartYRef.current = e.touches[0].clientY;
@@ -227,17 +265,27 @@ export default function ChatArea({
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (touchStartYRef.current === null) return;
+    if (isInsideInnerScrollContainer(e.target, scrollContainerRef.current)) return;
     const currentY = e.touches[0].clientY;
     const deltaY = touchStartYRef.current - currentY;
     if (deltaY < 0) {
-      // Swiping down to scroll content up
+      // Swiping down to scroll content up on the main canvas
       isAtBottomRef.current = false;
-      setShowScrollBottom(true);
+      const container = scrollContainerRef.current;
+      if (container) {
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+        if (distanceFromBottom > 30) {
+          setShowScrollBottom(!isChatEmpty);
+        }
+      }
     }
-  }, []);
+  }, [isChatEmpty]);
 
   // General scroll handler for scrollbar dragging, momentum finish, and keyboard nav
-  const handleScroll = useCallback(() => {
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    // Only respond to scroll events directly originating on the main canvas container itself
+    if (e.target !== e.currentTarget) return;
+
     const container = scrollContainerRef.current;
     if (!container) return;
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
