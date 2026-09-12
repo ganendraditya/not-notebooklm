@@ -1,4 +1,5 @@
 import os
+os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 import re
 import logging
 from contextlib import asynccontextmanager

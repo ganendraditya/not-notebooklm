@@ -71,7 +71,14 @@ class QdrantVectorStore(_BaseQdrantVectorStore):
         if aclient is not None:
             self._aclient = aclient
 
-from llama_index.embeddings.gemini import GeminiEmbedding
+try:
+    from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
+except ImportError:
+    try:
+        from llama_index.embeddings.gemini import GeminiEmbedding as GoogleGenAIEmbedding
+    except ImportError:
+        GoogleGenAIEmbedding = None
+
 try:
     from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 except Exception:
@@ -104,17 +111,19 @@ else:
 
 
 def init_embedding_and_vector_store():
-    """Initializes embeddings (Local Multilingual E5 or Gemini) and associates with Qdrant."""
+    """Initializes embeddings (Local Multilingual E5 or Google GenAI / Gemini) and associates with Qdrant."""
     env_provider = os.getenv("EMBEDDING_PROVIDER", "local").lower()
-    gemini_key = os.getenv("GEMINI_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    embedding_model = os.getenv("GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
 
-    if env_provider == "gemini" and gemini_key and not gemini_key.startswith("your_"):
-        try:
-            embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
-            vstore = QdrantVectorStore(collection_name="not_notebooklm_gemini", client=qdrant_client, enable_hybrid=False, batch_size=20)
-            return embed_model, vstore
-        except Exception as e:
-            logger.warning(f"[RAG Engine] Gemini Embedding initialization failed ({e}), falling back to local Multilingual E5 embeddings.")
+    if env_provider in ("gemini", "google") and gemini_key and not gemini_key.startswith("your_"):
+        if GoogleGenAIEmbedding is not None:
+            try:
+                embed_model = GoogleGenAIEmbedding(model_name=embedding_model, api_key=gemini_key)
+                vstore = QdrantVectorStore(collection_name="not_notebooklm_gemini", client=qdrant_client, enable_hybrid=False, batch_size=20)
+                return embed_model, vstore
+            except Exception as e:
+                logger.warning(f"[RAG Engine] Google GenAI Embedding initialization failed ({e}), falling back to local Multilingual E5 embeddings.")
 
     # Default Local Offline Embeddings (Multilingual 93+ languages)
     if HuggingFaceEmbedding is not None:
@@ -125,10 +134,13 @@ def init_embedding_and_vector_store():
         except Exception as e:
             logger.warning(f"[RAG Engine] HuggingFace Embedding loading failed: {e}")
 
-    # Ultimate fallback to Gemini
-    embed_model = GeminiEmbedding(model_name="models/gemini-embedding-2", api_key=gemini_key)
-    vstore = QdrantVectorStore(collection_name="not_notebooklm", client=qdrant_client, enable_hybrid=False, batch_size=20)
-    return embed_model, vstore
+    # Ultimate fallback to Google GenAI / Gemini
+    if GoogleGenAIEmbedding is not None:
+        embed_model = GoogleGenAIEmbedding(model_name=embedding_model, api_key=gemini_key or "dummy_key")
+        vstore = QdrantVectorStore(collection_name="not_notebooklm", client=qdrant_client, enable_hybrid=False, batch_size=20)
+        return embed_model, vstore
+
+    raise RuntimeError("No embedding provider available. Please install llama-index-embeddings-google-genai.")
 
 
 def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
