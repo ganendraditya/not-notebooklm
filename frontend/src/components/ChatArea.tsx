@@ -626,15 +626,15 @@ export default function ChatArea({
                                         <img src={fileHref} alt={att.filename} className="w-full h-full object-cover" />
                                       </div>
                                     ) : isWord ? (
-                                      <div className="w-7 h-7 rounded bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 font-bold text-[11px]">
+                                      <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-500 font-bold text-[11px]">
                                         W
                                       </div>
                                     ) : isPdf ? (
-                                      <div className="w-7 h-7 rounded bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 font-bold text-[10px]">
+                                      <div className="w-7 h-7 rounded-lg bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 font-bold text-[10px]">
                                         PDF
                                       </div>
                                     ) : (
-                                      <div className="w-7 h-7 rounded bg-app-item-hover border border-app-border flex items-center justify-center text-app-text-muted">
+                                      <div className="w-7 h-7 rounded-lg bg-app-item-hover border border-app-border flex items-center justify-center text-app-text-muted">
                                         <FileText size={15} />
                                       </div>
                                     )}
