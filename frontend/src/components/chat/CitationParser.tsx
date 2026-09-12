@@ -79,8 +79,19 @@ export function enhanceTableCitations(markdown: string): string {
           });
           resultLines.push(`| ${newCells.join(" | ")} |`);
         } else {
-          // Row-mapped document table: preserve cells as authored without forced tagging
-          resultLines.push(line);
+          // Row-mapped document table: if leading cell identifies Document [X], ensure remaining cells have [X]
+          const firstCell = cells[0] || "";
+          const rowDocMatch = firstCell.match(/\[(\d{1,3})\]/);
+          if (rowDocMatch && cells.length > 1) {
+            const docNum = rowDocMatch[1];
+            const newCells = [firstCell];
+            for (let i = 1; i < cells.length; i++) {
+              newCells.push(tagContent(cells[i], docNum));
+            }
+            resultLines.push(`| ${newCells.join(" | ")} |`);
+          } else {
+            resultLines.push(line);
+          }
         }
       }
     } else {

@@ -92,8 +92,17 @@ def enhance_table_citations(text: str) -> str:
                             new_cells.append(c)
                     result_lines.append('| ' + ' | '.join(new_cells) + ' |')
                 else:
-                    # Row-mapped document table: preserve cells as authored without forced tagging
-                    result_lines.append(line)
+                    # Row-mapped document table: if leading cell identifies Document [X], ensure remaining cells have [X]
+                    first_cell = cells[0] if cells else ""
+                    row_doc_match = re.search(r'\[(\d{1,3})\]', first_cell)
+                    if row_doc_match and len(cells) > 1:
+                        doc_num = row_doc_match.group(1)
+                        new_cells = [first_cell]
+                        for c in cells[1:]:
+                            new_cells.append(tag_cell_content(c, doc_num))
+                        result_lines.append('| ' + ' | '.join(new_cells) + ' |')
+                    else:
+                        result_lines.append(line)
         else:
             in_table = False
             col_doc_map = {}

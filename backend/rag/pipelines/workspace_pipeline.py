@@ -9,8 +9,7 @@ from rag.prompts import get_workspace_analysis_system_prompt
 from rag.formatters import format_clean_response
 from rag.parsers import parse_document_to_markdown
 from utils.file_utils import get_doc_file_path
-from services.rubric_grader_service import evaluate_response_grounding
-from rag.llm_factory import get_fast_llm, astream_llm_response
+from rag.llm_factory import astream_llm_response
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -247,56 +246,5 @@ async def handle_workspace_analysis_pipeline(
     await report_status("Synthesizing comparative findings and formatting response...")
     raw_content = await astream_llm_response(target_llm, chat_msgs, on_delta=on_delta)
     draft_content = format_clean_response(raw_content)
-
-    # Self-Correction Loop with Rubric Grader
-    try:
-        await report_status("Auditing factual grounding and citations with AI Rubric...")
-        auditor_llm = get_fast_llm() or target_llm
-
-        rubric_res = await evaluate_response_grounding(
-            query=query,
-            sources_context=full_docs_context,
-            draft_response=draft_content,
-            llm=auditor_llm
-        )
-
-        if rubric_res.is_grounded and rubric_res.grounding_score >= 0.80 and rubric_res.citation_accuracy:
-            return draft_content
-
-        needs_revision = (
-            not rubric_res.is_grounded
-            or not rubric_res.citation_accuracy
-            or rubric_res.grounding_score < 0.80
-            or bool(rubric_res.hallucinated_claims)
-        )
-
-        if needs_revision:
-            instruction = rubric_res.revision_instruction or (
-                "Ensure all factual claims, metrics, and table cells/bullets have precise [X] bracket citations, "
-                "and include the mandatory <!-- CITATION_MAP: ... --> block with exact verbatim quotes at the end."
-            )
-            await report_status("Refining and correcting factual citations...")
-            revision_prompt = (
-                f"{system_prompt_text}\n\n"
-                "CRITICAL AUDIT FEEDBACK (SELF-CORRECTION REQUIRED):\n"
-                f"Your previous draft failed the academic grounding & citation rubric:\n"
-                f"- Grounding Score: {rubric_res.grounding_score}\n"
-                f"- Citation Accuracy & Coverage: {rubric_res.citation_accuracy}\n"
-                f"- Issues: {json.dumps(rubric_res.hallucinated_claims, ensure_ascii=False)}\n"
-                f"- Revision Instruction: {instruction}\n\n"
-                "Please rewrite the response to be 100% truthful, strictly aligned with the provided documents, attach [X] citations to all claims and table cells/bullets, and ensure the <!-- CITATION_MAP --> block is present at the end."
-            )
-            revised_chat_msgs = [
-                LlamaChatMessage(role=MessageRole.SYSTEM, content=revision_prompt),
-                *(formatted_history if formatted_history else []),
-                context_msg,
-                LlamaChatMessage(role=MessageRole.USER, content=query)
-            ]
-            revised_content = await astream_llm_response(target_llm, revised_chat_msgs, on_delta=on_delta)
-            return format_clean_response(revised_content)
-        else:
-            logger.debug("[Workspace Pipeline] Rubric audit passed; using draft content.")
-    except Exception as grade_err:
-        logger.warning(f"[Workspace Pipeline] Rubric audit bypassed due to error: {grade_err}")
 
     return draft_content
