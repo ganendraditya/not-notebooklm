@@ -1,0 +1,3 @@
+setup:
+  project: not-notebooklm
+  config: dev

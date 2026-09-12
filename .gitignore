@@ -1,0 +1,42 @@
+node_modules/
+.next/
+dist/
+venv/
+backend/venv/
+__pycache__/
+*.pyc
+.env
+backend/.env
+backend/.env.local
+frontend/.env.local
+.DS_Store
+
+# Runtime data & uploads
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+backend/not_notebooklm.db
+backend/not_notebooklm.db-shm
+backend/not_notebooklm.db-wal
+backend/uploads/
+uploads/
+backend/qdrant_data/
+qdrant_data/
+scratch/
+
+# Secret Managers (Local caches & state)
+.doppler/
+.doppler.json
+.infisical/
+
+# Agent instructions, docs & rules
+.agents/
+notes/
+*.scratchpad.md
+REFACTOR_STATUS.md
+AGENTS.md
+*/AGENTS.md
+.cursorrules
+.windsurfrules
