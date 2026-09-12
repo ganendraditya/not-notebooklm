@@ -100,14 +100,15 @@ export function useDocumentManager({
   const handleImportDoiWrap = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!doiInput.trim()) return;
-    await doi.handleImportDoi(doiInput.trim());
+    const val = doiInput.trim();
     setDoiInput("");
     setIsAddSourcesModalOpen(false);
+    await doi.handleImportDoi(val);
   };
 
   const handleUploadBatchWrap = async (files: File[]) => {
-    await upload.handleUploadBatch(files);
     setIsAddSourcesModalOpen(false);
+    await upload.handleUploadBatch(files);
   };
 
   const handleBulkDownloadWrap = async () => {

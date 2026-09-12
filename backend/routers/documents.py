@@ -58,7 +58,7 @@ async def upload_document(
     if existing_count >= MAX_SOURCES_PER_CHAT:
         raise HTTPException(status_code=400, detail=f"Source limit reached! This conversation already contains {existing_count}/{MAX_SOURCES_PER_CHAT} sources.")
         
-    db_doc, file_path, enriched = handle_document_upload(chat_id, file, db)
+    db_doc, file_path, enriched = await handle_document_upload(chat_id, file, db)
 
     # Schedule vector store indexing in background
     background_tasks.add_task(rag.ingest_document, file_path, chat_id, db_doc.filename)

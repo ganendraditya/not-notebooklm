@@ -104,12 +104,14 @@ export const RightSidebarModals: React.FC<RightSidebarModalsProps> = ({
         citations={generateCitations(
           paperDetails?.title || ((viewingDoc as any)?.filename || "paper") || "",
           paperDetails?.authors || [],
-          paperDetails?.year || new Date().getFullYear().toString(),
+          paperDetails?.year || "",
           paperDetails?.journal || "",
           paperDetails?.doi || "",
           paperDetails?.url || (paperDetails?.doi ? `https://doi.org/${paperDetails.doi}` : "")
         )}
         doiStr={paperDetails?.doi || ""}
+        hasAuthors={Boolean(paperDetails?.authors && paperDetails.authors.length > 0 && paperDetails.authors.some(a => a.trim().length > 0 && a.toLowerCase() !== "anonymous"))}
+        hasYear={Boolean(paperDetails?.year && paperDetails.year.trim().length > 0 && paperDetails.year !== "N/A")}
       />
 
       {/* Centered Modal for Bulk Delete Confirmation */}

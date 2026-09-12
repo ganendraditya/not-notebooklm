@@ -340,6 +340,7 @@
   "action.unpin": "Unpin chat",
   "action.deleteChat": "Delete conversation",
   "action.cite": "Cite",
+  "right.citationIncompleteNotice": "Incomplete metadata: Author or publication year could not be verified automatically from official academic registries. Please verify before citing in formal research.",
   "right.academicResearchers": "Academic Researchers",
   "right.scholarlyPublication": "Scholarly Publication",
   "right.peerReviewed": "Peer-Reviewed",

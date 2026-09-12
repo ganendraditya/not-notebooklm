@@ -111,6 +111,35 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         
         db_doi = clean_doi(doc.doi)
         
+        # If document has missing DOI or authors in DB, opportunistically run 3-tier hybrid metadata extraction
+        if (not db_doi or not db_authors) and os.path.exists(file_path):
+            try:
+                from services.document.metadata_extractor import extract_hybrid_document_metadata
+                enriched = await extract_hybrid_document_metadata(file_path, doc.filename)
+                if enriched and (enriched.get("doi") or enriched.get("authors")):
+                    if enriched.get("doi"):
+                        db_doi = enriched["doi"]
+                        doc.doi = enriched["doi"]
+                        doc.url = enriched.get("url") or f"https://doi.org/{db_doi}"
+                    if enriched.get("title") and (not doc.title or doc.title == doc.filename.replace(".pdf", "")):
+                        doc.title = enriched["title"]
+                    if enriched.get("authors"):
+                        doc.authors = json.dumps(enriched["authors"], ensure_ascii=False)
+                        db_authors = enriched["authors"]
+                    if enriched.get("year"):
+                        doc.year = str(enriched["year"])
+                    if enriched.get("journal"):
+                        doc.journal = enriched["journal"]
+                    if enriched.get("abstract") and not doc.abstract:
+                        doc.abstract = enriched["abstract"]
+                    if enriched.get("journal_metric"):
+                        doc.journal_metric = enriched["journal_metric"]
+                    if enriched.get("access_status"):
+                        doc.access_status = enriched["access_status"]
+                    commit_with_retry(db)
+            except Exception as e:
+                logger.debug(f"[On-demand hybrid metadata enrichment error]: {e}")
+
         res_data = {
             "id": doc.id,
             "filename": doc.filename,

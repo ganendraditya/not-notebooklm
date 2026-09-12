@@ -340,6 +340,7 @@
   "action.unpin": "Lepas sematan",
   "action.deleteChat": "Hapus obrolan",
   "action.cite": "Sitasi",
+  "right.citationIncompleteNotice": "Metadata belum lengkap: Penulis atau tahun publikasi tidak dapat diverifikasi secara otomatis dari repositori resmi. Harap verifikasi sebelum mencantumkannya ke daftar pustaka.",
   "right.academicResearchers": "Peneliti Akademik",
   "right.scholarlyPublication": "Publikasi Ilmiah",
   "right.peerReviewed": "Telah Ditinjau Sejawat (Peer-Reviewed)",

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Quote, X, Download, Copy, Check } from "lucide-react";
+import { Quote, X, Download, Copy, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Portal } from "@/components/ui/Portal";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -11,9 +11,11 @@ interface CitationModalProps {
   onClose: () => void;
   citations: CitationFormats;
   doiStr: string;
+  hasAuthors?: boolean;
+  hasYear?: boolean;
 }
 
-export function CitationModal({ isOpen, onClose, citations, doiStr }: CitationModalProps) {
+export function CitationModal({ isOpen, onClose, citations, doiStr, hasAuthors = true, hasYear = true }: CitationModalProps) {
   const { t } = useTranslation();
   const [selectedCitationStyle, setSelectedCitationStyle] = useState<"apa" | "ieee" | "harvard" | "mla" | "chicago" | "bibtex" | "ris">("apa");
   const [copiedCitationKey, setCopiedCitationKey] = useState<string | null>(null);
@@ -61,6 +63,16 @@ export function CitationModal({ isOpen, onClose, citations, doiStr }: CitationMo
             </button>
           </Tooltip>
         </div>
+
+        {/* Incomplete Metadata Warning Notice */}
+        {(!hasAuthors || !hasYear) && (
+          <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-500 dark:text-amber-400">
+            <AlertCircle size={15} className="shrink-0 mt-0.5 text-amber-500" />
+            <span className="leading-snug">
+              {t('right.citationIncompleteNotice') || "Incomplete metadata: Author or publication year could not be verified automatically. Please review before citing in formal research."}
+            </span>
+          </div>
+        )}
 
         {/* Citation Format Tabs (Clean, Scrollable & Compact) */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar text-xs font-medium">
