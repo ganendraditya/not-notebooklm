@@ -17,6 +17,7 @@ import { useUIStore } from "@/stores/uiStore";
 
 import { useChatSession } from "@/hooks/chat/useChatSession";
 import { useChatStream, type ChatJobState } from "@/hooks/chat/useChatStream";
+import { isMatchingPaper } from "@/lib/sourceUtils";
 
 export default function ChatClient() {
   const { t } = useTranslation();
@@ -133,11 +134,7 @@ export default function ChatClient() {
       });
       // Remove matching pending item by doi or filename matching
       updatePendingSourcesList(prev => prev.filter(p => {
-        if (p.doi && doc.doi && p.doi.toLowerCase().trim() === doc.doi.toLowerCase().trim()) return false;
-        const normP = (p.filename || "").toLowerCase().replace(/\.pdf$/i, "").replace(/[^a-z0-9]/g, "");
-        const normDocFn = (doc.filename || "").toLowerCase().replace(/\.pdf$/i, "").replace(/[^a-z0-9]/g, "");
-        const normDocTitle = (doc.title || "").toLowerCase().replace(/\.pdf$/i, "").replace(/[^a-z0-9]/g, "");
-        if (normP && (normP === normDocFn || normP === normDocTitle || normDocFn.includes(normP) || normP.includes(normDocFn))) {
+        if (isMatchingPaper({ title: p.filename, filename: p.filename, doi: p.doi }, doc)) {
           return false;
         }
         return true;

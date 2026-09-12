@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, memo, useLayoutEffect, useEffect } from "react";
+import React, { useState, useRef, useMemo, useCallback, memo, useLayoutEffect, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -23,6 +23,7 @@ import { parseCitationsInReactNode, CitationContext, enhanceTableCitations } fro
 import { useTranslation } from "@/lib/i18n";
 import { consumeSSEStream } from "@/lib/sse";
 import { Tooltip } from "@/components/ui/tooltip";
+import { isMatchingPaper } from "@/lib/sourceUtils";
 
 export interface AcademicCandidateSource {
   title?: string;
@@ -298,7 +299,16 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     if (sourcesMatch) {
       clean = clean.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/, "").trim();
       try {
-        parsedSources = JSON.parse(sourcesMatch[1]);
+        const rawSources: AcademicCandidateSource[] = JSON.parse(sourcesMatch[1]);
+        if (Array.isArray(rawSources)) {
+          const uniqueSources: AcademicCandidateSource[] = [];
+          for (const s of rawSources) {
+            if (!uniqueSources.some(existing => isMatchingPaper(s, existing))) {
+              uniqueSources.push(s);
+            }
+          }
+          parsedSources = uniqueSources;
+        }
       } catch (e) {
         console.error("Failed to parse sources data:", e);
       }
@@ -349,26 +359,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
   const isDuplicateSource = useCallback((src: AcademicCandidateSource) => {
     if (!documents || documents.length === 0) return false;
-    const normalize = (s: string) => s.replace(/\.pdf$/i, "").replace(/[^a-zA-Z0-9\s]/g, " ").toLowerCase().trim().replace(/\s+/g, " ");
-    const srcNorm = normalize(src.title || "");
-    if (!srcNorm) return false;
-    const srcTokens = new Set(srcNorm.split(" "));
-
-    for (const doc of documents) {
-      const docNorm = normalize(doc.filename || "");
-      if (!docNorm) continue;
-      if (srcNorm === docNorm) return true;
-      if (docNorm.length >= 20 && (srcNorm.startsWith(docNorm) || docNorm.startsWith(srcNorm))) return true;
-
-      const docTokens = new Set(docNorm.split(" "));
-      let intersection = 0;
-      for (const t of srcTokens) {
-        if (docTokens.has(t)) intersection++;
-      }
-      const minLen = Math.min(srcTokens.size, docTokens.size);
-      if (minLen > 0 && intersection / minLen >= 0.75 && intersection >= 3) return true;
-    }
-    return false;
+    return documents.some(doc => isMatchingPaper(src, doc));
   }, [documents]);
 
   const [userSelectionOverrides, setUserSelectionOverrides] = useState<Record<number, boolean>>({});
@@ -396,6 +387,14 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   };
 
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleImport = async () => {
     const toImport = sources.filter((src, i) => !isDuplicateSource(src) && isSourceChecked(src, i));
@@ -436,7 +435,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       await consumeSSEStream(res, (data: any) => {
         if (data.type === "progress") {
           const currentProgress = data.current || 0;
-          setImportProgress({ current: currentProgress, total: toImport.length });
+          if (isMountedRef.current) {
+            setImportProgress({ current: currentProgress, total: toImport.length });
+          }
           if (data.doc) {
             onDocumentAdded?.(data.doc as DocType, currentChatId);
           }
@@ -447,18 +448,24 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             }
           }
         } else if (data.type === "done") {
-          setImportProgress({ current: toImport.length, total: toImport.length });
+          if (isMountedRef.current) {
+            setImportProgress({ current: toImport.length, total: toImport.length });
+          }
         }
       });
 
-      setUserSelectionOverrides({});
+      if (isMountedRef.current) {
+        setUserSelectionOverrides({});
+      }
     } catch (e) {
       console.error("Import sources failed:", e);
     } finally {
       // Ensure all pending source badges are cleaned up
       pendingItems.forEach(p => onResolvePendingSource?.(p.id));
-      setIsImporting(false);
-      setImportProgress(null);
+      if (isMountedRef.current) {
+        setIsImporting(false);
+        setImportProgress(null);
+      }
     }
   };
 

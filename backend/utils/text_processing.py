@@ -1,14 +1,20 @@
 import re
 import html
+import unicodedata
 from typing import Optional
 
 def normalize_title_str(t: str) -> str:
-    """Normalizes a title by stripping extensions, punctuation, and collapsing whitespace."""
+    """Normalizes a title by stripping extensions, punctuation, and collapsing whitespace without destroying non-Latin characters."""
     if not t:
         return ""
-    t = re.sub(r'\.pdf$', '', t, flags=re.I)
-    t = re.sub(r'[^a-zA-Z0-9\s]', ' ', t).lower()
-    return " ".join(t.split())
+    s = t.strip()
+    for ext in ('.pdf', '.txt', '.docx', '.doc', '.md'):
+        if s.lower().endswith(ext):
+            s = s[:-len(ext)].strip()
+            break
+    s = unicodedata.normalize('NFKC', s).lower()
+    chars = [c if (c.isalnum() or c.isspace()) else ' ' for c in s]
+    return " ".join("".join(chars).split())
 
 GENERIC_TITLE_BLACKLIST = {
     "article in press", "in press", "journal pre-proof", "uncorrected proof",
@@ -163,7 +169,7 @@ def clean_doi(raw_doi: Optional[str]) -> str:
     doi = doi.replace("**", "").replace("*", "").replace("__", "").replace("_", "")
     doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").replace("doi:", "")
     doi = doi.replace("https://dx.doi.org/", "").replace("http://dx.doi.org/", "").replace("dx.doi.org/", "").strip()
-    doi = re.sub(r'[;.,:)\s]+$', '', doi).strip()
+    doi = doi.rstrip(";.,:)\t\n\r ")
     return doi
 
 def reconstruct_inverted_index(inverted_index: Optional[dict]) -> str:

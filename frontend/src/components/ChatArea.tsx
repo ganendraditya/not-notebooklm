@@ -668,6 +668,7 @@ export default function ChatArea({
                           </div>
                         ) : msg.content ? (
                           <InChatMessageComponent 
+                            key={`assistant-msg-${idx}-v-${msg.active_variant_index ?? 0}`}
                             msg={msg}
                             activeChatId={activeChatId}
                             backendUrl={backendUrl}
