@@ -196,4 +196,52 @@ describe("ChatMessageItem Table & Cleanliness", () => {
     const citationButtons = Array.from(buttons).filter(b => b.textContent?.includes("1"));
     expect(citationButtons.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("preserves horizontal scroll position when activeCitationKey updates upon clicking a citation", () => {
+    const rawContent = `| Col 1 | Col 2 | Col 3 | Col 4 |
+|:---|:---|:---|:---|
+| [1] Paper 1 | Data 1 | Data 2 | Metric 88% [1] |`;
+
+    const msg = {
+      role: "assistant" as const,
+      content: rawContent,
+      created_at: new Date().toISOString(),
+    };
+
+    const documents = [
+      { id: 1, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }
+    ];
+
+    const { container, rerender } = renderWithI18n(
+      <InChatMessageComponent
+        msg={msg}
+        activeChatId="test-chat"
+        backendUrl="http://localhost:8000"
+        documents={documents}
+        activeCitationKey={null}
+      />
+    );
+
+    const scrollContainer = container.querySelector(".overflow-x-auto") as HTMLDivElement;
+    expect(scrollContainer).toBeTruthy();
+
+    // User scrolls horizontally to the right
+    fireEvent.scroll(scrollContainer, { target: { scrollLeft: 450 } });
+
+    // Re-render when active citation key changes (as happens when user clicks citation button)
+    rerender(
+      <I18nProvider>
+        <InChatMessageComponent
+          msg={msg}
+          activeChatId="test-chat"
+          backendUrl="http://localhost:8000"
+          documents={documents}
+          activeCitationKey="cite-td_10-88-1-0"
+        />
+      </I18nProvider>
+    );
+
+    // scrollLeft must remain preserved at 450 instead of resetting to 0
+    expect(scrollContainer.scrollLeft).toBe(450);
+  });
 });

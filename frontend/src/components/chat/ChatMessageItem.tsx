@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, memo } from "react";
+import React, { useState, useMemo, useCallback, memo, useLayoutEffect, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -149,9 +149,35 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   );
 };
 
-const MarkdownTableBlock: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+const MarkdownTableBlock: React.FC<{ children?: React.ReactNode; [key: string]: any }> = ({ children, ...props }) => {
   const tableRef = React.useRef<HTMLTableElement>(null);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const scrollPosRef = React.useRef<number>(0);
   const [copied, setCopied] = useState(false);
+
+  // Preserve horizontal scroll position across re-renders or layout changes (e.g. sidebar toggle or citation click)
+  useLayoutEffect(() => {
+    if (scrollContainerRef.current && scrollPosRef.current > 0) {
+      scrollContainerRef.current.scrollLeft = scrollPosRef.current;
+    }
+  });
+
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    scrollPosRef.current = e.currentTarget.scrollLeft;
+  }, []);
+
+  // Restore scrollLeft if window / sidebar causes container width resize
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const onResize = () => {
+      if (scrollPosRef.current > 0) {
+        el.scrollLeft = scrollPosRef.current;
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const handleCopy = useCallback(async () => {
     if (!tableRef.current) return;
@@ -205,12 +231,45 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode }> = ({ children
         </Tooltip>
       </div>
 
-      <div className="overflow-x-auto custom-scrollbar">
-        <table ref={tableRef} className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top">
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="overflow-x-auto custom-scrollbar"
+      >
+        <table ref={tableRef} className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top" {...props}>
           {children}
         </table>
       </div>
     </div>
+  );
+};
+
+const MarkdownTableHeader: React.FC<{ children?: React.ReactNode; [key: string]: any }> = ({ children, ...props }) => (
+  <thead className="bg-app-table-header text-app-text border-b border-app-border font-semibold select-none" {...props}>
+    {children}
+  </thead>
+);
+
+const MarkdownTableBody: React.FC<{ children?: React.ReactNode; [key: string]: any }> = ({ children, ...props }) => (
+  <tbody className="divide-y divide-app-divider" {...props}>
+    {children}
+  </tbody>
+);
+
+const MarkdownTableRow: React.FC<{ node?: any; children?: React.ReactNode; [key: string]: any }> = ({ node, children, ...props }) => {
+  const rowText = extractTableRowText(node, children);
+  const indexedChildren = React.Children.map(children, (child, colIndex) => {
+    if (React.isValidElement(child)) {
+      return React.cloneElement(child as React.ReactElement<any>, { colIndex });
+    }
+    return child;
+  });
+  return (
+    <TableRowContext.Provider value={rowText}>
+      <tr className="hover:bg-app-item-hover transition-colors align-top" {...props}>
+        {indexedChildren}
+      </tr>
+    </TableRowContext.Provider>
   );
 };
 
@@ -530,33 +589,10 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 </a>
               );
             },
-            table: ({ children }: any) => <MarkdownTableBlock>{children}</MarkdownTableBlock>,
-            thead: ({ children }: any) => (
-              <thead className="bg-app-table-header text-app-text border-b border-app-border font-semibold select-none">
-                {children}
-              </thead>
-            ),
-            tbody: ({ children }: any) => (
-              <tbody className="divide-y divide-app-divider">
-                {children}
-              </tbody>
-            ),
-            tr: ({ node, children, ...props }: any) => {
-              const rowText = extractTableRowText(node, children);
-              const indexedChildren = React.Children.map(children, (child, colIndex) => {
-                if (React.isValidElement(child)) {
-                  return React.cloneElement(child as React.ReactElement<any>, { colIndex });
-                }
-                return child;
-              });
-              return (
-                <TableRowContext.Provider value={rowText}>
-                  <tr className="hover:bg-app-item-hover transition-colors align-top" {...props}>
-                    {indexedChildren}
-                  </tr>
-                </TableRowContext.Provider>
-              );
-            },
+            table: MarkdownTableBlock,
+            thead: MarkdownTableHeader,
+            tbody: MarkdownTableBody,
+            tr: MarkdownTableRow,
             th: ({ node, children, colIndex, ...props }: any) => (
               <TableCellRenderer
                 isHeader={true}
