@@ -236,10 +236,26 @@ export default function RightSidebar({
     if (!title || GENERIC_HEADERS.has(title.trim().toLowerCase())) {
       title = filenameFallback;
     }
+
+    const isAcademicPaper = Boolean(
+      paperDetails?.doi || 
+      viewingDoc?.doi ||
+      (paperDetails?.journal && !["uploaded document", "scholarly publication"].includes(paperDetails.journal.trim().toLowerCase())) ||
+      (paperDetails?.authors && paperDetails.authors.length > 0) ||
+      (paperDetails?.citations && paperDetails.citations > 0)
+    );
+
     const authorsStr = paperDetails?.authors && paperDetails.authors.length > 0
       ? paperDetails.authors.join(", ")
-      : t('right.academicResearchers');
-    const pubDateStr = formatReadableDate(paperDetails?.publication_date, paperDetails?.year);
+      : isAcademicPaper
+      ? t('right.academicResearchers')
+      : "";
+
+    const rawUploadDate = viewingDoc?.created_at || paperDetails?.created_at;
+    const pubDateStr = isAcademicPaper
+      ? (formatReadableDate(paperDetails?.publication_date, paperDetails?.year) || (t('right.recentPublication') || "Recent publication"))
+      : (rawUploadDate ? `Uploaded ${formatReadableDate(rawUploadDate)}` : "");
+
     const journalName = paperDetails?.journal || t('right.scholarlyPublication');
     const citationsCount = paperDetails?.citations !== undefined ? paperDetails.citations : 0;
     const doiStr = paperDetails?.doi || "";
@@ -252,6 +268,7 @@ export default function RightSidebar({
           viewingDoc={viewingDoc}
           paperDetails={paperDetails}
           isLoadingDetails={isLoadingDetails}
+          isAcademicPaper={isAcademicPaper}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           onClose={onClose}
@@ -356,7 +373,7 @@ export default function RightSidebar({
       />
 
       {/* 2 & 3. Fixed Controls Area (Add Sources + Toolbar) */}
-      <div className="p-3.5 pb-2.5 space-y-2.5 shrink-0 bg-app-sidebar z-10 border-b border-app-divider shadow-sm">
+      <div className="px-2 pt-3 pb-2.5 space-y-2.5 shrink-0 bg-app-sidebar z-10 border-b border-app-divider shadow-sm">
         {/* Prominent '+ Add sources' Button (NotebookLM Style) */}
         <div className="w-full">
           <Button

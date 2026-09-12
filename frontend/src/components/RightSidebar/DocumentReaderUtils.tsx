@@ -584,8 +584,8 @@ export function getHighlightedContent(
 }
 
 export const formatReadableDate = (dateStr?: string, yearFallback?: string) => {
-  if (!dateStr && !yearFallback) return "Recent publication";
-  if (!dateStr) return yearFallback || new Date().getFullYear().toString();
+  if (!dateStr && !yearFallback) return "";
+  if (!dateStr) return yearFallback || "";
   
   if (/^\d{4}$/.test(dateStr.trim())) {
     return dateStr.trim();
@@ -604,6 +604,31 @@ export const formatReadableDate = (dateStr?: string, yearFallback?: string) => {
     // fallback
   }
   return dateStr;
+};
+
+export interface FileBadge {
+  label: string;
+  bg: string;
+}
+
+export const getFileBadgeInfo = (filename: string): FileBadge => {
+  if (filename.startsWith("10.") || filename.startsWith("DOI:") || filename.includes("doi.org")) {
+    return { label: "DOI", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
+  }
+  const ext = filename.split(".").pop()?.toLowerCase() || "doc";
+  if (ext === "pdf") {
+    return { label: "PDF", bg: "bg-red-600/15 border-red-500/40 text-red-500" };
+  } else if (ext === "docx" || ext === "doc") {
+    return { label: "DOC", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
+  } else if (ext === "bib" || ext === "bibtex") {
+    return { label: "BIB", bg: "bg-amber-600/15 border-amber-500/40 text-amber-500" };
+  } else if (ext === "ris") {
+    return { label: "RIS", bg: "bg-orange-600/15 border-orange-500/40 text-orange-500" };
+  } else if (ext === "md") {
+    return { label: "MD", bg: "bg-purple-600/15 border-purple-500/40 text-purple-500" };
+  } else {
+    return { label: "TXT", bg: "bg-app-item-hover border-app-border text-app-text-muted" };
+  }
 };
 
 

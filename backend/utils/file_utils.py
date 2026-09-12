@@ -34,18 +34,23 @@ def sanitize_paper_filename(title: str, max_length: int = 200) -> str:
             clean = truncated.strip()
     return f"{clean}.pdf" if not clean.lower().endswith(".pdf") else clean
 
+def sanitize_safe_filename(name: str) -> str:
+    """Safely sanitizes filename preventing directory traversal while preserving Unicode characters."""
+    if not name:
+        return "uploaded_doc"
+    base = os.path.basename(name).strip()
+    FORBIDDEN = {'/', '\\', ':', '*', '?', '"', '<', '>', '|', '\0'}
+    clean = "".join(c if c not in FORBIDDEN else '_' for c in base).strip()
+    clean = clean.lstrip(".")
+    return clean or "uploaded_doc"
+
 def get_doc_file_path(chat_id: str, filename: str) -> str:
     """Returns absolute file path for a chat document safely with dual unescaped/secure fallback."""
     raw_chat_id = (chat_id or "").strip()
     raw_fname = (filename or "").strip()
 
-    try:
-        import werkzeug.utils
-        clean_chat_id = werkzeug.utils.secure_filename(raw_chat_id)
-        clean_fname = werkzeug.utils.secure_filename(raw_fname)
-    except (ImportError, ModuleNotFoundError):
-        clean_chat_id = re.sub(r'[^a-zA-Z0-9_.-]', '_', raw_chat_id)
-        clean_fname = re.sub(r'[^a-zA-Z0-9_.-]', '_', raw_fname)
+    clean_chat_id = sanitize_safe_filename(raw_chat_id)
+    clean_fname = sanitize_safe_filename(raw_fname)
 
     # 1. Candidate paths to inspect (prefer authentic binary PDF on disk if available)
     candidate_paths = [

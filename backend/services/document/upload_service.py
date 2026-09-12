@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from fastapi import UploadFile
 
 from database import Document, commit_with_retry
-from utils.file_utils import UPLOAD_DIR
+from utils.file_utils import UPLOAD_DIR, sanitize_safe_filename
 from utils.pdf_utils import is_authentic_pdf_bytes
 
 logger = logging.getLogger("uvicorn.error")
@@ -74,10 +74,8 @@ def handle_document_upload(chat_id: str, file: UploadFile, db: Session) -> Tuple
     Handles physical file storage and DB row creation for uploaded documents.
     Returns (created_db_doc, file_path, enriched_metadata).
     """
-    import werkzeug.utils
-
-    clean_chat_id = werkzeug.utils.secure_filename(chat_id)
-    clean_fname = werkzeug.utils.secure_filename(file.filename or "uploaded_doc")
+    clean_chat_id = sanitize_safe_filename(chat_id)
+    clean_fname = sanitize_safe_filename(file.filename or "uploaded_doc")
     file_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
     
     with open(file_path, "wb") as buffer:

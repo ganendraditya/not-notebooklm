@@ -17,11 +17,13 @@ import { useTranslation } from "@/lib/i18n";
 import { Document as DocType } from "@/stores/documentStore";
 import { PaperDetailData } from "@/hooks/usePaperDetails";
 import { Tooltip } from "@/components/ui/tooltip";
+import { getFileBadgeInfo } from "../DocumentReaderUtils";
 
 export interface DocumentReaderProps {
   viewingDoc: DocType | null;
   paperDetails: PaperDetailData | null;
   isLoadingDetails: boolean;
+  isAcademicPaper?: boolean;
   activeTab: "preview" | "pdf";
   setActiveTab: (tab: "preview" | "pdf") => void;
   onClose: () => void;
@@ -50,6 +52,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
   viewingDoc,
   paperDetails,
   isLoadingDetails,
+  isAcademicPaper = false,
   activeTab,
   setActiveTab,
   onClose,
@@ -74,6 +77,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
   setIsCiteModalOpen,
 }) => {
   const { t } = useTranslation();
+  const badge = getFileBadgeInfo(viewingDoc?.filename || "");
 
   return (
     <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 z-10 transition-all relative text-app-text">
@@ -209,30 +213,34 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
               {/* Top Meta Section */}
               <div className="bg-app-surface border border-app-border rounded-xl mb-4 overflow-hidden shadow-sm">
                 
-                {paperDetails?.has_full_pdf ? (
-                  <div className="px-5 py-4 border-b border-app-border bg-emerald-500/10">
-                    <div className="flex items-center gap-2 text-emerald-500 font-medium text-sm">
-                      <Check size={16} className="stroke-[2.5]" />
-                      <span>Full Manuscript Verified</span>
+                {isAcademicPaper && (
+                  paperDetails?.has_full_pdf ? (
+                    <div className="px-5 py-4 border-b border-app-border bg-emerald-500/10">
+                      <div className="flex items-center gap-2 text-emerald-500 font-medium text-sm">
+                        <Check size={16} className="stroke-[2.5]" />
+                        <span>Full Manuscript Verified</span>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="px-5 py-4 border-b border-app-border bg-amber-500/10">
-                    <div className="flex items-center gap-2 text-amber-500 font-medium text-sm">
-                      <FileText size={16} className="stroke-[2.5]" />
-                      <span>Abstract & Metadata Only</span>
+                  ) : (
+                    <div className="px-5 py-4 border-b border-app-border bg-amber-500/10">
+                      <div className="flex items-center gap-2 text-amber-500 font-medium text-sm">
+                        <FileText size={16} className="stroke-[2.5]" />
+                        <span>Abstract & Metadata Only</span>
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
 
                 <div className="px-5 py-6 space-y-4">
                   <div className="flex flex-wrap items-center gap-3 text-xs mb-3">
-                    {pubDateStr && (
-                      <div className="flex items-center gap-1.5 text-app-text-muted">
-                        <span className="text-[10px] font-bold bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">PDF</span>
+                    <div className="flex items-center gap-2 text-app-text-muted">
+                      <span className={`text-[9.5px] font-bold uppercase px-1.5 py-0.5 rounded border ${badge.bg}`}>
+                        {badge.label}
+                      </span>
+                      {pubDateStr && (
                         <span>{pubDateStr}</span>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                   
                   <h1 className="text-xl font-bold text-app-text leading-tight tracking-tight break-words">
@@ -417,7 +425,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
           })()}
         </div>
 
-        {(() => {
+        {(landingUrl || isAcademicPaper) && (() => {
           const pdfLink = landingUrl || `https://scholar.google.com/scholar?q=${encodeURIComponent(title)}`;
           return (
             <Tooltip content={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"} side="top">
@@ -431,7 +439,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
                 aria-label={landingUrl ? "Open full-text paper link in new tab" : "Search for this paper on Google Scholar"}
               >
                 <ExternalLink size={12} />
-                <span>{landingUrl ? "PDF \u2197" : "PDF \u2197"}</span>
+                <span>PDF ↗</span>
               </a>
             </Tooltip>
           );

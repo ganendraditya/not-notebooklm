@@ -57,7 +57,7 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
   const { t } = useTranslation();
 
   return (
-    <div className="px-3.5 pb-3.5 flex-1 flex flex-col overflow-y-auto custom-scrollbar min-h-0 relative">
+    <div className="px-2 pb-3 flex-1 flex flex-col overflow-y-auto custom-scrollbar min-h-0 relative">
       <div className="w-full flex-1 space-y-0.5 pt-0.5">
         {sortedDocuments.length === 0 && pendingSources.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center text-app-text-muted px-3">
@@ -79,14 +79,14 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                 <div
                   key={doc.id}
                   onClick={() => setViewingDoc(doc)}
-                  className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-app-item-hover transition-colors cursor-pointer group"
+                  className="flex items-center justify-between py-2 px-2.5 rounded-lg bg-transparent hover:bg-app-item-hover transition-colors cursor-pointer group"
                 >
                   {/* Left: Clean Monospace Index + Compact Format Badge + File Name */}
                   <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
                     {/* Clean Minimalist Index */}
                     <Tooltip content={`Permanent Reference Index [${docIndex}]`} side="top">
                       <span 
-                        className="w-7 text-left -ml-0.5 text-[11px] font-mono font-medium text-app-text-dim group-hover:text-app-text transition-colors shrink-0 select-none tabular-nums"
+                        className="w-6 text-left text-[11px] font-mono font-medium text-app-text-dim group-hover:text-app-text transition-colors shrink-0 select-none tabular-nums"
                       >
                         {docIndex}.
                       </span>
@@ -232,12 +232,12 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
               return (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between py-1.5 pl-1 pr-0.5 rounded-lg bg-transparent hover:bg-app-item-hover transition-colors select-none group"
+                  className="flex items-center justify-between py-2 px-2.5 rounded-lg bg-transparent hover:bg-app-item-hover transition-colors select-none group"
                 >
                   {/* Left: Monospace Number + Badge + File / DOI Name */}
                   <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
                     <span 
-                      className="w-7 text-left -ml-0.5 text-[11px] font-mono font-medium text-app-text-dim shrink-0 select-none tabular-nums"
+                      className="w-6 text-left text-[11px] font-mono font-medium text-app-text-dim shrink-0 select-none tabular-nums"
                     >
                       {itemNumber}.
                     </span>

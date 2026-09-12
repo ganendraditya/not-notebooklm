@@ -66,7 +66,7 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
                 }
               }}
               disabled={documents.length <= 1}
-              className={`w-6 h-6 -ml-1 rounded transition-colors flex items-center justify-center ${
+              className={`w-7 h-7 rounded-lg transition-colors flex items-center justify-center ${
                 documents.length > 1
                   ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
                   : "text-app-text-dim opacity-30 cursor-not-allowed"
@@ -83,7 +83,7 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
 
           {/* Sort Dropdown Menu */}
           {isSortMenuOpen && (
-            <div className="absolute left-0 top-7 z-30 w-36 rounded-xl bg-app-dropdown border border-app-border-strong shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-app-text">
+            <div className="absolute left-0 top-8 z-30 w-36 rounded-xl bg-app-dropdown border border-app-border-strong shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100 text-app-text">
               {/* Section 1: Sort Criteria */}
               <div className="space-y-0.5 pb-0.5">
                 <button
@@ -127,15 +127,15 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
         </div>
 
         {/* Action Icon Buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           {/* Clean Duplicates */}
           <Tooltip content={t('right.cleanDup')} side="bottom">
             <button
               onClick={handleCleanDuplicates}
               disabled={documents.length <= 1 || isCleaningDuplicates}
-              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                 documents.length > 1 && !isCleaningDuplicates
-                  ? "text-app-text-muted hover:text-emerald-500 hover:bg-emerald-500/10 cursor-pointer"
+                  ? "text-app-text-muted hover:text-emerald-500 hover:bg-emerald-500/15 cursor-pointer"
                   : "text-app-text-dim opacity-30 cursor-not-allowed"
               }`}
               aria-label={t('right.cleanDup')}
@@ -162,9 +162,9 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
             <button
               onClick={handleOpenRename}
               disabled={selectedCount !== 1}
-              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                 selectedCount === 1
-                  ? "text-app-text-muted hover:text-blue-500 hover:bg-blue-500/10 cursor-pointer"
+                  ? "text-app-text-muted hover:text-blue-500 hover:bg-blue-500/15 cursor-pointer"
                   : selectedCount > 1
                   ? "text-app-text-dim opacity-25 cursor-not-allowed"
                   : "text-app-text-dim opacity-30 cursor-not-allowed"
@@ -200,7 +200,7 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
                 <button
                   onClick={handleBulkDownload}
                   disabled={!canDownload}
-                  className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                     canDownload
                       ? "text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer"
                       : "text-app-text-dim opacity-30 cursor-not-allowed"
@@ -228,9 +228,9 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
                 setShowBulkDeleteConfirm(true);
               }}
               disabled={selectedCount === 0 || isBulkDeleting}
-              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                 selectedCount > 0
-                  ? "text-app-text-muted hover:text-red-500 hover:bg-red-500/10 cursor-pointer"
+                  ? "text-app-text-muted hover:text-red-500 hover:bg-red-500/15 cursor-pointer"
                   : "text-app-text-dim opacity-30 cursor-not-allowed"
               }`}
               aria-label={selectedCount > 0 ? t('right.deleteSelected').replace('{n}', selectedCount.toString()) : t('right.selectToDelete')}
@@ -242,7 +242,7 @@ export const SourcesToolbar: React.FC<SourcesToolbarProps> = ({
       </div>
 
       {/* Select all label and checkbox */}
-      <div className={`flex items-center gap-2 pr-0.5 whitespace-nowrap select-none ${
+      <div className={`flex items-center gap-2 pr-1.5 whitespace-nowrap select-none ${
         documents.length === 0 ? "opacity-30 pointer-events-none" : ""
       }`}>
         <span className="text-[11px] font-medium text-app-text-muted select-none">{t('right.selectAll')}</span>
