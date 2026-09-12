@@ -523,7 +523,7 @@ export default function ChatArea({
         }`}
         style={!isChatEmpty ? { paddingBottom: `${Math.max(120, inputHeight + 16)}px` } : undefined}
       >
-        <div className="w-full max-w-3xl mx-auto pl-[19px] pr-[13px] sm:pl-[27px] sm:pr-[21px] md:pl-[35px] md:pr-[29px] space-y-6">
+        <div className="w-full px-4 space-y-6">
           {isChatEmpty ? (
             <div className="flex flex-col items-center justify-center py-6 text-center px-4 w-full max-w-2xl mx-auto">
               <div className="p-3.5 rounded-full bg-app-surface border border-app-border mb-4 shadow-sm">
@@ -768,7 +768,7 @@ export default function ChatArea({
       {/* Floating Gradient Backdrop for Input (width capped to input box width only, zero side overflow) */}
       {!isChatEmpty && (
         <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-10">
-          <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 md:px-8 pointer-events-none min-w-0 relative">
+          <div className="w-full px-4 pointer-events-none min-w-0 relative">
             <div className="absolute inset-x-0 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             {showScrollBottom && (
               <div className="flex justify-center mb-2 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-200">
