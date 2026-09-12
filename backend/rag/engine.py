@@ -187,6 +187,10 @@ async def dispatch_intent_pipeline(
 
         if intent == "ANALYZE_WORKSPACE":
             if not has_local_docs:
+                if "[Attachments Provided by User:]" in query:
+                    # User attached files directly in the chat message: route to general chat so the LLM reads and discusses them!
+                    raw_res = await chat_pipeline.handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
+                    return format_clean_response(raw_res)
                 return "Sesi percakapan ini belum memiliki dokumen referensi. Silakan unggah dokumen PDF atau gunakan fitur pencarian paper untuk menambahkan referensi terlebih dahulu."
             return await workspace_pipeline.handle_workspace_analysis_pipeline(
                 chat_id=chat_id,
@@ -226,6 +230,7 @@ async def query_chat(
     """
     from database import SessionLocal, Document as DBDocument
     
+    raw_user_query = (query or "").strip()
     query = prepare_query_attachments(query, chat_history)
     
     async def report_status(text: str):
@@ -267,9 +272,11 @@ async def query_chat(
     if not candidate_llms:
         return "Error: Tidak ada LLM Provider yang terkonfigurasi. Silakan periksa file .env."
 
-    # Intent classification is performed ultra-fast via Fast Lite LLM
+    # Intent classification is performed ultra-fast via Fast Lite LLM using clean user prompt
     fast_instance = get_fast_llm() or (candidate_llms[0][0] if candidate_llms else None)
-    intent = await classify_user_intent(query, has_local_docs, len(local_docs), fast_instance)
+    has_chat_attachments = "[Attachments Provided by User:]" in query
+    intent_query = raw_user_query if raw_user_query else ("Silakan baca dan diskusikan dokumen terlampir." if has_chat_attachments else query)
+    intent = await classify_user_intent(intent_query, has_local_docs, len(local_docs), fast_instance)
     logger.info(f"[RAG Engine] Fast LLM Semantic Intent: {intent}")
 
     # Dynamic timeout: complex comparative workspace queries need up to 150s

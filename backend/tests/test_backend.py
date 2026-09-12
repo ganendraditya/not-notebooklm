@@ -311,6 +311,21 @@ def test_rag_history_and_attachment_preparation():
     assert "[Attachments Provided by User:]" in prepared
     assert "Document attached: sample_draft.txt" in prepared
 
+def test_intent_routes_to_general_chat_when_no_workspace_docs():
+    """Verify intent classifier and pipeline routing never falsely block chat attachments with empty workspace."""
+    import asyncio
+    from unittest.mock import MagicMock, AsyncMock
+    from rag.intent import classify_user_intent
+
+    mock_llm = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.text = "ANALYZE_WORKSPACE"
+    mock_llm.acomplete = AsyncMock(return_value=mock_resp)
+
+    # When has_docs is False, even if the model outputs ANALYZE_WORKSPACE, it must fall back to GENERAL_CHAT
+    res = asyncio.run(classify_user_intent("ini baca bro", has_docs=False, doc_count=0, llm=mock_llm))
+    assert res == "GENERAL_CHAT"
+
 def test_doi_cleaning_and_pdf_validation():
     """Verify clean_doi standardizes strings and is_authentic_pdf_bytes filters synthetic PDFs."""
     from helpers import clean_doi, is_authentic_pdf_bytes
