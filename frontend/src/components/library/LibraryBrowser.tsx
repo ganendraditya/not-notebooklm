@@ -78,31 +78,43 @@ export default function LibraryBrowser({
       const res = await fetch(`${backendUrl}/storage/files?category=${backendCat}`);
       if (res.ok) {
         const data = await res.json();
-        const filtered = data.filter((item: any) => 
-          (item.filename || "").toLowerCase().includes(q.toLowerCase()) ||
+        const mappedItems: LibraryItem[] = (Array.isArray(data) ? data : []).map((raw: any) => ({
+          id: raw.id || "",
+          type: raw.category === "images" ? "image" : raw.category === "documents" ? "document" : "file",
+          name: raw.filename || raw.raw_filename || "Untitled",
+          raw_filename: raw.raw_filename || raw.filename || "",
+          size_bytes: raw.size ?? raw.size_bytes ?? 0,
+          modified: raw.uploaded_at || raw.modified || new Date().toISOString(),
+          path: raw.id || raw.path || "",
+          chat_id: raw.chat_id || null,
+          chat_title: raw.chat_title || null,
+        }));
+
+        const filtered = mappedItems.filter((item) => 
+          item.name.toLowerCase().includes(q.toLowerCase()) ||
           (item.chat_title || "").toLowerCase().includes(q.toLowerCase())
         );
 
         if (sortBy === "name") {
-          filtered.sort((a: any, b: any) => 
+          filtered.sort((a, b) => 
             order === "asc" 
-              ? (a.filename || "").localeCompare(b.filename || "") 
-              : (b.filename || "").localeCompare(a.filename || "")
+              ? a.name.localeCompare(b.name) 
+              : b.name.localeCompare(a.name)
           );
         } else if (sortBy === "chat") {
-          filtered.sort((a: any, b: any) => {
+          filtered.sort((a, b) => {
             const titleA = a.chat_title || "";
             const titleB = b.chat_title || "";
             return order === "asc" ? titleA.localeCompare(titleB) : titleB.localeCompare(titleA);
           });
         } else if (sortBy === "size") {
-          filtered.sort((a: any, b: any) => 
-            order === "asc" ? a.size - b.size : b.size - a.size
+          filtered.sort((a, b) => 
+            order === "asc" ? a.size_bytes - b.size_bytes : b.size_bytes - a.size_bytes
           );
         } else {
-          filtered.sort((a: any, b: any) => {
-            const timeA = new Date(a.uploaded_at).getTime();
-            const timeB = new Date(b.uploaded_at).getTime();
+          filtered.sort((a, b) => {
+            const timeA = new Date(a.modified).getTime();
+            const timeB = new Date(b.modified).getTime();
             return order === "asc" ? timeA - timeB : timeB - timeA;
           });
         }
@@ -206,8 +218,8 @@ export default function LibraryBrowser({
     }
   };
 
-  const renderFileIcon = (filename: string) => {
-    const ext = filename.split(".").pop()?.toLowerCase() || "";
+  const renderFileIcon = (filename?: string) => {
+    const ext = (filename || "").split(".").pop()?.toLowerCase() || "";
     if (ext === "pdf") {
       return (
         <div className="w-8 h-8 rounded-lg bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-[10px] shrink-0 select-none">
@@ -250,8 +262,8 @@ export default function LibraryBrowser({
     );
   };
 
-  const renderGridFileIcon = (filename: string) => {
-    const ext = filename.split(".").pop()?.toLowerCase() || "";
+  const renderGridFileIcon = (filename?: string) => {
+    const ext = (filename || "").split(".").pop()?.toLowerCase() || "";
     if (ext === "pdf") {
       return (
         <div className="w-14 h-14 rounded-2xl bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-sm shadow-sm select-none">
