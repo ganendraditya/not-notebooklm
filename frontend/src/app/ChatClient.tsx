@@ -34,7 +34,8 @@ export default function ChatClient() {
     documents, setDocuments, pendingSources, setPendingSources,
     targetedSource, setTargetedSource, viewingDoc, setViewingDoc,
     groundingHighlight, setGroundingHighlight,
-    updateDocumentsList, updatePendingSourcesList
+    updateDocumentsList, updatePendingSourcesList,
+    cancelPendingItem
   } = useDocumentStore();
 
   const {
@@ -148,6 +149,10 @@ export default function ChatClient() {
 
   const handleResolvePendingSource = (pendingId: string) => {
     updatePendingSourcesList(prev => prev.filter(p => p.id !== pendingId));
+  };
+
+  const handleCancelPendingSource = (pendingId: string) => {
+    cancelPendingItem(pendingId);
   };
 
   const handleDocumentUpdated = (updatedDoc: Document) => {
@@ -415,7 +420,7 @@ export default function ChatClient() {
                     }}
                     externalViewingDoc={viewingDoc}
                     onViewingDocChange={setViewingDoc}
-                    onCancelPendingSource={handleResolvePendingSource}
+                    onCancelPendingSource={handleCancelPendingSource}
                     groundingHighlight={groundingHighlight}
                     onClearGroundingHighlight={() => setGroundingHighlight(null)}
                     onClearViewingDoc={() => {

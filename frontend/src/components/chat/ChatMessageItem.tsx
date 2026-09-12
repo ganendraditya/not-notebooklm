@@ -376,6 +376,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   }, [userSelectionOverrides, isDuplicateSource]);
 
   const toggleSelectAll = () => {
+    if (isImporting) return;
     const novelIndices = sources.map((s, i) => (!isDuplicateSource(s) ? i : -1)).filter(i => i !== -1);
     const areAllNovelSelected = novelIndices.length > 0 && novelIndices.every(i => isSourceChecked(sources[i], i));
     const nextState = !areAllNovelSelected;
@@ -389,16 +390,17 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const isMountedRef = useRef(true);
-  const currentAbortControllerRef = useRef<AbortController | null>(null);
-  const isCancelledLocallyRef = useRef<boolean>(false);
+  const activeItemControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const cancelledPendingIdsRef = useRef<Set<string>>(new Set());
+  const isBatchCancelledRef = useRef<boolean>(false);
 
   useEffect(() => {
     isMountedRef.current = true;
+    const controllersMap = activeItemControllersRef.current;
     return () => {
       isMountedRef.current = false;
-      if (currentAbortControllerRef.current) {
-        currentAbortControllerRef.current.abort();
-      }
+      controllersMap.forEach(c => c.abort());
+      controllersMap.clear();
     };
   }, []);
 
@@ -406,10 +408,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     const toImport = sources.filter((src, i) => !isDuplicateSource(src) && isSourceChecked(src, i));
     if (toImport.length === 0) return;
 
-    const abortController = new AbortController();
-    currentAbortControllerRef.current = abortController;
-    isCancelledLocallyRef.current = false;
-    const batchCreatedDocIds: number[] = [];
+    isBatchCancelledRef.current = false;
+    cancelledPendingIdsRef.current.clear();
+    activeItemControllersRef.current.clear();
 
     setIsImporting(true);
     setImportProgress({ current: 0, total: toImport.length });
@@ -426,80 +427,97 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
     let currentChatId = activeChatId;
 
-    const cancelThisBatch = () => {
-      isCancelledLocallyRef.current = true;
-      if (currentAbortControllerRef.current) {
-        currentAbortControllerRef.current.abort();
-        currentAbortControllerRef.current = null;
-      }
-      if (isMountedRef.current) {
-        setIsImporting(false);
-        setImportProgress(null);
-      }
-
-      // Remove all pending placeholder items of this batch (preserving any completed documents)
-      pendingItems.forEach(p => {
+    // Register cancellation callback for each pending item in the sidebar
+    pendingItems.forEach((p) => {
+      registerPendingCancelCallback(p.id, () => {
+        cancelledPendingIdsRef.current.add(p.id);
+        const controller = activeItemControllersRef.current.get(p.id);
+        if (controller) {
+          controller.abort();
+          activeItemControllersRef.current.delete(p.id);
+        }
         onResolvePendingSource?.(p.id);
-        unregisterPendingCancelCallback(p.id);
-      });
-    };
 
-    pendingItems.forEach(p => {
-      registerPendingCancelCallback(p.id, cancelThisBatch);
+        // If all items were cancelled by the user in the sidebar, terminate batch state immediately
+        const allCancelled = pendingItems.every(item => cancelledPendingIdsRef.current.has(item.id));
+        if (allCancelled) {
+          isBatchCancelledRef.current = true;
+          if (isMountedRef.current) {
+            setIsImporting(false);
+            setImportProgress(null);
+          }
+        }
+      });
     });
 
     try {
       if (!currentChatId && onEnsureChatSession) {
         currentChatId = await onEnsureChatSession(toImport[0]?.title || "Research Paper");
       }
-      if (!currentChatId || isCancelledLocallyRef.current) return;
+      if (!currentChatId || isBatchCancelledRef.current) return;
 
-      // Streamed batch ingestion via single HTTP request with real-time SSE progress
-      const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sources: toImport }),
-        signal: abortController.signal
-      });
+      for (let i = 0; i < toImport.length; i++) {
+        if (isBatchCancelledRef.current) break;
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        throw new Error(errData?.detail || `Server returned ${res.status}`);
+        const src = toImport[i];
+        const pending = pendingItems[i];
+
+        // If user already clicked cancel on this item, skip it completely!
+        if (cancelledPendingIdsRef.current.has(pending.id)) {
+          onResolvePendingSource?.(pending.id);
+          unregisterPendingCancelCallback(pending.id);
+          continue;
+        }
+
+        if (isMountedRef.current) {
+          setImportProgress({ current: i + 1, total: toImport.length });
+        }
+
+        const itemController = new AbortController();
+        activeItemControllersRef.current.set(pending.id, itemController);
+        let createdDocId: number | null = null;
+
+        try {
+          const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sources: [src] }),
+            signal: itemController.signal
+          });
+
+          if (res.ok) {
+            await consumeSSEStream(res, (data: any) => {
+              if (cancelledPendingIdsRef.current.has(pending.id) || isBatchCancelledRef.current) return;
+
+              if (data.type === "progress" && data.doc) {
+                createdDocId = data.doc.id;
+                if (!cancelledPendingIdsRef.current.has(pending.id) && !isBatchCancelledRef.current) {
+                  onDocumentAdded?.(data.doc as DocType, currentChatId || undefined);
+                }
+              }
+            });
+          }
+        } catch (err: any) {
+          if (err.name === "AbortError" || cancelledPendingIdsRef.current.has(pending.id)) {
+            // If aborted, delete any created document from backend so zero trace remains
+            if (createdDocId && currentChatId) {
+              fetch(`${backendUrl}/chats/${currentChatId}/documents/${createdDocId}`, { method: "DELETE" }).catch(() => {});
+            }
+          } else {
+            console.error("Import source failed:", err);
+          }
+        } finally {
+          activeItemControllersRef.current.delete(pending.id);
+          onResolvePendingSource?.(pending.id);
+          unregisterPendingCancelCallback(pending.id);
+        }
       }
 
-      await consumeSSEStream(res, (data: any) => {
-        if (isCancelledLocallyRef.current) return;
-
-        if (data.type === "progress") {
-          const currentProgress = data.current || 0;
-          if (isMountedRef.current) {
-            setImportProgress({ current: currentProgress, total: toImport.length });
-          }
-          if (data.doc) {
-            batchCreatedDocIds.push(data.doc.id);
-            if (!isCancelledLocallyRef.current) {
-              onDocumentAdded?.(data.doc as DocType, currentChatId || undefined);
-            }
-          }
-          if (currentProgress > 0 && currentProgress <= pendingItems.length) {
-            const pendingId = pendingItems[currentProgress - 1]?.id;
-            if (pendingId !== undefined) {
-              onResolvePendingSource?.(pendingId);
-              unregisterPendingCancelCallback(pendingId);
-            }
-          }
-        } else if (data.type === "done") {
-          if (isMountedRef.current) {
-            setImportProgress({ current: toImport.length, total: toImport.length });
-          }
-        }
-      });
-
-      if (isMountedRef.current && !isCancelledLocallyRef.current) {
+      if (isMountedRef.current && !isBatchCancelledRef.current) {
         setUserSelectionOverrides({});
       }
     } catch (e: any) {
-      if (e.name === "AbortError" || isCancelledLocallyRef.current) {
+      if (e.name === "AbortError" || isBatchCancelledRef.current) {
         return;
       }
       console.error("Import sources failed:", e);
@@ -508,8 +526,8 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         onResolvePendingSource?.(p.id);
         unregisterPendingCancelCallback(p.id);
       });
-      currentAbortControllerRef.current = null;
-      if (isMountedRef.current && !isCancelledLocallyRef.current) {
+      activeItemControllersRef.current.clear();
+      if (isMountedRef.current) {
         setIsImporting(false);
         setImportProgress(null);
       }
@@ -517,8 +535,12 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   };
 
   const handleCancelImport = () => {
-    if (currentAbortControllerRef.current) {
-      currentAbortControllerRef.current.abort();
+    isBatchCancelledRef.current = true;
+    activeItemControllersRef.current.forEach(c => c.abort());
+    activeItemControllersRef.current.clear();
+    if (isMountedRef.current) {
+      setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -743,15 +765,20 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 <span className="text-app-text-muted">{t('chat.researchFound')}</span>
                 {novelSourcesCount > 0 && (
                   <div 
-                    onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
-                    className="flex items-center gap-2 cursor-pointer select-none group/selectall"
+                    onClick={(e) => { e.stopPropagation(); if (!isImporting) toggleSelectAll(); }}
+                    className={`flex items-center gap-2 select-none ${
+                      isImporting ? "opacity-40 cursor-not-allowed" : "cursor-pointer group/selectall"
+                    }`}
                   >
                     <span className="text-[11px] font-medium text-app-text-muted group-hover/selectall:text-app-text transition-colors">
                       {allNovelSelected ? "Deselect All" : "Select All"}
                     </span>
                     <button 
                       type="button"
-                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
+                      disabled={isImporting}
+                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 ${
+                        isImporting ? "cursor-not-allowed" : "cursor-pointer"
+                      } ${
                         allNovelSelected || isPartiallySelected
                           ? "bg-blue-600 border-blue-600 text-white"
                           : "border-app-border-strong bg-transparent group-hover/selectall:border-gray-400"
@@ -776,16 +803,18 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                     <div 
                       key={i} 
                       onClick={() => {
-                        if (!isAlreadyAdded) {
+                        if (!isAlreadyAdded && !isImporting) {
                           setUserSelectionOverrides(prev => ({ ...prev, [i]: !isSourceChecked(src, i) }));
                         }
                       }}
                       className={`p-3 px-3.5 flex items-start justify-between gap-3 transition-colors rounded-xl m-1 ${
                         isAlreadyAdded 
                           ? "bg-emerald-500/[0.04] border border-emerald-500/10 cursor-default" 
-                          : isChecked 
-                            ? "bg-app-item-hover cursor-pointer" 
-                            : "hover:bg-app-item-hover cursor-pointer"
+                          : isImporting
+                            ? "opacity-60 cursor-not-allowed"
+                            : isChecked 
+                              ? "bg-app-item-hover cursor-pointer" 
+                              : "hover:bg-app-item-hover cursor-pointer"
                       }`}
                     >
                       <div className="flex items-start gap-3 flex-1 min-w-0">
