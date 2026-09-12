@@ -380,10 +380,12 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
           </Tooltip>
 
           {activeChatId && viewingDoc && (() => {
-            const isDownloadable = Boolean(!isLoadingDetails && paperDetails?.has_full_pdf);
+            const isDownloadable = Boolean(!isLoadingDetails);
             const downloadTooltip = isDownloadable
-              ? (t('right.downloadOriginal') || t('right.downloadPdf') || "Download full manuscript PDF")
-              : (t('right.downloadNotAvail') || "Full manuscript PDF is not available for download");
+              ? (paperDetails?.has_full_pdf !== false 
+                  ? (t('right.downloadPdf') || "Download manuscript PDF") 
+                  : (t('right.downloadFile') || "Download document text"))
+              : (t('right.downloadNotAvail') || "Document is not available for download");
 
             const handleDownload = () => {
               if (!isDownloadable) return;

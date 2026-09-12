@@ -12,6 +12,7 @@ import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/store
 import { useTranslation } from "@/lib/i18n";
 import { SourcesToolbar } from "./RightSidebar/SourcesToolbar";
 import { RightSidebarModals } from "./RightSidebar/RightSidebarModals";
+import { DownloadManager } from "@/components/DownloadManager";
 import { Tooltip } from "@/components/ui/tooltip";
 
 interface RightSidebarProps {
@@ -465,6 +466,11 @@ export default function RightSidebar({
         setRenameTitleInput={setRenameTitleInput}
         setIsRenameModalOpen={setIsRenameModalOpen}
         handleSaveRename={handleSaveRename}
+      />
+
+      <DownloadManager 
+        task={downloadTask} 
+        onClose={() => setDownloadTask(null)} 
       />
     </aside>
   );

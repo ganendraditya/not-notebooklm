@@ -10,7 +10,7 @@ from typing import List, AsyncGenerator
 from sqlalchemy.orm import Session
 
 from database import Document
-from utils.file_utils import TEMP_ZIPS_DIR
+from utils.file_utils import TEMP_ZIPS_DIR, get_doc_file_path
 from utils.pdf_utils import get_authentic_document_pdf
 
 logger = logging.getLogger("uvicorn.error")
@@ -46,7 +46,17 @@ async def generate_bulk_zip_stream(
                 d_id, d_fn, d_title, d_doi, d_url = doc_info
                 try:
                     pdf_data, clean_name = get_authentic_document_pdf(chat_id, d_fn)
-                    return d_fn, d_title, d_doi, d_url, clean_name, pdf_data, None
+                    if pdf_data:
+                        return d_fn, d_title, d_doi, d_url, clean_name, pdf_data, None
+                    
+                    file_path = get_doc_file_path(chat_id, d_fn)
+                    if os.path.exists(file_path):
+                        with open(file_path, "rb") as f:
+                            file_bytes = f.read()
+                        if file_bytes:
+                            return d_fn, d_title, d_doi, d_url, d_fn, file_bytes, None
+                    
+                    return d_fn, d_title, d_doi, d_url, d_fn, None, None
                 except Exception as e:
                     logger.error(f"[Worker Sync PDF Error]: {e}")
                     return d_fn, d_title, d_doi, d_url, d_fn, None, str(e)

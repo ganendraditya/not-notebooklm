@@ -129,16 +129,47 @@ def download_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
         
+    # 1. If authentic binary PDF exists on disk, serve it directly
     pdf_bytes, download_filename = get_authentic_document_pdf(chat_id, doc.filename)
-    if not pdf_bytes:
-        raise HTTPException(
-            status_code=404, 
-            detail="Naskah lengkap PDF tidak tersedia untuk diunduh (hanya metadata / abstrak)."
+    if pdf_bytes:
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": make_content_disposition("attachment", download_filename)}
         )
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": make_content_disposition("attachment", download_filename)}
+
+    # 2. If source file (.txt, .docx, .md, etc.) exists on disk, serve as direct file download
+    file_path = get_doc_file_path(chat_id, doc.filename)
+    if os.path.exists(file_path):
+        ext = os.path.splitext(doc.filename)[1].lower()
+        media_types = {
+            ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".csv": "text/csv",
+            ".txt": "text/plain; charset=utf-8",
+            ".md": "text/markdown; charset=utf-8",
+            ".bib": "text/plain; charset=utf-8",
+            ".ris": "text/plain; charset=utf-8"
+        }
+        return FileResponse(
+            file_path,
+            media_type=media_types.get(ext, "application/octet-stream"),
+            filename=doc.filename,
+            headers={"Content-Disposition": make_content_disposition("attachment", doc.filename)}
+        )
+
+    # 3. If stored content exists in database, fallback to serve content as text file
+    if doc.content:
+        out_fn = doc.filename if doc.filename.lower().endswith((".txt", ".md")) else f"{doc.filename}.txt"
+        return Response(
+            content=doc.content.encode("utf-8"),
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": make_content_disposition("attachment", out_fn)}
+        )
+
+    raise HTTPException(
+        status_code=404, 
+        detail="Berkas dokumen tidak ditemukan di penyimpanan server."
     )
 
 @router.get("/chats/{chat_id}/documents/{doc_id}/raw")
