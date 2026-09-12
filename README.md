@@ -10,34 +10,43 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 
 ### Highlights
 
-* **Automated Literature Discovery:** Queries global academic registries (OpenAlex, Crossref, and web fallbacks) with iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
+* **Deterministic Workspace Citation Indexing:** Every document retains a fixed, immutable citation number (`1.`, `2.`, `3.`) across all turns of the conversation. When a document is removed, the system cleanly rearranges remaining indices without numeric fragmentation.
+* **Automated Literature Discovery:** Queries global academic registries (OpenAlex, Crossref, arXiv, and web fallbacks) with iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
 * **Full-Text PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent resolvers (arXiv, Unpaywall, OpenAlex) while enriching paper records with journal quartiles and citation counts.
-* **3-Tier Hybrid Metadata Extractor:** Seamlessly handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and an AI Document Inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
-* **Grounded Synthesis & Matrix Tables:** Produces comparative literature review matrices with cell-level citation tagging, mitigating hallucinations by grounding claims directly in retrieved excerpts.
-* **Interactive Document Reader:** Split-pane interface featuring bidirectional citation navigation—click any citation badge to jump to and highlight the exact passage in the source PDF or document.
-* **Multi-Format Citation Generator:** Export clean, verified academic citations across standard formats: APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS.
-* **Local-First Architecture:** Runs on your local machine with zero mandatory cloud accounts. Supports bring-your-own local models (e.g., Ollama) or any OpenAI-compatible API endpoint, with optional S3 storage (Cloudflare R2, MinIO).
+* **Cell-Level Citation Matrices & Markdown Export:** Synthesizes literature into structured comparative review matrices with verifiable citations embedded directly in individual table cells, accompanied by 1-click Markdown table copy and native KaTeX math equation rendering.
+* **Interactive Split-Pane Reader & Jump-to-Highlight:** Bidirectional citation navigation—clicking any citation badge in a response or table cell automatically opens the document reader, scrolls to the page, and highlights the exact supporting passage.
+* **Targeted Document Focus:** One-click "Ask about this document" mode focuses questions exclusively on an individual paper without deselecting other workspace files.
+* **7-Format Citation Generator & Bulk ZIP Export:** Instant generation of verified academic citations in APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS formats, alongside one-click bulk ZIP bundling for entire workspaces.
+* **3-Tier Hybrid Metadata Extractor:** Handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and an AI Document Inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
+* **Local-First & Multi-Role LLM Architecture:** Runs locally with embedded SQLite and Qdrant. Connects to any OpenAI-compatible API (Ollama, vLLM, DeepSeek, GPT-4o) with tiered primary, fast, and auto-fallback model roles, plus optional S3 storage (Cloudflare R2, MinIO).
 
 ---
 
 ## Workflow & Core Capabilities
 
-### 1. Literature Discovery & Paper Retrieval
-Search across OpenAlex, Crossref, and academic sources. NotbookLM filters candidates based on relevance screening and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select and batch-import papers directly into the workspace.
+### 1. Literature Discovery & Granular Ingestion
+Search across OpenAlex, Crossref, arXiv, and academic registries. NotbookLM screens candidate publications and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select candidates with tri-state selection controls, batch-import with live progress tracking (`Adding x/y...`), and cancel individual downloads granularly from the sidebar without leaving orphan files.
 
 ![Literature Discovery](docs/assets/literature-discovery.png)
 
-### 2. Intelligent Source Management & Multi-Format Ingestion
+### 2. Deterministic Source Management & Multi-Format Ingestion
 Imported and uploaded sources appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
 * **Format Badges:** Visual tags identify source filetypes—`PDF`, `DOC` (Word), `TXT`, `MD`, `BIB`, and `RIS`.
+* **Deterministic Indices & Auto-Reindex:** A source's citation number remains consistent throughout the entire conversation. Deleting a source automatically compacts and shifts remaining document indices cleanly.
 * **Verified Paper vs. Local Manuscript:** Authentic journal publications retain official publisher metadata, while local documents (such as theses, student projects, or CVs) are cleanly cataloged without artificial journal labels.
-* **Bulk Export:** Download original documents individually or bundle multiple selected sources into a single organized ZIP package.
+* **Bulk ZIP Export:** Download original documents individually or bundle multiple selected sources into a single organized ZIP package.
 
-### 3. Integrated Document & PDF Viewer
-Inspect full manuscripts directly within the workspace. The built-in document reader provides a dual-view experience: stream and read the authentic publication PDF, or switch to the extracted full-text view for citation navigation and quick reading.
+### 3. Integrated Document Reader & Targeted Focus
+Inspect full manuscripts directly within the workspace:
+* **Dual-View Inspection:** Stream authentic publication PDFs or switch to extracted full-text for citation navigation.
+* **Ask About This Document:** Focus queries exclusively on a single source with one click, bypassing manual workspace deselection.
+* **Multi-Format Citation Generator:** Export clean, verified academic citations across APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS.
 
 ### 4. Grounded Synthesis & Bidirectional Citation Highlighting
-Synthesize multiple papers into comparative review matrices. Each finding is tagged with traceable citation badges (`[6]`, `[7]`, `[8]`). Clicking any citation opens the document reader and automatically scrolls to highlight the exact supporting sentence in the source text.
+Synthesize multiple papers into comparative review matrices. Each finding is tagged with traceable citation badges (`[1]`, `[2]`). Clicking any citation opens the document reader and automatically scrolls to highlight the exact supporting sentence in the source text:
+* **Cell-Level Evidence:** Citations are anchored to specific table cells for verifiable metric-by-metric comparison.
+* **1-Click Markdown Copy:** Copy sanitized Markdown tables directly into Notion, Obsidian, Typora, or Word.
+* **KaTeX Mathematics:** Seamlessly renders mathematical notation, formulas, and matrices ($E = mc^2$, $\sum$, $\int$).
 
 ![Grounded Citation Highlighting](docs/assets/citation-grounding.png)
 
