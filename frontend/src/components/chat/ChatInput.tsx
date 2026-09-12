@@ -67,6 +67,15 @@ export const ChatInputBox = memo(function ChatInputBox({
   const [containerWidth, setContainerWidth] = useState(760);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const activeUploadControllersRef = useRef<Map<string, AbortController>>(new Map());
+
+  useEffect(() => {
+    const controllers = activeUploadControllersRef.current;
+    return () => {
+      controllers.forEach(c => c.abort());
+      controllers.clear();
+    };
+  }, []);
 
   useEffect(() => {
     if (!textareaRef.current) return;
@@ -265,6 +274,24 @@ export const ChatInputBox = memo(function ChatInputBox({
 
     if (validFiles.length === 0) return;
 
+    // 1. Instant Optimistic Staging: Immediately render all files with individual loading spinners
+    const stagedAttachments: Attachment[] = validFiles.map((file, idx) => {
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      const isImg = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext);
+      return {
+        id: `staged-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+        type: isImg ? "image" : "file",
+        filename: file.name,
+        size: file.size,
+        file: file,
+        previewUrl: isImg ? URL.createObjectURL(file) : undefined,
+        isUploading: true
+      };
+    });
+
+    setAttachments(prev => [...prev, ...stagedAttachments]);
+    setIsUploading(true);
+
     let targetChatId = chatId;
     if (!targetChatId && onEnsureChatSession) {
       try {
@@ -274,45 +301,67 @@ export const ChatInputBox = memo(function ChatInputBox({
       }
     }
     
-    if (!targetChatId) return;
-    
-    setIsUploading(true);
-    const newAttachments = [...attachments];
-    
-    for (let i = 0; i < validFiles.length; i++) {
-      const file = validFiles[i];
-      const formData = new FormData();
-      formData.append("file", file);
-      
-      try {
-        const res = await fetch(`${backendUrl}/chats/${targetChatId}/upload_chat_media`, {
-          method: "POST",
-          body: formData
-        });
-        
-        if (res.ok) {
-          const data = await res.json();
-          newAttachments.push({
-            type: data.attachment.type,
-            filename: data.attachment.filename,
-            url: data.attachment.url,
-            size: data.attachment.size || file.size,
-            previewUrl: URL.createObjectURL(file)
-          });
-          
-          if (data.storage_full || data.attachment?.chat_only) {
-            setStorageWarningFile({
-              filename: data.attachment.filename,
-              size: data.attachment.size || file.size
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to upload file:", e);
-      }
+    if (!targetChatId) {
+      setAttachments(prev => prev.filter(a => !stagedAttachments.some(s => s.id === a.id)));
+      setIsUploading(false);
+      return;
     }
-    
-    setAttachments(newAttachments);
+
+    // 2. Concurrent Uploads with per-file completion tracking
+    await Promise.all(
+      stagedAttachments.map(async (staged) => {
+        const file = staged.file!;
+        const controller = new AbortController();
+        activeUploadControllersRef.current.set(staged.id!, controller);
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const res = await fetch(`${backendUrl}/chats/${targetChatId}/upload_chat_media`, {
+            method: "POST",
+            body: formData,
+            signal: controller.signal
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            setAttachments(prev => prev.map(a => {
+              if (a.id === staged.id) {
+                return {
+                  ...a,
+                  type: data.attachment.type,
+                  filename: data.attachment.filename,
+                  url: data.attachment.url,
+                  size: data.attachment.size || file.size,
+                  previewUrl: a.previewUrl || (data.attachment.type === "image" ? `${backendUrl}${data.attachment.url}` : undefined),
+                  isUploading: false
+                };
+              }
+              return a;
+            }));
+
+            if (data.storage_full || data.attachment?.chat_only) {
+              setStorageWarningFile({
+                filename: data.attachment.filename,
+                size: data.attachment.size || file.size
+              });
+            }
+          } else {
+            setAttachments(prev => prev.filter(a => a.id !== staged.id));
+            showAttachmentError(`Failed to upload "${file.name}".`);
+          }
+        } catch (e: any) {
+          if (e.name !== "AbortError") {
+            console.error("Failed to upload file:", e);
+            setAttachments(prev => prev.filter(a => a.id !== staged.id));
+            showAttachmentError(`Failed to upload "${file.name}".`);
+          }
+        } finally {
+          activeUploadControllersRef.current.delete(staged.id!);
+        }
+      })
+    );
+
     setIsUploading(false);
   };
 
@@ -324,6 +373,7 @@ export const ChatInputBox = memo(function ChatInputBox({
   };
 
   const handleSend = () => {
+    if (isLoading || isUploading || attachments.some(a => a.isUploading)) return;
     const query = input.trim();
     if (!query && attachments.length === 0) return;
 
@@ -373,7 +423,8 @@ export const ChatInputBox = memo(function ChatInputBox({
       finalMessage = `${finalMessage}\n[Filter Preferences: ${filterClauses.join(", ")}]`;
     }
 
-    onSubmit(finalMessage, attachments.length > 0 ? attachments : undefined);
+    const readyAttachments = attachments.filter(a => !a.isUploading && Boolean(a.url));
+    onSubmit(finalMessage, readyAttachments.length > 0 ? readyAttachments : undefined);
     setInput("");
     setAttachments([]);
     onClearTargetedSource?.();
@@ -383,6 +434,16 @@ export const ChatInputBox = memo(function ChatInputBox({
   };
 
   const removeAttachment = (index: number) => {
+    const attToRemove = attachments[index];
+    if (attToRemove) {
+      if (attToRemove.id && activeUploadControllersRef.current.has(attToRemove.id)) {
+        activeUploadControllersRef.current.get(attToRemove.id)?.abort();
+        activeUploadControllersRef.current.delete(attToRemove.id);
+      }
+      if (attToRemove.previewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(attToRemove.previewUrl);
+      }
+    }
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -522,7 +583,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                 <button
                   type="button"
                   onClick={handleSend}
-                  disabled={(!input.trim() && attachments.length === 0) || isUploading}
+                  disabled={(!input.trim() && attachments.length === 0) || isUploading || attachments.some(a => a.isUploading)}
                   className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 disabled:opacity-30 disabled:hover:opacity-30 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0"
                   aria-label={t('chat.sendTitle')}
                 >

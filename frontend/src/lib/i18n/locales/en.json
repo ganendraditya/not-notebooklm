@@ -138,6 +138,7 @@
   "chat.sourcesCount": "{count} sources",
   "chat.addToSources": "Add {count}to sources",
   "chat.cancelAdding": "Cancel adding",
+  "chat.uploading": "Uploading...",
   "chat.previousResponse": "Previous response",
   "chat.nextResponse": "Next response",
   "chat.regenerateResponse": "Regenerate response",
