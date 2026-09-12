@@ -525,7 +525,7 @@ export default function ChatArea({
       >
         <div className="w-full px-4 space-y-6">
           {isChatEmpty ? (
-            <div className="flex flex-col items-center justify-center py-6 text-center px-4 w-full max-w-2xl mx-auto">
+            <div className="flex flex-col items-center justify-center py-6 text-center w-full">
               <div className="p-3.5 rounded-full bg-app-surface border border-app-border mb-4 shadow-sm">
                 <Sparkles size={28} className="text-blue-500" />
               </div>

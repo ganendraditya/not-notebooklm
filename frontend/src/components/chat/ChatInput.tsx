@@ -387,7 +387,7 @@ export const ChatInputBox = memo(function ChatInputBox({
   };
 
   return (
-    <div className={`w-full ${isCentered ? "max-w-2xl mx-auto my-4" : ""}`}>
+    <div className={`w-full ${isCentered ? "my-4" : ""}`}>
       {/* Storage Limit Exceeded Modal */}
       <StorageWarningModal 
         file={storageWarningFile} 
