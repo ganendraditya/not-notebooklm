@@ -210,6 +210,7 @@
   "right.copyCitation": "Copy Citation",
   "right.sourcesCapacity": "Sources capacity",
   "right.renameSource": "Rename source",
+  "right.renameSourceDesc": "Enter a custom display title for this document.",
   "right.filePrefix": "File: ",
   "right.save": "Save",
   "right.close": "Close",

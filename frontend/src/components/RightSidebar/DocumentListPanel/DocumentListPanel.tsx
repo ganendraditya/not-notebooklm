@@ -86,7 +86,7 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                     {/* Clean Minimalist Index */}
                     <Tooltip content={`Permanent Reference Index [${docIndex}]`} side="top">
                       <span 
-                        className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-app-text-dim group-hover:text-app-text transition-colors shrink-0 select-none tabular-nums"
+                        className="w-7 text-left -ml-0.5 text-[11px] font-mono font-medium text-app-text-dim group-hover:text-app-text transition-colors shrink-0 select-none tabular-nums"
                       >
                         {docIndex}.
                       </span>
@@ -237,7 +237,7 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                   {/* Left: Monospace Number + Badge + File / DOI Name */}
                   <div className="flex items-center gap-2 min-w-0 flex-1 mr-1.5">
                     <span 
-                      className="w-7 text-left pl-0.5 text-[11px] font-mono font-medium text-app-text-dim shrink-0 select-none tabular-nums"
+                      className="w-7 text-left -ml-0.5 text-[11px] font-mono font-medium text-app-text-dim shrink-0 select-none tabular-nums"
                     >
                       {itemNumber}.
                     </span>
