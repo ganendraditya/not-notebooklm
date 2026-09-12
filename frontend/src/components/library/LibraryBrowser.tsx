@@ -308,13 +308,13 @@ export default function LibraryBrowser({
   return (
     <div className={containerClassName}>
       {/* Top Header */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-app-divider bg-app-sidebar">
-        <div className="flex items-center gap-3">
+      <div className="w-full h-[52px] px-4 flex items-center justify-between border-b border-app-border bg-app-sidebar shrink-0 z-20 select-none">
+        <div className="flex items-center gap-2.5">
           {headerLeading}
-          <h1 className="text-lg sm:text-xl font-bold text-app-text tracking-tight">{t("library.title")}</h1>
+          <span className="font-semibold text-sm text-app-text tracking-tight">{t("library.title")}</span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {/* Search Box */}
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-app-text-dim" />
@@ -323,7 +323,7 @@ export default function LibraryBrowser({
               placeholder={t("library.searchPlaceholder")} 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-app-input border border-app-border rounded-full pl-9 pr-4 py-1.5 text-xs text-app-text w-40 sm:w-72 focus:border-blue-500/50 outline-none transition-all placeholder:text-app-text-dim"
+              className="bg-app-input border border-app-border rounded-full pl-9 pr-4 py-1 text-xs text-app-text w-40 sm:w-64 focus:border-blue-500/50 outline-none transition-all placeholder:text-app-text-dim h-7"
             />
           </div>
           {headerTrailing}
@@ -331,7 +331,7 @@ export default function LibraryBrowser({
       </div>
 
       {/* Filter Tabs & Selection Actions Toolbar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-app-divider bg-app-sidebar">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-app-divider bg-app-sidebar">
         {/* Left Side: Category Tabs & Inline Selection Action Bar */}
         <div className="flex items-center gap-3">
           {/* Pill Category Tabs */}
@@ -427,7 +427,7 @@ export default function LibraryBrowser({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-scroll [scrollbar-gutter:stable] custom-scrollbar p-6 relative">
+      <div className="flex-1 overflow-y-scroll [scrollbar-gutter:stable] custom-scrollbar px-4 py-4 relative">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-64 text-app-text-dim space-y-2">
             <div className="w-6 h-6 border-2 border-app-border border-t-blue-500 rounded-full animate-spin"></div>
@@ -442,7 +442,7 @@ export default function LibraryBrowser({
         ) : viewMode === "list" ? (
           <div className="w-full space-y-1">
             {/* Table Header */}
-            <div className="flex items-center px-3 py-2 text-xs font-semibold text-app-text-dim border-b border-app-divider select-none">
+            <div className="flex items-center px-2 py-2 text-xs font-semibold text-app-text-dim border-b border-app-divider select-none">
               <div className="w-9 shrink-0 flex items-center">
                 <input 
                   ref={headerCheckboxRef}
@@ -518,7 +518,7 @@ export default function LibraryBrowser({
             {items.map(item => (
               <div 
                 key={item.id} 
-                className={`flex items-center px-3 py-2.5 hover:bg-app-item-hover rounded-xl cursor-pointer transition-colors group ${
+                className={`flex items-center px-2 py-2.5 hover:bg-app-item-hover rounded-xl cursor-pointer transition-colors group ${
                   selectedIds.has(item.id) ? "bg-app-item-active" : ""
                 }`}
                 onClick={() => toggleSelect(item.id)}

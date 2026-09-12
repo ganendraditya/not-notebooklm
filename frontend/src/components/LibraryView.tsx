@@ -32,17 +32,18 @@ export default function LibraryView({
       onSelectChat={onSelectChat}
       containerClassName="flex-1 flex flex-col h-full bg-app-bg text-app-text relative overflow-hidden"
       headerLeading={
-        <Tooltip content={t("ui.openSidebar")} side="bottom">
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer mr-1 ${isSidebarOpen ? "hidden" : "flex"}`}
-            onClick={onOpenSidebar}
-            aria-label={t("ui.openSidebar")}
-          >
-            <Sidebar size={18} />
-          </Button>
-        </Tooltip>
+        !isSidebarOpen && onOpenSidebar ? (
+          <Tooltip content={t("chat.openSidebar")} side="bottom">
+            <button
+              type="button"
+              className="w-7 h-7 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg cursor-pointer flex items-center justify-center transition-colors hidden lg:flex"
+              onClick={onOpenSidebar}
+              aria-label={t("chat.openSidebar")}
+            >
+              <Sidebar size={15} />
+            </button>
+          </Tooltip>
+        ) : null
       }
     />
   );

@@ -62,20 +62,21 @@ export default function SearchChatsView({
   return (
     <div className="flex-1 flex flex-col h-full bg-app-bg text-app-text relative overflow-hidden">
       {/* Top Bar for Sidebar toggle if closed */}
-      <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-app-divider bg-app-sidebar">
-        <div className="flex items-center gap-3">
-          <Tooltip content={t('ui.openSidebar')} side="bottom">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`h-8 w-8 text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer mr-1 ${isSidebarOpen ? "hidden" : "flex"}`}
-              onClick={onOpenSidebar}
-              aria-label={t('ui.openSidebar')}
-            >
-              <Sidebar size={18} />
-            </Button>
-          </Tooltip>
-          <h1 className="text-lg sm:text-xl font-bold text-app-text tracking-tight">{t('searchView.title')}</h1>
+      <div className="w-full h-[52px] px-4 flex items-center justify-between border-b border-app-border bg-app-sidebar shrink-0 z-20 select-none">
+        <div className="flex items-center gap-2.5">
+          {!isSidebarOpen && onOpenSidebar && (
+            <Tooltip content={t('chat.openSidebar')} side="bottom">
+              <button
+                type="button"
+                className="w-7 h-7 text-app-text-muted hover:text-app-text hover:bg-app-item-hover rounded-lg cursor-pointer flex items-center justify-center transition-colors hidden lg:flex"
+                onClick={onOpenSidebar}
+                aria-label={t('chat.openSidebar')}
+              >
+                <Sidebar size={15} />
+              </button>
+            </Tooltip>
+          )}
+          <span className="font-semibold text-sm text-app-text tracking-tight">{t('searchView.title')}</span>
         </div>
       </div>
 
