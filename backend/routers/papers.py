@@ -40,10 +40,12 @@ async def import_sources_stream(chat_id: str, req: models.ImportSourcesRequest, 
             detail=f"Document limit reached (Max {MAX_SOURCES_PER_CHAT} documents per chat). Please delete some sources before importing new ones."
         )
         
-    allowed_sources = req.sources[:remaining_slots]
+    # Allow requested sources through; import stream checks existing documents
+    # and enforces remaining_slots quota strictly against novel candidate papers
+    allowed_sources = req.sources
 
     return StreamingResponse(
-        import_sources_progressive_stream(chat_id, allowed_sources, current_doc_count),
+        import_sources_progressive_stream(chat_id, allowed_sources, current_doc_count, remaining_slots=remaining_slots),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

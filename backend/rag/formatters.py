@@ -87,7 +87,10 @@ def enhance_table_citations(text: str) -> str:
                     new_cells = []
                     for idx, c in enumerate(cells):
                         if idx in col_doc_map:
-                            new_cells.append(tag_cell_content(c, col_doc_map[idx]))
+                            if re.search(r'\[\d{1,3}\]', c):
+                                new_cells.append(c)
+                            else:
+                                new_cells.append(tag_cell_content(c, col_doc_map[idx]))
                         else:
                             new_cells.append(c)
                     result_lines.append('| ' + ' | '.join(new_cells) + ' |')
@@ -99,7 +102,10 @@ def enhance_table_citations(text: str) -> str:
                         doc_num = row_doc_match.group(1)
                         new_cells = [first_cell]
                         for c in cells[1:]:
-                            new_cells.append(tag_cell_content(c, doc_num))
+                            if re.search(r'\[\d{1,3}\]', c):
+                                new_cells.append(c)
+                            else:
+                                new_cells.append(tag_cell_content(c, doc_num))
                         result_lines.append('| ' + ' | '.join(new_cells) + ' |')
                     else:
                         result_lines.append(line)

@@ -6,7 +6,7 @@ import asyncio
 from typing import Dict, Any, Tuple
 from sqlalchemy.orm import Session
 
-from database import Document
+from database import Document, commit_with_retry
 from utils.file_utils import get_doc_file_path
 from utils.pdf_utils import is_authentic_pdf_bytes, is_binary_pdf
 from utils.text_processing import clean_doi

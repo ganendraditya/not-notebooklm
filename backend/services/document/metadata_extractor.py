@@ -5,9 +5,8 @@ import logging
 import asyncio
 from typing import Dict, Any, Optional, Tuple
 
-from utils.file_utils import sanitize_safe_filename
 from utils.pdf_utils import is_authentic_pdf_bytes
-from utils.text_processing import clean_doi, normalize_title_str, is_title_match
+from utils.text_processing import clean_doi, is_title_match
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -34,11 +33,10 @@ def extract_raw_header_text(file_path: str, filename: str, max_chars: int = 6000
         if is_valid_pdf:
             try:
                 import pymupdf
-                pdoc = pymupdf.open(file_path)
-                pages_to_check = min(len(pdoc), 3)
-                chunks = [pdoc[i].get_text() for i in range(pages_to_check)]
-                raw_header = "\n".join(chunks)[:max_chars]
-                pdoc.close()
+                with pymupdf.open(file_path) as pdoc:
+                    pages_to_check = min(len(pdoc), 3)
+                    chunks = [pdoc[i].get_text() for i in range(pages_to_check)]
+                    raw_header = "\n".join(chunks)[:max_chars]
             except Exception as e:
                 logger.debug(f"[Metadata Extractor] PyMuPDF header extraction failed: {e}")
                 raw_header = ""
@@ -143,8 +141,9 @@ async def resolve_tier2_crossref_title(clean_fn_title: str, raw_header: str) -> 
                         ]
                         container = data.get("container-title", [])
                         journal = container[0] if container else ""
-                        issued = data.get("issued", {}).get("date-parts", [[]])[0]
-                        year = str(issued[0]) if issued else ""
+                        issued_parts = (data.get("issued") or {}).get("date-parts", [])
+                        issued = issued_parts[0] if issued_parts and isinstance(issued_parts, list) else []
+                        year = str(issued[0]) if issued and isinstance(issued, list) else ""
                         citations = data.get("is-referenced-by-count", 0)
                         landing = data.get("URL", f"https://doi.org/{doi}" if doi else "")
 
@@ -259,6 +258,7 @@ Respond ONLY with valid JSON (no markdown fences, no explanation):
             "year": year,
             "journal": journal,
             "journal_metric": journal_metric,
+            "access_status": access_status,
             "abstract": (data.get("abstract") or "").strip(),
             "url": "",
             "doi": "",

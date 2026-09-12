@@ -135,17 +135,21 @@ def extract_abstract_from_html(html_text: str) -> str:
                 
     return ""
 
-def is_title_match(t1: str, t2: str) -> bool:
-    """Checks if two academic paper titles match with high fuzzy similarity (>= 65%)."""
+def is_title_match(t1: str, t2: str, threshold: float = 0.65) -> bool:
+    """Checks if two academic paper titles match with high fuzzy similarity."""
     if not t1 or not t2:
         return False
     c1 = re.sub(r'[^a-zA-Z0-9\s]', '', t1).lower().strip()
     c2 = re.sub(r'[^a-zA-Z0-9\s]', '', t2).lower().strip()
-    if c1 == c2 or c1 in c2 or c2 in c1:
+    if not c1 or not c2:
+        return False
+    if c1 == c2:
+        return True
+    if len(c1) >= 20 and len(c2) >= 20 and (c1 in c2 or c2 in c1):
         return True
     import difflib
     ratio = difflib.SequenceMatcher(None, c1, c2).ratio()
-    return ratio >= 0.65
+    return ratio >= threshold
 
 def is_ai_synthesized_overview(text: str) -> bool:
     """Detects if an abstract text is an AI-generated fallback summary template rather than authentic author text."""

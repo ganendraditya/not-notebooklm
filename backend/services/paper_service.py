@@ -124,40 +124,60 @@ def filter_novel_sources(chat_id: str, sources: List[models.PaperCandidate], rem
 async def import_sources_progressive_stream(
     chat_id: str,
     allowed_sources: List[models.PaperCandidate],
-    current_doc_count: int
+    current_doc_count: int,
+    remaining_slots: Optional[int] = None
 ) -> AsyncGenerator[str, None]:
     """Progressively downloads papers, creates DB entries, and batches embedding into vector store."""
     batch_docs_for_embedding = []
     created_doc_ids = []
     total_to_import = len(allowed_sources)
     
+    # Pre-fetch existing chat documents once before entering the loop to eliminate redundant DB roundtrips
+    pre_db = SessionLocal()
+    existing_docs = []
+    try:
+        existing_docs = pre_db.query(Document).filter(Document.chat_id == chat_id).all()
+    finally:
+        pre_db.close()
+
+    doi_map: Dict[str, Any] = {}
+    title_entries: List[Tuple[Any, str]] = []
+    for d in existing_docs:
+        if d.doi:
+            doi_map[clean_doi(d.doi)] = d
+        d_norm = normalize_title_str(d.title or d.filename)
+        if d_norm:
+            title_entries.append((d, d_norm))
+
     try:
         for idx, paper in enumerate(allowed_sources, start=1):
             c_doi = clean_doi(paper.doi) if paper.doi else ""
-            local_db = SessionLocal()
             existing_doc = None
-            try:
-                if c_doi:
-                    existing_doc = local_db.query(Document).filter(
-                        Document.chat_id == chat_id,
-                        Document.doi == c_doi
-                    ).first()
-                if not existing_doc and paper.title:
-                    norm_cand = normalize_title_str(paper.title)
-                    db_docs = local_db.query(Document).filter(Document.chat_id == chat_id).all()
-                    for d in db_docs:
-                        d_norm = normalize_title_str(d.title or d.filename)
-                        if norm_cand and d_norm and (norm_cand == d_norm or (len(norm_cand) >= 20 and (norm_cand in d_norm or d_norm in norm_cand))):
+            if c_doi and c_doi in doi_map:
+                existing_doc = doi_map[c_doi]
+
+            if not existing_doc and paper.title:
+                norm_cand = normalize_title_str(paper.title)
+                if norm_cand:
+                    for d, d_norm in title_entries:
+                        if norm_cand == d_norm:
                             existing_doc = d
                             break
-            finally:
-                local_db.close()
+                        if len(norm_cand) >= 20 and len(d_norm) >= 20 and (norm_cand.startswith(d_norm) or d_norm.startswith(norm_cand)):
+                            existing_doc = d
+                            break
 
             if existing_doc:
                 created_at_str = existing_doc.created_at.isoformat() if existing_doc.created_at else ""
-                has_pdf = existing_doc.has_full_pdf if existing_doc.has_full_pdf is not None else (existing_doc.filename or "").lower().endswith(".pdf")
-                yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': existing_doc.id, 'filename': existing_doc.filename, 'title': existing_doc.title or existing_doc.filename.replace('.pdf', '').replace('_', ' ').strip(), 'created_at': created_at_str, 'index': current_doc_count + idx, 'has_full_pdf': has_pdf, 'is_oa': existing_doc.is_oa if existing_doc.is_oa is not None else True}})}\n\n"
+                has_pdf = (existing_doc.filename or "").lower().endswith(".pdf")
+                clean_title = existing_doc.title or (existing_doc.filename or "").replace('.pdf', '').replace('_', ' ').strip()
+                yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': existing_doc.id, 'filename': existing_doc.filename, 'title': clean_title, 'created_at': created_at_str, 'index': current_doc_count + len(created_doc_ids) + 1, 'has_full_pdf': has_pdf, 'is_oa': existing_doc.is_oa if existing_doc.is_oa is not None else True}})}\n\n"
                 continue
+
+            # Enforce remaining slot limit against novel papers
+            if remaining_slots is not None and len(created_doc_ids) >= remaining_slots:
+                logger.info(f"[Import Stream] Capacity limit reached ({remaining_slots} novel papers). Halting stream.")
+                break
 
             doc_text, filename, c_doi, has_downloaded_pdf = await asyncio.to_thread(prepare_paper_file_sync, chat_id, paper)
             abstract_text = (paper.snippet or "").strip()
@@ -192,6 +212,12 @@ async def import_sources_progressive_stream(
                 local_db.refresh(db_doc)
                 created_doc_id = db_doc.id
                 created_at_str = db_doc.created_at.isoformat() if db_doc.created_at else ""
+
+                if c_doi:
+                    doi_map[c_doi] = db_doc
+                new_norm = normalize_title_str(db_doc.title or db_doc.filename)
+                if new_norm:
+                    title_entries.append((db_doc, new_norm))
             finally:
                 local_db.close()
 
@@ -199,7 +225,8 @@ async def import_sources_progressive_stream(
                 created_doc_ids.append(created_doc_id)
             batch_docs_for_embedding.append((doc_text, filename, chat_id))
 
-            yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': created_doc_id, 'filename': filename, 'title': db_doc.title or filename.replace('.pdf', '').replace('_', ' ').strip(), 'created_at': created_at_str, 'index': current_doc_count + idx, 'has_full_pdf': has_downloaded_pdf, 'is_oa': db_doc.is_oa if db_doc.is_oa is not None else True}})}\n\n"
+            clean_doc_title = db_doc.title or (filename or "").replace('.pdf', '').replace('_', ' ').strip()
+            yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': created_doc_id, 'filename': filename, 'title': clean_doc_title, 'created_at': created_at_str, 'index': current_doc_count + len(created_doc_ids), 'has_full_pdf': has_downloaded_pdf, 'is_oa': db_doc.is_oa if db_doc.is_oa is not None else True}})}\n\n"
 
         yield f"data: {json.dumps({'type': 'done', 'total': total_to_import})}\n\n"
     except (GeneratorExit, asyncio.CancelledError):

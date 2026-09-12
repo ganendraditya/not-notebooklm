@@ -14,6 +14,7 @@ from utils.file_utils import UPLOAD_DIR, sanitize_safe_filename
 from services.document.metadata_extractor import extract_hybrid_document_metadata
 
 logger = logging.getLogger("uvicorn.error")
+_METADATA_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
 def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dict[str, Any]:
     """Synchronous bridge for hybrid metadata extraction."""
@@ -24,8 +25,7 @@ def extract_and_enrich_uploaded_file(file_path: str, filename: str) -> Dict[str,
             loop = None
 
         if loop and loop.is_running():
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                return pool.submit(asyncio.run, extract_hybrid_document_metadata(file_path, filename)).result()
+            return _METADATA_POOL.submit(asyncio.run, extract_hybrid_document_metadata(file_path, filename)).result()
         return asyncio.run(extract_hybrid_document_metadata(file_path, filename))
     except Exception as e:
         logger.debug(f"[Sync metadata extraction fallback]: {e}")
