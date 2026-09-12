@@ -17,6 +17,7 @@ export function useDocumentManager({
   onDocumentDeleted,
   onBulkDocumentsDeleted,
   onEnsureChatSession,
+  onCancelPendingSource,
   viewingDoc,
   setViewingDoc,
   t
@@ -32,6 +33,7 @@ export function useDocumentManager({
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   viewingDoc?: Document | null;
   setViewingDoc?: (doc: Document | null) => void;
+  onCancelPendingSource?: (id: string) => void;
   t: (key: string) => string;
 }) {
   // Modal states that bridge multiple logics
@@ -115,6 +117,12 @@ export function useDocumentManager({
     await download.handleBulkDownload(selection.selectedDocList);
   };
 
+  const cancelPendingSource = (pendingId: string) => {
+    upload.cancelUpload(pendingId);
+    doi.cancelDoi(pendingId);
+    onCancelPendingSource?.(pendingId);
+  };
+
   return {
     // Expose all Selection state
     ...selection,
@@ -136,6 +144,7 @@ export function useDocumentManager({
     setInternalPendingSources: upload.setInternalPendingSources,
     handleUploadBatch: handleUploadBatchWrap,
     handleImportDoi: handleImportDoiWrap,
+    cancelPendingSource,
     
     // Expose Modals & Inputs
     isAddSourcesModalOpen, setIsAddSourcesModalOpen,

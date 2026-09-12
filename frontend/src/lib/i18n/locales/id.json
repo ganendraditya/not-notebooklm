@@ -358,6 +358,7 @@
   "right.noAddAbstract": "Tidak ada teks abstrak tambahan yang disediakan.",
   "right.pdf": "PDF",
   "right.find": "Cari",
+  "right.cancelUpload": "Batalkan proses upload",
   "alert.unsupportedFormat": "Format berkas tidak didukung. Format yang didukung: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
   "alert.limitReached": "Batas kapasitas sumber tercapai! Maksimal 300 sumber per notebook.",
   "alert.capacityWarning": "Hanya mengunggah {n} dari {m} berkas yang valid untuk mematuhi batas 300 sumber."

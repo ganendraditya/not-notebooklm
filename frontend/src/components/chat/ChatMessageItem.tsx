@@ -8,7 +8,9 @@ import rehypeKatex from "rehype-katex";
 import { 
   ChevronDown, 
   Check, 
+  Minus,
   Plus, 
+  X,
   Loader2, 
   ExternalLink, 
   BookOpen, 
@@ -17,7 +19,7 @@ import {
   Table
 } from "lucide-react";
 import { ChatMessage } from "@/stores/chatStore";
-import { Document as DocType } from "@/stores/documentStore";
+import { Document as DocType, registerPendingCancelCallback, unregisterPendingCancelCallback } from "@/stores/documentStore";
 import { parseCitationsInReactNode, CitationContext, enhanceTableCitations } from "./CitationParser";
 import { useTranslation } from "@/lib/i18n";
 import { consumeSSEStream } from "@/lib/sse";
@@ -387,17 +389,27 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const isMountedRef = useRef(true);
+  const currentAbortControllerRef = useRef<AbortController | null>(null);
+  const isCancelledLocallyRef = useRef<boolean>(false);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      if (currentAbortControllerRef.current) {
+        currentAbortControllerRef.current.abort();
+      }
     };
   }, []);
 
   const handleImport = async () => {
     const toImport = sources.filter((src, i) => !isDuplicateSource(src) && isSourceChecked(src, i));
     if (toImport.length === 0) return;
+
+    const abortController = new AbortController();
+    currentAbortControllerRef.current = abortController;
+    isCancelledLocallyRef.current = false;
+    const batchCreatedDocIds: number[] = [];
 
     setIsImporting(true);
     setImportProgress({ current: 0, total: toImport.length });
@@ -412,18 +424,42 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     }));
     onAddPendingSources?.(pendingItems);
 
+    let currentChatId = activeChatId;
+
+    const cancelThisBatch = () => {
+      isCancelledLocallyRef.current = true;
+      if (currentAbortControllerRef.current) {
+        currentAbortControllerRef.current.abort();
+        currentAbortControllerRef.current = null;
+      }
+      if (isMountedRef.current) {
+        setIsImporting(false);
+        setImportProgress(null);
+      }
+
+      // Remove all pending placeholder items of this batch (preserving any completed documents)
+      pendingItems.forEach(p => {
+        onResolvePendingSource?.(p.id);
+        unregisterPendingCancelCallback(p.id);
+      });
+    };
+
+    pendingItems.forEach(p => {
+      registerPendingCancelCallback(p.id, cancelThisBatch);
+    });
+
     try {
-      let currentChatId = activeChatId;
       if (!currentChatId && onEnsureChatSession) {
         currentChatId = await onEnsureChatSession(toImport[0]?.title || "Research Paper");
       }
-      if (!currentChatId) return;
+      if (!currentChatId || isCancelledLocallyRef.current) return;
 
       // Streamed batch ingestion via single HTTP request with real-time SSE progress
       const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sources: toImport })
+        body: JSON.stringify({ sources: toImport }),
+        signal: abortController.signal
       });
 
       if (!res.ok) {
@@ -432,18 +468,24 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       }
 
       await consumeSSEStream(res, (data: any) => {
+        if (isCancelledLocallyRef.current) return;
+
         if (data.type === "progress") {
           const currentProgress = data.current || 0;
           if (isMountedRef.current) {
             setImportProgress({ current: currentProgress, total: toImport.length });
           }
           if (data.doc) {
-            onDocumentAdded?.(data.doc as DocType, currentChatId);
+            batchCreatedDocIds.push(data.doc.id);
+            if (!isCancelledLocallyRef.current) {
+              onDocumentAdded?.(data.doc as DocType, currentChatId || undefined);
+            }
           }
           if (currentProgress > 0 && currentProgress <= pendingItems.length) {
             const pendingId = pendingItems[currentProgress - 1]?.id;
             if (pendingId !== undefined) {
               onResolvePendingSource?.(pendingId);
+              unregisterPendingCancelCallback(pendingId);
             }
           }
         } else if (data.type === "done") {
@@ -453,18 +495,30 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
         }
       });
 
-      if (isMountedRef.current) {
+      if (isMountedRef.current && !isCancelledLocallyRef.current) {
         setUserSelectionOverrides({});
       }
-    } catch (e) {
+    } catch (e: any) {
+      if (e.name === "AbortError" || isCancelledLocallyRef.current) {
+        return;
+      }
       console.error("Import sources failed:", e);
     } finally {
-      // Ensure all pending source badges are cleaned up
-      pendingItems.forEach(p => onResolvePendingSource?.(p.id));
-      if (isMountedRef.current) {
+      pendingItems.forEach(p => {
+        onResolvePendingSource?.(p.id);
+        unregisterPendingCancelCallback(p.id);
+      });
+      currentAbortControllerRef.current = null;
+      if (isMountedRef.current && !isCancelledLocallyRef.current) {
         setIsImporting(false);
         setImportProgress(null);
       }
+    }
+  };
+
+  const handleCancelImport = () => {
+    if (currentAbortControllerRef.current) {
+      currentAbortControllerRef.current.abort();
     }
   };
 
@@ -474,6 +528,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
     const novelIndices = sources.map((s, i) => (!isDuplicateSource(s) ? i : -1)).filter(i => i !== -1);
     return novelIndices.length > 0 && novelIndices.every(i => isSourceChecked(sources[i], i));
   }, [sources, isDuplicateSource, isSourceChecked]);
+  const isPartiallySelected = selectedCount > 0 && selectedCount < novelSourcesCount;
 
   return (
     <div className={`mb-3 flex ${isUser ? "justify-end" : "justify-start w-full"} font-sans group`}>
@@ -684,15 +739,32 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
           {!isCollapsed && (
             <>
-              <div className="px-4 py-2 bg-app-surface border-b border-app-divider flex items-center justify-between text-xs text-app-text-muted">
+              <div className="pl-4 pr-[22px] py-2 bg-app-surface border-b border-app-divider flex items-center justify-between text-xs text-app-text-muted">
                 <span className="text-app-text-muted">{t('chat.researchFound')}</span>
                 {novelSourcesCount > 0 && (
-                  <button 
+                  <div 
                     onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }}
-                    className="hover:text-blue-600 font-medium cursor-pointer transition-colors text-blue-500"
+                    className="flex items-center gap-2 cursor-pointer select-none group/selectall"
                   >
-                    {allNovelSelected ? "Deselect All" : "Select All"}
-                  </button>
+                    <span className="text-[11px] font-medium text-app-text-muted group-hover/selectall:text-app-text transition-colors">
+                      {allNovelSelected ? "Deselect All" : "Select All"}
+                    </span>
+                    <button 
+                      type="button"
+                      className={`w-4 h-4 rounded border flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
+                        allNovelSelected || isPartiallySelected
+                          ? "bg-blue-600 border-blue-600 text-white"
+                          : "border-app-border-strong bg-transparent group-hover/selectall:border-gray-400"
+                      }`}
+                      aria-label={allNovelSelected ? "Deselect All" : "Select All"}
+                    >
+                      {allNovelSelected ? (
+                        <Check size={11} strokeWidth={3} />
+                      ) : isPartiallySelected ? (
+                        <Minus size={11} strokeWidth={3} />
+                      ) : null}
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -785,15 +857,24 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
                 <button
                   type="button"
-                  onClick={handleImport}
-                  disabled={isImporting || selectedCount === 0}
-                  className="h-8 px-4 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border-0 outline-none transition-colors"
+                  onClick={isImporting ? handleCancelImport : handleImport}
+                  disabled={!isImporting && selectedCount === 0}
+                  className={`h-8 px-4 rounded-full text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors border-0 outline-none ${
+                    isImporting
+                      ? "bg-blue-600 hover:bg-red-600 text-white shadow-md group/cancelbtn"
+                      : "bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  }`}
+                  title={isImporting ? (t('right.cancelUpload') || "Cancel adding") : undefined}
                 >
                   {isImporting ? (
                     <>
-                      <Loader2 size={12} className="animate-spin" />
-                      <span>
-                        {importProgress ? `Adding ${importProgress.current}/${importProgress.total}...` : "Adding sources..."}
+                      <span className="flex items-center gap-1.5 group-hover/cancelbtn:hidden">
+                        <Loader2 size={12} className="animate-spin" />
+                        <span>{importProgress ? `Adding ${importProgress.current}/${importProgress.total}...` : "Adding sources..."}</span>
+                      </span>
+                      <span className="hidden group-hover/cancelbtn:flex items-center gap-1.5 text-white">
+                        <X size={12} strokeWidth={2.5} />
+                        <span>{t('right.cancelUpload') || "Cancel adding"}</span>
                       </span>
                     </>
                   ) : (

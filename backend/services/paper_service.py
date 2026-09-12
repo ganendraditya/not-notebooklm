@@ -16,7 +16,7 @@ from utils.file_utils import (
     sanitize_paper_filename,
 )
 from utils.pdf_utils import is_authentic_pdf_bytes
-from utils.text_processing import clean_doi
+from utils.text_processing import clean_doi, normalize_title_str
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -128,56 +128,88 @@ async def import_sources_progressive_stream(
 ) -> AsyncGenerator[str, None]:
     """Progressively downloads papers, creates DB entries, and batches embedding into vector store."""
     batch_docs_for_embedding = []
+    created_doc_ids = []
     total_to_import = len(allowed_sources)
     
-    for idx, paper in enumerate(allowed_sources, start=1):
-        doc_text, filename, c_doi, has_downloaded_pdf = await asyncio.to_thread(prepare_paper_file_sync, chat_id, paper)
-        abstract_text = (paper.snippet or "").strip()
+    try:
+        for idx, paper in enumerate(allowed_sources, start=1):
+            c_doi = clean_doi(paper.doi) if paper.doi else ""
+            local_db = SessionLocal()
+            existing_doc = None
+            try:
+                if c_doi:
+                    existing_doc = local_db.query(Document).filter(
+                        Document.chat_id == chat_id,
+                        Document.doi == c_doi
+                    ).first()
+                if not existing_doc and paper.title:
+                    norm_cand = normalize_title_str(paper.title)
+                    db_docs = local_db.query(Document).filter(Document.chat_id == chat_id).all()
+                    for d in db_docs:
+                        d_norm = normalize_title_str(d.title or d.filename)
+                        if norm_cand and d_norm and (norm_cand == d_norm or (len(norm_cand) >= 20 and (norm_cand in d_norm or d_norm in norm_cand))):
+                            existing_doc = d
+                            break
+            finally:
+                local_db.close()
 
-        local_db = SessionLocal()
-        created_doc_id = None
-        created_at_str = ""
-        try:
-            authors_json = json.dumps(paper.authors or [], ensure_ascii=False)
-            db_doc = Document(
-                chat_id=chat_id,
-                filename=filename,
-                title=paper.title,
-                authors=authors_json,
-                year=str(paper.year or ""),
-                journal=paper.venue or "",
-                journal_metric=paper.journal_metric or "",
-                doi=c_doi,
-                url=paper.url or "",
-                pdf_url=paper.pdf_url or "",
-                abstract=abstract_text,
-                abstract_type="official" if abstract_text and len(abstract_text) > 80 else "ai_summary",
-                is_oa=paper.is_oa if paper.is_oa is not None else True,
-                access_status="Open Access" if paper.is_oa else "Closed Access",
-                snippet=abstract_text,
-                venue=paper.venue or "",
-                citations=paper.citations or 0,
-                quality_tier=4,
-            )
-            local_db.add(db_doc)
-            commit_with_retry(local_db)
-            local_db.refresh(db_doc)
-            created_doc_id = db_doc.id
-            created_at_str = db_doc.created_at.isoformat() if db_doc.created_at else ""
-        finally:
-            local_db.close()
+            if existing_doc:
+                created_at_str = existing_doc.created_at.isoformat() if existing_doc.created_at else ""
+                has_pdf = existing_doc.has_full_pdf if existing_doc.has_full_pdf is not None else (existing_doc.filename or "").lower().endswith(".pdf")
+                yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': existing_doc.id, 'filename': existing_doc.filename, 'title': existing_doc.title or existing_doc.filename.replace('.pdf', '').replace('_', ' ').strip(), 'created_at': created_at_str, 'index': current_doc_count + idx, 'has_full_pdf': has_pdf, 'is_oa': existing_doc.is_oa if existing_doc.is_oa is not None else True}})}\n\n"
+                continue
 
-        batch_docs_for_embedding.append((doc_text, filename, chat_id))
+            doc_text, filename, c_doi, has_downloaded_pdf = await asyncio.to_thread(prepare_paper_file_sync, chat_id, paper)
+            abstract_text = (paper.snippet or "").strip()
 
-        yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': created_doc_id, 'filename': filename, 'title': db_doc.title or filename.replace('.pdf', '').replace('_', ' ').strip(), 'created_at': created_at_str, 'index': current_doc_count + idx, 'has_full_pdf': has_downloaded_pdf, 'is_oa': db_doc.is_oa if db_doc.is_oa is not None else True}})}\n\n"
+            local_db = SessionLocal()
+            created_doc_id = None
+            created_at_str = ""
+            try:
+                authors_json = json.dumps(paper.authors or [], ensure_ascii=False)
+                db_doc = Document(
+                    chat_id=chat_id,
+                    filename=filename,
+                    title=paper.title,
+                    authors=authors_json,
+                    year=str(paper.year or ""),
+                    journal=paper.venue or "",
+                    journal_metric=paper.journal_metric or "",
+                    doi=c_doi,
+                    url=paper.url or "",
+                    pdf_url=paper.pdf_url or "",
+                    abstract=abstract_text,
+                    abstract_type="official" if abstract_text and len(abstract_text) > 80 else "ai_summary",
+                    is_oa=paper.is_oa if paper.is_oa is not None else True,
+                    access_status="Open Access" if paper.is_oa else "Closed Access",
+                    snippet=abstract_text,
+                    venue=paper.venue or "",
+                    citations=paper.citations or 0,
+                    quality_tier=4,
+                )
+                local_db.add(db_doc)
+                commit_with_retry(local_db)
+                local_db.refresh(db_doc)
+                created_doc_id = db_doc.id
+                created_at_str = db_doc.created_at.isoformat() if db_doc.created_at else ""
+            finally:
+                local_db.close()
 
-    if batch_docs_for_embedding:
-        try:
-            await asyncio.to_thread(rag.ingest_documents_batch, batch_docs_for_embedding)
-        except Exception as e:
-            logger.warning(f"[Batch Vector Ingestion Warning]: {e}")
+            if created_doc_id:
+                created_doc_ids.append(created_doc_id)
+            batch_docs_for_embedding.append((doc_text, filename, chat_id))
 
-    yield f"data: {json.dumps({'type': 'done', 'total': total_to_import})}\n\n"
+            yield f"data: {json.dumps({'type': 'progress', 'current': idx, 'total': total_to_import, 'doc': {'id': created_doc_id, 'filename': filename, 'title': db_doc.title or filename.replace('.pdf', '').replace('_', ' ').strip(), 'created_at': created_at_str, 'index': current_doc_count + idx, 'has_full_pdf': has_downloaded_pdf, 'is_oa': db_doc.is_oa if db_doc.is_oa is not None else True}})}\n\n"
+
+        yield f"data: {json.dumps({'type': 'done', 'total': total_to_import})}\n\n"
+    except (GeneratorExit, asyncio.CancelledError):
+        logger.info(f"[Import Stream Stopped] Stream interrupted. Preserving {len(created_doc_ids)} completed documents.")
+    finally:
+        if batch_docs_for_embedding:
+            try:
+                await asyncio.to_thread(rag.ingest_documents_batch, batch_docs_for_embedding)
+            except Exception as e:
+                logger.warning(f"[Batch Vector Ingestion Warning]: {e}")
 
 async def import_sources_batch(chat_id: str, allowed_sources: List[models.PaperCandidate], db: Session) -> List[models.DocumentResponse]:
     """Batch imports sources synchronously, preparing files, saving to DB, and vectorizing."""

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Document, PendingSourceItem } from "@/stores/documentStore";
 
 export function useDocumentDoi({
@@ -15,8 +15,21 @@ export function useDocumentDoi({
   t: any;
 }) {
   const [doiPendingSources, setDoiPendingSources] = useState<PendingSourceItem[]>([]);
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+
+  const cancelDoi = (sourceId: string) => {
+    const controller = abortControllersRef.current.get(sourceId);
+    if (controller) {
+      controller.abort();
+      abortControllersRef.current.delete(sourceId);
+    }
+    setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+  };
 
   const importDoi = async (chatId: string, doi: string, sourceId: string) => {
+    const controller = new AbortController();
+    abortControllersRef.current.set(sourceId, controller);
+
     setDoiPendingSources(prev => prev.map(p => 
       p.id === sourceId ? { ...p, status: "uploading" } : p
     ));
@@ -25,7 +38,8 @@ export function useDocumentDoi({
       const res = await fetch(`${backendUrl}/chats/${chatId}/documents/import-doi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doi })
+        body: JSON.stringify({ doi }),
+        signal: controller.signal
       });
       
       if (!res.ok) {
@@ -37,9 +51,15 @@ export function useDocumentDoi({
       onDocumentAdded?.(doc, chatId);
       setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
     } catch (error: any) {
+      if (error.name === "AbortError") {
+        setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+        return;
+      }
       setDoiPendingSources(prev => prev.map(p => 
         p.id === sourceId ? { ...p, status: "error", error: error.message || "Import failed" } : p
       ));
+    } finally {
+      abortControllersRef.current.delete(sourceId);
     }
   };
 
@@ -67,6 +87,7 @@ export function useDocumentDoi({
 
   return {
     doiPendingSources,
-    handleImportDoi
+    handleImportDoi,
+    cancelDoi
   };
 }

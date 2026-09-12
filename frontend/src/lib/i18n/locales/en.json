@@ -358,6 +358,7 @@
   "right.noAddAbstract": "No additional abstract text provided.",
   "right.pdf": "PDF",
   "right.find": "Find",
+  "right.cancelUpload": "Cancel upload",
   "alert.unsupportedFormat": "Unsupported file format. Supported formats: .pdf, .docx, .doc, .txt, .md, .bib, .ris",
   "alert.limitReached": "Source limit reached! Maximum capacity is 300 sources per notebook.",
   "alert.capacityWarning": "Only uploading {n} out of {m} valid files to respect the 300 source cap."

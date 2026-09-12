@@ -52,7 +52,18 @@ interface DocumentStore {
   addDocument: (doc: Document) => void;
   updateDocumentsList: (updater: (prev: Document[]) => Document[]) => void;
   updatePendingSourcesList: (updater: (prev: PendingSourceItem[]) => PendingSourceItem[]) => void;
+  cancelPendingItem: (id: string) => void;
 }
+
+const cancelCallbacksMap = new Map<string, () => void>();
+
+export const registerPendingCancelCallback = (id: string, cb: () => void) => {
+  cancelCallbacksMap.set(id, cb);
+};
+
+export const unregisterPendingCancelCallback = (id: string) => {
+  cancelCallbacksMap.delete(id);
+};
 
 export const useDocumentStore = create<DocumentStore>((set) => ({
   documents: [],
@@ -69,5 +80,17 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
   
   addDocument: (doc) => set((state) => ({ documents: [...state.documents, doc] })),
   updateDocumentsList: (updater) => set((state) => ({ documents: updater(state.documents) })),
-  updatePendingSourcesList: (updater) => set((state) => ({ pendingSources: updater(state.pendingSources) }))
+  updatePendingSourcesList: (updater) => set((state) => ({ pendingSources: updater(state.pendingSources) })),
+  cancelPendingItem: (id: string) => {
+    const cb = cancelCallbacksMap.get(id);
+    if (cb) {
+      try {
+        cb();
+      } catch (e) {
+        console.error("Cancel callback error:", e);
+      }
+    }
+    cancelCallbacksMap.delete(id);
+    set((state) => ({ pendingSources: state.pendingSources.filter((p) => p.id !== id) }));
+  }
 }));

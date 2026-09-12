@@ -1,6 +1,6 @@
 # NotbookLM
 
-An open-source academic research assistant and document workspace designed to run locally on your own machine. Inspired by tools like Google Notebook (previously NotebookLM), Consensus, and Elicit, NotbookLM bridges conversational AI with verifiable academic literature synthesis.
+An open-source academic research assistant and document workspace designed to run locally on your own machine. Inspired by tools like Google Notebook / Gemini Notebook (previously NotebookLM), Consensus, and Elicit, NotbookLM bridges conversational AI with verifiable academic literature synthesis.
 
 ![NotbookLM Workspace](docs/assets/workspace-preview.png)
 
@@ -12,8 +12,10 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 
 * **Automated Literature Discovery:** Queries global academic registries (OpenAlex, Crossref, and web fallbacks) with iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
 * **Full-Text PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent resolvers (arXiv, Unpaywall, OpenAlex) while enriching paper records with journal quartiles and citation counts.
+* **3-Tier Hybrid Metadata Extractor:** Seamlessly handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and an AI Document Inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
 * **Grounded Synthesis & Matrix Tables:** Produces comparative literature review matrices with cell-level citation tagging, mitigating hallucinations by grounding claims directly in retrieved excerpts.
 * **Interactive Document Reader:** Split-pane interface featuring bidirectional citation navigation—click any citation badge to jump to and highlight the exact passage in the source PDF or document.
+* **Multi-Format Citation Generator:** Export clean, verified academic citations across standard formats: APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS.
 * **Local-First Architecture:** Runs on your local machine with zero mandatory cloud accounts. Supports bring-your-own local models (e.g., Ollama) or any OpenAI-compatible API endpoint, with optional S3 storage (Cloudflare R2, MinIO).
 
 ---
@@ -25,10 +27,11 @@ Search across OpenAlex, Crossref, and academic sources. NotbookLM filters candid
 
 ![Literature Discovery](docs/assets/literature-discovery.png)
 
-### 2. Intelligent Source Management (PDF vs. Metadata)
-Imported papers appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
-* **`PDF` badge:** The open-access full-text PDF was successfully located and downloaded via concurrent resolvers (arXiv, Unpaywall, OpenAlex).
-* **`TXT` badge:** Full-text PDF was behind paywalls or unavailable; NotbookLM indexed verified metadata and abstracts to maintain comprehensive coverage.
+### 2. Intelligent Source Management & Multi-Format Ingestion
+Imported and uploaded sources appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
+* **Format Badges:** Visual tags identify source filetypes—`PDF`, `DOC` (Word), `TXT`, `MD`, `BIB`, and `RIS`.
+* **Verified Paper vs. Local Manuscript:** Authentic journal publications retain official publisher metadata, while local documents (such as theses, student projects, or CVs) are cleanly cataloged without artificial journal labels.
+* **Bulk Export:** Download original documents individually or bundle multiple selected sources into a single organized ZIP package.
 
 ### 3. Integrated Document & PDF Viewer
 Inspect full manuscripts directly within the workspace. The built-in document reader provides a dual-view experience: stream and read the authentic publication PDF, or switch to the extracted full-text view for citation navigation and quick reading.

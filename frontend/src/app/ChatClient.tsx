@@ -415,6 +415,7 @@ export default function ChatClient() {
                     }}
                     externalViewingDoc={viewingDoc}
                     onViewingDocChange={setViewingDoc}
+                    onCancelPendingSource={handleResolvePendingSource}
                     groundingHighlight={groundingHighlight}
                     onClearGroundingHighlight={() => setGroundingHighlight(null)}
                     onClearViewingDoc={() => {

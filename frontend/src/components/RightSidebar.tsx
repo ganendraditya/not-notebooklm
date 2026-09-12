@@ -28,6 +28,7 @@ interface RightSidebarProps {
   onAskAboutDocument?: (doc: Document, paperTitle?: string) => void;
   externalViewingDoc?: Document | null;
   onViewingDocChange?: (doc: Document | null) => void;
+  onCancelPendingSource?: (pendingId: string) => void;
   groundingHighlight?: CitationGroundingHighlight | null;
   onClearGroundingHighlight?: () => void;
   onClearViewingDoc?: () => void;
@@ -50,6 +51,7 @@ export default function RightSidebar({
   onAskAboutDocument, 
   externalViewingDoc, 
   onViewingDocChange,
+  onCancelPendingSource,
   groundingHighlight,
   onClearViewingDoc, 
   backendUrl, 
@@ -92,7 +94,8 @@ export default function RightSidebar({
     toggleDocSelection, handleToggleSelectAll,
     getFileBadgeInfo, handleOpenRename, handleSaveRename,
     handleCleanDuplicates, handleBulkDownload, handleConfirmBulkDelete,
-    handleUploadBatch, handleImportDoi
+    handleUploadBatch, handleImportDoi,
+    cancelPendingSource
   } = useDocumentManager({
     documents,
     externalPendingSources,
@@ -103,6 +106,7 @@ export default function RightSidebar({
     onDocumentDeleted,
     onBulkDocumentsDeleted,
     onEnsureChatSession,
+    onCancelPendingSource,
     viewingDoc,
     setViewingDoc,
     t
@@ -438,6 +442,7 @@ export default function RightSidebar({
         setDocToDelete={setDocToDelete}
         setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
         setInternalPendingSources={setInternalPendingSources}
+        cancelPendingSource={cancelPendingSource}
         activeChatId={activeChatId}
         backendUrl={backendUrl}
       />

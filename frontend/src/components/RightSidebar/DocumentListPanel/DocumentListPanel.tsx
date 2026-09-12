@@ -30,6 +30,7 @@ export interface DocumentListPanelProps {
   setDocToDelete: (id: number | null) => void;
   setShowBulkDeleteConfirm: (isOpen: boolean) => void;
   setInternalPendingSources: React.Dispatch<React.SetStateAction<PendingSourceItem[]>>;
+  cancelPendingSource?: (id: string) => void;
   activeChatId: string | null;
   backendUrl: string;
 }
@@ -51,6 +52,7 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
   setDocToDelete,
   setShowBulkDeleteConfirm,
   setInternalPendingSources,
+  cancelPendingSource,
   activeChatId,
   backendUrl,
 }) => {
@@ -257,14 +259,35 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                     </span>
                   </div>
 
-                  {/* Right: Circular Spinner or Error Icon */}
-                  <div className="flex items-center shrink-0 pr-0.5">
+                  {/* Right: Circular Spinner (with Hover Cancel 'X') or Error Icon */}
+                  <div className="flex items-center shrink-0 p-1 -m-1">
                     {item.status === "uploading" ? (
-                      <div className="w-3.5 h-3.5 flex items-center justify-center" title={t('right.uploading')}>
-                        <svg className="animate-spin w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                          <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
+                      <div className="relative w-3.5 h-3.5 flex items-center justify-center group/spinner">
+                        {/* Normal Spinning Circle (Hides on hover) */}
+                        <div className="flex items-center justify-center group-hover/spinner:hidden" title={t('right.uploading')}>
+                          <svg className="animate-spin w-3.5 h-3.5 text-blue-400" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                            <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        </div>
+                        {/* Hover Cancel 'X' Button */}
+                        <Tooltip content={t('right.cancelUpload') || "Cancel upload"} side="left">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (cancelPendingSource) {
+                                cancelPendingSource(item.id);
+                              } else {
+                                setInternalPendingSources(prev => prev.filter(p => p.id !== item.id));
+                              }
+                            }}
+                            className="hidden group-hover/spinner:flex items-center justify-center w-3.5 h-3.5 text-app-text-muted hover:text-red-500 rounded transition-colors cursor-pointer"
+                            aria-label={t('right.cancelUpload') || "Cancel upload"}
+                          >
+                            <X size={12} strokeWidth={2.5} />
+                          </button>
+                        </Tooltip>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1">
@@ -274,7 +297,13 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
                         <Tooltip content={t('right.dismiss')} side="top">
                           <button
                             type="button"
-                            onClick={() => setInternalPendingSources(prev => prev.filter(p => p.id !== item.id))}
+                            onClick={() => {
+                              if (cancelPendingSource) {
+                                cancelPendingSource(item.id);
+                              } else {
+                                setInternalPendingSources(prev => prev.filter(p => p.id !== item.id));
+                              }
+                            }}
                             className="text-app-text-dim hover:text-app-text p-0.5 rounded cursor-pointer"
                             aria-label={t('right.dismiss')}
                           >

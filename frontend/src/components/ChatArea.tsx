@@ -771,7 +771,7 @@ export default function ChatArea({
       {!isChatEmpty && (
         <div className="absolute bottom-0 inset-x-0 pb-3 pt-6 pointer-events-none z-10">
           <div className="w-full px-4 pointer-events-none min-w-0 relative">
-            <div className="absolute inset-x-0 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
+            <div className="absolute left-4 right-4 -top-6 -bottom-3 bg-gradient-to-t from-app-bg via-app-bg/95 to-transparent -z-10 pointer-events-none rounded-3xl" />
             {showScrollBottom && (
               <div className="flex justify-center mb-2 pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-200">
                 <button
