@@ -160,6 +160,12 @@ export default function ChatClient() {
     }
   };
 
+  // Whenever active chat changes, always reset viewingDoc and groundingHighlight
+  useEffect(() => {
+    setViewingDoc(null);
+    setGroundingHighlight(null);
+  }, [activeChatId, setViewingDoc, setGroundingHighlight]);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
   const [mobileTab, setMobileTab] = useState<"menu" | "chat" | "sources">("chat");
@@ -389,6 +395,7 @@ export default function ChatClient() {
               <div className={`h-full min-w-0 ${mobileTab === "chat" ? "hidden lg:block" : "w-full lg:w-auto"}`}>
                 <ErrorBoundary fallbackTitle="Panel sumber referensi mengalami kendala">
                   <RightSidebar 
+                    key={activeChatId || "new-chat"}
                     activeChatId={activeChatId} 
                     documents={documents} 
                     pendingSources={pendingSources}
@@ -410,6 +417,7 @@ export default function ChatClient() {
                       setMobileTab("chat");
                     }}
                     externalViewingDoc={viewingDoc}
+                    onViewingDocChange={setViewingDoc}
                     groundingHighlight={groundingHighlight}
                     onClearGroundingHighlight={() => setGroundingHighlight(null)}
                     onClearViewingDoc={() => {

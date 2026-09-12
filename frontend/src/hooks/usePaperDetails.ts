@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect, useCallback } from "react";
 import { Document, CitationGroundingHighlight } from "@/stores/documentStore";
 
 export interface PaperDetailData {
@@ -30,6 +30,7 @@ interface UsePaperDetailsProps {
   activeChatId: string | null;
   backendUrl: string;
   externalViewingDoc?: Document | null;
+  onViewingDocChange?: (doc: Document | null) => void;
   groundingHighlight?: CitationGroundingHighlight | null;
 }
 
@@ -59,18 +60,35 @@ export function usePaperDetails({
   activeChatId,
   backendUrl,
   externalViewingDoc,
+  onViewingDocChange,
   groundingHighlight,
 }: UsePaperDetailsProps) {
-  const [viewingDoc, setViewingDoc] = useState<Document | null>(externalViewingDoc || null);
+  const [viewingDoc, setViewingDocState] = useState<Document | null>(externalViewingDoc || null);
   const [paperDetails, setPaperDetails] = useState<PaperDetailData | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"preview" | "pdf">("preview");
 
   const paperDetailsCacheRef = useRef<Map<number, PaperDetailData>>(new Map());
 
+  const setViewingDoc = useCallback((doc: Document | null) => {
+    setViewingDocState(doc);
+    if (onViewingDocChange) {
+      onViewingDocChange(doc);
+    }
+  }, [onViewingDocChange]);
+
   useEffect(() => {
-    setViewingDoc(externalViewingDoc || null);
+    setViewingDocState(externalViewingDoc || null);
   }, [externalViewingDoc]);
+
+  // Whenever active chat changes, always reset viewingDoc and paperDetails to exit reader mode and show default sources list
+  useEffect(() => {
+    setViewingDocState(null);
+    setPaperDetails(null);
+    if (onViewingDocChange) {
+      onViewingDocChange(null);
+    }
+  }, [activeChatId, onViewingDocChange]);
 
   useEffect(() => {
     if (!viewingDoc || !activeChatId) {

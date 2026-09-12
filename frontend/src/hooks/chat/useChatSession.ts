@@ -35,7 +35,10 @@ export function useChatSession(
     try {
       localStorage.setItem("last_active_chat_id", id);
     } catch {}
-    if (activeChatId === id) return;
+    if (activeChatId === id) {
+      setViewingDoc(null);
+      return;
+    }
 
     setActiveChatId(id);
     setViewingDoc(null);

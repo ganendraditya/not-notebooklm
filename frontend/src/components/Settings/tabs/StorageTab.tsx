@@ -307,21 +307,24 @@ export default function StorageTab({
 
               {sessions.length > 0 ? (
                 <div className="border border-app-border rounded-xl overflow-hidden bg-transparent">
-                  <div className="max-h-48 overflow-y-auto custom-scrollbar divide-y divide-app-divider">
-                    <div className="sticky top-0 z-10 flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted border-b border-app-divider backdrop-blur-sm">
-                      <span>Conversations</span>
-                      <input 
-                        type="checkbox"
-                        checked={selectedChatIds.length === sessions.length && sessions.length > 0}
-                        ref={input => {
-                          if (input) {
-                            input.indeterminate = selectedChatIds.length > 0 && selectedChatIds.length < sessions.length;
-                          }
-                        }}
-                        onChange={toggleSelectAllChats}
-                        className="rounded cursor-pointer accent-blue-500 shrink-0"
-                      />
-                    </div>
+                  {/* Fixed Header Row */}
+                  <div className="flex items-center justify-between px-3 py-2 bg-app-surface text-xs font-medium text-app-text-muted border-b border-app-border">
+                    <span>Conversations</span>
+                    <input 
+                      type="checkbox"
+                      checked={selectedChatIds.length === sessions.length && sessions.length > 0}
+                      ref={input => {
+                        if (input) {
+                          input.indeterminate = selectedChatIds.length > 0 && selectedChatIds.length < sessions.length;
+                        }
+                      }}
+                      onChange={toggleSelectAllChats}
+                      className="rounded cursor-pointer accent-blue-500 shrink-0"
+                    />
+                  </div>
+
+                  {/* Scrollable Conversation Rows (Scrollbar strictly starts from header bottomline) */}
+                  <div className="max-h-40 overflow-y-auto custom-scrollbar divide-y divide-app-divider">
                     {sessions.map((s) => (
                       <label 
                         key={s.id} 

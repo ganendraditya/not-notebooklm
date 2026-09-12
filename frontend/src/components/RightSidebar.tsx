@@ -25,6 +25,7 @@ interface RightSidebarProps {
   onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
   onAskAboutDocument?: (doc: Document, paperTitle?: string) => void;
   externalViewingDoc?: Document | null;
+  onViewingDocChange?: (doc: Document | null) => void;
   groundingHighlight?: CitationGroundingHighlight | null;
   onClearGroundingHighlight?: () => void;
   onClearViewingDoc?: () => void;
@@ -46,6 +47,7 @@ export default function RightSidebar({
   onEnsureChatSession, 
   onAskAboutDocument, 
   externalViewingDoc, 
+  onViewingDocChange,
   groundingHighlight,
   onClearGroundingHighlight,
   onClearViewingDoc, 
@@ -53,7 +55,13 @@ export default function RightSidebar({
   onClose 
 }: RightSidebarProps) {
   const { t } = useTranslation();
-  const { viewingDoc, setViewingDoc, paperDetails, isLoadingDetails, activeTab, setActiveTab } = usePaperDetails({ activeChatId, backendUrl, externalViewingDoc, groundingHighlight });
+  const { viewingDoc, setViewingDoc, paperDetails, isLoadingDetails, activeTab, setActiveTab } = usePaperDetails({ 
+    activeChatId, 
+    backendUrl, 
+    externalViewingDoc, 
+    onViewingDocChange,
+    groundingHighlight 
+  });
   const {
     selectedDocs, setSelectedDocs,
     sortBy, setSortBy,
