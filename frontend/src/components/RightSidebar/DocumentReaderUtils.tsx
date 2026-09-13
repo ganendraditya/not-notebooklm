@@ -82,22 +82,13 @@ export function getHighlightedContent(
   // Try to find it DIRECTLY in the document text FIRST, before falling back to aiQuotes or keyword scoring.
   // This is critical for table cells where the LLM wrote verbatim content from the paper (e.g. journal names,
   // dataset descriptions, methodology details) — the cell text itself should be found in the source document.
+  // Uses n-gram sequence matching (language-agnostic, no hardcoded word lists).
   if (targetQuery && targetQuery.trim().length > 20) {
     const directHighlightedIndices = new Set<number>();
     const cleanTarget = targetQuery.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
     const allTargetWords = cleanTarget.split(/\s+/).filter(w => w.length >= 2);
 
-    // Stopwords to exclude from word-overlap scoring (same set used by fallback path)
-    const directStopWords = new Set([
-      "yang", "dari", "pada", "untuk", "dengan", "adalah", "dalam", "ini", "itu", "dan", "atau", "oleh", "ke", "di",
-      "the", "and", "for", "with", "this", "that", "from", "using", "paper", "berikut", "tabel", "rekapitulasi",
-      "dokumen", "terdapat", "adanya", "sebagai", "juga", "dapat", "akan", "telah", "namun", "serta", "karena",
-      "bisa", "lebih", "secara", "seperti", "yaitu", "yakni", "merupakan", "berdasarkan", "menggunakan",
-      "penelitian", "studi", "sistem", "metode", "hasil", "nilai", "proses"
-    ]);
-    const targetContentWords = allTargetWords.filter(w => !directStopWords.has(w) && !/^\d+$/.test(w));
-
-    if (allTargetWords.length >= 3 && targetContentWords.length >= 3) {
+    if (allTargetWords.length >= 4) {
       // Try exact substring match first (very strict — requires full phrase containment)
       rawSentences.forEach((s, idx) => {
         if (/^#{1,6}\s+/i.test(s.trim())) return;
@@ -107,59 +98,58 @@ export function getHighlightedContent(
         }
       });
 
-      // If no exact substring match, try high-precision content word overlap (stopwords excluded)
+      // If no exact substring match, use n-gram sequence matching (language-agnostic)
+      // Extract 3-word and 4-word consecutive n-grams from the target text.
+      // A sentence that contains many of these n-grams is very likely the source.
       if (directHighlightedIndices.size === 0) {
-        // Extract numeric tokens for metric-aware matching
-        const targetNumbers = cleanTarget.match(/\b\d+\b/g) || [];
-
-        let bestIdx = -1;
-        let bestScore = 0;
-
-        rawSentences.forEach((s, idx) => {
-          if (/^#{1,6}\s+/i.test(s.trim())) return;
-          const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-          if (sClean.length < 15) return;
-          if (/https?\s|doi\s|issn|available online|halaman/.test(sClean)) return;
-
-          let wordOverlap = 0;
-          targetContentWords.forEach(tw => {
-            if (sClean.includes(tw)) wordOverlap++;
-          });
-          const wordRatio = wordOverlap / targetContentWords.length;
-
-          // Numeric bonus
-          let numericHits = 0;
-          if (targetNumbers.length > 0) {
-            const sNumbers = sClean.match(/\b\d+\b/g) || [];
-            const sNumSet = new Set(sNumbers);
-            targetNumbers.forEach(n => { if (sNumSet.has(n)) numericHits++; });
+        const trigrams: string[] = [];
+        const quadgrams: string[] = [];
+        for (let i = 0; i <= allTargetWords.length - 3; i++) {
+          trigrams.push(`${allTargetWords[i]} ${allTargetWords[i+1]} ${allTargetWords[i+2]}`);
+          if (i <= allTargetWords.length - 4) {
+            quadgrams.push(`${allTargetWords[i]} ${allTargetWords[i+1]} ${allTargetWords[i+2]} ${allTargetWords[i+3]}`);
           }
-          const numericBonus = targetNumbers.length > 0 ? (numericHits / targetNumbers.length) * 0.2 : 0;
-          const combinedScore = wordRatio + numericBonus;
+        }
+        const allNgrams = [...quadgrams, ...trigrams];
+        if (allNgrams.length === 0) {
+          // Not enough words for n-grams — skip direct path
+        } else {
+          let bestIdx = -1;
+          let bestScore = 0;
 
-          // Require high overlap (>= 60% content word match AND at least 3 words hit) to confirm this is the source sentence
-          if (wordRatio >= 0.60 && wordOverlap >= 3 && combinedScore > bestScore) {
-            bestScore = combinedScore;
-            bestIdx = idx;
-          }
-        });
+          rawSentences.forEach((s, idx) => {
+            if (/^#{1,6}\s+/i.test(s.trim())) return;
+            const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+            if (sClean.length < 15) return;
 
-        if (bestIdx !== -1) {
-          directHighlightedIndices.add(bestIdx);
-          // Also include immediately adjacent sentences if they have decent overlap (for multi-sentence cells)
-          [bestIdx - 1, bestIdx + 1].forEach(adj => {
-            if (adj >= 0 && adj < rawSentences.length) {
-              const adjClean = rawSentences[adj].toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-              if (adjClean.length < 15 || /^#{1,6}\s+/i.test(rawSentences[adj].trim())) return;
-              let adjOverlap = 0;
-              targetContentWords.forEach(tw => {
-                if (adjClean.includes(tw)) adjOverlap++;
-              });
-              if (targetContentWords.length > 0 && adjOverlap / targetContentWords.length >= 0.40) {
-                directHighlightedIndices.add(adj);
-              }
+            let ngramHits = 0;
+            allNgrams.forEach(ng => {
+              if (sClean.includes(ng)) ngramHits++;
+            });
+
+            // Require at least 30% of n-grams found AND at least 2 n-gram hits
+            const ngramRatio = ngramHits / allNgrams.length;
+            if (ngramRatio >= 0.30 && ngramHits >= 2 && ngramHits > bestScore) {
+              bestScore = ngramHits;
+              bestIdx = idx;
             }
           });
+
+          if (bestIdx !== -1) {
+            directHighlightedIndices.add(bestIdx);
+            // Also include immediately adjacent sentences if they share n-grams (multi-sentence cells)
+            [bestIdx - 1, bestIdx + 1].forEach(adj => {
+              if (adj >= 0 && adj < rawSentences.length) {
+                const adjClean = rawSentences[adj].toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+                if (adjClean.length < 15 || /^#{1,6}\s+/i.test(rawSentences[adj].trim())) return;
+                let adjHits = 0;
+                allNgrams.forEach(ng => { if (adjClean.includes(ng)) adjHits++; });
+                if (allNgrams.length > 0 && adjHits / allNgrams.length >= 0.20 && adjHits >= 2) {
+                  directHighlightedIndices.add(adj);
+                }
+              }
+            });
+          }
         }
       }
 
@@ -456,15 +446,6 @@ export function getHighlightedContent(
     }
   }
 
-  // Common stopwords in Indonesian and English
-  const stopWords = new Set([
-    "yang", "dari", "pada", "untuk", "dengan", "adalah", "dalam", "ini", "itu", "dan", "atau", "oleh", "ke", "di",
-    "the", "and", "for", "with", "this", "that", "from", "using", "paper", "berikut", "tabel", "rekapitulasi",
-    "dokumen", "terdapat", "adanya", "sebagai", "juga", "dapat", "akan", "telah", "namun", "serta", "karena",
-    "bisa", "lebih", "secara", "seperti", "yaitu", "yakni", "merupakan", "berdasarkan", "parameter", "metode",
-    "hasil", "nilai", "sebesar", "ketika", "menggunakan"
-  ]);
-
   // Normalize query & strip LaTeX delimiters ($C=10$, \gamma=1 -> c=10, gamma=1) and diacritics
   const normQuery = (targetQuery || "")
     .toLowerCase()
@@ -490,22 +471,22 @@ export function getHighlightedContent(
   // Extract parameter bindings: e.g. "c=10", "gamma=1", "k=5", "fold=10"
   const paramBindings = (normQuery.match(/\b[a-z_]+\s*=\s*\d+(?:[,.]\d+)?\b/g) || []).map(p => p.replace(/\s+/g, ""));
 
-  // Extract model/algorithm/parameter specific terms: e.g. "svm", "rbf", "gamma", "tfidf", "kernel", "logistic", "naive"
-  const cleanTokens = normQuery
+  // Extract all content words (no hardcoded stopword lists — language-agnostic)
+  const allQueryWords = normQuery
     .replace(/[^a-zA-Z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length >= 2 && !stopWords.has(w) && !/^\d+$/.test(w));
+    .filter(w => w.length >= 2 && !/^\d+$/.test(w));
 
   // Extract explicit benchmark dataset or model entities: e.g. "dada-2000", "yolov8", "resnet-50", "imagenet-1k", "swin-t"
   const datasetModelMatches = (normQuery.match(/\b[a-z]{2,}[-_]?\d+[a-z\d]*\b/gi) || [])
     .map(e => e.toLowerCase());
 
-  // Extract keyphrases (2-word & 3-word n-grams)
+  // Build 2-word and 3-word n-grams from ALL query words (language-agnostic phrase matching)
   const queryPhrases: string[] = [];
-  for (let i = 0; i < cleanTokens.length - 1; i++) {
-    queryPhrases.push(`${cleanTokens[i]} ${cleanTokens[i + 1]}`);
-    if (i < cleanTokens.length - 2) {
-      queryPhrases.push(`${cleanTokens[i]} ${cleanTokens[i + 1]} ${cleanTokens[i + 2]}`);
+  for (let i = 0; i < allQueryWords.length - 1; i++) {
+    queryPhrases.push(`${allQueryWords[i]} ${allQueryWords[i + 1]}`);
+    if (i < allQueryWords.length - 2) {
+      queryPhrases.push(`${allQueryWords[i]} ${allQueryWords[i + 1]} ${allQueryWords[i + 2]}`);
     }
   }
 
@@ -610,10 +591,11 @@ export function getHighlightedContent(
       }
     });
 
-    // 7. Keyword overlap matching (Weight: 6 points each)
-    cleanTokens.forEach(w => {
+    // 7. Individual word overlap matching (Weight: 4 points each — lower weight since no stopword filtering;
+    //    the n-gram phrases above carry more discriminative signal)
+    allQueryWords.forEach(w => {
       if (sWords.has(w) || sClean.includes(w)) {
-        score += 6;
+        score += 4;
       }
     });
 
