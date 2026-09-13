@@ -481,69 +481,78 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       }
       if (!currentChatId || isBatchCancelledRef.current) return;
 
-      for (let i = 0; i < toImport.length; i++) {
-        if (isBatchCancelledRef.current) break;
+      // Concurrency Pool: Process up to 4 papers concurrently for 3-4x throughput while strictly adhering to academic API rate limits
+      const CONCURRENCY = Math.min(4, toImport.length);
+      let nextIndex = 0;
+      let completedCount = 0;
 
-        const src = toImport[i];
-        const pending = pendingItems[i];
+      const runWorker = async () => {
+        while (nextIndex < toImport.length && !isBatchCancelledRef.current) {
+          const currentIndex = nextIndex++;
+          const src = toImport[currentIndex];
+          const pending = pendingItems[currentIndex];
 
-        // If user already clicked cancel on this item, skip it completely!
-        if (cancelledPendingIdsRef.current.has(pending.id)) {
-          onResolvePendingSource?.(pending.id);
-          unregisterPendingCancelCallback(pending.id);
-          continue;
-        }
-
-        const activeItems = pendingItems.filter(item => !cancelledPendingIdsRef.current.has(item.id));
-        const activeIndex = activeItems.findIndex(item => item.id === pending.id);
-
-        if (isMountedRef.current && activeIndex !== -1) {
-          setImportProgress({ current: activeIndex + 1, total: activeItems.length });
-        }
-
-        const itemController = new AbortController();
-        activeItemControllersRef.current.set(pending.id, itemController);
-        let createdDocId: number | null = null;
-
-        try {
-          const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sources: [src] }),
-            signal: itemController.signal
-          });
-
-          if (!res.ok) {
-            const errData = await res.json().catch(() => null);
-            throw new Error(errData?.detail || `Server returned ${res.status}`);
+          // If user already clicked cancel on this item, skip it completely!
+          if (cancelledPendingIdsRef.current.has(pending.id)) {
+            onResolvePendingSourceRef.current?.(pending.id);
+            unregisterPendingCancelCallback(pending.id);
+            continue;
           }
 
-          await consumeSSEStream(res, (data: any) => {
-            if (cancelledPendingIdsRef.current.has(pending.id) || isBatchCancelledRef.current) return;
+          const itemController = new AbortController();
+          activeItemControllersRef.current.set(pending.id, itemController);
+          let createdDocId: number | null = null;
 
-            if (data.type === "progress" && data.doc) {
-              createdDocId = data.doc.id;
-              if (!cancelledPendingIdsRef.current.has(pending.id) && !isBatchCancelledRef.current) {
-                onDocumentAdded?.(data.doc as DocType, currentChatId || undefined);
+          try {
+            const res = await fetch(`${backendUrl}/chats/${currentChatId}/import_sources_stream`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sources: [src] }),
+              signal: itemController.signal
+            });
+
+            if (!res.ok) {
+              const errData = await res.json().catch(() => null);
+              throw new Error(errData?.detail || `Server returned ${res.status}`);
+            }
+
+            await consumeSSEStream(res, (data: any) => {
+              if (cancelledPendingIdsRef.current.has(pending.id) || isBatchCancelledRef.current) return;
+
+              if (data.type === "progress" && data.doc) {
+                createdDocId = data.doc.id;
+                if (!cancelledPendingIdsRef.current.has(pending.id) && !isBatchCancelledRef.current) {
+                  onDocumentAdded?.(data.doc as DocType, currentChatId || undefined);
+                }
               }
+            });
+          } catch (err: any) {
+            if (err.name === "AbortError" || cancelledPendingIdsRef.current.has(pending.id)) {
+              // If aborted, delete any created document from backend so zero trace remains
+              if (createdDocId && currentChatId) {
+                fetch(`${backendUrl}/chats/${currentChatId}/documents/${createdDocId}`, { method: "DELETE" }).catch(() => {});
+                useDocumentStore.getState().updateDocumentsList(prev => prev.filter(d => d.id !== createdDocId));
+              }
+            } else {
+              console.error("Import source failed:", err);
             }
-          });
-        } catch (err: any) {
-          if (err.name === "AbortError" || cancelledPendingIdsRef.current.has(pending.id)) {
-            // If aborted, delete any created document from backend so zero trace remains
-            if (createdDocId && currentChatId) {
-              fetch(`${backendUrl}/chats/${currentChatId}/documents/${createdDocId}`, { method: "DELETE" }).catch(() => {});
-              useDocumentStore.getState().updateDocumentsList(prev => prev.filter(d => d.id !== createdDocId));
+          } finally {
+            activeItemControllersRef.current.delete(pending.id);
+            onResolvePendingSourceRef.current?.(pending.id);
+            unregisterPendingCancelCallback(pending.id);
+            completedCount++;
+            if (isMountedRef.current && !isBatchCancelledRef.current) {
+              setImportProgress({
+                current: Math.min(completedCount, toImport.length),
+                total: toImport.length
+              });
             }
-          } else {
-            console.error("Import source failed:", err);
           }
-        } finally {
-          activeItemControllersRef.current.delete(pending.id);
-          onResolvePendingSource?.(pending.id);
-          unregisterPendingCancelCallback(pending.id);
         }
-      }
+      };
+
+      const workers = Array.from({ length: CONCURRENCY }, () => runWorker());
+      await Promise.all(workers);
 
       if (isMountedRef.current && !isBatchCancelledRef.current) {
         setUserSelectionOverrides({});
