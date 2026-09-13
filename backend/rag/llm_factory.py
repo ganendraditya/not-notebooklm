@@ -220,7 +220,7 @@ async def astream_llm_response(
                     full_content += token
                     if in_hidden_metadata:
                         continue
-                    if "<!-- CITATION_MAP" in full_content or "<!-- SOURCES_DATA" in full_content:
+                    if re.search(r'<!--\s*(?:CITATION_MAP|SOURCES_DATA)', full_content, re.IGNORECASE):
                         in_hidden_metadata = True
                         continue
                     res = on_delta(token)

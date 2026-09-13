@@ -123,10 +123,17 @@ def format_clean_response(text: str) -> str:
         return ""
     text = text.strip()
     citation_data = None
-    if "<!-- CITATION_MAP:" in text:
-        parts = text.split("<!-- CITATION_MAP:", 1)
-        text = parts[0].rstrip()
-        citation_data = parts[1].split("-->", 1)[0].strip()
+    
+    # Match CITATION_MAP with or without colon and flexible whitespace
+    m = re.search(r'<!--\s*CITATION_MAP(?::|\s)([\s\S]*?)(?:-->|$)', text, re.IGNORECASE)
+    if m:
+        raw_data = m.group(1).strip().lstrip(":").strip()
+        if raw_data.startswith("{"):
+            citation_data = raw_data
+        text = text[:m.start()].rstrip()
+
+    # Strip any malformed or non-JSON CITATION_MAP comment blocks completely
+    text = re.sub(r'<!--\s*CITATION_MAP[\s\S]*?(?:-->|$)', '', text, flags=re.IGNORECASE).rstrip()
 
     # Automatically enhance table citations so every claim has clickable evidence
     text = enhance_table_citations(text)
@@ -142,12 +149,13 @@ def extract_structured_citations(text: str) -> Tuple[str, Dict[str, Any]]:
         return "", {}
     clean_text = text.strip()
     citations = {}
-    if "<!-- CITATION_MAP:" in clean_text:
-        parts = clean_text.split("<!-- CITATION_MAP:", 1)
-        clean_text = parts[0].rstrip()
-        raw_json = parts[1].split("-->", 1)[0].strip()
+    m = re.search(r'<!--\s*CITATION_MAP(?::|\s)([\s\S]*?)(?:-->|$)', clean_text, re.IGNORECASE)
+    if m:
+        raw_json = m.group(1).strip().lstrip(":").strip()
+        clean_text = clean_text[:m.start()].rstrip()
         try:
             citations = json.loads(raw_json)
         except Exception:
             pass
+    clean_text = re.sub(r'<!--\s*CITATION_MAP[\s\S]*?(?:-->|$)', '', clean_text, flags=re.IGNORECASE).rstrip()
     return clean_text, citations
