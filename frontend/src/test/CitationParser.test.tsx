@@ -227,4 +227,49 @@ describe("CitationParser", () => {
     expect(capturedCtx.sentence).not.toContain("High Stakes Domain");
     expect(capturedCtx.sentence).not.toContain("Indexing overhead");
   });
+
+  it("extracts full sentence when citation is placed after a period (. [X])", () => {
+    const docs = [{ id: 16, index: 16, filename: "Paper16.pdf", title: "Traffic Control", created_at: "2026-01-01T00:00:00Z" }];
+    let capturedCtx: any = null;
+    const onOpen = (_doc: any, ctx: any) => {
+      capturedCtx = ctx;
+    };
+
+    const text = 'Metode "Panjang Antrean" memiliki akurasi jauh lebih tinggi (91.18%) dibandingkan metode "Kepadatan/Luas Piksel" (77.03%). [16]';
+    const result = parseCitationsInReactNode(text, docs, onOpen, null, undefined, undefined, "claim_16", false);
+    const { container } = render(<div>{result}</div>);
+
+    const btn = container.querySelector("button")!;
+    btn.click();
+    expect(capturedCtx).toBeTruthy();
+    // Must extract the full empirical claim, NEVER an empty string or just the number
+    expect(capturedCtx.sentence).toContain("Panjang Antrean");
+    expect(capturedCtx.sentence).toContain("91.18%");
+    expect(capturedCtx.sentence).toContain("77.03%");
+  });
+
+  it("extracts separate distinct claim contexts for multiple citations in the same cell/paragraph", () => {
+    const docs = [{ id: 2, index: 2, filename: "Paper2.pdf", title: "DA-TransUNet", created_at: "2026-01-01T00:00:00Z" }];
+    const capturedCtxs: any[] = [];
+    const onOpen = (_doc: any, ctx: any) => {
+      capturedCtxs.push(ctx);
+    };
+
+    const multiClaimText = "• Integrates Vision Transformer (ViT) with Dual Attention Blocks into U-Net [2]. • DA-Block couples a Position Attention Module [2].";
+    const result = parseCitationsInReactNode(multiClaimText, docs, onOpen, null, undefined, undefined, "multi_claim", false);
+    const { container } = render(<div>{result}</div>);
+
+    const buttons = container.querySelectorAll("button");
+    expect(buttons.length).toBe(2);
+
+    // Click button 1
+    buttons[0].click();
+    expect(capturedCtxs[0].sentence).toContain("Integrates Vision Transformer");
+    expect(capturedCtxs[0].sentence).not.toContain("Position Attention Module");
+
+    // Click button 2
+    buttons[1].click();
+    expect(capturedCtxs[1].sentence).toContain("Position Attention Module");
+    expect(capturedCtxs[1].sentence).not.toContain("Integrates Vision Transformer");
+  });
 });

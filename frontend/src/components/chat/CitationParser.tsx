@@ -145,7 +145,7 @@ export function parseCitationsInReactNode(
         parts.push(renderTextWithLineBreaks(node.substring(lastIndex, matchIndex), `${elementPrefix}-pre-${lastIndex}`));
       }
 
-      // Extract precise context sentence/cell text for grounding
+      // Extract precise context sentence/clause for grounding
       let contextSentence = "";
       const searchBase = effectiveFullText || node;
       let baseIndex = searchBase.indexOf(node);
@@ -154,56 +154,77 @@ export function parseCitationsInReactNode(
       }
       const actualMatchIndex = baseIndex + matchIndex;
 
+      let scopeStart = 0;
+      let scopeEnd = searchBase.length;
+
       if (searchBase.includes("|")) {
-        // Table cell: find the exact cell bounded by pipes around this match
         const pipeBefore = searchBase.lastIndexOf("|", actualMatchIndex);
         const pipeAfter = searchBase.indexOf("|", actualMatchIndex + match[0].length);
-        const cellStart = pipeBefore !== -1 ? pipeBefore + 1 : 0;
-        const cellEnd = pipeAfter !== -1 ? pipeAfter : searchBase.length;
-        const exactCell = searchBase.substring(cellStart, cellEnd);
-        contextSentence = exactCell
-          .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
-          .trim();
-      } else {
-        // Natural sentence boundaries in paragraphs or list items
-        const textBefore = searchBase.substring(0, actualMatchIndex);
-        const textAfter = searchBase.substring(actualMatchIndex + match[0].length);
-
-        const lastSentenceEnd = Math.max(
-          textBefore.lastIndexOf(". "),
-          textBefore.lastIndexOf("! "),
-          textBefore.lastIndexOf("? "),
-          textBefore.lastIndexOf("\n\n"),
-          textBefore.lastIndexOf(";\n")
-        );
-        const sentenceStart = lastSentenceEnd !== -1 ? lastSentenceEnd + 1 : 0;
-        
-        const nextSentenceEnd = Math.min(
-          ...[
-            textAfter.indexOf(". "),
-            textAfter.indexOf("! "),
-            textAfter.indexOf("? "),
-            textAfter.indexOf("\n\n"),
-            textAfter.indexOf(";\n")
-          ].filter(x => x !== -1)
-        );
-        const sentenceEnd = nextSentenceEnd !== -1 ? actualMatchIndex + match[0].length + nextSentenceEnd + 1 : searchBase.length;
-        
-        contextSentence = searchBase
-          .substring(sentenceStart, sentenceEnd)
-          .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
-          .trim();
+        if (pipeBefore !== -1) scopeStart = pipeBefore + 1;
+        if (pipeAfter !== -1) scopeEnd = pipeAfter;
       }
 
-      // Check if contextSentence is purely a title or document identifier (e.g. "Tahir et al. (2023)" or "Paper 1" or empty)
-      const isTitleOrDocIdentifier = isDocColumn || !contextSentence || contextSentence.length < 5 || (
-        /^\s*(?:[A-Z][a-z]+(?:\s+et\s+al\.?)?(?:\s*\(\d{4}\))?|(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?)\s*$/i.test(contextSentence)
+      const scopeText = searchBase.substring(scopeStart, scopeEnd);
+      const matchInScope = actualMatchIndex - scopeStart;
+
+      // Extract the specific bullet point or sentence clause enclosing this match
+      const beforeMatch = scopeText.substring(0, matchInScope);
+      const afterMatch = scopeText.substring(matchInScope + match[0].length);
+
+      const clauseStartRel = Math.max(
+        beforeMatch.lastIndexOf("\n"),
+        beforeMatch.lastIndexOf("•"),
+        beforeMatch.lastIndexOf("<br>"),
+        beforeMatch.lastIndexOf("<br/>")
       );
-      if (isTitleOrDocIdentifier) {
+
+      // Check for sentence boundary (. ! ?) within the clause, trimming punctuation right before match
+      const cleanedBefore = beforeMatch.replace(/[.\s!?;:]+$/, "");
+      const sentenceBoundary = Math.max(
+        cleanedBefore.lastIndexOf(". "),
+        cleanedBefore.lastIndexOf("! "),
+        cleanedBefore.lastIndexOf("? ")
+      );
+
+      const finalStart = Math.max(
+        clauseStartRel !== -1 ? clauseStartRel + 1 : 0,
+        sentenceBoundary !== -1 ? sentenceBoundary + 1 : 0
+      );
+
+      // Find end of clause or sentence
+      const nextClauseEnd = Math.min(
+        ...[afterMatch.indexOf("\n"), afterMatch.indexOf("•"), afterMatch.indexOf("<br>")].filter(x => x !== -1)
+      );
+      const nextSentenceEnd = Math.min(
+        ...[afterMatch.indexOf(". "), afterMatch.indexOf("! "), afterMatch.indexOf("? ")].filter(x => x !== -1)
+      );
+
+      let finalEndRel = matchInScope + match[0].length;
+      if (nextSentenceEnd !== -1 && (nextClauseEnd === -1 || nextSentenceEnd <= nextClauseEnd)) {
+        finalEndRel += nextSentenceEnd + 1;
+      } else if (nextClauseEnd !== -1) {
+        finalEndRel += nextClauseEnd;
+      } else if (nextClauseEnd !== -1) {
+        finalEndRel += nextClauseEnd;
+      } else {
+        finalEndRel = scopeText.length;
+      }
+
+      contextSentence = scopeText.substring(finalStart, finalEndRel)
+        .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
+        .trim();
+
+      // Check if contextSentence is purely an author tag or document identifier (e.g. "Tahir et al. (2023)", "Cahyono & Budiyanto (2020)", "Doc 1")
+      const wordCount = contextSentence.split(/\s+/).filter(Boolean).length;
+      const isAuthorTag = wordCount <= 6 && (
+        /\(\d{4}\)/.test(contextSentence) || 
+        /et\s+al/i.test(contextSentence) || 
+        /^(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?$/i.test(contextSentence)
+      ) && !/\b(?:metode|method|akurasi|accuracy|recall|precision|presisi|f1|iou|model|loss|dataset|algorithm|algoritma|integrat|segment|detect|flow|buffer|speed|kecepatan)\b/i.test(contextSentence);
+
+      if (isDocColumn || !contextSentence || contextSentence.length < 3 || isAuthorTag) {
         contextSentence = "";
       }
 
@@ -281,8 +302,8 @@ export function parseCitationsInReactNode(
                     onClick={(e) => {
                       e.stopPropagation();
                       if (doc && onOpenDocument) {
-                        if (isDocColumn || !contextSentence) {
-                          // In Document Identity column or title list: open document cleanly with zero highlights
+                        if (isDocColumn) {
+                          // In Document Identity column: open document cleanly with zero highlights
                           onOpenDocument(doc, undefined);
                         } else {
                           onOpenDocument(doc, {

@@ -219,6 +219,8 @@ export function getHighlightedContent(
                 <React.Fragment key={idx}>
                   {leadingSpace && <span>{leadingSpace}</span>}
                   <mark
+                    data-highlight-active={isActiveCluster ? "true" : undefined}
+                    data-cluster-index={clusterIdx}
                     ref={(el) => {
                       if (el && isClusterAnchor && highlightRefsMap) {
                         highlightRefsMap.current.set(clusterIdx, el);
@@ -307,10 +309,10 @@ export function getHighlightedContent(
   // Extract split ratios: e.g. "90:10", "80:20", "60:40"
   const ratioMatches = (normQuery.match(/\b\d+\s*:\s*\d+\b/g) || []).map(r => r.replace(/\s+/g, ""));
 
-  // Extract explicit integer numbers >= 3 digits (e.g. 1500 from "1.500" or 900)
+  // Extract explicit integer numbers >= 3 digits (e.g. 1500 from "1.500" or 900), excluding 4-digit publication years (1900-2099)
   const rawNumberMatches = (normQuery.match(/\b\d+(?:[.,]\d+)?\b/g) || [])
     .map(n => n.replace(/[.,]/g, ""))
-    .filter(n => n.length >= 3 && !metricsSet.has(n));
+    .filter(n => n.length >= 3 && !metricsSet.has(n) && !/^(?:19|20)\d{2}$/.test(n));
   const numberSet = new Set(rawNumberMatches);
 
   // Extract parameter bindings: e.g. "c=10", "gamma=1", "k=5", "fold=10"
@@ -439,13 +441,17 @@ export function getHighlightedContent(
     return score;
   });
 
-  // Dynamic Multi-Highlight Selection & Clustering:
+  // Dynamic Focused Evidence Selection (NotebookLM Style):
   const highlightedIndices = new Set<number>();
   const clusters: number[][] = [];
 
-  if (maxSingleScore > 0) {
-    // Selectivity threshold: Keep top evidence passages matching query claims
-    const threshold = Math.max(10, maxSingleScore * 0.40);
+  const hasHardEvidence = hasMetricOrData || metricsSet.size > 0 || ratioMatches.length > 0 || numberSet.size > 0 || paramBindings.length > 0;
+  const minRequiredScore = hasHardEvidence ? 20 : 40;
+
+  if (maxSingleScore >= minRequiredScore) {
+    // Selectivity threshold: Keep only top evidence sentences matching query claims
+    // (must be within 80% of maxSingleScore to avoid 30 spurious low-confidence highlights)
+    const threshold = Math.max(minRequiredScore, maxSingleScore * 0.80);
     
     // Pick candidate sentences meeting threshold
     const candidateIndices: number[] = [];
@@ -455,35 +461,40 @@ export function getHighlightedContent(
       }
     });
 
-    // Add candidates to highlighted set
-    candidateIndices.forEach(idx => highlightedIndices.add(idx));
-
-    // Connect adjacent 1-to-2 sentence gaps in the same paragraph if context flows cohesively
-    for (let i = 0; i < candidateIndices.length - 1; i++) {
-      const curr = candidateIndices[i];
-      const next = candidateIndices[i + 1];
-      const gap = next - curr;
-      if (gap >= 2 && gap <= 3) {
-        for (let g = curr + 1; g < next; g++) {
-          highlightedIndices.add(g);
-        }
-      }
-    }
-  }
-
-  // Fallback: If no match above threshold, highlight best matching sentence ONLY if it scored >= 15 (strict significance)
-  if (highlightedIndices.size === 0) {
-    let fallbackIdx = -1;
-    let bestScore = 14; // Must have substantial overlap (at least 3 keywords or keyphrase/metric) to qualify
-    sentenceScores.forEach((sc, idx) => {
-      if (sc > bestScore) {
-        bestScore = sc;
-        fallbackIdx = idx;
+    // Group candidates into initial clusters
+    const initialClusters: number[][] = [];
+    let curClust: number[] = [];
+    candidateIndices.forEach(idx => {
+      if (curClust.length === 0) {
+        curClust.push(idx);
+      } else if (idx === curClust[curClust.length - 1] + 1) {
+        curClust.push(idx);
+      } else {
+        initialClusters.push(curClust);
+        curClust = [idx];
       }
     });
-    if (fallbackIdx >= 0) {
-      highlightedIndices.add(fallbackIdx);
+    if (curClust.length > 0) {
+      initialClusters.push(curClust);
     }
+
+    // Rank clusters by peak sentence score
+    initialClusters.sort((a, b) => {
+      const maxA = Math.max(...a.map(i => sentenceScores[i] || 0));
+      const maxB = Math.max(...b.map(i => sentenceScores[i] || 0));
+      return maxB - maxA;
+    });
+
+    // Keep AT MOST the top 2 highest scoring clusters to maintain laser-focused evidence
+    const topClusters = initialClusters.slice(0, 2);
+    topClusters.forEach(clust => {
+      clust.forEach(idx => highlightedIndices.add(idx));
+    });
+  }
+
+  // Fallback: If no match above threshold, highlight best matching sentence ONLY if it scored >= minRequiredScore (strict significance)
+  if (highlightedIndices.size === 0 && bestSentenceIdx !== -1 && maxSingleScore >= minRequiredScore) {
+    highlightedIndices.add(bestSentenceIdx);
   }
 
   // If still nothing matched, return unhighlighted text (no random highlight)
@@ -544,6 +555,8 @@ export function getHighlightedContent(
             <React.Fragment key={idx}>
               {leadingSpace && <span>{leadingSpace}</span>}
               <mark
+                data-highlight-active={isActiveCluster ? "true" : undefined}
+                data-cluster-index={clusterIdx}
                 ref={(el) => {
                   if (el && isClusterAnchor && highlightRefsMap) {
                     highlightRefsMap.current.set(clusterIdx, el);

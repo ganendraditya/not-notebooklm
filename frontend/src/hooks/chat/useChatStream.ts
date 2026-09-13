@@ -83,6 +83,7 @@ export function useChatStream(
 
     const controller = new AbortController();
     job.controller = controller;
+    let latestAsstMsg: any = null;
 
     try {
       bumpSessionToTop(targetChatId);
@@ -96,8 +97,6 @@ export function useChatStream(
         }),
         signal: controller.signal
       });
-
-      let latestAsstMsg: any = null;
 
       const smoother = createSmoothTextStreamer({
         onUpdate: (displayed) => {
@@ -128,7 +127,11 @@ export function useChatStream(
               }
               return [...prev, asstMsg];
             });
+            setIsLoading(false);
+            setActiveStatus(null);
           }
+          job.isProcessing = false;
+          job.status = null;
 
           // Trigger system / browser notification if user is away in another tab
           const cleanPreview = (asstMsg.content || "")
@@ -231,13 +234,14 @@ export function useChatStream(
       if (activeChatIdRef.current === targetChatId) {
         setActiveStatus(null);
       }
-      // Recursively process the next message in queue for this chat
-      if (job.queue.length > 0) {
-        await processNextInQueue(targetChatId);
-      } else {
+      // If no valid response was completed (e.g. aborted or errored out), clean up loading state immediately
+      if (!latestAsstMsg || controller.signal.aborted) {
         job.isProcessing = false;
         if (activeChatIdRef.current === targetChatId) {
           setIsLoading(false);
+        }
+        if (job.queue.length > 0) {
+          await processNextInQueue(targetChatId);
         }
       }
     }
@@ -377,17 +381,21 @@ export function useChatStream(
           });
         }
       },
-      onDone: () => {
-        const asstMsg = latestAsstMsg || { role: "assistant", content: "", created_at: new Date().toISOString() };
-        if (activeChatIdRef.current === currentChatId) {
-          updateMessagesList(prev => {
-            const lastMsg = prev[prev.length - 1];
-            if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-              return [...prev.slice(0, -1), { ...asstMsg, isStreaming: false }];
-            }
-            return [...prev, asstMsg];
-          });
-        }
+        onDone: () => {
+          const asstMsg = latestAsstMsg || { role: "assistant", content: "", created_at: new Date().toISOString() };
+          if (activeChatIdRef.current === currentChatId) {
+            updateMessagesList(prev => {
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+                return [...prev.slice(0, -1), { ...asstMsg, isStreaming: false }];
+              }
+              return [...prev, asstMsg];
+            });
+            setIsLoading(false);
+            setActiveStatus(null);
+          }
+          job.isProcessing = false;
+          job.status = null;
 
         const cleanPreview = (asstMsg.content || "")
           .replace(/<!--[\s\S]*?-->/g, "")
@@ -483,11 +491,15 @@ export function useChatStream(
       if (job.controller === controller) {
         job.controller = null;
       }
-      job.isProcessing = false;
       job.status = null;
       if (activeChatIdRef.current === currentChatId) {
         setActiveStatus(null);
-        setIsLoading(false);
+      }
+      if (!latestAsstMsg || controller.signal.aborted) {
+        job.isProcessing = false;
+        if (activeChatIdRef.current === currentChatId) {
+          setIsLoading(false);
+        }
       }
     }
   };
@@ -556,7 +568,11 @@ export function useChatStream(
             }
             return next;
           });
+          setIsLoading(false);
+          setActiveStatus(null);
         }
+        job.isProcessing = false;
+        job.status = null;
 
         const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
         if (actionMatch) {
@@ -638,11 +654,15 @@ export function useChatStream(
       if (job.controller === controller) {
         job.controller = null;
       }
-      job.isProcessing = false;
       job.status = null;
       if (activeChatIdRef.current === currentChatId) {
         setActiveStatus(null);
-        setIsLoading(false);
+      }
+      if (!latestAsstMsg || controller.signal.aborted) {
+        job.isProcessing = false;
+        if (activeChatIdRef.current === currentChatId) {
+          setIsLoading(false);
+        }
       }
     }
   };

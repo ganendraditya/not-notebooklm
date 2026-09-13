@@ -217,11 +217,20 @@ async def astream_llm_response(
             async for chunk in response_stream:
                 token = chunk.delta or ""
                 if token:
+                    prev_len = len(full_content)
                     full_content += token
                     if in_hidden_metadata:
                         continue
-                    if re.search(r'<!--\s*(?:CITATION_MAP|SOURCES_DATA)', full_content, re.IGNORECASE):
+                    m = re.search(r'<!--\s*(?:CITATION_MAP|SOURCES_DATA)', full_content, re.IGNORECASE)
+                    if m:
                         in_hidden_metadata = True
+                        comment_start = m.start()
+                        if comment_start > prev_len:
+                            visible_portion = full_content[prev_len:comment_start]
+                            if visible_portion:
+                                res = on_delta(visible_portion)
+                                if inspect.isawaitable(res):
+                                    await res
                         continue
                     res = on_delta(token)
                     if inspect.isawaitable(res):

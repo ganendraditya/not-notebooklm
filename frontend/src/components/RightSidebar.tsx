@@ -157,14 +157,23 @@ export default function RightSidebar({
   useEffect(() => {
     if (!isLoadingDetails) {
       const timer = setTimeout(() => {
-        const targetEl = highlightRefsMap.current.get(activeMatchIndex);
+        let targetEl = highlightRefsMap.current.get(activeMatchIndex);
+        if (!targetEl) {
+          targetEl = document.querySelector(`mark[data-cluster-index="${activeMatchIndex}"]`) as HTMLElement;
+        }
+        if (!targetEl) {
+          targetEl = document.querySelector('mark[data-highlight-active="true"]') as HTMLElement;
+        }
+        if (!targetEl) {
+          targetEl = document.querySelector('mark') as HTMLElement;
+        }
         if (targetEl) {
           targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-      }, 150);
+      }, 200);
       return () => clearTimeout(timer);
     }
-  }, [isLoadingDetails, activeMatchIndex, groundingHighlight, activeTab, paperDetails?.content]);
+  }, [isLoadingDetails, activeMatchIndex, groundingHighlight?.clickId, activeTab, paperDetails?.content]);
 
   // Local memory cache for instant viewer loading without repeated network/parsing overhead
   // Close sort menu on click outside
