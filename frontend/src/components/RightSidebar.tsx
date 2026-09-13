@@ -135,7 +135,7 @@ export default function RightSidebar({
       activeMatchIndex,
       groundingHighlight?.aiQuotes
     );
-  }, [currentContent, groundingHighlight?.sentence, groundingHighlight?.aiQuotes, groundingHighlight?.clickId, activeMatchIndex]);
+  }, [currentContent, groundingHighlight?.sentence, groundingHighlight?.aiQuotes, activeMatchIndex]);
 
   useEffect(() => {
     setTotalMatches(highlightResult.matchCount);
@@ -146,7 +146,7 @@ export default function RightSidebar({
         setActiveMatchIndex(prev => (prev >= highlightResult.matchCount ? 0 : prev));
       }
     }
-  }, [highlightResult.matchCount, highlightResult.initialActiveIndex]);
+  }, [highlightResult.matchCount, highlightResult.initialActiveIndex, groundingHighlight?.clickId]);
 
   // Reset highlight refs when highlighted target changes (or same citation re-clicked)
   useEffect(() => {

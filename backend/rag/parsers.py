@@ -51,9 +51,12 @@ def parse_document_to_markdown(file_path: str) -> str:
     md_text = ""
     if ext == ".pdf" or is_binary_pdf:
         try:
+            # Enforce natural multi-column academic reading order (Column 1 top-to-bottom, then Column 2)
+            # Prevents right-column headers (e.g. REFERENCES) from prematurely interrupting left-column sections
+            pymupdf4llm.use_layout(False)
             md_text = pymupdf4llm.to_markdown(file_path)
         except Exception:
-            # Fallback to plain PyMuPDF text extraction if pymupdf4llm layout parser fails
+            # Fallback to plain PyMuPDF text extraction if pymupdf4llm parser fails
             try:
                 import pymupdf
                 doc = pymupdf.open(file_path)

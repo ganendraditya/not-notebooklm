@@ -222,8 +222,8 @@ async def handle_workspace_analysis_pipeline(
         "STRICT IEEE CITATION & CITATION_MAP REQUIREMENTS (MANDATORY BEFORE COMPLETION):\n"
         "1. IEEE CITATION POSITION: Citation tags [X] MUST ALWAYS appear BEFORE sentence-ending periods or punctuation (e.g. 'mencapai akurasi 93% [13].' or 'metode Swin [1], [2].'). NEVER place citation tags after the period (NEVER write 'akurasi 93%. [1]'). In table cells, place citation tags before the closing period of each bullet (e.g. '• Integrates DA-Blocks [2].').\n"
         "2. CITATION MAP (MANDATORY): Whenever your response contains citations [X], you MUST append the hidden CITATION_MAP at the VERY END of your response:\n"
-        "<!-- CITATION_MAP: {\"X\": [\"Exact verbatim sentence copied from Document X in its original language proving the claim\"]} -->\n"
-        "Copy authentic verbatim sentences directly from the document text provided in the prompt context. Do not paraphrase or invent quotes. This is required for the document viewer to highlight the source evidence accurately."
+        "<!-- CITATION_MAP: {\"X\": [\"Verbatim sentence proving finding A from Doc X\", \"Verbatim sentence proving finding B from Doc X\"]} -->\n"
+        "Copy authentic verbatim sentences directly from the document text provided in the prompt context (provide 1 to 3 key evidence sentences per cited document). Do not paraphrase or invent quotes. This is required for the document viewer to highlight the source evidence accurately."
     )
 
     system_msg = LlamaChatMessage(

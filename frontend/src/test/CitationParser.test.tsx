@@ -189,22 +189,18 @@ describe("CitationParser", () => {
     expect(container.querySelector("button")).toBeNull();
   });
 
-  it("deduplicates repeated document citation buttons in document identity column and opens with zero highlights", () => {
+  it("renders document identity columns as plain text without non-highlighting buttons", () => {
     const docs = [{ id: 2, index: 2, filename: "Paper2.pdf", title: "Hyper-RAG", created_at: "2026-01-01T00:00:00Z" }];
     const onOpen = vi.fn();
 
-    // In Document Identity column (isDocColumn = true), redundant duplicate [2] must be filtered out
+    // In Document Identity column (isDocColumn = true), citation tags are rendered as clean text, not non-highlighting buttons
     const cellText = "[2] Feng et al. (2026) Nature Communications [2]";
     const result = parseCitationsInReactNode(cellText, docs, onOpen, null, undefined, undefined, "td_0", true);
     const { container } = render(<div>{result}</div>);
 
     const buttons = container.querySelectorAll("button");
-    expect(buttons.length).toBe(1);
-    expect(buttons[0].textContent).toContain("2");
-
-    // Clicking document column button must open with zero highlights (undefined context)
-    buttons[0].click();
-    expect(onOpen).toHaveBeenCalledWith(docs[0], undefined);
+    expect(buttons.length).toBe(0);
+    expect(container.textContent).toContain("[2] Feng et al. (2026) Nature Communications [2]");
   });
 
   it("extracts only the specific cell context in table rows instead of the entire multi-column row", () => {

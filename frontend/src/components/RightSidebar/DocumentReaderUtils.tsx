@@ -100,9 +100,9 @@ export function getHighlightedContent(
       });
 
       const maxScore = Math.max(...scoredQuotes.map(sq => sq.score));
-      // If one quote is clearly more relevant to the clicked cell, use only the relevant quote(s)
+      // If one or more quotes are relevant to the clicked cell, include them
       if (maxScore > 0) {
-        selectedQuotes = scoredQuotes.filter(sq => sq.score >= maxScore * 0.7).map(sq => sq.quote);
+        selectedQuotes = scoredQuotes.filter(sq => sq.score >= maxScore * 0.6).map(sq => sq.quote);
       }
     }
 
@@ -561,9 +561,9 @@ export function getHighlightedContent(
   const minRequiredScore = hasHardEvidence ? 20 : 40;
 
   if (maxSingleScore >= minRequiredScore) {
-    // Selectivity threshold: Keep only top evidence sentences matching query claims
-    // (must be within 80% of maxSingleScore to avoid 30 spurious low-confidence highlights)
-    const threshold = Math.max(minRequiredScore, maxSingleScore * 0.80);
+    // Selectivity threshold: Keep top evidence sentences matching query claims
+    // (must be within 70% of maxSingleScore to retain valid secondary evidence clusters for 1/2, 1/3 navigation)
+    const threshold = Math.max(minRequiredScore, maxSingleScore * 0.70);
     
     // Pick candidate sentences meeting threshold
     const candidateIndices: number[] = [];
@@ -597,8 +597,14 @@ export function getHighlightedContent(
       return maxB - maxA;
     });
 
-    // Keep STRICTLY the single highest-scoring focal cluster (NotebookLM laser-focus, zero fragmented jumping)
-    const topClusters = initialClusters.slice(0, 1);
+    // Keep up to the top 3 highest-scoring qualified clusters (e.g. Abstract, Methodology, Results)
+    // to enable interactive arrow navigation (1/2, 1/3) while preventing fragmented low-confidence scatter
+    const peakScore = Math.max(...(initialClusters[0]?.map(i => sentenceScores[i] || 0) || [0]));
+    const qualifiedClusters = initialClusters.filter(clust => {
+      const clustPeak = Math.max(...clust.map(i => sentenceScores[i] || 0));
+      return clustPeak >= Math.max(minRequiredScore, peakScore * 0.70);
+    });
+    const topClusters = (qualifiedClusters.length > 0 ? qualifiedClusters : initialClusters).slice(0, 3);
     topClusters.forEach(clust => {
       clust.forEach(idx => highlightedIndices.add(idx));
     });

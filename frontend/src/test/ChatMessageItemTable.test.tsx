@@ -190,11 +190,11 @@ describe("ChatMessageItem Table & Cleanliness", () => {
     const anchorLinks = container.querySelectorAll("a");
     expect(anchorLinks.length).toBe(0);
 
-    // Must render interactive buttons for the citations
+    // Must render interactive buttons for the content column citations (while identity column is clean text)
     const buttons = container.querySelectorAll("button");
-    // At least 2 citation buttons (one in col 1, one in col 2) plus the copy button
     const citationButtons = Array.from(buttons).filter(b => b.textContent?.includes("1"));
-    expect(citationButtons.length).toBeGreaterThanOrEqual(2);
+    expect(citationButtons.length).toBe(1);
+    expect(container.textContent).toContain("Pipeline 5 tahap [1]");
   });
 
   it("preserves horizontal scroll position when activeCitationKey updates upon clicking a citation", () => {
@@ -290,5 +290,81 @@ describe("ChatMessageItem Table & Cleanliness", () => {
 
     fireEvent.scroll(sourcesScrollContainer, { target: { scrollTop: 50 } });
     expect(onParentScroll).not.toHaveBeenCalled();
+  });
+
+  it("suppresses non-highlighting buttons on No, Author, and Title columns while keeping buttons on empirical columns", () => {
+    const rawContent = `| No & Dokumen | Penulis & Tahun | Judul & Fokus Utama | Metode / Pendekatan Teknis | Temuan Utama (Hasil & Performa) | Limitasi / Kendala | Rekomendasi Future Work |
+| --- | --- | --- | --- | --- | --- | --- |
+| [1] | Tahir et al. (2023) [1] | Real-Time Event-Driven Road Traffic Monitoring System Using CCTV Video Analytics [1] | Sequential DCNN (data sintetis BeamNG Drive) [1]. | Akurasi klasifikasi insiden rata-rata 82.3% [1]. | Akurasi malam hari sangat rendah (56.7%) [1]. | Penambahan data sintetis malam hari [1]. |`;
+
+    const documents = [
+      {
+        id: 1,
+        index: 1,
+        filename: "Tahir2023.pdf",
+        title: "Real-Time Event-Driven Road Traffic Monitoring System Using CCTV Video Analytics",
+        created_at: "2026-01-01T00:00:00Z"
+      }
+    ];
+
+    const onOpenDocument = vi.fn();
+
+    const msg = {
+      role: "assistant" as const,
+      content: rawContent,
+      created_at: new Date().toISOString(),
+    };
+
+    const { container } = renderWithI18n(
+      <InChatMessageComponent
+        msg={msg}
+        activeChatId="test-chat"
+        backendUrl="http://localhost:8000"
+        documents={documents}
+        onOpenDocument={onOpenDocument}
+      />
+    );
+
+    const tdElements = container.querySelectorAll("td");
+    expect(tdElements.length).toBe(7);
+
+    // Col 0: No & Dokumen -> plain text, NO button
+    expect(tdElements[0].querySelectorAll("button").length).toBe(0);
+    expect(tdElements[0].textContent).toContain("[1]");
+
+    // Col 1: Penulis & Tahun -> plain text, NO button
+    expect(tdElements[1].querySelectorAll("button").length).toBe(0);
+    expect(tdElements[1].textContent).toContain("Tahir et al. (2023)");
+
+    // Col 2: Judul & Fokus Utama -> plain text, NO button
+    expect(tdElements[2].querySelectorAll("button").length).toBe(0);
+    expect(tdElements[2].textContent).toContain("Real-Time Event-Driven Road Traffic Monitoring System");
+
+    // Col 3: Metode -> HAS citation button
+    const col3Btns = tdElements[3].querySelectorAll("button");
+    expect(col3Btns.length).toBe(1);
+
+    // Col 4: Temuan -> HAS citation button
+    const col4Btns = tdElements[4].querySelectorAll("button");
+    expect(col4Btns.length).toBe(1);
+
+    // Col 5: Limitasi -> HAS citation button
+    const col5Btns = tdElements[5].querySelectorAll("button");
+    expect(col5Btns.length).toBe(1);
+
+    // Col 6: Rekomendasi -> HAS citation button
+    const col6Btns = tdElements[6].querySelectorAll("button");
+    expect(col6Btns.length).toBe(1);
+
+    // Clicking empirical button triggers onOpenDocument with context
+    col4Btns[0].click();
+    expect(onOpenDocument).toHaveBeenCalledTimes(1);
+    expect(onOpenDocument).toHaveBeenCalledWith(
+      documents[0],
+      expect.objectContaining({
+        sentence: expect.stringContaining("82.3%"),
+        num: 1
+      })
+    );
   });
 });

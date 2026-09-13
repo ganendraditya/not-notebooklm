@@ -28,12 +28,13 @@ Pada malam hari, akurasi mengalami penurunan menjadi 73% akibat pendaran lampu k
 Metode panjang antrean terbukti lebih presisi dibandingkan metode luas piksel untuk penentuan durasi lampu hijau.
 `;
 
-  it("produces laser-focused grounding (exactly 1 focal cluster) on empirical metric claims", () => {
+  it("produces focused grounding evidence (1 to 3 clusters) enabling multi-match navigation", () => {
     const claim = 'Akurasi penghitungan mencapai 91.18% sedangkan metode kepadatan 77.03%.';
     const result = getHighlightedContent(samplePaper, claim);
 
-    // Must find matching evidence and strictly isolate to 1 focal cluster (no scattered fragments)
-    expect(result.matchCount).toBe(1);
+    // Must find matching evidence and allow multi-cluster navigation (1/2 or 1/3)
+    expect(result.matchCount).toBeGreaterThanOrEqual(1);
+    expect(result.matchCount).toBeLessThanOrEqual(3);
   });
 
   it("does not falsely highlight header publication years (e.g. 2020) on author queries", () => {

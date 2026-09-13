@@ -33,18 +33,30 @@ export function enhanceTableCitations(markdown: string): string {
     return `${s} [${docNum}]`;
   };
 
+  const isIdentityColContent = (val: string): boolean => {
+    const clean = val.replace(/\[\d{1,3}\]/g, "").trim();
+    const cleanWordCount = clean.split(/\s+/).filter(Boolean).length;
+    return cleanWordCount <= 6 && (
+      /^\(?\d{4}\)?$/.test(clean) ||
+      /[A-Za-z]+.*?\(\d{4}\)/.test(clean) ||
+      /et\s+al/i.test(clean) ||
+      /^(?:doc|dokumen|paper|sumber|ref|source)\s*\[?\d+\]?$/i.test(clean)
+    );
+  };
+
+  const isMetadataHeader = (h: string): boolean => {
+    if (!h) return false;
+    const clean = h.replace(/[*_#~`:]/g, "").trim().toLowerCase();
+    return /^(?:no|dokumen|doc|paper|penulis|author|authors|tahun|year|judul|title|fokus|identity|rujukan)\b/i.test(clean) ||
+      /(?:penulis|author|authors|judul|title|document\s*identity|paper\s*title|fokus\s*utama)/i.test(clean);
+  };
+
   const tagContent = (val: string, docNum: string): string => {
     if (!val.trim() || isNegativeOrEmptyCitation(val) || val.includes(`[${docNum}]`)) {
       return val;
     }
-    // Do not tag bare author or identity labels (e.g. "Pradana et al. (2023)")
-    const cleanWordCount = val.split(/\s+/).filter(Boolean).length;
-    if (cleanWordCount <= 6 && (
-      /^\(?\d{4}\)?$/.test(val.trim()) ||
-      /[A-Za-z]+.*?\(\d{4}\)/.test(val) ||
-      /et\s+al/i.test(val) ||
-      /^(?:doc|dokumen|paper|sumber|ref|source)\s*\[?\d+\]?$/i.test(val)
-    )) {
+    // Do not tag bare author, identity, or metadata labels
+    if (isIdentityColContent(val)) {
       return val;
     }
     if (/<br\s*\/?>/i.test(val)) {
@@ -73,6 +85,7 @@ export function enhanceTableCitations(markdown: string): string {
   const lines = markdown.split("\n");
   let inTable = false;
   let colDocMap: Record<number, string> = {};
+  let headerNames: string[] = [];
   const resultLines: string[] = [];
 
   for (const line of lines) {
@@ -82,6 +95,7 @@ export function enhanceTableCitations(markdown: string): string {
       if (!inTable) {
         inTable = true;
         colDocMap = {};
+        headerNames = cells.map(c => c.toLowerCase());
         cells.forEach((c, idx) => {
           const m = c.match(/\[(\d{1,3})\]/);
           if (m) colDocMap[idx] = m[1];
@@ -91,28 +105,34 @@ export function enhanceTableCitations(markdown: string): string {
         resultLines.push(line);
       } else {
         if (Object.keys(colDocMap).length > 0) {
+          const firstCol = cells[0] || "";
+          const isMetaRow = isMetadataHeader(firstCol) || isIdentityColContent(firstCol);
           const newCells = cells.map((c, idx) => {
-            if (colDocMap[idx]) return tagContent(c, colDocMap[idx]);
+            if (colDocMap[idx]) {
+              if (isMetaRow || isIdentityColContent(c)) {
+                return c.replace(/\s*\[\d{1,3}\]/g, "").trim();
+              }
+              return tagContent(c, colDocMap[idx]);
+            }
             return c;
           });
           resultLines.push(`| ${newCells.join(" | ")} |`);
         } else {
-          // Row-mapped document table: if leading cell identifies Document [X], ensure remaining cells have [X]
+          // Row-mapped document table: if leading cell identifies Document [X], ensure content cells have [X]
           const firstCell = cells[0] || "";
           const rowDocMatch = firstCell.match(/\[(\d{1,3})\]/);
           if (rowDocMatch && cells.length > 1) {
             const docNum = rowDocMatch[1];
             const newCells = [firstCell];
             for (let i = 1; i < cells.length; i++) {
-              // Never tag author or document identity columns
-              const isIdentityCol = i === 1 && cells.length >= 3 && (
-                /^\(?\d{4}\)?$/.test(cells[i].trim()) ||
-                /[A-Za-z]+.*?\(\d{4}\)/.test(cells[i]) ||
-                /et\s+al/i.test(cells[i]) ||
-                cells[i].length < 40
-              );
-              if (isIdentityCol) {
-                newCells.push(cells[i]);
+              const h = headerNames[i] || "";
+              const isMeta = isMetadataHeader(h);
+              const isAuthorOrDoc = isIdentityColContent(cells[i]);
+
+              if (isMeta || isAuthorOrDoc) {
+                // Strip any spurious [docNum] tags from author, year, or title cells
+                const stripped = cells[i].replace(/\s*\[\d{1,3}\]/g, "").trim();
+                newCells.push(stripped);
               } else {
                 newCells.push(tagContent(cells[i], docNum));
               }
@@ -126,6 +146,7 @@ export function enhanceTableCitations(markdown: string): string {
     } else {
       inTable = false;
       colDocMap = {};
+      headerNames = [];
       resultLines.push(line);
     }
   }
@@ -156,8 +177,6 @@ export function parseCitationsInReactNode(
   isDocColumn: boolean = false
 ): React.ReactNode {
   if (typeof node === "string") {
-    // Track document numbers seen in this cell to deduplicate repeated badges in document columns
-    const seenDocNumsInCell = new Set<number>();
     // Determine the full text available (use parent/container text if node is a partial string)
     const effectiveFullText = parentFullText || node;
     // Support standard and double bracket citations: [1], [[1]], [1]], [1, 2], [1]-[3], [Dokumen 1], [Document 1]
@@ -255,14 +274,28 @@ export function parseCitationsInReactNode(
         /^(?:doc|dokumen|paper|sumber|ref|source)\s*\[?\d+\]?$/i.test(contextSentence)
       ) && !/\b(?:metode|method|akurasi|accuracy|recall|precision|presisi|f1|iou|model|loss|dataset|algorithm|algoritma|integrat|segment|detect|flow|buffer|speed|kecepatan)\b/i.test(contextSentence);
 
-      if (!isDocColumn && isAuthorTag) {
-        // Author / year label without empirical claim: do not render as a clickable citation button
+      // Check if contextSentence matches a paper title from documents
+      const isPaperTitle = Boolean(
+        documents && documents.length > 0 && contextSentence && (
+          documents.some(d => {
+            const docTitle = (d.title || d.filename?.replace(/\.pdf$/i, "") || "").trim().toLowerCase();
+            if (docTitle.length < 8) return false;
+            const sLower = contextSentence.trim().toLowerCase();
+            return sLower === docTitle ||
+              (sLower.includes(docTitle) && Math.abs(sLower.length - docTitle.length) <= 20) ||
+              (docTitle.includes(sLower) && Math.abs(docTitle.length - sLower.length) <= 10);
+          })
+        )
+      );
+
+      if (isDocColumn || isAuthorTag || isPaperTitle) {
+        // Document identity column, author/year tag, or paper title: render as plain text, NOT a citation button
         parts.push(match[0]);
         lastIndex = regex.lastIndex;
         continue;
       }
 
-      if (isDocColumn || !contextSentence || contextSentence.length < 3) {
+      if (!contextSentence || contextSentence.length < 3) {
         contextSentence = "";
       }
 
@@ -284,17 +317,7 @@ export function parseCitationsInReactNode(
         });
       }
 
-      // In Document/Identity column (Col 0), deduplicate: only render the FIRST button for each document number!
       let effectiveNums = nums;
-      if (isDocColumn) {
-        effectiveNums = nums.filter(n => !seenDocNumsInCell.has(n));
-        effectiveNums.forEach(n => seenDocNumsInCell.add(n));
-        if (effectiveNums.length === 0) {
-          // Skip redundant trailing duplicate in document identity cell
-          lastIndex = regex.lastIndex;
-          continue;
-        }
-      }
 
       // Only render clickable citation buttons for citations that have an existing document
       // and verifiable highlight quotes or substantive empirical claim content
@@ -302,14 +325,16 @@ export function parseCitationsInReactNode(
       effectiveNums = effectiveNums.filter(num => {
         const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
         if (!doc) return false;
-        if (isDocColumn) return true; // Document identity column button
 
         if (hasCitationMap) {
           const aiQuotesForDoc = citationMap[num.toString()] || citationMap[`[${num}]`];
-          if (aiQuotesForDoc && aiQuotesForDoc.length > 0) return true;
-          // If citation map is present but this doc has no quote, require strong empirical claim
+          if (aiQuotesForDoc && aiQuotesForDoc.length > 0) {
+            return true;
+          }
+          // If citation map is present but this doc has no quote, require non-empty context
           if (!contextSentence || contextSentence.length < 8) return false;
         }
+
         return true;
       });
 
@@ -343,9 +368,7 @@ export function parseCitationsInReactNode(
                     <span>{docTitle}</span>
                   </div>
                   <div className="text-[10px] text-neutral-400 font-normal leading-tight">
-                    {isDocColumn 
-                      ? "Click to open and read document"
-                      : "Click to view source and highlight AI-verified evidence"}
+                    Click to view source and highlight AI-verified evidence
                   </div>
                 </div>
               );
@@ -363,17 +386,12 @@ export function parseCitationsInReactNode(
                     onClick={(e) => {
                       e.stopPropagation();
                       if (doc && onOpenDocument) {
-                        if (isDocColumn) {
-                          // In Document Identity column: open document cleanly with zero highlights
-                          onOpenDocument(doc, undefined);
-                        } else {
-                          onOpenDocument(doc, {
-                            sentence: contextSentence,
-                            num: num,
-                            citationKey: citeUniqueKey,
-                            aiQuotes: aiQuotesForDoc
-                          });
-                        }
+                        onOpenDocument(doc, {
+                          sentence: contextSentence,
+                          num: num,
+                          citationKey: citeUniqueKey,
+                          aiQuotes: aiQuotesForDoc
+                        });
                       }
                     }}
                     className={`inline-flex items-center justify-center min-w-6 px-1 h-5 text-[10px] font-mono font-bold not-italic normal-case tracking-normal rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-none shadow-sm ${
