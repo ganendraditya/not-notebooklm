@@ -113,6 +113,8 @@ Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_W
         raw_intent = resp.text.strip().upper().replace("'", "").replace('"', "").replace("`", "")
         for valid in ["REMOVE_SOURCES", "SEARCH_NEW", "ANALYZE_WORKSPACE", "GENERAL_CHAT"]:
             if valid in raw_intent:
+                if not has_docs and valid in ("ANALYZE_WORKSPACE", "REMOVE_SOURCES"):
+                    return "GENERAL_CHAT"
                 return valid
     except Exception as e:
         logger.debug(f"[Intent Classifier Error]: {e}")

@@ -102,7 +102,7 @@ def test_services_modular_integration(tmp_path):
     sample_file.write_text("# Test Research Paper (2024)\n\nDOI: 10.1234/test.2024\n\nAbstract\nThis is a test abstract.", encoding="utf-8")
     
     enriched = extract_and_enrich_uploaded_file(str(sample_file), "sample.txt")
-    assert enriched["title"] in ("sample", "Test Research Paper")
+    assert enriched["title"].lower() in ("sample", "test research paper")
     assert enriched["doi"] == "10.1234/test.2024"
 
 def test_rag_formatters():

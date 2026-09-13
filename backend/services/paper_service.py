@@ -3,7 +3,7 @@ import re
 import json
 import logging
 import asyncio
-from typing import List, Tuple, Dict, Any, AsyncGenerator
+from typing import List, Tuple, Dict, Any, AsyncGenerator, Optional
 from sqlalchemy.orm import Session
 
 from database import Document, ChatSession, SessionLocal, commit_with_retry
