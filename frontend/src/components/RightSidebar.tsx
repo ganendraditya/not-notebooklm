@@ -135,7 +135,7 @@ export default function RightSidebar({
       activeMatchIndex,
       groundingHighlight?.aiQuotes
     );
-  }, [currentContent, groundingHighlight?.sentence, groundingHighlight?.aiQuotes, activeMatchIndex]);
+  }, [currentContent, groundingHighlight?.sentence, groundingHighlight?.aiQuotes, groundingHighlight?.clickId, activeMatchIndex]);
 
   useEffect(() => {
     setTotalMatches(highlightResult.matchCount);
