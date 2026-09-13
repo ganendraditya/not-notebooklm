@@ -77,8 +77,169 @@ export function getHighlightedContent(
   }
   if (rawSentences.length === 0) return { nodes: <span>{fullText}</span>, matchCount: 0 };
 
-  // 1. PRIMARY AI-DRIVEN GROUNDING PATH:
-  // If Gemini provided exact verbatim quote(s) via CITATION_MAP, match against them directly!
+  // 0. DIRECT CLAIM TEXT GROUNDING PATH:
+  // The targetQuery (= cell text / sentence around the citation) IS the actual claim from the document.
+  // Try to find it DIRECTLY in the document text FIRST, before falling back to aiQuotes or keyword scoring.
+  // This is critical for table cells where the LLM wrote verbatim content from the paper (e.g. journal names,
+  // dataset descriptions, methodology details) — the cell text itself should be found in the source document.
+  if (targetQuery && targetQuery.trim().length > 20) {
+    const directHighlightedIndices = new Set<number>();
+    const cleanTarget = targetQuery.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+    const allTargetWords = cleanTarget.split(/\s+/).filter(w => w.length >= 2);
+
+    // Stopwords to exclude from word-overlap scoring (same set used by fallback path)
+    const directStopWords = new Set([
+      "yang", "dari", "pada", "untuk", "dengan", "adalah", "dalam", "ini", "itu", "dan", "atau", "oleh", "ke", "di",
+      "the", "and", "for", "with", "this", "that", "from", "using", "paper", "berikut", "tabel", "rekapitulasi",
+      "dokumen", "terdapat", "adanya", "sebagai", "juga", "dapat", "akan", "telah", "namun", "serta", "karena",
+      "bisa", "lebih", "secara", "seperti", "yaitu", "yakni", "merupakan", "berdasarkan", "menggunakan",
+      "penelitian", "studi", "sistem", "metode", "hasil", "nilai", "proses"
+    ]);
+    const targetContentWords = allTargetWords.filter(w => !directStopWords.has(w) && !/^\d+$/.test(w));
+
+    if (allTargetWords.length >= 3 && targetContentWords.length >= 3) {
+      // Try exact substring match first (very strict — requires full phrase containment)
+      rawSentences.forEach((s, idx) => {
+        if (/^#{1,6}\s+/i.test(s.trim())) return;
+        const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+        if (sClean.length >= 15 && (sClean.includes(cleanTarget) || cleanTarget.includes(sClean))) {
+          directHighlightedIndices.add(idx);
+        }
+      });
+
+      // If no exact substring match, try high-precision content word overlap (stopwords excluded)
+      if (directHighlightedIndices.size === 0) {
+        // Extract numeric tokens for metric-aware matching
+        const targetNumbers = cleanTarget.match(/\b\d+\b/g) || [];
+
+        let bestIdx = -1;
+        let bestScore = 0;
+
+        rawSentences.forEach((s, idx) => {
+          if (/^#{1,6}\s+/i.test(s.trim())) return;
+          const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+          if (sClean.length < 15) return;
+          if (/https?\s|doi\s|issn|available online|halaman/.test(sClean)) return;
+
+          let wordOverlap = 0;
+          targetContentWords.forEach(tw => {
+            if (sClean.includes(tw)) wordOverlap++;
+          });
+          const wordRatio = wordOverlap / targetContentWords.length;
+
+          // Numeric bonus
+          let numericHits = 0;
+          if (targetNumbers.length > 0) {
+            const sNumbers = sClean.match(/\b\d+\b/g) || [];
+            const sNumSet = new Set(sNumbers);
+            targetNumbers.forEach(n => { if (sNumSet.has(n)) numericHits++; });
+          }
+          const numericBonus = targetNumbers.length > 0 ? (numericHits / targetNumbers.length) * 0.2 : 0;
+          const combinedScore = wordRatio + numericBonus;
+
+          // Require high overlap (>= 60% content word match AND at least 3 words hit) to confirm this is the source sentence
+          if (wordRatio >= 0.60 && wordOverlap >= 3 && combinedScore > bestScore) {
+            bestScore = combinedScore;
+            bestIdx = idx;
+          }
+        });
+
+        if (bestIdx !== -1) {
+          directHighlightedIndices.add(bestIdx);
+          // Also include immediately adjacent sentences if they have decent overlap (for multi-sentence cells)
+          [bestIdx - 1, bestIdx + 1].forEach(adj => {
+            if (adj >= 0 && adj < rawSentences.length) {
+              const adjClean = rawSentences[adj].toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+              if (adjClean.length < 15 || /^#{1,6}\s+/i.test(rawSentences[adj].trim())) return;
+              let adjOverlap = 0;
+              targetContentWords.forEach(tw => {
+                if (adjClean.includes(tw)) adjOverlap++;
+              });
+              if (targetContentWords.length > 0 && adjOverlap / targetContentWords.length >= 0.40) {
+                directHighlightedIndices.add(adj);
+              }
+            }
+          });
+        }
+      }
+
+      // If we found direct matches, render them immediately — no need for aiQuotes fallback
+      if (directHighlightedIndices.size > 0) {
+        const sortedIndices = Array.from(directHighlightedIndices).sort((a, b) => a - b);
+        const directClusters: number[][] = [];
+        let curClust: number[] = [];
+        sortedIndices.forEach(idx => {
+          if (curClust.length === 0) {
+            curClust.push(idx);
+          } else if (idx === curClust[curClust.length - 1] + 1) {
+            curClust.push(idx);
+          } else {
+            directClusters.push([...curClust]);
+            curClust = [idx];
+          }
+        });
+        if (curClust.length > 0) directClusters.push(curClust);
+
+        const indexToClusterMap = new Map<number, number>();
+        directClusters.forEach((clust, cIdx) => {
+          clust.forEach(idx => indexToClusterMap.set(idx, cIdx));
+        });
+
+        const nodes = (
+          <>
+            {rawSentences.map((sentence, idx) => {
+              const isHighlighted = directHighlightedIndices.has(idx);
+              if (isHighlighted) {
+                const match = sentence.match(/^(\s*)([\s\S]*?)(\s*)$/);
+                const leadingSpace = match ? match[1] : "";
+                const coreText = match ? match[2] : sentence;
+                const trailingSpace = match ? match[3] : "";
+                if (!coreText) return <span key={idx}>{sentence}</span>;
+
+                const clusterIdx = indexToClusterMap.get(idx) ?? 0;
+                const isClusterAnchor = directClusters[clusterIdx]?.[0] === idx;
+                const isActiveCluster = clusterIdx === activeMatchIndex;
+
+                return (
+                  <React.Fragment key={idx}>
+                    {leadingSpace && <span>{leadingSpace}</span>}
+                    <mark
+                      data-highlight-active={isActiveCluster ? "true" : undefined}
+                      data-cluster-index={clusterIdx}
+                      ref={(el) => {
+                        if (el && isClusterAnchor && highlightRefsMap) {
+                          highlightRefsMap.current.set(clusterIdx, el);
+                        }
+                      }}
+                      className={`font-medium px-0.5 py-0 rounded-none inline transition-colors ${
+                        isActiveCluster
+                          ? "bg-amber-400/60 dark:bg-amber-400/40 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/60 dark:ring-amber-400/50"
+                          : "bg-amber-200/50 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
+                      }`}
+                      title={`Direct Evidence ${clusterIdx + 1} of ${directClusters.length}`}
+                    >
+                      {coreText}
+                    </mark>
+                    {trailingSpace && <span>{trailingSpace}</span>}
+                  </React.Fragment>
+                );
+              }
+              return <span key={idx}>{sentence}</span>;
+            })}
+          </>
+        );
+
+        return {
+          nodes,
+          matchCount: directClusters.length,
+          initialActiveIndex: 0
+        };
+      }
+    }
+  }
+
+  // 1. AI-DRIVEN GROUNDING PATH (FALLBACK):
+  // If direct claim text search above found nothing, try AI-provided verbatim quote(s) via CITATION_MAP.
   if (aiQuotes && aiQuotes.length > 0) {
     const aiHighlightedIndices = new Set<number>();
     const aiClusters: number[][] = [];
@@ -101,7 +262,8 @@ export function getHighlightedContent(
 
       const maxScore = Math.max(...scoredQuotes.map(sq => sq.score));
       // If one or more quotes are relevant to the clicked cell, include them
-      if (maxScore > 0) {
+      // Require at least 20% of target tokens to match to avoid false positives on metadata cells
+      if (maxScore > 0 && maxScore >= targetTokens.size * 0.2) {
         selectedQuotes = scoredQuotes.filter(sq => sq.score >= maxScore * 0.6).map(sq => sq.quote);
       }
     }
@@ -252,7 +414,7 @@ export function getHighlightedContent(
     }
   }
 
-  // 2. FALLBACK CONTEXTUAL SEMANTIC GROUNDING PATH:
+  // 3. FALLBACK CONTEXTUAL SEMANTIC GROUNDING PATH (keyword scoring):
   // Identify if query contains explicit metrics, ratios, or evaluation terms
   const hasMetricOrData = Boolean(
     targetQuery && (
