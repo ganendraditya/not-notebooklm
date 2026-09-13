@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Sparkles, Settings } from "lucide-react";
 import LeftSidebar from "@/components/LeftSidebar";
 import ChatArea from "@/components/ChatArea";
