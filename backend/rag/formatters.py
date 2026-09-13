@@ -19,8 +19,16 @@ def is_negative_or_empty(val: str) -> bool:
     )
 
 
+def attach_cite_before_period(text: str, doc_num: str) -> str:
+    """Attaches [doc_num] before any trailing sentence-ending period (IEEE format)."""
+    s = text.rstrip()
+    if s.endswith('.'):
+        return f"{s[:-1].rstrip()} [{doc_num}]."
+    return f"{s} [{doc_num}]"
+
+
 def tag_cell_content(val: str, doc_num: str) -> str:
-    """Attaches [doc_num] to each bullet point, line, or claim inside a table cell."""
+    """Attaches [doc_num] to each bullet point, line, or claim inside a table cell before punctuation."""
     if not val.strip() or is_negative_or_empty(val) or f'[{doc_num}]' in val:
         return val
 
@@ -45,12 +53,12 @@ def tag_cell_content(val: str, doc_num: str) -> str:
             if not it.strip():
                 new_items.append(it)
             elif not is_negative_or_empty(it) and f'[{doc_num}]' not in it:
-                new_items.append(f'{it.rstrip()} [{doc_num}] ')
+                new_items.append(f'{attach_cite_before_period(it, doc_num)} ')
             else:
                 new_items.append(it)
         return '•'.join(new_items).rstrip()
 
-    return f'{val.rstrip()} [{doc_num}]'
+    return attach_cite_before_period(val, doc_num)
 
 
 def enhance_table_citations(text: str) -> str:
@@ -140,8 +148,13 @@ def format_clean_response(text: str) -> str:
     m = re.search(r'<!--\s*CITATION_MAP(?::|\s)([\s\S]*?)(?:-->|$)', text, re.IGNORECASE)
     if m:
         raw_data = m.group(1).strip().lstrip(":").strip()
-        if raw_data.startswith("{"):
-            citation_data = raw_data
+        # Clean markdown code fences like ```json ... ``` or ``` ... ```
+        cleaned_json = re.sub(r'^```(?:json)?\s*', '', raw_data, flags=re.IGNORECASE)
+        cleaned_json = re.sub(r'\s*```$', '', cleaned_json).strip()
+        first_brace = cleaned_json.find('{')
+        last_brace = cleaned_json.rfind('}')
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            citation_data = cleaned_json[first_brace:last_brace+1]
         text = text[:m.start()].rstrip()
 
     # Strip any malformed or non-JSON CITATION_MAP comment blocks completely
@@ -152,6 +165,11 @@ def format_clean_response(text: str) -> str:
 
     # Clean double citations on the same line (e.g. [1] Text... [1] -> Text... [1])
     text = deduplicate_line_citations(text)
+
+    # IEEE citation placement rule: ensure citations appear BEFORE the period, not after!
+    # e.g. 'terjadi). [20]' -> 'terjadi) [20].' and 'metode. [1]' -> 'metode [1].'
+    text = re.sub(r'\.(\s*)(\[{1,2}\d{1,3}(?:\s*,\s*\d{1,3})*\]{1,2})', r' \2.', text)
+    text = re.sub(r'(\[{1,2}\d{1,3}(?:\s*,\s*\d{1,3})*\]{1,2})\s*\.{2,}', r'\1.', text)
 
     if citation_data:
         return f"{text}\n\n<!-- CITATION_MAP: {citation_data} -->"
@@ -169,7 +187,13 @@ def extract_structured_citations(text: str) -> Tuple[str, Dict[str, Any]]:
         raw_json = m.group(1).strip().lstrip(":").strip()
         clean_text = clean_text[:m.start()].rstrip()
         try:
-            citations = json.loads(raw_json)
+            cleaned = re.sub(r'^```(?:json)?\s*', '', raw_json, flags=re.IGNORECASE)
+            cleaned = re.sub(r'\s*```$', '', cleaned).strip()
+            first_brace = cleaned.find('{')
+            last_brace = cleaned.rfind('}')
+            if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                cleaned = cleaned[first_brace:last_brace+1]
+            citations = json.loads(cleaned)
         except Exception:
             pass
     clean_text = re.sub(r'<!--\s*CITATION_MAP[\s\S]*?(?:-->|$)', '', clean_text, flags=re.IGNORECASE).rstrip()

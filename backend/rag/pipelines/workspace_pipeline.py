@@ -218,7 +218,12 @@ async def handle_workspace_analysis_pipeline(
         "CRITICAL INSTRUCTIONS FOR SYNTHESIS & ANALYSIS:\n"
         "- Respond strictly and proportionally to what the user asks. If the user asks a simple question (e.g. counting, listing, or checking status), answer directly and concisely without unsolicited long tables or essays.\n"
         "- When the user explicitly asks to summarize, analyze, compare, or generate chapters/sections, write a rich, detailed academic text synthesizing the data.\n"
-        "- DO NOT refuse with excuses about copyright or partial text. Leverage the available document text fully."
+        "- DO NOT refuse with excuses about copyright or partial text. Leverage the available document text fully.\n\n"
+        "STRICT IEEE CITATION & CITATION_MAP REQUIREMENTS (MANDATORY BEFORE COMPLETION):\n"
+        "1. IEEE CITATION POSITION: Citation tags [X] MUST ALWAYS appear BEFORE sentence-ending periods or punctuation (e.g. 'mencapai akurasi 93% [13].' or 'metode Swin [1], [2].'). NEVER place citation tags after the period (NEVER write 'akurasi 93%. [1]'). In table cells, place citation tags before the closing period of each bullet (e.g. '• Integrates DA-Blocks [2].').\n"
+        "2. CITATION MAP (MANDATORY): Whenever your response contains citations [X], you MUST append the hidden CITATION_MAP at the VERY END of your response:\n"
+        "<!-- CITATION_MAP: {\"X\": [\"Exact verbatim sentence copied from Document X in its original language proving the claim\"]} -->\n"
+        "Copy authentic verbatim sentences directly from the document text provided in the prompt context. Do not paraphrase or invent quotes. This is required for the document viewer to highlight the source evidence accurately."
     )
 
     system_msg = LlamaChatMessage(

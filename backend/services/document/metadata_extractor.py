@@ -172,10 +172,7 @@ async def resolve_tier3_ai_inspector(clean_fn_title: str, raw_header: str) -> Op
         return None
 
     try:
-        from rag.llm_factory import get_fast_llm
-        fast_llm = get_fast_llm()
-        if not fast_llm:
-            return None
+        from rag.llm_factory import acall_fast_with_fallback
 
         sample_text = raw_header[:2500].strip()
         prompt = f"""You are an academic document metadata extractor. Analyze the front matter/cover page of this uploaded document and extract its metadata in strict JSON format.
@@ -208,7 +205,7 @@ Respond ONLY with valid JSON (no markdown fences, no explanation):
   "abstract": "string"
 }}"""
 
-        resp = await fast_llm.acomplete(prompt)
+        resp = await acall_fast_with_fallback(lambda llm: llm.acomplete(prompt))
         raw_resp = resp.text.strip()
         raw_resp = re.sub(r'^```(?:json)?\s*', '', raw_resp, flags=re.I)
         raw_resp = re.sub(r'\s*```$', '', raw_resp)

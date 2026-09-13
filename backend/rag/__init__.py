@@ -70,6 +70,8 @@ from .llm_factory import (
     get_llm_factory,
     get_main_llm,
     get_fast_llm,
+    get_fallback_llm,
+    acall_fast_with_fallback,
     clear_llm_cache,
 )
 
@@ -124,6 +126,8 @@ __all__ = [
     "get_llm_factory",
     "get_main_llm",
     "get_fast_llm",
+    "get_fallback_llm",
+    "acall_fast_with_fallback",
     "clear_llm_cache",
     # Engine & Ingestion
     "ingest_document_text",

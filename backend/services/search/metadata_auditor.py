@@ -27,7 +27,7 @@ def audit_paper_metadata_with_ai(
     filter out garbage category names, and determine Scopus/SINTA quartile and quality_tier.
     """
     try:
-        from rag.engine import get_fast_llm, get_main_llm
+        from rag.llm_factory import get_fast_llm, get_main_llm, get_fallback_llm
         active_llm = get_fast_llm() or get_main_llm()
         if active_llm:
             prompt = f"""
@@ -70,7 +70,15 @@ Output ONLY valid JSON matching:
   "abstract_type": "official" or "ai_summary"
 }}
 """
-            res = active_llm.complete(prompt)
+            res = None
+            try:
+                res = active_llm.complete(prompt)
+            except Exception as fast_err:
+                logger.warning(f"[AI Auditor] Fast LLM failed: {fast_err}")
+                fb_llm = get_fallback_llm()
+                if fb_llm and fb_llm is not active_llm:
+                    logger.info(f"[AI Auditor] Cascading to fallback LLM...")
+                    res = fb_llm.complete(prompt)
             if res and res.text:
                 clean_json_str = extract_json_from_llm(res.text)
                 parsed = json.loads(clean_json_str)

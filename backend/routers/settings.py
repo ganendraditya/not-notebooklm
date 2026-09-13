@@ -63,18 +63,21 @@ def factory_reset_storage(payload: dict, db: Session = Depends(get_db)):
 @router.get("/llm/models")
 def get_llm_models():
     """Returns active LLM configuration info dynamically."""
-    from rag.llm_factory import get_main_llm, get_fast_llm
+    from rag.llm_factory import get_main_llm, get_fast_llm, get_fallback_llm
     
     main_instance = get_main_llm()
     fast_instance = get_fast_llm()
+    fallback_instance = get_fallback_llm()
     
     main_model = getattr(main_instance, "model", None) or os.getenv("LLM_MODEL", "gpt-4o")
     fast_model = getattr(fast_instance, "model", None) or os.getenv("LLM_FAST_MODEL", main_model)
+    fallback_model = getattr(fallback_instance, "model", None) or os.getenv("LLM_FALLBACK_MODEL", "")
     
     return {
         "status": "success",
         "tiered_architecture": True,
         "main_model": main_model,
         "fast_model": fast_model,
-        "description": f"Two-Tier Engine: Heavy Synthesis powered by {main_model}, Rapid Triage & Auditing powered by {fast_model}."
+        "fallback_model": fallback_model or None,
+        "description": f"Two-Tier Engine: Heavy Synthesis powered by {main_model}, Rapid Triage & Auditing powered by {fast_model}." + (f" Fallback cascade: {fallback_model}." if fallback_model else "")
     }

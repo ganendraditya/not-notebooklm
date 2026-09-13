@@ -4,7 +4,7 @@ import logging
 from typing import List
 from database import SessionLocal, Document as DBDocument
 from rag.prompts import get_source_deletion_prompt
-from rag.llm_factory import get_fast_llm
+from rag.llm_factory import acall_fast_with_fallback
 from services.storage_service import delete_multiple_documents
 
 logger = logging.getLogger("uvicorn.error")
@@ -16,8 +16,6 @@ async def handle_source_removal_pipeline(
     report_status
 ) -> str:
     """Evaluates and executes user requests to delete specific sources from a workspace."""
-    fast_llm = get_fast_llm() or target_llm
-
     await report_status("Processing document deletion request...")
     db_s = SessionLocal()
     current_db_docs = []
@@ -34,7 +32,7 @@ async def handle_source_removal_pipeline(
 
     eval_prompt = get_source_deletion_prompt(query, doc_summaries)
     try:
-        eval_resp = await fast_llm.acomplete(eval_prompt)
+        eval_resp = await acall_fast_with_fallback(lambda llm: llm.acomplete(eval_prompt))
         clean_json_text = eval_resp.text.strip()
         clean_json_text = re.sub(r'^```(?:json)?\s*', '', clean_json_text, flags=re.I)
         clean_json_text = re.sub(r'\s*```$', '', clean_json_text)

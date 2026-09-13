@@ -25,8 +25,26 @@ export function isNegativeOrEmptyCitation(val: string): boolean {
 export function enhanceTableCitations(markdown: string): string {
   if (!markdown || !markdown.includes("|")) return markdown;
 
+  const attachBeforePeriod = (text: string, docNum: string): string => {
+    const s = text.trimEnd();
+    if (s.endsWith(".")) {
+      return `${s.slice(0, -1).trimEnd()} [${docNum}].`;
+    }
+    return `${s} [${docNum}]`;
+  };
+
   const tagContent = (val: string, docNum: string): string => {
     if (!val.trim() || isNegativeOrEmptyCitation(val) || val.includes(`[${docNum}]`)) {
+      return val;
+    }
+    // Do not tag bare author or identity labels (e.g. "Pradana et al. (2023)")
+    const cleanWordCount = val.split(/\s+/).filter(Boolean).length;
+    if (cleanWordCount <= 6 && (
+      /^\(?\d{4}\)?$/.test(val.trim()) ||
+      /[A-Za-z]+.*?\(\d{4}\)/.test(val) ||
+      /et\s+al/i.test(val) ||
+      /^(?:doc|dokumen|paper|sumber|ref|source)\s*\[?\d+\]?$/i.test(val)
+    )) {
       return val;
     }
     if (/<br\s*\/?>/i.test(val)) {
@@ -44,12 +62,12 @@ export function enhanceTableCitations(markdown: string): string {
       return items.map(it => {
         if (!it.trim()) return it;
         if (!isNegativeOrEmptyCitation(it) && !it.includes(`[${docNum}]`)) {
-          return `${it.trimEnd()} [${docNum}] `;
+          return `${attachBeforePeriod(it, docNum)} `;
         }
         return it;
       }).join("•").trimEnd();
     }
-    return `${val.trimEnd()} [${docNum}]`;
+    return attachBeforePeriod(val, docNum);
   };
 
   const lines = markdown.split("\n");
@@ -86,7 +104,18 @@ export function enhanceTableCitations(markdown: string): string {
             const docNum = rowDocMatch[1];
             const newCells = [firstCell];
             for (let i = 1; i < cells.length; i++) {
-              newCells.push(tagContent(cells[i], docNum));
+              // Never tag author or document identity columns
+              const isIdentityCol = i === 1 && cells.length >= 3 && (
+                /^\(?\d{4}\)?$/.test(cells[i].trim()) ||
+                /[A-Za-z]+.*?\(\d{4}\)/.test(cells[i]) ||
+                /et\s+al/i.test(cells[i]) ||
+                cells[i].length < 40
+              );
+              if (isIdentityCol) {
+                newCells.push(cells[i]);
+              } else {
+                newCells.push(tagContent(cells[i], docNum));
+              }
             }
             resultLines.push(`| ${newCells.join(" | ")} |`);
           } else {
@@ -178,12 +207,13 @@ export function parseCitationsInReactNode(
         beforeMatch.lastIndexOf("<br/>")
       );
 
-      // Check for sentence boundary (. ! ?) within the clause, trimming punctuation right before match
+      // Check for sentence boundary (. ! ?) within the clause, ignoring abbreviations like 'et al.'
       const cleanedBefore = beforeMatch.replace(/[.\s!?;:]+$/, "");
+      const cleanedForBoundary = cleanedBefore.replace(/\b(?:et\s+al|dr|prof|e\.g|i\.e)\./gi, m => m.slice(0, -1) + "_");
       const sentenceBoundary = Math.max(
-        cleanedBefore.lastIndexOf(". "),
-        cleanedBefore.lastIndexOf("! "),
-        cleanedBefore.lastIndexOf("? ")
+        cleanedForBoundary.lastIndexOf(". "),
+        cleanedForBoundary.lastIndexOf("! "),
+        cleanedForBoundary.lastIndexOf("? ")
       );
 
       const finalStart = Math.max(
@@ -216,9 +246,10 @@ export function parseCitationsInReactNode(
         .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
         .trim();
 
-      // Check if contextSentence is purely an author tag or document identifier (e.g. "Tahir et al. (2023)", "Cahyono & Budiyanto (2020)", "Dokumen 1")
+      // Check if contextSentence is purely an author tag or document identifier (e.g. "Tahir et al. (2023)", "Pradana et al. (2023)", "Dokumen 1")
       const wordCount = contextSentence.split(/\s+/).filter(Boolean).length;
       const isAuthorTag = wordCount > 0 && wordCount <= 6 && (
+        /^\(?\d{4}\)?$/.test(contextSentence) ||
         /[A-Za-z]+.*?\(\d{4}\)/.test(contextSentence) || 
         /et\s+al/i.test(contextSentence) || 
         /^(?:doc|dokumen|paper|sumber|ref|source)\s*\[?\d+\]?$/i.test(contextSentence)
@@ -263,6 +294,29 @@ export function parseCitationsInReactNode(
           lastIndex = regex.lastIndex;
           continue;
         }
+      }
+
+      // Only render clickable citation buttons for citations that have an existing document
+      // and verifiable highlight quotes or substantive empirical claim content
+      const hasCitationMap = citationMap && Object.keys(citationMap).length > 0;
+      effectiveNums = effectiveNums.filter(num => {
+        const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
+        if (!doc) return false;
+        if (isDocColumn) return true; // Document identity column button
+
+        if (hasCitationMap) {
+          const aiQuotesForDoc = citationMap[num.toString()] || citationMap[`[${num}]`];
+          if (aiQuotesForDoc && aiQuotesForDoc.length > 0) return true;
+          // If citation map is present but this doc has no quote, require strong empirical claim
+          if (!contextSentence || contextSentence.length < 8) return false;
+        }
+        return true;
+      });
+
+      if (effectiveNums.length === 0) {
+        parts.push(match[0]);
+        lastIndex = regex.lastIndex;
+        continue;
       }
 
       if (effectiveNums.length > 0) {

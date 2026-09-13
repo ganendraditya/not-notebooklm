@@ -12,6 +12,7 @@ logger = logging.getLogger("uvicorn.error")
 
 _CACHED_MAIN_LLM = None
 _CACHED_FAST_LLM = None
+_CACHED_FALLBACK_LLM = None
 _CACHED_CONFIG_HASH = None
 
 
@@ -66,9 +67,10 @@ def _get_gateway_credentials():
 
 def clear_llm_cache():
     """Clears cached LLM instances, forcing fresh recreation on next query."""
-    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
+    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_FALLBACK_LLM, _CACHED_CONFIG_HASH
     _CACHED_MAIN_LLM = None
     _CACHED_FAST_LLM = None
+    _CACHED_FALLBACK_LLM = None
     _CACHED_CONFIG_HASH = None
 
 
@@ -93,7 +95,7 @@ def get_main_llm(force_refresh: bool = False):
                 model=model,
                 is_chat_model=True,
                 is_function_calling_model=True,
-                max_tokens=8192,
+                max_tokens=16384,
                 timeout=120.0
             )
         except Exception as e:
@@ -144,6 +146,70 @@ def get_fast_llm(force_refresh: bool = False):
     return _CACHED_FAST_LLM
 
 
+def get_fallback_llm():
+    """
+    Returns the Fallback LLM instance (singleton, lazily created).
+    Used as a safety net when both Primary and Fast models fail at runtime (rate limit, quota exhaustion).
+    """
+    global _CACHED_FALLBACK_LLM
+    if _CACHED_FALLBACK_LLM is not None:
+        return _CACHED_FALLBACK_LLM
+
+    base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
+    if not has_gateway or not fallback_model or fallback_model == model:
+        return None
+
+    try:
+        _CACHED_FALLBACK_LLM = OpenAILike(
+            api_base=base_url,
+            api_key=api_key,
+            model=fallback_model,
+            is_chat_model=True,
+            is_function_calling_model=True,
+            max_tokens=16384,
+            timeout=120.0
+        )
+    except Exception as e:
+        logger.warning(f"[LLM Factory] Failed to initialize Fallback LLM ({fallback_model}): {e}")
+
+    return _CACHED_FALLBACK_LLM
+
+
+async def acall_fast_with_fallback(call_fn, *args, **kwargs):
+    """
+    Executes a fast LLM call with automatic cascade to fallback model on runtime errors.
+
+    Usage:
+        result = await acall_fast_with_fallback(
+            lambda llm: llm.acomplete(prompt)
+        )
+
+    Cascade order: Fast LLM -> Fallback LLM -> raise original error.
+    The callable `call_fn` receives a single LLM instance argument.
+    """
+    fast_inst = get_fast_llm()
+    if fast_inst:
+        try:
+            return await call_fn(fast_inst)
+        except Exception as fast_err:
+            fast_model_name = getattr(fast_inst, "model", "fast")
+            logger.warning(f"[LLM Fast Cascade] {fast_model_name} failed: {fast_err}")
+
+            fb_inst = get_fallback_llm()
+            if fb_inst and fb_inst is not fast_inst:
+                fb_model_name = getattr(fb_inst, "model", "fallback")
+                logger.info(f"[LLM Fast Cascade] -> Cascading fast task to {fb_model_name}...")
+                try:
+                    return await call_fn(fb_inst)
+                except Exception as fb_err:
+                    logger.warning(f"[LLM Fast Cascade] Fallback {fb_model_name} also failed: {fb_err}")
+                    raise fast_err  # Raise original error for clearer diagnostics
+
+            raise  # No fallback available, re-raise fast error
+
+    raise RuntimeError("No LLM instance available for fast task")
+
+
 def get_llm_factory(provider_override: Optional[str] = None, force_refresh: bool = False):
     """Singleton helper returning (main_llm, fast_llm)."""
     return get_main_llm(force_refresh=force_refresh), get_fast_llm(force_refresh=force_refresh)
@@ -177,21 +243,10 @@ def get_candidate_llm_chain():
         label = getattr(main_instance, "model", "default")
         add_candidate(main_instance, f"Primary Synthesizer ({label})")
 
-    base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
-    if has_gateway and fallback_model and fallback_model != model:
-        try:
-            fb_inst = OpenAILike(
-                api_base=base_url,
-                api_key=api_key,
-                model=fallback_model,
-                is_chat_model=True,
-                is_function_calling_model=True,
-                max_tokens=8192,
-                timeout=120.0
-            )
-            add_candidate(fb_inst, f"Fallback Model ({fallback_model})")
-        except Exception as e:
-            logger.debug(f"[LLM Factory] Fallback model init error: {e}")
+    fb_inst = get_fallback_llm()
+    if fb_inst:
+        fb_label = getattr(fb_inst, "model", "fallback")
+        add_candidate(fb_inst, f"Fallback Model ({fb_label})")
 
     if fast_instance and fast_instance != main_instance:
         label = getattr(fast_instance, "model", "default")

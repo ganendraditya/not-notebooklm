@@ -32,6 +32,7 @@ from .llm_factory import (
     create_llm_instances,
     get_candidate_llm_chain,
     astream_llm_response,
+    acall_fast_with_fallback,
 )
 from .pipelines import (
     chat_pipeline,
@@ -65,11 +66,7 @@ async def generate_chat_title(first_user_message: str) -> str:
     if is_simple_conversational(first_user_message):
         return fallback_title or "New Research"
 
-    # Use Fast LLM for rapid, lightweight title generation
-    fast_llm_instance = get_fast_llm()
-    if not fast_llm_instance:
-        return fallback_title or "New Research"
-
+    # Use Fast LLM for rapid, lightweight title generation (with fallback cascade)
     title_prompt = (
         "You are an AI conversation title generator.\n"
         "Task: Create a concise, professional title (2 to 5 words max) summarizing the topic of the user's message.\n"
@@ -83,7 +80,7 @@ async def generate_chat_title(first_user_message: str) -> str:
     )
 
     try:
-        resp = await fast_llm_instance.acomplete(title_prompt)
+        resp = await acall_fast_with_fallback(lambda llm: llm.acomplete(title_prompt))
         raw_title = resp.text.strip().strip('"\'*`#').strip()
         raw_title = re.sub(r'^(Title|Judul|Topic)\s*:\s*', '', raw_title, flags=re.I).strip()
         if raw_title and len(raw_title) >= 3:
@@ -272,15 +269,20 @@ async def query_chat(
     if not candidate_llms:
         return "Error: Tidak ada LLM Provider yang terkonfigurasi. Silakan periksa file .env."
 
-    # Intent classification is performed ultra-fast via Fast Lite LLM using clean user prompt
-    fast_instance = get_fast_llm() or (candidate_llms[0][0] if candidate_llms else None)
+    # Intent classification is performed ultra-fast via Fast Lite LLM (with fallback cascade)
     has_chat_attachments = "[Attachments Provided by User:]" in query
     intent_query = raw_user_query if raw_user_query else ("Silakan baca dan diskusikan dokumen terlampir." if has_chat_attachments else query)
-    intent = await classify_user_intent(intent_query, has_local_docs, len(local_docs), fast_instance)
+    try:
+        intent = await acall_fast_with_fallback(
+            lambda llm: classify_user_intent(intent_query, has_local_docs, len(local_docs), llm)
+        )
+    except Exception as intent_err:
+        logger.warning(f"[RAG Engine] All LLMs failed for intent classification: {intent_err}")
+        intent = "ANALYZE_WORKSPACE" if has_local_docs else "GENERAL_CHAT"
     logger.info(f"[RAG Engine] Fast LLM Semantic Intent: {intent}")
 
-    # Dynamic timeout: complex comparative workspace queries need up to 150s
-    pipeline_timeout = 150.0 if intent == "ANALYZE_WORKSPACE" else 75.0
+    # Dynamic timeout: complex comparative workspace queries need up to 180s for large document sets
+    pipeline_timeout = 180.0 if intent == "ANALYZE_WORKSPACE" else 75.0
 
     last_err = None
     for cand_idx, (curr_llm, curr_name) in enumerate(candidate_llms):

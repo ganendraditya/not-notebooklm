@@ -344,6 +344,40 @@ export function getHighlightedContent(
     .split(/\s+/)
     .filter(w => w.length >= 2 && !stopWords.has(w) && !/^\d+$/.test(w));
 
+  // Extract explicit benchmark dataset or model entities: e.g. "dada-2000", "yolov8", "resnet-50", "imagenet-1k", "swin-t"
+  const datasetModelMatches = (normQuery.match(/\b[a-z]{2,}[-_]?\d+[a-z\d]*\b/gi) || [])
+    .map(e => e.toLowerCase());
+
+  // Academic bilingual cognate synonym mapping (Indonesian <-> English)
+  const COGNATE_SYNONYMS: Record<string, string[]> = {
+    inkonsistensi: ["inconsist", "inconsistency", "inconsistent"],
+    inkonsisten: ["inconsist", "inconsistent"],
+    anotasi: ["annotat", "annotation", "label"],
+    label: ["label", "annotation", "annotat"],
+    cuplikan: ["video", "clip", "footage", "frame", "game"],
+    game: ["game", "video game"],
+    bahaya: ["risk", "danger", "hazard", "incident", "accident", "near-miss"],
+    kecelakaan: ["accident", "crash", "collision", "incident", "near-miss"],
+    klasifikasi: ["classif", "classification"],
+    segmentasi: ["segment", "segmentation"],
+    deteksi: ["detect", "detection"],
+    evaluasi: ["evaluat", "evaluation"],
+    kuantitatif: ["quantitat"],
+    kualitatif: ["qualitat"],
+    komparasi: ["compar"],
+    distribusi: ["distribut"],
+    akurasi: ["accura", "accuracy"],
+    presisi: ["precis", "precision"],
+    arsitektur: ["architect", "architecture"],
+    metodologi: ["method", "methodology"],
+    metode: ["method"],
+    sintetis: ["synth", "synthetic"],
+    translasi: ["translat", "translation"],
+    modifikasi: ["modif", "modification"],
+    oklusi: ["occlu", "occlusion"],
+    trajektori: ["traject", "trajectory"],
+  };
+
   // Extract keyphrases (2-word & 3-word n-grams)
   const queryPhrases: string[] = [];
   for (let i = 0; i < cleanTokens.length - 1; i++) {
@@ -357,7 +391,7 @@ export function getHighlightedContent(
   let queryIntent: SectionCategory = "GENERAL";
   if (/(?:rekomendasi|future|saran|pengembangan|arah|ke depan|eksplorasi|penambahan|perluasan|integrasi\s+variabel|potensi)/i.test(normQuery)) {
     queryIntent = "FUTURE_WORK";
-  } else if (/(?:limitasi|kelemahan|keterbatasan|kendala|belum|anjlok|turun\s+drastis|minim|rentan|terbatas|kekurangan)/i.test(normQuery)) {
+  } else if (/(?:limitasi|kelemahan|keterbatasan|kendala|belum|anjlok|turun\s+drastis|minim|rentan|terbatas|kekurangan|inkonsistensi|salah\s+kelas|salah\s+label)/i.test(normQuery)) {
     queryIntent = "LIMITATIONS";
   } else if (/(?:akurasi|map|presisi|recall|f1|mse|temuan|kinerja|hasil|persentase|berhasil)/i.test(normQuery)) {
     queryIntent = "RESULTS";
@@ -463,14 +497,34 @@ export function getHighlightedContent(
       }
     });
 
-    // 6. Domain Entity / Model / Sentiment keywords (Weight: 6 points)
+    // 6. Benchmark Dataset or Named Model entities match (Weight: 40 points)
+    datasetModelMatches.forEach(entity => {
+      const normEntity = entity.replace(/[-_]/g, " ");
+      if (sLower.includes(entity) || sClean.includes(entity) || sClean.includes(normEntity)) {
+        score += 40;
+      }
+    });
+
+    // 7. Academic bilingual cognate synonym match (Indonesian <-> English) (Weight: 15 points each)
+    Object.entries(COGNATE_SYNONYMS).forEach(([indoKey, engTargets]) => {
+      if (normQuery.includes(indoKey)) {
+        for (const target of engTargets) {
+          if (sClean.includes(target) || sLower.includes(target)) {
+            score += 15;
+            break;
+          }
+        }
+      }
+    });
+
+    // 8. Domain Entity / Model / Sentiment keywords (Weight: 6 points)
     cleanTokens.forEach(w => {
       if (sWords.has(w) || sClean.includes(w)) {
         score += 6;
       }
     });
 
-    // 7. Section Intent Alignment: Prioritize sections matching the claim's semantic purpose
+    // 9. Section Intent Alignment: Prioritize sections matching the claim's semantic purpose
     // (e.g., prevent recommendations from grounding on past papers in "Related Work")
     if (score > 0) {
       if (queryIntent === "FUTURE_WORK") {
@@ -503,7 +557,7 @@ export function getHighlightedContent(
   const highlightedIndices = new Set<number>();
   const clusters: number[][] = [];
 
-  const hasHardEvidence = hasMetricOrData || metricsSet.size > 0 || ratioMatches.length > 0 || numberSet.size > 0 || paramBindings.length > 0;
+  const hasHardEvidence = hasMetricOrData || metricsSet.size > 0 || ratioMatches.length > 0 || numberSet.size > 0 || paramBindings.length > 0 || datasetModelMatches.length > 0;
   const minRequiredScore = hasHardEvidence ? 20 : 40;
 
   if (maxSingleScore >= minRequiredScore) {

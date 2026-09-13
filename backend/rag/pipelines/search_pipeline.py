@@ -10,7 +10,7 @@ from rag.search import (
     get_existing_notebook_sources_signatures,
 )
 from rag.prompts import get_search_synthesis_prompt
-from rag.llm_factory import get_fast_llm, astream_llm_response
+from rag.llm_factory import acall_fast_with_fallback, astream_llm_response
 from utils.text_processing import clean_doi, normalize_title_str
 
 logger = logging.getLogger("uvicorn.error")
@@ -24,10 +24,10 @@ async def handle_academic_search_pipeline(
     on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
     """Discovers, filters, audits, and synthesizes scholarly literature with iterative batch replenishment."""
-    fast_llm = get_fast_llm() or target_llm
-
     await report_status("Analyzing query parameters, constraints, and language...")
-    plan = await plan_academic_search(query, formatted_history, fast_llm)
+    plan = await acall_fast_with_fallback(
+        lambda llm: plan_academic_search(query, formatted_history, llm)
+    )
     
     target_count = plan.get('target_count', 12)
     user_requested_count = plan.get('user_requested_count')
@@ -49,7 +49,9 @@ async def handle_academic_search_pipeline(
 
     # Stage 1 AI Quality Auditor: Strict domain & methodology verification
     await report_status("Auditing paper relevance, domain alignment, and methodology...")
-    verified_papers = await judge_and_filter_papers_with_llm(query, raw_papers, target_count, fast_llm)
+    verified_papers = await acall_fast_with_fallback(
+        lambda llm: judge_and_filter_papers_with_llm(query, raw_papers, target_count, llm)
+    )
     if not verified_papers:
         verified_papers = raw_papers[:target_count]
 
@@ -78,7 +80,9 @@ async def handle_academic_search_pipeline(
             batch2_raw = await asyncio.to_thread(search_academic_papers_planned, batch2_plan, batch2_sigs)
             if batch2_raw:
                 await report_status("Screening additional literature candidates for quality...")
-                batch2_verified = await judge_and_filter_papers_with_llm(query, batch2_raw, needed, fast_llm)
+                batch2_verified = await acall_fast_with_fallback(
+                    lambda llm: judge_and_filter_papers_with_llm(query, batch2_raw, needed, llm)
+                )
                 for bp in batch2_verified:
                     if len(verified_papers) < target_count:
                         verified_papers.append(bp)

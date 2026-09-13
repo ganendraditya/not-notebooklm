@@ -359,6 +359,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
 
     // Ensure all table cells mapped to documents have granular clickable citations
     clean = enhanceTableCitations(clean);
+
+    // IEEE citation placement rule: ensure citations appear BEFORE periods/commas (e.g. "terjadi) [20]." instead of "terjadi). [20]")
+    clean = clean.replace(/\.(\s*)(\[{1,2}\d{1,3}(?:\s*,\s*\d{1,3})*\]{1,2})/g, " $2.");
+    clean = clean.replace(/(\[{1,2}\d{1,3}(?:\s*,\s*\d{1,3})*\]{1,2})\s*\.{2,}/g, "$1.");
+
     return { cleanContent: clean, sources: parsedSources, citationMap: parsedCitationMap };
   }, [msg.content]);
 
