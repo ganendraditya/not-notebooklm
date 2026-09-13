@@ -1,16 +1,31 @@
 import os
+import re
+import json
 import asyncio
 import logging
 from typing import List, Tuple, Dict, Any, Optional, Callable
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 from database import SessionLocal, Document as DBDocument
 from rag.prompts import get_workspace_analysis_system_prompt
-from rag.formatters import format_clean_response
+from rag.formatters import format_clean_response, extract_structured_citations
 from rag.parsers import parse_document_to_markdown
 from utils.file_utils import get_doc_file_path
 from rag.llm_factory import astream_llm_response
 
 logger = logging.getLogger("uvicorn.error")
+
+def extract_key_sentences_from_chunk(text: str, limit: int = 2) -> List[str]:
+    """Extracts 1-2 distinct, substantive verbatim sentences from a chunk for grounding."""
+    raw_sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    candidates = []
+    for s in raw_sentences:
+        s_clean = s.strip().replace('\n', ' ')
+        if 40 <= len(s_clean) <= 300 and not s_clean.startswith('#') and not s_clean.startswith('['):
+            if not re.match(r'^\d+\.?\s*$', s_clean):
+                candidates.append(s_clean)
+                if len(candidates) >= limit:
+                    break
+    return candidates
 
 async def _load_single_doc_snippet_async(idx_fname_chat: tuple, db_records: Dict[str, Any], total_doc_count: int) -> Tuple[bool, str]:
     """Helper that reads and formats text from a single document record or file on disk."""
@@ -143,13 +158,23 @@ async def _retrieve_hybrid_workspace_context(
                 logger.debug(f"[Workspace Hybrid] FlashRank fallback: {rank_err}")
                 selected_nodes = nodes[:12]
 
+            pre_stored_rag_map: Dict[str, List[str]] = {}
             for idx, n in enumerate(selected_nodes, start=1):
                 fname = n.node.metadata.get("filename", "Dokumen")
                 sec = n.node.metadata.get("section") or n.node.metadata.get("breadcrumb") or ""
                 sec_lbl = f" - Bagian: {sec}" if sec else ""
+                doc_idx = local_docs.index(fname) + 1 if fname in local_docs else idx
+                chunk_text = n.node.get_content()
                 retrieved_blocks.append(
-                    f"--- KUTIPAN RELEVAN [{idx}] (Sumber: {fname}{sec_lbl}) ---\n{n.node.get_content()}"
+                    f"--- KUTIPAN RELEVAN Dokumen [{doc_idx}] (Sumber: {fname}{sec_lbl}) ---\n{chunk_text}"
                 )
+
+                doc_key = str(doc_idx)
+                if doc_key not in pre_stored_rag_map:
+                    pre_stored_rag_map[doc_key] = []
+                for s in extract_key_sentences_from_chunk(chunk_text, limit=2):
+                    if s not in pre_stored_rag_map[doc_key] and len(pre_stored_rag_map[doc_key]) < 3:
+                        pre_stored_rag_map[doc_key].append(s)
     except Exception as e:
         logger.warning(f"[Workspace Hybrid] Vector retrieval encountered error: {e}")
 
@@ -157,14 +182,16 @@ async def _retrieve_hybrid_workspace_context(
         return (
             f"{catalog_text}\n\n"
             f"=== KUTIPAN MENDALAM DARI DOKUMEN TERKAIT QUERY ({len(retrieved_blocks)} BAGIAN RELEVAN TERTINGGI) ===\n\n"
-            + "\n\n".join(retrieved_blocks)
+            + "\n\n".join(retrieved_blocks),
+            pre_stored_rag_map
         )
     else:
         # Fallback if vector index has no chunks yet: use compact snippets
         loaded_results = await asyncio.gather(
             *(_load_single_doc_snippet_async((i, fname, chat_id), db_records, total_docs) for i, fname in enumerate(local_docs))
         )
-        return "\n\n".join([snippet for _, snippet in loaded_results])
+        fb_map = {str(i): extract_key_sentences_from_chunk(s, limit=2) for i, (_, s) in enumerate(loaded_results, start=1)}
+        return "\n\n".join([snippet for _, snippet in loaded_results]), fb_map
 
 async def handle_workspace_analysis_pipeline(
     chat_id: str,
@@ -198,14 +225,17 @@ async def handle_workspace_analysis_pipeline(
         db.close()
 
     total_doc_count = len(local_docs)
+    pre_stored_rag_map: Dict[str, List[str]] = {}
     if total_doc_count <= 4:
         await report_status("Reading full content of loaded workspace documents...")
         loaded_results = await asyncio.gather(
             *(_load_single_doc_snippet_async((i, fname, chat_id), db_records, total_doc_count) for i, fname in enumerate(local_docs))
         )
         full_docs_context = "\n\n".join([snippet for _, snippet in loaded_results])
+        for i, (_, snippet) in enumerate(loaded_results, start=1):
+            pre_stored_rag_map[str(i)] = extract_key_sentences_from_chunk(snippet, limit=2)
     else:
-        full_docs_context = await _retrieve_hybrid_workspace_context(
+        full_docs_context, pre_stored_rag_map = await _retrieve_hybrid_workspace_context(
             chat_id=chat_id,
             query=query,
             local_docs=local_docs,
@@ -244,6 +274,26 @@ async def handle_workspace_analysis_pipeline(
     
     await report_status("Synthesizing comparative findings and formatting response...")
     raw_content = await astream_llm_response(target_llm, chat_msgs, on_delta=on_delta)
-    draft_content = format_clean_response(raw_content)
 
+    clean_text, llm_citations = extract_structured_citations(raw_content)
+
+    # Merge RAG pre-stored verbatim evidence map with LLM citations
+    merged_citations: Dict[str, List[str]] = {**pre_stored_rag_map}
+    for k, v in llm_citations.items():
+        clean_k = str(k).strip("[]")
+        if clean_k not in merged_citations:
+            merged_citations[clean_k] = []
+        if isinstance(v, list):
+            for quote in v:
+                if quote not in merged_citations[clean_k]:
+                    merged_citations[clean_k].append(quote)
+        elif isinstance(v, str) and v not in merged_citations[clean_k]:
+            merged_citations[clean_k].append(v)
+
+    if merged_citations:
+        draft_content = f"{clean_text}\n\n<!-- CITATION_MAP: {json.dumps(merged_citations, ensure_ascii=False)} -->"
+    else:
+        draft_content = clean_text
+
+    draft_content = format_clean_response(draft_content)
     return draft_content

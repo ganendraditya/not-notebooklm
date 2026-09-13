@@ -335,11 +335,8 @@ export function parseCitationsInReactNode(
 
         if (hasCitationMap) {
           const aiQuotesForDoc = citationMap[num.toString()] || citationMap[`[${num}]`];
-          if (aiQuotesForDoc && aiQuotesForDoc.length > 0) {
-            return true;
-          }
-          // If citation map is present but this doc has no quote, require non-empty context
-          if (!contextSentence || contextSentence.length < 8) return false;
+          // If citation map is present, ONLY render a button if this document has evidence quotes
+          return Boolean(aiQuotesForDoc && aiQuotesForDoc.length > 0);
         }
 
         return true;
