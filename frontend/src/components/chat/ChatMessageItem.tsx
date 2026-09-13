@@ -294,17 +294,17 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   const { t } = useTranslation();
   const isUser = msg.role === "user";
   const { cleanContent, sources, citationMap } = useMemo(() => {
-    const sourcesMatch = msg.content.match(/<!-- SOURCES_DATA:\s*([\s\S]*?)\s*-->/);
-    const citationMapMatch = msg.content.match(/<!-- CITATION_MAP:\s*([\s\S]*?)\s*-->/);
+    const sourcesMatch = msg.content.match(/<!-- SOURCES_DATA:\s*([\s\S]*?)(?:-->|$)/);
+    const citationMapMatch = msg.content.match(/<!-- CITATION_MAP:\s*([\s\S]*?)(?:-->|$)/);
 
     let clean = msg.content;
     let parsedSources: AcademicCandidateSource[] = [];
     let parsedCitationMap: Record<string, string[]> = {};
     
     if (sourcesMatch) {
-      clean = clean.replace(/<!-- SOURCES_DATA:[\s\S]*?-->/, "").trim();
+      clean = clean.replace(/<!-- SOURCES_DATA:[\s\S]*?(?:-->|$)/gi, "").trim();
       try {
-        const rawSources: AcademicCandidateSource[] = JSON.parse(sourcesMatch[1]);
+        const rawSources: AcademicCandidateSource[] = JSON.parse(sourcesMatch[1].replace(/-->.*$/, "").trim());
         if (Array.isArray(rawSources)) {
           const uniqueSources: AcademicCandidateSource[] = [];
           for (const s of rawSources) {
@@ -314,21 +314,21 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           }
           parsedSources = uniqueSources;
         }
-      } catch (e) {
-        console.error("Failed to parse sources data:", e);
+      } catch {
+        // May be incomplete while streaming
       }
     }
 
     if (citationMapMatch) {
-      clean = clean.replace(/<!-- CITATION_MAP:[\s\S]*?-->/, "").trim();
+      clean = clean.replace(/<!-- CITATION_MAP:[\s\S]*?(?:-->|$)/gi, "").trim();
       try {
         // Robust JSON parse: strip markdown code fences, trailing commas
-        let rawJson = citationMapMatch[1].trim();
+        let rawJson = citationMapMatch[1].replace(/-->.*$/, "").trim();
         rawJson = rawJson.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
         rawJson = rawJson.replace(/,\s*([\]}])/g, "$1"); // trailing commas
         parsedCitationMap = JSON.parse(rawJson);
-      } catch (e) {
-        console.error("Failed to parse citation map data:", e);
+      } catch {
+        // May be incomplete while streaming
       }
     }
 
