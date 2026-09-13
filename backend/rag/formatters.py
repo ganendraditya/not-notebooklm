@@ -101,8 +101,11 @@ def enhance_table_citations(text: str) -> str:
                     if row_doc_match and len(cells) > 1:
                         doc_num = row_doc_match.group(1)
                         new_cells = [first_cell]
-                        for c in cells[1:]:
-                            if re.search(r'\[\d{1,3}\]', c):
+                        for idx, c in enumerate(cells[1:], start=1):
+                            # Skip author/year column (idx 1) if first cell was already a document badge [X]
+                            if idx == 1 and re.match(r'^[A-Za-z\s.,&()\-]+(?:\(\d{4}\))?$', c.strip()):
+                                new_cells.append(c)
+                            elif re.search(r'\[\d{1,3}\]', c):
                                 new_cells.append(c)
                             else:
                                 new_cells.append(tag_cell_content(c, doc_num))
@@ -143,6 +146,10 @@ def format_clean_response(text: str) -> str:
     if not text:
         return ""
     text = text.strip()
+    
+    # Ensure separator rows concatenated with header row on the same line (e.g. '... || --- |') are split cleanly
+    text = re.sub(r'\|\s*\|(\s*:?-+:?\s*\|)', r'|\n|\1', text)
+
     citation_data = None
     
     # Match CITATION_MAP with or without colon and flexible whitespace
