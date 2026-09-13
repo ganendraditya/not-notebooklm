@@ -474,14 +474,14 @@ export function getHighlightedContent(
     // (e.g., prevent recommendations from grounding on past papers in "Related Work")
     if (score > 0) {
       if (queryIntent === "FUTURE_WORK") {
-        if (sec === "FUTURE_WORK") score += 50;
-        else if (sec === "CONCLUSION") score += 20;
-        else if (sec === "RELATED_WORK") score = Math.max(0, score - 50);
-        else if (sec === "METHODOLOGY") score = Math.max(0, score - 20);
+        if (sec === "RELATED_WORK") return 0; // Strictly prohibit literature review for future work!
+        if (sec === "FUTURE_WORK") score += 60;
+        else if (sec === "CONCLUSION") score += 25;
+        else if (sec === "METHODOLOGY") score = Math.max(0, score - 30);
       } else if (queryIntent === "LIMITATIONS") {
-        if (sec === "LIMITATIONS") score += 50;
+        if (sec === "RELATED_WORK") return 0; // Strictly prohibit literature review for limitations!
+        if (sec === "LIMITATIONS") score += 60;
         else if (sec === "CONCLUSION") score += 20;
-        else if (sec === "RELATED_WORK") score = Math.max(0, score - 50);
       } else if (queryIntent === "RESULTS") {
         if (sec === "RESULTS") score += 40;
         else if (sec === "RELATED_WORK") score = Math.max(0, score - 30);
@@ -543,8 +543,8 @@ export function getHighlightedContent(
       return maxB - maxA;
     });
 
-    // Keep AT MOST the top 2 highest scoring clusters to maintain laser-focused evidence
-    const topClusters = initialClusters.slice(0, 2);
+    // Keep STRICTLY the single highest-scoring focal cluster (NotebookLM laser-focus, zero fragmented jumping)
+    const topClusters = initialClusters.slice(0, 1);
     topClusters.forEach(clust => {
       clust.forEach(idx => highlightedIndices.add(idx));
     });

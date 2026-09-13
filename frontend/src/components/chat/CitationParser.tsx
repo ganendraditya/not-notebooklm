@@ -216,15 +216,22 @@ export function parseCitationsInReactNode(
         .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
         .trim();
 
-      // Check if contextSentence is purely an author tag or document identifier (e.g. "Tahir et al. (2023)", "Cahyono & Budiyanto (2020)", "Doc 1")
+      // Check if contextSentence is purely an author tag or document identifier (e.g. "Tahir et al. (2023)", "Cahyono & Budiyanto (2020)", "Dokumen 1")
       const wordCount = contextSentence.split(/\s+/).filter(Boolean).length;
-      const isAuthorTag = wordCount <= 6 && (
-        /\(\d{4}\)/.test(contextSentence) || 
+      const isAuthorTag = wordCount > 0 && wordCount <= 6 && (
+        /[A-Za-z]+.*?\(\d{4}\)/.test(contextSentence) || 
         /et\s+al/i.test(contextSentence) || 
-        /^(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?$/i.test(contextSentence)
+        /^(?:doc|dokumen|paper|sumber|ref|source)\s*\[?\d+\]?$/i.test(contextSentence)
       ) && !/\b(?:metode|method|akurasi|accuracy|recall|precision|presisi|f1|iou|model|loss|dataset|algorithm|algoritma|integrat|segment|detect|flow|buffer|speed|kecepatan)\b/i.test(contextSentence);
 
-      if (isDocColumn || !contextSentence || contextSentence.length < 3 || isAuthorTag) {
+      if (!isDocColumn && isAuthorTag) {
+        // Author / year label without empirical claim: do not render as a clickable citation button
+        parts.push(match[0]);
+        lastIndex = regex.lastIndex;
+        continue;
+      }
+
+      if (isDocColumn || !contextSentence || contextSentence.length < 3) {
         contextSentence = "";
       }
 
