@@ -53,4 +53,27 @@ Metode panjang antrean terbukti lebih presisi dibandingkan metode luas piksel un
     // Vague queries with only common stopwords/words should yield 0 highlights rather than cluttering the document
     expect(result.matchCount).toBe(0);
   });
+
+  it("aligns future work recommendations with future/conclusion section rather than related work", () => {
+    const paperWithSections = `
+# System Paper
+## II. LITERATURE AND RELATED WORK
+In prior work, road accident detection used synthetic data from multiple perspectives named MP-RAD [28].
+A 3D CNN model was explored in previous research for video comparison.
+
+## III. METHODOLOGY
+We train sequential DCNN on BeamNG synthetic datasets.
+
+## VII. FUTURE DIRECTIONS
+In the future, the 3D CNN model can undergo training with synthetic data to enable a comparison of results.
+Furthermore, the use of multi-view synthetic data could be beneficial to improve accuracy.
+`;
+    const recQuery = "Penambahan data sintetis dan multi-perspective; eksplorasi 3D CNN untuk masa depan";
+    const result = getHighlightedContent(paperWithSections, recQuery);
+
+    // Must match the FUTURE DIRECTIONS section
+    expect(result.matchCount).toBeGreaterThanOrEqual(1);
+    // Should NOT match the RELATED WORK section
+    expect(result.matchCount).toBeLessThanOrEqual(2);
+  });
 });
