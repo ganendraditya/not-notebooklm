@@ -143,17 +143,17 @@ export default function ChatClient() {
     }
   };
 
-  const handleAddPendingSources = (items: PendingSourceItem[]) => {
+  const handleAddPendingSources = useCallback((items: PendingSourceItem[]) => {
     updatePendingSourcesList(prev => [...prev, ...items]);
-  };
+  }, [updatePendingSourcesList]);
 
-  const handleResolvePendingSource = (pendingId: string) => {
+  const handleResolvePendingSource = useCallback((pendingId: string) => {
     updatePendingSourcesList(prev => prev.filter(p => p.id !== pendingId));
-  };
+  }, [updatePendingSourcesList]);
 
-  const handleCancelPendingSource = (pendingId: string) => {
+  const handleCancelPendingSource = useCallback((pendingId: string) => {
     cancelPendingItem(pendingId);
-  };
+  }, [cancelPendingItem]);
 
   const handleDocumentUpdated = (updatedDoc: Document) => {
     updateDocumentsList(prev => prev.map(d => d.id === updatedDoc.id ? { ...d, title: updatedDoc.title } : d));

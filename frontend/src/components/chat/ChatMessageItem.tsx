@@ -401,6 +401,8 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   const cancelledPendingIdsRef = useRef<Set<string>>(new Set());
   const isBatchCancelledRef = useRef<boolean>(false);
   const pendingItemsRef = useRef<{ id: string }[]>([]);
+  const onResolvePendingSourceRef = useRef(onResolvePendingSource);
+  onResolvePendingSourceRef.current = onResolvePendingSource;
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -412,11 +414,11 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
       controllersMap.clear();
       pendingItemsRef.current.forEach(p => {
         unregisterPendingCancelCallback(p.id);
-        onResolvePendingSource?.(p.id);
+        onResolvePendingSourceRef.current?.(p.id);
       });
       pendingItemsRef.current = [];
     };
-  }, [onResolvePendingSource]);
+  }, []);
 
   const handleImport = async () => {
     const toImport = sources.filter((src, i) => !isDuplicateSource(src) && isSourceChecked(src, i));
