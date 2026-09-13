@@ -9,14 +9,14 @@ from qdrant_client import QdrantClient
 
 # Compatibility shim for qdrant-client >= 1.14 where .search was replaced by .query_points
 if not hasattr(QdrantClient, "search"):
-    def _compat_search(self, collection_name, query_vector, query_filter=None, limit=10, with_payload=True, with_vectors=False, score_threshold=None, **kwargs):
-        kwargs.pop("search_params", None)
-        kwargs.pop("offset", None)
+    def _compat_search(self, collection_name, query_vector, query_filter=None, search_params=None, limit=10, offset=None, with_payload=True, with_vectors=False, score_threshold=None, **kwargs):
         res = self.query_points(
             collection_name=collection_name,
             query=query_vector,
             query_filter=query_filter,
+            search_params=search_params,
             limit=limit,
+            offset=offset,
             with_payload=with_payload,
             with_vectors=with_vectors,
             score_threshold=score_threshold,
@@ -26,14 +26,14 @@ if not hasattr(QdrantClient, "search"):
     QdrantClient.search = _compat_search
 
 if hasattr(qdrant_client, "AsyncQdrantClient") and not hasattr(qdrant_client.AsyncQdrantClient, "search"):
-    async def _compat_asearch(self, collection_name, query_vector, query_filter=None, limit=10, with_payload=True, with_vectors=False, score_threshold=None, **kwargs):
-        kwargs.pop("search_params", None)
-        kwargs.pop("offset", None)
+    async def _compat_asearch(self, collection_name, query_vector, query_filter=None, search_params=None, limit=10, offset=None, with_payload=True, with_vectors=False, score_threshold=None, **kwargs):
         res = await self.query_points(
             collection_name=collection_name,
             query=query_vector,
             query_filter=query_filter,
+            search_params=search_params,
             limit=limit,
+            offset=offset,
             with_payload=with_payload,
             with_vectors=with_vectors,
             score_threshold=score_threshold,
@@ -95,7 +95,8 @@ os.makedirs(QDRANT_PATH, exist_ok=True)
 # Setup Qdrant Client (Supports Remote Server / Docker or Local Disk fallback)
 if QDRANT_URL:
     try:
-        qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+        qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY, timeout=5)
+        qdrant_client.get_collections()
         logger.info(f"[Qdrant] Connected to remote server at {QDRANT_URL}")
     except Exception as e:
         logger.warning(f"[Qdrant] Failed connecting to remote URL {QDRANT_URL}: {e}. Falling back to disk.")
@@ -135,12 +136,12 @@ def init_embedding_and_vector_store():
             logger.warning(f"[RAG Engine] HuggingFace Embedding loading failed: {e}")
 
     # Ultimate fallback to Google GenAI / Gemini
-    if GoogleGenAIEmbedding is not None:
-        embed_model = GoogleGenAIEmbedding(model_name=embedding_model, api_key=gemini_key or "dummy_key")
+    if GoogleGenAIEmbedding is not None and gemini_key and not gemini_key.startswith("your_"):
+        embed_model = GoogleGenAIEmbedding(model_name=embedding_model, api_key=gemini_key)
         vstore = QdrantVectorStore(collection_name="not_notebooklm", client=qdrant_client, enable_hybrid=False, batch_size=20)
         return embed_model, vstore
 
-    raise RuntimeError("No embedding provider available. Please install llama-index-embeddings-google-genai.")
+    raise RuntimeError("No embedding provider available or valid API key configured. Please install llama-index-embeddings-huggingface or set GEMINI_API_KEY.")
 
 
 def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
@@ -173,7 +174,7 @@ def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
         collections = []
         try:
             collections_response = qdrant_client.get_collections()
-            collections = [c.name for c in collections_response.collections]
+            collections = [c.name for c in collections_response.collections if c.name.startswith("not_notebooklm")]
         except Exception as e:
             logger.warning(f"[Qdrant] Failed listing collections for deletion: {e}")
             collections = ["not_notebooklm_e5", "not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
@@ -254,10 +255,10 @@ def ingest_document_text(text: str, filename: str, chat_id: str) -> bool:
     return ingest_documents_batch([(text, filename, chat_id)])
 
 
-def ingest_document(file_path: str, chat_id: str) -> bool:
+def ingest_document(file_path: str, chat_id: str, filename: Optional[str] = None) -> bool:
     """Parses a multi-format document and ingests it into Qdrant."""
     from .parsers import parse_document_to_markdown
-    filename = os.path.basename(file_path)
+    fn = filename or os.path.basename(file_path)
     md_text = parse_document_to_markdown(file_path)
-    return ingest_document_text(md_text, filename, chat_id)
+    return ingest_document_text(md_text, fn, chat_id)
 

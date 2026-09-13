@@ -50,9 +50,9 @@ def fetch_openalex_metadata_by_doi(clean_doi: str, expected_title: str = "") -> 
                     issns.append(str(src.get("issn")))
 
             authors = [
-                a.get("author", {}).get("display_name")
-                for a in data.get("authorships", [])
-                if a.get("author", {}).get("display_name")
+                (a.get("author") or {}).get("display_name")
+                for a in (data.get("authorships") or [])
+                if (a.get("author") or {}).get("display_name")
             ]
 
             landing = loc.get("landing_page_url") or data.get("doi") or f"https://doi.org/{clean_doi}"
@@ -101,9 +101,9 @@ def search_openalex_metadata_by_title(title: str) -> Optional[Dict[str, Any]]:
                 cand_title = w.get("title", "")
                 if is_title_match(cand_title, title):
                     authors = [
-                        a.get("author", {}).get("display_name")
-                        for a in w.get("authorships", [])
-                        if a.get("author", {}).get("display_name")
+                        (a.get("author") or {}).get("display_name")
+                        for a in (w.get("authorships") or [])
+                        if (a.get("author") or {}).get("display_name")
                     ]
                     journal = w.get("primary_location", {}).get("source", {}).get("display_name", "")
                     pub_year = str(w.get("publication_year") or "")
@@ -158,8 +158,15 @@ def fetch_crossref_metadata_by_doi(clean_doi: str, expected_title: str = "") -> 
             container = msg.get("container-title", [])
             journal = container[0] if container else ""
 
-            created = msg.get("created", {}).get("date-parts", [[]])[0]
-            pub_year = str(created[0]) if created else ""
+            date_info = (
+                msg.get("issued")
+                or msg.get("published-print")
+                or msg.get("published-online")
+                or msg.get("created")
+                or {}
+            )
+            date_parts = date_info.get("date-parts")
+            pub_year = str(date_parts[0][0]) if date_parts and len(date_parts) > 0 and len(date_parts[0]) > 0 else ""
             citations = msg.get("is-referenced-by-count", 0)
             landing = msg.get("URL", f"https://doi.org/{clean_doi}")
 
@@ -203,7 +210,7 @@ def fetch_semantic_scholar_metadata_by_doi(clean_doi: str, expected_title: str =
             authors = [a.get("name") for a in s2_data.get("authors", []) if a.get("name")]
             pub_year = str(s2_data.get("year") or "")
             citations = s2_data.get("citationCount", 0)
-            pdf_url = s2_data.get("openAccessPdf", {}).get("url") or ""
+            pdf_url = (s2_data.get("openAccessPdf") or {}).get("url") or ""
 
             abstract = ""
             abstract_type = "official"

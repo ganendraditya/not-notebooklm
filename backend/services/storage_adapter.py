@@ -5,12 +5,14 @@ Provides unified, decoupled object storage synchronization alongside local disk 
 
 import os
 import logging
+import threading
 from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger("uvicorn.error")
 
 _S3_CLIENT = None
 _S3_INITIALIZED = False
+_S3_LOCK = threading.Lock()
 
 
 def is_s3_enabled() -> bool:
@@ -42,61 +44,64 @@ def get_s3_client():
     if _S3_INITIALIZED and _S3_CLIENT is not None:
         return _S3_CLIENT
 
-    _S3_INITIALIZED = True
+    with _S3_LOCK:
+        if _S3_INITIALIZED and _S3_CLIENT is not None:
+            return _S3_CLIENT
+        _S3_INITIALIZED = True
 
-    try:
-        import boto3
-        from botocore.config import Config
-
-        endpoint_url = os.getenv("S3_ENDPOINT_URL", "").strip()
-        access_key = os.getenv("S3_ACCESS_KEY_ID", "").strip()
-        secret_key = os.getenv("S3_SECRET_ACCESS_KEY", "").strip()
-        region = os.getenv("S3_REGION", "auto").strip() or "auto"
-
-        # Cloudflare R2 and MinIO require signature version s3v4 and path/virtual-host style handling
-        s3_config = Config(
-            signature_version="s3v4",
-            retries={"max_attempts": 3, "mode": "standard"},
-            connect_timeout=15,
-            read_timeout=60,
-        )
-
-        _S3_CLIENT = boto3.client(
-            "s3",
-            endpoint_url=endpoint_url,
-            aws_access_key_id=access_key,
-            aws_secret_access_key=secret_key,
-            region_name=region,
-            config=s3_config,
-        )
-        logger.info(f"[StorageAdapter] Successfully initialized S3 client for endpoint: {endpoint_url}")
-
-        # Automatically verify and create bucket if missing (ideal for local MinIO & testing)
         try:
-            b_name = get_bucket_name()
-            _S3_CLIENT.head_bucket(Bucket=b_name)
-        except Exception:
-            try:
-                if region in ("us-east-1", "auto", ""):
-                    _S3_CLIENT.create_bucket(Bucket=b_name)
-                else:
-                    _S3_CLIENT.create_bucket(
-                        Bucket=b_name,
-                        CreateBucketConfiguration={"LocationConstraint": region},
-                    )
-                logger.info(f"[StorageAdapter] Automatically created S3 bucket '{b_name}' on {endpoint_url}")
-            except Exception as be:
-                logger.debug(f"[StorageAdapter] Bucket check/create note: {be}")
+            import boto3
+            from botocore.config import Config
 
-        return _S3_CLIENT
-    except ImportError:
-        logger.warning("[StorageAdapter] 'boto3' library is not installed. Run: pip install boto3")
-        _S3_CLIENT = None
-        return None
-    except Exception as e:
-        logger.error(f"[StorageAdapter] Failed to initialize S3 client: {e}")
-        _S3_CLIENT = None
-        return None
+            endpoint_url = os.getenv("S3_ENDPOINT_URL", "").strip()
+            access_key = os.getenv("S3_ACCESS_KEY_ID", "").strip()
+            secret_key = os.getenv("S3_SECRET_ACCESS_KEY", "").strip()
+            region = os.getenv("S3_REGION", "auto").strip() or "auto"
+
+            # Cloudflare R2 and MinIO require signature version s3v4 and path/virtual-host style handling
+            s3_config = Config(
+                signature_version="s3v4",
+                retries={"max_attempts": 3, "mode": "standard"},
+                connect_timeout=15,
+                read_timeout=60,
+            )
+
+            _S3_CLIENT = boto3.client(
+                "s3",
+                endpoint_url=endpoint_url,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region,
+                config=s3_config,
+            )
+            logger.info(f"[StorageAdapter] Successfully initialized S3 client for endpoint: {endpoint_url}")
+
+            # Automatically verify and create bucket if missing (ideal for local MinIO & testing)
+            try:
+                b_name = get_bucket_name()
+                _S3_CLIENT.head_bucket(Bucket=b_name)
+            except Exception:
+                try:
+                    if region in ("us-east-1", "auto", ""):
+                        _S3_CLIENT.create_bucket(Bucket=b_name)
+                    else:
+                        _S3_CLIENT.create_bucket(
+                            Bucket=b_name,
+                            CreateBucketConfiguration={"LocationConstraint": region},
+                        )
+                    logger.info(f"[StorageAdapter] Automatically created S3 bucket '{b_name}' on {endpoint_url}")
+                except Exception as be:
+                    logger.debug(f"[StorageAdapter] Bucket check/create note: {be}")
+
+            return _S3_CLIENT
+        except ImportError:
+            logger.warning("[StorageAdapter] 'boto3' library is not installed. Run: pip install boto3")
+            _S3_CLIENT = None
+            return None
+        except Exception as e:
+            logger.error(f"[StorageAdapter] Failed to initialize S3 client: {e}")
+            _S3_CLIENT = None
+            return None
 
 
 def upload_file(local_path: str, s3_key: str, content_type: Optional[str] = None) -> bool:
@@ -200,7 +205,7 @@ def delete_file(s3_key: str) -> bool:
 
 def delete_files_with_prefix(prefix: str) -> int:
     """Bulk deletes all objects matching the specified key prefix."""
-    if not is_s3_enabled():
+    if not is_s3_enabled() or not prefix or not prefix.strip():
         return 0
 
     client = get_s3_client()
