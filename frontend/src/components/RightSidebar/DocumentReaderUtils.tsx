@@ -274,15 +274,10 @@ export function getHighlightedContent(
     return { nodes: <span>{fullText}</span>, matchCount: 0 };
   }
 
-  // Identify sections and bibliography in the document to contextualize grounding
-  type SectionCategory = "RELATED_WORK" | "METHODOLOGY" | "RESULTS" | "LIMITATIONS" | "FUTURE_WORK" | "CONCLUSION" | "REFERENCES" | "GENERAL";
-  let activeSection: SectionCategory = "GENERAL";
-  const sentenceSections: SectionCategory[] = [];
+  // Identify where the bibliography / reference list starts to avoid grounding on references
   let refSectionIndex = -1;
-
   for (let i = 0; i < rawSentences.length; i++) {
     const sTrim = rawSentences[i].trim();
-    // Only detect section category if the line is genuinely a standalone heading
     const isHeading = (
       sTrim.startsWith("#") ||
       (sTrim.startsWith("**") && sTrim.endsWith("**") && sTrim.length < 80) ||
@@ -291,33 +286,12 @@ export function getHighlightedContent(
     );
 
     if (isHeading) {
-      let cleanHeader = sTrim.replace(/[*_#~`:]/g, "").trim().toLowerCase();
-      cleanHeader = cleanHeader.replace(/^(?:[ivx\d]+[\.\s\-]+|[a-z]\.|\d+\.)\s*/i, "").trim();
-
+      const cleanHeader = sTrim.replace(/[*_#~`:]/g, "").trim().toLowerCase();
       if (/^(?:references?|daftar\s+pustaka|bibliography)\b/i.test(cleanHeader)) {
-        activeSection = "REFERENCES";
-        if (refSectionIndex === -1) refSectionIndex = i;
-      } else if (/^(?:future|saran|rekomendasi|future\s+directions?|pengembangan\s+selanjutnya)\b/i.test(cleanHeader) ||
-                 /(?:future\s+directions?|future\s+work|rekomendasi|kesimpulan\s+dan\s+saran|saran)/i.test(cleanHeader)) {
-        activeSection = "FUTURE_WORK";
-      } else if (/^(?:limitations?|limitasi|keterbatasan|kelemahan)\b/i.test(cleanHeader) ||
-                 /(?:limitations?|keterbatasan)/i.test(cleanHeader)) {
-        activeSection = "LIMITATIONS";
-      } else if (/^(?:conclusions?|kesimpulan)\b/i.test(cleanHeader) ||
-                 /(?:conclusions?|kesimpulan)/i.test(cleanHeader)) {
-        activeSection = "CONCLUSION";
-      } else if (/^(?:results?|hasil|evaluasi|evaluation|performance|pembahasan|findings?)\b/i.test(cleanHeader) ||
-                 /(?:results?\s+and\s+discussion|hasil\s+dan\s+pembahasan)/i.test(cleanHeader)) {
-        activeSection = "RESULTS";
-      } else if (/^(?:methods?|metodologi|metode|proposed|arsitektur|framework|system\s+design)\b/i.test(cleanHeader) ||
-                 /(?:methodology|proposed\s+method)/i.test(cleanHeader)) {
-        activeSection = "METHODOLOGY";
-      } else if (/^(?:related\s+work|literature|tinjauan\s+pustaka|penelitian\s+terkait)\b/i.test(cleanHeader) ||
-                 /(?:literature\s+and\s+related\s+work|related\s+works?)/i.test(cleanHeader)) {
-        activeSection = "RELATED_WORK";
+        refSectionIndex = i;
+        break;
       }
     }
-    sentenceSections.push(activeSection);
   }
 
   // Common stopwords in Indonesian and English
@@ -364,40 +338,6 @@ export function getHighlightedContent(
   const datasetModelMatches = (normQuery.match(/\b[a-z]{2,}[-_]?\d+[a-z\d]*\b/gi) || [])
     .map(e => e.toLowerCase());
 
-  // Academic bilingual cognate synonym mapping (Indonesian <-> English)
-  const COGNATE_SYNONYMS: Record<string, string[]> = {
-    inkonsistensi: ["inconsist", "inconsistency", "inconsistent"],
-    inkonsisten: ["inconsist", "inconsistent"],
-    anotasi: ["annotat", "annotation", "label"],
-    label: ["label", "annotation", "annotat"],
-    cuplikan: ["video", "clip", "footage", "frame", "game"],
-    game: ["game", "video game"],
-    bahaya: ["risk", "danger", "hazard", "incident", "accident", "near-miss"],
-    kecelakaan: ["accident", "crash", "collision", "incident", "near-miss"],
-    klasifikasi: ["classif", "classification"],
-    segmentasi: ["segment", "segmentation"],
-    deteksi: ["detect", "detection"],
-    evaluasi: ["evaluat", "evaluation"],
-    kuantitatif: ["quantitat"],
-    kualitatif: ["qualitat"],
-    komparasi: ["compar"],
-    distribusi: ["distribut"],
-    akurasi: ["accura", "accuracy"],
-    presisi: ["precis", "precision"],
-    arsitektur: ["architect", "architecture"],
-    metodologi: ["method", "methodology"],
-    metode: ["method"],
-    sintetis: ["synth", "synthetic"],
-    translasi: ["translat", "translation"],
-    modifikasi: ["modif", "modification"],
-    oklusi: ["occlu", "occlusion"],
-    trajektori: ["traject", "trajectory"],
-    subtraction: ["subtract", "substraction", "subtraksi"],
-    subtraksi: ["subtract", "substraction", "subtraksi"],
-    penggabungan: ["gabung", "kombinasi", "combin", "hybrid", "integrat", "fus"],
-    gabung: ["gabung", "kombinasi", "combin", "hybrid", "integrat", "fus"],
-  };
-
   // Extract keyphrases (2-word & 3-word n-grams)
   const queryPhrases: string[] = [];
   for (let i = 0; i < cleanTokens.length - 1; i++) {
@@ -407,28 +347,11 @@ export function getHighlightedContent(
     }
   }
 
-  // Detect intent category of the query to align with corresponding paper sections
-  let queryIntent: SectionCategory = "GENERAL";
-  if (/(?:rekomendasi|future|saran|pengembangan|arah|ke depan|eksplorasi|penambahan|perluasan|integrasi\s+variabel|potensi)/i.test(normQuery)) {
-    queryIntent = "FUTURE_WORK";
-  } else if (/(?:limitasi|kelemahan|keterbatasan|kendala|belum|anjlok|turun\s+drastis|minim|rentan|terbatas|kekurangan|inkonsistensi|salah\s+kelas|salah\s+label)/i.test(normQuery)) {
-    queryIntent = "LIMITATIONS";
-  } else if (/(?:akurasi|map|presisi|recall|f1|mse|temuan|kinerja|hasil|persentase|berhasil)/i.test(normQuery)) {
-    queryIntent = "RESULTS";
-  } else if (/(?:metode|pendekatan|arsitektur|algoritma|model|dcnn|yolo|kalman|classifier|haar|pbas)/i.test(normQuery)) {
-    queryIntent = "METHODOLOGY";
-  }
-
-  // Calculate scores for each sentence with semantic entity weighting
+  // Calculate scores for each sentence with universal entity, phrase, and metric weighting
   let maxSingleScore = 0;
   let bestSentenceIdx = -1;
   const sentenceScores = rawSentences.map((s, idx) => {
     if (refSectionIndex !== -1 && idx >= refSectionIndex) {
-      return 0;
-    }
-
-    const sec = sentenceSections[idx] || "GENERAL";
-    if (sec === "REFERENCES") {
       return 0;
     }
 
@@ -525,49 +448,12 @@ export function getHighlightedContent(
       }
     });
 
-    // 7. Academic bilingual cognate synonym match (Indonesian <-> English) (Weight: 15 points each)
-    Object.entries(COGNATE_SYNONYMS).forEach(([indoKey, engTargets]) => {
-      if (normQuery.includes(indoKey)) {
-        for (const target of engTargets) {
-          if (sClean.includes(target) || sLower.includes(target)) {
-            score += 15;
-            break;
-          }
-        }
-      }
-    });
-
-    // 8. Domain Entity / Model / Sentiment keywords (Weight: 6 points)
+    // 7. Keyword overlap matching (Weight: 6 points each)
     cleanTokens.forEach(w => {
       if (sWords.has(w) || sClean.includes(w)) {
         score += 6;
       }
     });
-
-    // 9. Section Intent Alignment: Prioritize sections matching the claim's semantic purpose
-    // (e.g., prevent recommendations from grounding on past papers in "Related Work")
-    if (score > 0) {
-      if (queryIntent === "FUTURE_WORK") {
-        if (sec === "RELATED_WORK") return 0; // Strictly prohibit literature review for future work!
-        if (sec === "LIMITATIONS") return 0; // Strictly prohibit limitations section for future work!
-        if (sec === "FUTURE_WORK") score += 60;
-        else if (sec === "CONCLUSION") score += 25;
-        else if (sec === "METHODOLOGY") score = Math.max(0, score - 30);
-        else if (sec === "GENERAL") score = Math.max(0, score - 40); // Introduction / background review should not be chosen when future work exists!
-      } else if (queryIntent === "LIMITATIONS") {
-        if (sec === "RELATED_WORK") return 0; // Strictly prohibit literature review for limitations!
-        if (sec === "FUTURE_WORK") return 0; // Strictly prohibit future work for limitations!
-        if (sec === "LIMITATIONS") score += 60;
-        else if (sec === "CONCLUSION") score += 20;
-        else if (sec === "GENERAL") score = Math.max(0, score - 30);
-      } else if (queryIntent === "RESULTS") {
-        if (sec === "RESULTS") score += 40;
-        else if (sec === "RELATED_WORK") score = Math.max(0, score - 30);
-      } else if (queryIntent === "METHODOLOGY") {
-        if (sec === "METHODOLOGY") score += 35;
-        else if (sec === "RELATED_WORK") score = Math.max(0, score - 20);
-      }
-    }
 
     if (score > maxSingleScore) {
       maxSingleScore = score;
