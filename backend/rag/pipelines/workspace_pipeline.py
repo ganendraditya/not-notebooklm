@@ -216,7 +216,8 @@ async def handle_workspace_analysis_pipeline(
     system_prompt_text = (
         f"{get_workspace_analysis_system_prompt(total_doc_count)}\n\n"
         "CRITICAL INSTRUCTIONS FOR SYNTHESIS & ANALYSIS:\n"
-        "- When the user asks to summarize, analyze, compare, or generate chapters/sections (like Bab 3, Metodologi, Hasil, dll.), write a rich, detailed, and comprehensive academic text synthesizing the data.\n"
+        "- Respond strictly and proportionally to what the user asks. If the user asks a simple question (e.g. counting, listing, or checking status), answer directly and concisely without unsolicited long tables or essays.\n"
+        "- When the user explicitly asks to summarize, analyze, compare, or generate chapters/sections, write a rich, detailed academic text synthesizing the data.\n"
         "- DO NOT refuse with excuses about copyright or partial text. Leverage the available document text fully."
     )
 
@@ -228,18 +229,11 @@ async def handle_workspace_analysis_pipeline(
         role=MessageRole.SYSTEM,
         content=f"BERIKUT ADALAH SELURUH DATA & TEKS DOKUMEN REFERENSI YANG DIIMPOR ({total_doc_count} DOKUMEN):\n\n{full_docs_context}"
     )
-    augmented_user_query = (
-        f"{query}\n\n"
-        "[PETUNJUK FORMAT PENTING: Wajib cantumkan tag sitasi bracket [1], [2], dst. pada SETIAP baris temuan/metrik dan DI DALAM SETIAP SEL TABEL (jangan hanya di judul/header kolom). "
-        "Setiap temuan, metode, angka metrik harus memiliki tag [X] agar tombol bukti interaktif muncul. "
-        "Di baris paling akhir respon, sertakan blok <!-- CITATION_MAP: {\"1\": [\"...\"], \"2\": [\"...\"]} --> dengan kutipan kalimat persis dari naskah sumber.]"
-    )
-
     chat_msgs = [
         system_msg,
         *(formatted_history if formatted_history else []),
         context_msg,
-        LlamaChatMessage(role=MessageRole.USER, content=augmented_user_query)
+        LlamaChatMessage(role=MessageRole.USER, content=query)
     ]
     
     await report_status("Synthesizing comparative findings and formatting response...")

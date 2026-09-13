@@ -125,31 +125,20 @@ export default function StorageTab({
   const handleFactoryReset = async () => {
     if (resetConfirmInput.trim().toLowerCase() !== "reset-all-data" || isResetting) return;
     setIsResetting(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
       const res = await fetch(`${backendUrl}/settings/storage/reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirm_text: "reset-all-data" }),
-        signal: controller.signal
+        body: JSON.stringify({ confirm_text: "reset-all-data" })
       });
-      clearTimeout(timeoutId);
       if (res.ok) {
         setIsResetConfirmOpen(false);
         setResetConfirmInput("");
         onAllDataReset();
         onClose();
-      } else {
-        const errData = await res.json().catch(() => null);
-        alert(errData?.detail || "Failed to reset data. Please check server status.");
       }
-    } catch (e: any) {
-      clearTimeout(timeoutId);
+    } catch (e) {
       console.error("Failed to factory reset:", e);
-      if (e.name === "AbortError") {
-        alert("Factory reset timed out. Please verify backend server is responding.");
-      }
     } finally {
       setIsResetting(false);
     }

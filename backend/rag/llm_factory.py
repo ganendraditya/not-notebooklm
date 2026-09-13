@@ -213,10 +213,16 @@ async def astream_llm_response(
         try:
             response_stream = await target_llm.astream_chat(chat_msgs)
             full_content = ""
+            in_hidden_metadata = False
             async for chunk in response_stream:
                 token = chunk.delta or ""
                 if token:
                     full_content += token
+                    if in_hidden_metadata:
+                        continue
+                    if re.search(r'<!--\s*(?:CITATION_MAP|SOURCES_DATA)', full_content, re.IGNORECASE):
+                        in_hidden_metadata = True
+                        continue
                     res = on_delta(token)
                     if inspect.isawaitable(res):
                         await res
@@ -228,7 +234,9 @@ async def astream_llm_response(
     resp = await target_llm.achat(chat_msgs)
     full_content = resp.message.content or ""
     if on_delta and full_content:
-        res = on_delta(full_content)
+        import re
+        visible_content = re.sub(r'<!--\s*(?:CITATION_MAP|SOURCES_DATA)[\s\S]*?(?:-->|$)', '', full_content).strip()
+        res = on_delta(visible_content)
         if inspect.isawaitable(res):
             await res
     return full_content

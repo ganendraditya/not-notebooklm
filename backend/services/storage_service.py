@@ -187,11 +187,6 @@ def delete_storage_file_and_records(db: Session, file_path: str) -> bool:
                 docs.extend(matching)
                 break
 
-    # Case 5: Remainder fallback if chat_id in disk path no longer exists in DB
-    if not docs and "_" in raw_filename:
-        _, remainder = raw_filename.split("_", 1)
-        docs = db.query(Document).filter(Document.filename == remainder).all()
-
     valid_doc_ids = []
     for doc in docs:
         try:
@@ -234,12 +229,14 @@ def cleanup_orphan_files_on_disk(active_chat_ids: Set[str]) -> tuple:
                     except Exception as e:
                         logger.warning(f"[Storage] Failed to remove orphan file {fp}: {e}")
 
-    # 2. Clean temporary ZIP archives
+    # 2. Clean temporary ZIP archives older than 1 hour
     if os.path.exists(TEMP_ZIPS_DIR):
+        import time
+        now = time.time()
         for fname in os.listdir(TEMP_ZIPS_DIR):
             fp = os.path.join(TEMP_ZIPS_DIR, fname)
             try:
-                if os.path.isfile(fp):
+                if os.path.isfile(fp) and (now - os.path.getmtime(fp)) > 3600:
                     sz = os.path.getsize(fp)
                     os.remove(fp)
                     deleted_files += 1
@@ -291,7 +288,8 @@ def get_unified_storage_summary(db_path: str) -> dict:
     category_counts = {"images": 0, "documents": 0, "others": 0}
 
     if os.path.exists(UPLOAD_DIR):
-        for root, _, files in os.walk(UPLOAD_DIR):
+        for root, dirs, files in os.walk(UPLOAD_DIR):
+            dirs[:] = [d for d in dirs if d != "temp_zips"]
             for file in files:
                 uploads_count += 1
                 file_path = os.path.join(root, file)

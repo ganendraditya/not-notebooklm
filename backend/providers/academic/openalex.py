@@ -28,7 +28,7 @@ def fetch_openalex(
             url = "https://api.openalex.org/works"
             params = {"search": term.strip(), "per_page": per_page, "page": page}
             filter_parts = []
-            if min_year: filter_parts.append(f"publication_year:{min_year}-2026")
+            if min_year: filter_parts.append(f"publication_year:{min_year}-")
             if min_citations > 0: filter_parts.append(f"cited_by_count:>{min_citations - 1}")
             if open_access_only: filter_parts.append("is_oa:true")
             if lang_codes and len(lang_codes) > 0:
@@ -56,7 +56,7 @@ def fetch_openalex(
                     if min_citations > 0 and citations_count < min_citations: continue
                             
                     loc = work.get("primary_location") or {}
-                    is_oa_work = work.get("open_access", {}).get("is_oa", False) or loc.get("is_oa", False)
+                    is_oa_work = (work.get("open_access") or {}).get("is_oa", False) or loc.get("is_oa", False)
                     if open_access_only and not is_oa_work:
                         continue
 

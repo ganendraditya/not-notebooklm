@@ -117,19 +117,50 @@ def enhance_table_citations(text: str) -> str:
     return '\n'.join(result_lines)
 
 
+def deduplicate_line_citations(text: str) -> str:
+    """
+    Standardizes academic citations by removing redundant duplicate citations on the same line
+    (e.g. '1. **[5]** Title (2023) [5]' -> '1. Title (2023) [5]' or '[1] Text... [1]' -> 'Text... [1]').
+    """
+    if not text:
+        return ""
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        # Match leading bullet/number followed by bracketed citation like '1. **[5]**' or '- [5]' or '[5]'
+        m = re.match(r'^(\s*(?:\d+[\.\)]|\*|-)?\s*)\*{0,2}\[(\d{1,3})\]\*{0,2}\s*(.*)$', line)
+        if m:
+            prefix, doc_num, rest = m.groups()
+            # If the rest of the line already contains [doc_num], remove the leading duplicate tag
+            if f'[{doc_num}]' in rest:
+                line = f"{prefix}{rest.lstrip('-: ')}"
+        cleaned_lines.append(line)
+    return '\n'.join(cleaned_lines)
+
+
 def format_clean_response(text: str) -> str:
     """Normalizes LLM response whitespace, standardizes citations, and formats citation blocks."""
     if not text:
         return ""
     text = text.strip()
     citation_data = None
-    if "<!-- CITATION_MAP:" in text:
-        parts = text.split("<!-- CITATION_MAP:", 1)
-        text = parts[0].rstrip()
-        citation_data = parts[1].split("-->", 1)[0].strip()
+    
+    # Match CITATION_MAP with or without colon and flexible whitespace
+    m = re.search(r'<!--\s*CITATION_MAP(?::|\s)([\s\S]*?)(?:-->|$)', text, re.IGNORECASE)
+    if m:
+        raw_data = m.group(1).strip().lstrip(":").strip()
+        if raw_data.startswith("{"):
+            citation_data = raw_data
+        text = text[:m.start()].rstrip()
+
+    # Strip any malformed or non-JSON CITATION_MAP comment blocks completely
+    text = re.sub(r'<!--\s*CITATION_MAP[\s\S]*?(?:-->|$)', '', text, flags=re.IGNORECASE).rstrip()
 
     # Automatically enhance table citations so every claim has clickable evidence
     text = enhance_table_citations(text)
+
+    # Clean double citations on the same line (e.g. [1] Text... [1] -> Text... [1])
+    text = deduplicate_line_citations(text)
 
     if citation_data:
         return f"{text}\n\n<!-- CITATION_MAP: {citation_data} -->"
@@ -142,12 +173,13 @@ def extract_structured_citations(text: str) -> Tuple[str, Dict[str, Any]]:
         return "", {}
     clean_text = text.strip()
     citations = {}
-    if "<!-- CITATION_MAP:" in clean_text:
-        parts = clean_text.split("<!-- CITATION_MAP:", 1)
-        clean_text = parts[0].rstrip()
-        raw_json = parts[1].split("-->", 1)[0].strip()
+    m = re.search(r'<!--\s*CITATION_MAP(?::|\s)([\s\S]*?)(?:-->|$)', clean_text, re.IGNORECASE)
+    if m:
+        raw_json = m.group(1).strip().lstrip(":").strip()
+        clean_text = clean_text[:m.start()].rstrip()
         try:
             citations = json.loads(raw_json)
         except Exception:
             pass
+    clean_text = re.sub(r'<!--\s*CITATION_MAP[\s\S]*?(?:-->|$)', '', clean_text, flags=re.IGNORECASE).rstrip()
     return clean_text, citations

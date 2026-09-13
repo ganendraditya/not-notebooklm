@@ -118,15 +118,15 @@ export default function ChatClient() {
     getChatJobRef.current = getChatJob;
   }, [getChatJob]);
 
-  const handleBulkDocumentsDeleted = useCallback((docIds: number[]) => {
+  const handleBulkDocumentsDeleted = (docIds: number[]) => {
     const idSet = new Set(docIds);
     updateDocumentsList(prev => {
       const remaining = prev.filter(d => !idSet.has(d.id));
       return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
     });
-  }, [updateDocumentsList]);
+  };
 
-  const handleDocumentAdded = useCallback((doc: Document, targetChatId?: string) => {
+  const handleDocumentAdded = (doc: Document, targetChatId?: string) => {
     // Only append to the visible documents list if the user is currently viewing the target chat
     if (!targetChatId || targetChatId === activeChatIdRef.current) {
       updateDocumentsList(prev => {
@@ -141,7 +141,7 @@ export default function ChatClient() {
         return true;
       }));
     }
-  }, [updateDocumentsList, updatePendingSourcesList]);
+  };
 
   const handleAddPendingSources = useCallback((items: PendingSourceItem[]) => {
     updatePendingSourcesList(prev => [...prev, ...items]);
@@ -155,13 +155,12 @@ export default function ChatClient() {
     cancelPendingItem(pendingId);
   }, [cancelPendingItem]);
 
-  const handleDocumentUpdated = useCallback((updatedDoc: Document) => {
+  const handleDocumentUpdated = (updatedDoc: Document) => {
     updateDocumentsList(prev => prev.map(d => d.id === updatedDoc.id ? { ...d, title: updatedDoc.title } : d));
-    const curr = useDocumentStore.getState().viewingDoc;
-    if (curr && curr.id === updatedDoc.id) {
-      setViewingDoc({ ...curr, title: updatedDoc.title });
+    if (viewingDoc && viewingDoc.id === updatedDoc.id) {
+      setViewingDoc({ ...viewingDoc, title: updatedDoc.title });
     }
-  }, [updateDocumentsList, setViewingDoc]);
+  };
 
   // Whenever active chat changes, always reset viewingDoc and groundingHighlight
   useEffect(() => {

@@ -24,7 +24,7 @@ export type { Attachment };
 export interface ChatInputBoxProps {
   isCentered?: boolean;
   isLoading?: boolean;
-  documentsCount: number;
+  documentsCount?: number;
   onToggleRightSidebar?: () => void;
   onSubmit: (text: string, attachments?: Attachment[]) => void;
   onStopGeneration?: () => void;
@@ -32,7 +32,7 @@ export interface ChatInputBoxProps {
   onRemoveQueuedPrompt?: (index: number) => void;
   onPromoteQueuedPrompt?: (index: number) => void;
   backendUrl: string;
-  chatId: string | null;
+  chatId?: string | null;
   onEnsureChatSession?: () => Promise<string>;
   targetedSource?: TargetedSource | null;
   onClearTargetedSource?: () => void;
@@ -42,7 +42,7 @@ export interface ChatInputBoxProps {
 export const ChatInputBox = memo(function ChatInputBox({
   isCentered = false,
   isLoading = false,
-  documentsCount,
+  documentsCount = 0,
   onToggleRightSidebar,
   onSubmit,
   onStopGeneration,
@@ -99,7 +99,7 @@ export const ChatInputBox = memo(function ChatInputBox({
   }, []);
 
   useEffect(() => {
-    if (!textareaRef.current) return;
+    if (!textareaRef.current || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         if (entry.contentRect.width > 0) {

@@ -296,11 +296,12 @@ async def extract_hybrid_document_metadata(file_path: str, filename: str) -> Dic
         tier1_res["is_valid_pdf"] = is_valid_pdf
         return tier1_res
 
-    # 2. Tier 2: Crossref Title Search
-    tier2_res = await resolve_tier2_crossref_title(clean_fn_title, raw_header)
-    if tier2_res:
-        tier2_res["is_valid_pdf"] = is_valid_pdf
-        return tier2_res
+    # 2. Tier 2: Crossref Title Search (only if no DOI was found in raw text)
+    if not extracted_doi:
+        tier2_res = await resolve_tier2_crossref_title(clean_fn_title, raw_header)
+        if tier2_res:
+            tier2_res["is_valid_pdf"] = is_valid_pdf
+            return tier2_res
 
     # 3. Tier 3: AI Document Inspector for Skripsi / Thesis / Reports
     tier3_res = await resolve_tier3_ai_inspector(clean_fn_title, raw_header)

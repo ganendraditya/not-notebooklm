@@ -103,7 +103,7 @@ def test_services_modular_integration(tmp_path):
     
     enriched = extract_and_enrich_uploaded_file(str(sample_file), "sample.txt")
     assert enriched["title"].lower() in ("sample", "test research paper")
-    assert bool(enriched["doi"])
+    assert enriched["doi"] == "10.1234/test.2024"
 
 def test_rag_formatters():
     """Verify clean response formatting and deterministic citation extraction."""
@@ -134,6 +134,21 @@ def test_enhance_table_citations():
     assert "Akurasi 72.25% [1]" in formatted
     assert "Akurasi 82.54% [2]" in formatted
     assert "Tidak disebutkan secara eksplisit [1]" not in formatted
+
+def test_deduplicate_line_citations():
+    """Verify that redundant duplicate citation tags on the same line are cleanly eliminated."""
+    from rag.formatters import deduplicate_line_citations
+    text = (
+        "1. **[5]** Real-Time Event-Driven System (Tahir et al., 2023) [5]\n"
+        "2. **[7]** Pengawasan CCTV Kota (Aini et al., 2020) [7]\n"
+        "[1] asdfjfdsldjflak. dlsfdslkfjds. [1]\n"
+        "3. **[11]** Single citation kept"
+    )
+    res = deduplicate_line_citations(text)
+    assert "1. Real-Time Event-Driven System (Tahir et al., 2023) [5]" in res
+    assert "2. Pengawasan CCTV Kota (Aini et al., 2020) [7]" in res
+    assert "asdfjfdsldjflak. dlsfdslkfjds. [1]" in res
+    assert "3. **[11]** Single citation kept" in res
 
 def test_paper_service_prepare_and_document_response():
     """Verify prepare_paper_file_sync return signature and DocumentResponse model contracts."""

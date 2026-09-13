@@ -16,7 +16,7 @@ logger = logging.getLogger("uvicorn.error")
 def resolve_arxiv_pdf(clean_doi: str, title: str, direct_url: str, candidate_pdf_url: str) -> Optional[bytes]:
     """Resolves arXiv preprints directly via standard PDF endpoints."""
     all_text = f"{clean_doi} {title} {direct_url} {candidate_pdf_url}".lower()
-    m = re.search(r'(?:arxiv[:\s/]|abs/|pdf/)(\d{4}\.\d{4,5}(?:v\d+)?)', all_text)
+    m = re.search(r'(?:arxiv[:\s/]|arxiv\.org/(?:abs|pdf)/)(\d{4}\.\d{4,5}(?:v\d+)?)', all_text)
     arxiv_id = m.group(1) if m else None
     if not arxiv_id and "arxiv." in clean_doi:
         m2 = re.search(r'(\d{4}\.\d{4,5})', clean_doi)
@@ -113,7 +113,7 @@ def resolve_landing_page_pdf(clean_doi: str, direct_url: str) -> Optional[bytes]
 
             # A. Citation meta tags
             meta_matches = re.findall(
-                r'<meta\s+[^>]*?name=["\'](?:citation_pdf_url|eprints\.document_url|DC\.Identifier\.URI)["\'][^>]*?content=["\'](.*?)["\']', 
+                r'<meta\s+[^>]*?name=["\'](?:citation_pdf_url|eprints\.document_url)["\'][^>]*?content=["\'](.*?)["\']', 
                 html, re.I
             )
             for m_pdf in meta_matches:
@@ -166,7 +166,11 @@ def resolve_and_fetch_authentic_pdf(
     if candidate_pdf_url and candidate_pdf_url.startswith("http"):
         fast_url = candidate_pdf_url
         if "/article/view/" in fast_url:
-            fast_url = re.sub(r'/article/view/(\d+)(?:/(\d+))?', r'/article/download/\1/\2', fast_url).rstrip('/')
+            fast_url = re.sub(
+                r'/article/view/(\d+)(?:/(\d+))?',
+                lambda m: f"/article/download/{m.group(1)}" + (f"/{m.group(2)}" if m.group(2) else ""),
+                fast_url
+            ).rstrip('/')
         pdf_bytes = try_fetch_open_access_pdf(fast_url, timeout_sec=4)
         if pdf_bytes:
             return pdf_bytes
@@ -222,9 +226,12 @@ def resolve_and_fetch_authentic_pdf(
         worker_semantic_scholar
     ]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(workers)) as executor:
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(workers))
+    try:
         futures = [executor.submit(w) for w in workers]
         stop_event.wait(timeout=10.0)
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
     with lock:
         if winning_result:

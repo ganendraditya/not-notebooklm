@@ -211,6 +211,7 @@ def download_storage_files(req: DownloadRequest, background_tasks: BackgroundTas
     os.makedirs(TEMP_ZIPS_DIR, exist_ok=True)
     temp_zip_path = os.path.join(TEMP_ZIPS_DIR, f"export_{uuid.uuid4().hex}.zip")
     count = 0
+    added_arcnames = set()
     
     with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for file_id in req.file_ids:
@@ -233,13 +234,14 @@ def download_storage_files(req: DownloadRequest, background_tasks: BackgroundTas
                 # Prevent silent file overwrites within the same ZIP archive
                 arcname = base_name
                 collision_idx = 1
-                while arcname in zf.namelist():
+                while arcname in added_arcnames:
                     name, ext = os.path.splitext(base_name)
                     arcname = f"{name}_{collision_idx}{ext}"
                     collision_idx += 1
 
                 try:
                     zf.write(file_path, arcname=arcname)
+                    added_arcnames.add(arcname)
                     count += 1
                 except Exception:
                     pass

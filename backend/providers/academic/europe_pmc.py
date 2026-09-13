@@ -29,18 +29,18 @@ def fetch_europe_pmc(
         if resp.status_code == 200:
             for p in resp.json().get("resultList", {}).get("result", []):
                 if len(fetched) >= target_count: break
-                title = p.get("title", "").strip().rstrip(".")
+                title = html.unescape(p.get("title") or "").strip().rstrip(".")
                 doi = p.get("doi", "")
                 if not title or not is_valid_academic_title_fn(title) or is_candidate_duplicate_fn(title, doi): continue
                 
                 year = str(p.get("pubYear", ""))
                 if min_year and year.isdigit() and int(year) < min_year: continue
                 
-                author_str = p.get("authorString", "")
+                author_str = p.get("authorString") or ""
                 authors = [a.strip() for a in author_str.split(",") if a.strip()]
-                venue = p.get("journalTitle", "")
-                abstract = p.get("abstractText", "")
-                ft_urls = p.get("fullTextUrlList", {}).get("fullTextUrl", [])
+                venue = p.get("journalTitle") or ""
+                abstract = p.get("abstractText") or ""
+                ft_urls = (p.get("fullTextUrlList") or {}).get("fullTextUrl") or []
                 pdf_urls = [f.get("url") for f in ft_urls if f.get("documentStyle") == "pdf" and f.get("url")]
                 pdf_url = pdf_urls[0] if pdf_urls else ""
                 
@@ -58,11 +58,12 @@ def fetch_europe_pmc(
                 if not is_matching_topic_fn(title, snippet): continue
                 
                 mark_candidate_seen_fn(title, doi)
+                src = p.get("source") or "MED"
                 fetched.append({
                     "title": title,
                     "year": str(year),
                     "doi": f"https://doi.org/{doi}" if doi and not doi.startswith("http") else doi,
-                    "url": f"https://doi.org/{doi}" if doi else f"https://europepmc.org/article/MED/{p.get('id')}",
+                    "url": f"https://doi.org/{doi}" if doi else f"https://europepmc.org/article/{src}/{p.get('id')}",
                     "snippet": snippet,
                     "authors": authors,
                     "venue": venue,

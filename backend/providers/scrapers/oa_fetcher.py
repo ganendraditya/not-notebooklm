@@ -1,5 +1,6 @@
 import os
 import re
+import html
 import logging
 from typing import Optional
 import requests
@@ -7,12 +8,12 @@ from utils.pdf_utils import is_authentic_pdf_bytes
 
 logger = logging.getLogger("uvicorn.error")
 
-def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0) -> Optional[bytes]:
+def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0, max_depth: int = 2) -> Optional[bytes]:
     """
     Attempts to download an authentic Open Access PDF from publisher or repository.
     Includes browser headers, redirect handling, SSL fallback, and %PDF- verification.
     """
-    if not pdf_url or not isinstance(pdf_url, str) or not pdf_url.startswith("http"):
+    if not pdf_url or not isinstance(pdf_url, str) or not pdf_url.startswith("http") or max_depth < 0:
         return None
         
     user_agent = os.getenv(
@@ -40,8 +41,10 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0) -> Option
             if b"<html" in data[:500].lower():
                 html_text = data[:5000].decode("utf-8", errors="ignore")
                 meta_pdf = re.search(r'<meta\s+[^>]*?name=["\'](?:citation_pdf_url|eprints\.document_url)["\'][^>]*?content=["\'](.*?)["\']', html_text, re.I)
-                if meta_pdf and meta_pdf.group(1).startswith("http") and meta_pdf.group(1) != pdf_url:
-                    return try_fetch_open_access_pdf(meta_pdf.group(1), timeout_sec=timeout_sec)
+                if meta_pdf:
+                    next_url = html.unescape(meta_pdf.group(1).strip())
+                    if next_url.startswith("http") and next_url != pdf_url:
+                        return try_fetch_open_access_pdf(next_url, timeout_sec=timeout_sec, max_depth=max_depth - 1)
     except Exception as e:
         logger.debug(f"Failed to fetch OA PDF from {pdf_url}: {e}")
 

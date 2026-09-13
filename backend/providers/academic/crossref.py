@@ -38,22 +38,34 @@ def fetch_crossref(
                     if not title or not is_valid_academic_title_fn(title) or is_candidate_duplicate_fn(title, doi): continue
                         
                     year = "N/A"
-                    created = item.get("created", {}).get("date-parts", [[]])[0]
-                    if created: year = str(created[0])
+                    date_info = (
+                        item.get("issued")
+                        or item.get("published-print")
+                        or item.get("published-online")
+                        or item.get("created")
+                        or {}
+                    )
+                    date_parts = date_info.get("date-parts")
+                    if date_parts and len(date_parts) > 0 and len(date_parts[0]) > 0:
+                        year = str(date_parts[0][0])
                     if min_year and year.isdigit() and int(year) < min_year: continue
 
                     # Open access link check for Crossref
-                    link_list = item.get("link", [])
+                    link_list = item.get("link") or []
                     oa_pdf_link = ""
                     for l_entry in link_list:
                         if l_entry.get("content-type") == "application/pdf":
                             oa_pdf_link = l_entry.get("URL", "")
                             break
-                    is_oa_cr = bool(oa_pdf_link) or any("open-access" in str(lic.get("URL", "")).lower() for lic in item.get("license", []))
+                    is_oa_cr = bool(oa_pdf_link) or any("open-access" in str(lic.get("URL", "")).lower() for lic in (item.get("license") or []))
                     if open_access_only and not is_oa_cr:
                         continue
                         
-                    authors = [f"{a.get('given', '')} {a.get('family', '')}".strip() for a in item.get("author", [])]
+                    authors = [
+                        f"{a.get('given', '')} {a.get('family', '')}".strip() 
+                        for a in (item.get("author") or [])
+                        if a.get("family") or a.get("given") or a.get("name")
+                    ]
                     venue = item.get("container-title", [""])[0] if item.get("container-title") else ""
                     raw_abs = item.get("abstract", "")
                     clean_abs = re.sub(r"<[^>]+>", " ", raw_abs) if raw_abs else ""
