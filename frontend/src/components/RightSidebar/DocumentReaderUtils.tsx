@@ -67,8 +67,8 @@ export function getHighlightedContent(
 
   // Tokenize document text into atomic chunks while strictly preserving all original whitespace and linebreaks
   const rawSentences: string[] = [];
-  // Match sentence chunks ending in punctuation (.!?) or linebreaks, capturing the delimiter to preserve formatting
-  const tokenRegex = /(?:[\s\S]*?(?:(?<!\d)(?<!\d\s)[.!?]+(?=\s|$)|[\r\n]+))|[\s\S]+/g;
+  // Match headings, sentence chunks ending in punctuation (.!?), or paragraph breaks (\n\n), strictly preserving original formatting without shattering wrapped single lines
+  const tokenRegex = /(?:^\s*#{1,6}\s+[^\n]*\n?|^\s*\*{2}[^\n*]+\*{2}\s*\n?|[\s\S]*?(?:(?<!\b[IVX\d])(?<!\d)(?<!\d\s)[.!?]+(?=\s|$)|\n\s*\n))|[\s\S]+/gm;
   let match;
   while ((match = tokenRegex.exec(fullText)) !== null) {
     if (match[0].length > 0) {
@@ -286,7 +286,8 @@ export function getHighlightedContent(
     const isHeading = (
       sTrim.startsWith("#") ||
       (sTrim.startsWith("**") && sTrim.endsWith("**") && sTrim.length < 80) ||
-      (/^(?:#{1,6}\s+|\*{0,2}(?:[IVX\d]+[\.\s\-]+|[A-Z\s]{4,}:|\d+\.)\s*)([A-Z\s]{3,})/i.test(sTrim) && sTrim.length < 80 && !sTrim.includes(". "))
+      (/^[A-Z\s]{4,40}$/.test(sTrim)) ||
+      (/^(?:#{1,6}\s+|\*{0,2}(?:[IVX\d]+[\.\s\-]+|[A-Z\s]{4,}:|\d+\.)\s*)([A-Z\s]{3,})/i.test(sTrim) && sTrim.length < 80 && !/[a-zA-Z]{2,}\.\s+[A-Z]/.test(sTrim))
     );
 
     if (isHeading) {
@@ -297,7 +298,7 @@ export function getHighlightedContent(
         activeSection = "REFERENCES";
         if (refSectionIndex === -1) refSectionIndex = i;
       } else if (/^(?:future|saran|rekomendasi|future\s+directions?|pengembangan\s+selanjutnya)\b/i.test(cleanHeader) ||
-                 /(?:future\s+directions?|future\s+work|rekomendasi)/i.test(cleanHeader)) {
+                 /(?:future\s+directions?|future\s+work|rekomendasi|kesimpulan\s+dan\s+saran|saran)/i.test(cleanHeader)) {
         activeSection = "FUTURE_WORK";
       } else if (/^(?:limitations?|limitasi|keterbatasan|kelemahan)\b/i.test(cleanHeader) ||
                  /(?:limitations?|keterbatasan)/i.test(cleanHeader)) {
@@ -391,6 +392,10 @@ export function getHighlightedContent(
     modifikasi: ["modif", "modification"],
     oklusi: ["occlu", "occlusion"],
     trajektori: ["traject", "trajectory"],
+    subtraction: ["subtract", "substraction", "subtraksi"],
+    subtraksi: ["subtract", "substraction", "subtraksi"],
+    penggabungan: ["gabung", "kombinasi", "combin", "hybrid", "integrat", "fus"],
+    gabung: ["gabung", "kombinasi", "combin", "hybrid", "integrat", "fus"],
   };
 
   // Extract keyphrases (2-word & 3-word n-grams)
@@ -548,11 +553,13 @@ export function getHighlightedContent(
         if (sec === "FUTURE_WORK") score += 60;
         else if (sec === "CONCLUSION") score += 25;
         else if (sec === "METHODOLOGY") score = Math.max(0, score - 30);
+        else if (sec === "GENERAL") score = Math.max(0, score - 40); // Introduction / background review should not be chosen when future work exists!
       } else if (queryIntent === "LIMITATIONS") {
         if (sec === "RELATED_WORK") return 0; // Strictly prohibit literature review for limitations!
         if (sec === "FUTURE_WORK") return 0; // Strictly prohibit future work for limitations!
         if (sec === "LIMITATIONS") score += 60;
         else if (sec === "CONCLUSION") score += 20;
+        else if (sec === "GENERAL") score = Math.max(0, score - 30);
       } else if (queryIntent === "RESULTS") {
         if (sec === "RESULTS") score += 40;
         else if (sec === "RELATED_WORK") score = Math.max(0, score - 30);
