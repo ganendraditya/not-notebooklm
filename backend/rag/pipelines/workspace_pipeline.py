@@ -229,16 +229,11 @@ async def handle_workspace_analysis_pipeline(
         role=MessageRole.SYSTEM,
         content=f"BERIKUT ADALAH SELURUH DATA & TEKS DOKUMEN REFERENSI YANG DIIMPOR ({total_doc_count} DOKUMEN):\n\n{full_docs_context}"
     )
-    augmented_user_query = (
-        f"{query}\n\n"
-        "[PETUNJUK: Jawab secara proporsional sesuai pertanyaan pengguna. Jika mengutip fakta spesifik dari dokumen, sertakan sitasi [X] dan blok <!-- CITATION_MAP --> di baris paling akhir.]"
-    )
-
     chat_msgs = [
         system_msg,
         *(formatted_history if formatted_history else []),
         context_msg,
-        LlamaChatMessage(role=MessageRole.USER, content=augmented_user_query)
+        LlamaChatMessage(role=MessageRole.USER, content=query)
     ]
     
     await report_status("Synthesizing comparative findings and formatting response...")
