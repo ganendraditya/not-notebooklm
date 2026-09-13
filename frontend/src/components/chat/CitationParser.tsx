@@ -147,35 +147,27 @@ export function parseCitationsInReactNode(
 
       // Extract precise context sentence/cell text for grounding
       let contextSentence = "";
+      const searchBase = effectiveFullText || node;
+      let baseIndex = searchBase.indexOf(node);
+      if (baseIndex === -1) {
+        baseIndex = 0;
+      }
+      const actualMatchIndex = baseIndex + matchIndex;
 
-      if (!node.includes("|") && node.length <= 300) {
-        // node is already an isolated cell or local text segment: extract from node directly
-        contextSentence = node
-          .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
-          .trim();
-      } else if (effectiveFullText.includes("|")) {
-        // Extract ONLY the specific cell text containing this match, NOT the entire multi-column row!
-        const lines = effectiveFullText.split("\n");
-        const matchingLine = lines.find(l => l.includes(match![0])) || effectiveFullText;
-        const matchingCell = matchingLine
-          .split("|")
-          .map(c => c.trim())
-          .find(c => c.includes(match![0])) || "";
-        contextSentence = matchingCell
+      if (searchBase.includes("|")) {
+        // Table cell: find the exact cell bounded by pipes around this match
+        const pipeBefore = searchBase.lastIndexOf("|", actualMatchIndex);
+        const pipeAfter = searchBase.indexOf("|", actualMatchIndex + match[0].length);
+        const cellStart = pipeBefore !== -1 ? pipeBefore + 1 : 0;
+        const cellEnd = pipeAfter !== -1 ? pipeAfter : searchBase.length;
+        const exactCell = searchBase.substring(cellStart, cellEnd);
+        contextSentence = exactCell
           .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
           .replace(/<[^>]+>/g, " ")
           .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
           .trim();
       } else {
-        // In individual cell or natural text/paragraphs: find sentence boundaries using effectiveFullText
-        const searchBase = effectiveFullText;
-        let baseIndex = searchBase.indexOf(node);
-        if (baseIndex === -1) {
-          baseIndex = 0;
-        }
-        const actualMatchIndex = baseIndex + matchIndex;
+        // Natural sentence boundaries in paragraphs or list items
         const textBefore = searchBase.substring(0, actualMatchIndex);
         const textAfter = searchBase.substring(actualMatchIndex + match[0].length);
 
@@ -207,13 +199,12 @@ export function parseCitationsInReactNode(
           .trim();
       }
 
-      // Fallback: If contextSentence is still too short or empty, fallback to effectiveFullText
-      if (!contextSentence || contextSentence.length < 3) {
-        contextSentence = effectiveFullText
-          .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
-          .trim();
+      // Check if contextSentence is purely a title or document identifier (e.g. "Tahir et al. (2023)" or "Paper 1" or empty)
+      const isTitleOrDocIdentifier = isDocColumn || !contextSentence || contextSentence.length < 5 || (
+        /^\s*(?:[A-Z][a-z]+(?:\s+et\s+al\.?)?(?:\s*\(\d{4}\))?|(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?)\s*$/i.test(contextSentence)
+      );
+      if (isTitleOrDocIdentifier) {
+        contextSentence = "";
       }
 
       const rawNumbers = match[1] || match[2] || match[3] || match[4] || "";
@@ -290,8 +281,8 @@ export function parseCitationsInReactNode(
                     onClick={(e) => {
                       e.stopPropagation();
                       if (doc && onOpenDocument) {
-                        if (isDocColumn) {
-                          // In Document Identity column: open document cleanly with zero highlights
+                        if (isDocColumn || !contextSentence) {
+                          // In Document Identity column or title list: open document cleanly with zero highlights
                           onOpenDocument(doc, undefined);
                         } else {
                           onOpenDocument(doc, {
