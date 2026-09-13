@@ -267,35 +267,12 @@ export function parseCitationsInReactNode(
         .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
         .trim();
 
-      // Check if contextSentence is purely an author tag or document identifier (e.g. "Tahir et al. (2023)", "Pradana et al. (2023)", "Dokumen 1")
-      const wordCount = contextSentence.split(/\s+/).filter(Boolean).length;
-      const isAuthorTag = wordCount > 0 && wordCount <= 6 && (
-        /^\(?\d{4}\)?$/.test(contextSentence) ||
-        /[A-Za-z]+.*?\(\d{4}\)/.test(contextSentence) || 
-        /et\s+al/i.test(contextSentence) || 
-        /^(?:doc|dokumen|paper|sumber|ref|source)\s*\[?\d+\]?$/i.test(contextSentence)
-      ) && !/\b(?:metode|method|akurasi|accuracy|recall|precision|presisi|f1|iou|model|loss|dataset|algorithm|algoritma|integrat|segment|detect|flow|buffer|speed|kecepatan)\b/i.test(contextSentence);
-
-      // Check if contextSentence matches a paper title from documents
-      const isPaperTitle = Boolean(
-        documents && documents.length > 0 && contextSentence && (
-          documents.some(d => {
-            const docTitle = (d.title || d.filename?.replace(/\.pdf$/i, "") || "").trim().toLowerCase();
-            if (docTitle.length < 8) return false;
-            const sLower = contextSentence.trim().toLowerCase();
-            return sLower === docTitle ||
-              (sLower.includes(docTitle) && Math.abs(sLower.length - docTitle.length) <= 20) ||
-              (docTitle.includes(sLower) && Math.abs(docTitle.length - sLower.length) <= 10);
-          })
-        )
-      );
-
-      // If the citation tag is in a table cell or has no substantive claim text,
+      // If the citation tag is in a table header or has no substantive claim text,
       // it is a bare document index/badge (e.g. "| [1] |"), NOT a citation on an empirical claim!
       const isBareDocBadge = searchBase.includes("|") && (!contextSentence || contextSentence.length < 3);
 
-      if (isDocColumn || isAuthorTag || isPaperTitle || isBareDocBadge) {
-        // Document identity column, author/year tag, paper title, or bare document badge: render as plain text, NOT a citation button
+      if (isDocColumn || isBareDocBadge) {
+        // Document header or bare document badge: render as plain text, NOT a citation button
         parts.push(match[0]);
         lastIndex = regex.lastIndex;
         continue;

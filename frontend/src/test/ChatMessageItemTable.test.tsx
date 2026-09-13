@@ -367,4 +367,52 @@ describe("ChatMessageItem Table & Cleanliness", () => {
       })
     );
   });
+
+  it("renders buttons in column-mapped table cells (where columns are Dokumen [1], Dokumen [2])", () => {
+    const rawContent = `| No | Parameter Analisis | Dokumen [1] (Batubara dkk., 2024) | Dokumen [2] (Pradana dkk., 2024) |
+| :---: | :--- | :--- | :--- |
+| **1** | **Judul Paper** | Perancangan Sistem Deteksi Pelanggaran Penggunaan Helm... Menggunakan YOLOv5 Ultralytics [1] | Deteksi Rambu Lalu Lintas Real-Time di Indonesia dengan Penerapan YOLOv11 [2]. |
+| **8** | **Kinerja & Evaluasi Utama** | • mAP@0.5 rata-rata: **0,938** [1].<br>• Evaluasi sistem real-time (1.200 motor): **Akurasi 98,5%**, Presisi 98,97%, Recall 96,48%, F1-score 97,71% [1]. | • mAP@0.5: **0,995** [2]. |
+
+<!-- CITATION_MAP: {"1": ["Perancangan sistem deteksi", "Akurasi 98,5%"], "2": ["Deteksi rambu", "mAP 0,995"]} -->`;
+
+    const documents = [
+      { id: 1, index: 1, filename: "Batubara2024.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" },
+      { id: 2, index: 2, filename: "Pradana2024.pdf", title: "Paper 2", created_at: "2026-01-01T00:00:00Z" }
+    ];
+
+    const { container } = renderWithI18n(
+      <InChatMessageComponent
+        msg={{ role: "assistant", content: rawContent, created_at: new Date().toISOString() }}
+        activeChatId="test-chat"
+        backendUrl="http://localhost:8000"
+        documents={documents}
+      />
+    );
+
+    const ths = container.querySelectorAll("th");
+    // Headers must not have buttons
+    ths.forEach(th => expect(th.querySelectorAll("button").length).toBe(0));
+
+    const tds = container.querySelectorAll("td");
+    // Row 1 (Parameter: Judul Paper):
+    // Col 0: **1** -> 0 buttons
+    expect(tds[0].querySelectorAll("button").length).toBe(0);
+    // Col 1: **Judul Paper** -> 0 buttons
+    expect(tds[1].querySelectorAll("button").length).toBe(0);
+    // Col 2: Perancangan ... [1] -> 1 button
+    expect(tds[2].querySelectorAll("button").length).toBe(1);
+    // Col 3: Deteksi ... [2] -> 1 button
+    expect(tds[3].querySelectorAll("button").length).toBe(1);
+
+    // Row 2 (Parameter: Kinerja & Evaluasi Utama):
+    // Col 0: **8** -> 0 buttons
+    expect(tds[4].querySelectorAll("button").length).toBe(0);
+    // Col 1: **Kinerja & Evaluasi Utama** -> 0 buttons
+    expect(tds[5].querySelectorAll("button").length).toBe(0);
+    // Col 2: • mAP@0.5 rata-rata: 0,938 [1] ... Akurasi 98,5% [1] -> has buttons
+    expect(tds[6].querySelectorAll("button").length).toBeGreaterThanOrEqual(1);
+    // Col 3: • mAP@0.5: 0,995 [2] -> 1 button
+    expect(tds[7].querySelectorAll("button").length).toBe(1);
+  });
 });

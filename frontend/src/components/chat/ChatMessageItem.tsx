@@ -94,22 +94,8 @@ interface TableCellRendererProps {
   [key: string]: any;
 }
 
-const TableHeadersContext = React.createContext<string[]>([]);
-
-const extractTableHeadersFromNode = (tableNode: any): string[] => {
-  if (!tableNode || !tableNode.children || tableNode.children.length === 0) return [];
-  const thead = tableNode.children.find((c: any) => c.tagName === "thead") || tableNode;
-  const headerRow = thead.children?.find((c: any) => c.tagName === "tr") || 
-                    (thead.tagName === "tr" ? thead : tableNode.children.find((c: any) => c.tagName === "tr"));
-  if (!headerRow || !headerRow.children) return [];
-  return headerRow.children
-    .filter((cell: any) => cell.tagName === "th" || cell.tagName === "td")
-    .map((cell: any) => extractNodeText(cell).trim().toLowerCase());
-};
-
 const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   isHeader = false,
-  colIndex = 0,
   node,
   documents,
   onOpenDocument,
@@ -118,66 +104,9 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
   children,
   ...props
 }) => {
-  const tableHeaders = React.useContext(TableHeadersContext);
-  const currentHeader = tableHeaders[colIndex] || "";
-
   const cellRawText = extractNodeText(children);
-  const cellClean = cellRawText
-    .replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
-    .trim();
 
-  const isMetadataHeader = (h: string): boolean => {
-    if (!h) return false;
-    const clean = h.replace(/[*_#~`:]/g, "").trim().toLowerCase();
-    return /^(?:no|dokumen|doc|paper|penulis|author|authors|tahun|year|judul|title|fokus|identity|rujukan)\b/i.test(clean) ||
-      /(?:penulis|author|authors|judul|title|document\s*identity|paper\s*title|fokus\s*utama)/i.test(clean);
-  };
-
-  const isAuthorOrTitleCell = (text: string, docs?: any[]): boolean => {
-    if (!text) return false;
-    const clean = text.replace(/(?:\[(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\]|(?:Dokumen|Document|Paper|Source)\s*\[?\d{1,3}\]?(?:\s*:|\b)|\bDokumen\s+\d{1,3}\b|\(\d{1,3}\))/gi, "").trim();
-    if (!clean) return false;
-    const words = clean.split(/\s+/).filter(Boolean);
-    if (words.length > 0 && words.length <= 6 && (
-      /^\(?\d{4}\)?$/.test(clean) ||
-      /[A-Za-z]+.*?\(\d{4}\)/.test(clean) ||
-      /et\s+al/i.test(clean) ||
-      /^(?:doc|dokumen|paper|sumber|ref|source)\s*\[?\d+\]?$/i.test(clean)
-    )) {
-      return true;
-    }
-    if (docs && docs.length > 0 && clean.length >= 8) {
-      const cleanLower = clean.toLowerCase();
-      const isTitle = docs.some((d: any) => {
-        const docTitle = (d.title || d.filename?.replace(/\.pdf$/i, "") || "").trim().toLowerCase();
-        if (docTitle.length < 8) return false;
-        return cleanLower === docTitle ||
-          (cleanLower.includes(docTitle) && Math.abs(cleanLower.length - docTitle.length) <= 20) ||
-          (docTitle.includes(cleanLower) && Math.abs(docTitle.length - cleanLower.length) <= 10);
-      });
-      if (isTitle) return true;
-    }
-    return false;
-  };
-
-  const isPureDocNumberCell = /^(?:\[?\d{1,3}\]?|dokumen\s*\[?\d{1,3}\]?)$/i.test(cellClean.trim());
-
-  // Column 0 is the document identity column, as are author and title columns
-  const isIdentityCol = !isHeader && (
-    colIndex === 0 ||
-    isPureDocNumberCell ||
-    isMetadataHeader(currentHeader) ||
-    isAuthorOrTitleCell(cellClean, documents)
-  );
-
-  // Never pass the entire multi-column rowContext as search context!
-  // If this cell is an identity column or has no factual text, pass "" so no random highlighting occurs.
-  const isGenericOrEmpty = isIdentityCol || !cellClean || cellClean.length < 3 || /^(?:doc|dokumen|paper|sumber|ref|source)?\s*\[?\d*\]?$/i.test(cellClean);
-  const contextToPass = isGenericOrEmpty ? "" : cellRawText;
-
-  // Compute unique AST cell offset to ensure citation keys in different columns never collide
+  // Compute unique AST cell offset to ensure citation keys in different cells never collide
   const offset = node?.position?.start?.offset ?? (node?.position?.start ? `${node.position.start.line}_${node.position.start.column}` : undefined);
   const cellPrefix = isHeader ? `th_${offset ?? "h"}` : `td_${offset ?? "d"}`;
 
@@ -187,6 +116,8 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
     align === "right" ? "text-right" :
     align === "center" ? "text-center" :
     "text-left";
+
+  const isDocNumberCell = /^\s*(?:\[?\d{1,3}\]?|dokumen\s*\[?\d{1,3}\]?)\s*$/i.test(cellRawText);
 
   if (isHeader) {
     return (
@@ -203,7 +134,7 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
       className={`py-2.5 px-3 text-app-text-muted text-xs leading-relaxed align-top ${alignClass}`} 
       {...props}
     >
-      {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, contextToPass, citationMap, cellPrefix, isIdentityCol)}
+      {parseCitationsInReactNode(children, documents, onOpenDocument, activeCitationKey, cellRawText, citationMap, cellPrefix, isDocNumberCell)}
     </td>
   );
 };
@@ -213,7 +144,6 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode; [key: string]: 
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const scrollPosRef = React.useRef<number>(0);
   const [copied, setCopied] = useState(false);
-  const headers = React.useMemo(() => extractTableHeadersFromNode(props.node), [props.node]);
 
   // Preserve horizontal scroll position across re-renders or layout changes (e.g. sidebar toggle or citation click)
   useLayoutEffect(() => {
@@ -269,44 +199,42 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode; [key: string]: 
   }, []);
 
   return (
-    <TableHeadersContext.Provider value={headers}>
-      <div className="my-4 rounded-xl border border-app-border overflow-hidden shadow-sm bg-app-card/30">
-        {/* Top integrated mini-toolbar */}
-        <div className="flex items-center justify-between px-3 py-1 bg-app-surface/90 border-b border-app-border text-xs text-app-text-muted select-none">
-          <div className="flex items-center text-app-text-dim">
-            <Table size={13} className="text-app-text-dim shrink-0" />
-          </div>
-          <Tooltip content={copied ? "Copied!" : "Copy table"} side="top">
-            <button
-              type="button"
-              onClick={handleCopy}
-              aria-label="Copy table"
-              className="p-1 rounded-md text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
-            >
-              {copied ? (
-                <Check size={13} className="text-emerald-500 shrink-0" />
-              ) : (
-                <Copy size={13} className="shrink-0" />
-              )}
-            </button>
-          </Tooltip>
+    <div className="my-4 rounded-xl border border-app-border overflow-hidden shadow-sm bg-app-card/30">
+      {/* Top integrated mini-toolbar */}
+      <div className="flex items-center justify-between px-3 py-1 bg-app-surface/90 border-b border-app-border text-xs text-app-text-muted select-none">
+        <div className="flex items-center text-app-text-dim">
+          <Table size={13} className="text-app-text-dim shrink-0" />
         </div>
-
-        <div 
-          ref={scrollContainerRef}
-          onScroll={(e) => {
-            e.stopPropagation();
-            handleScroll(e);
-          }}
-          onWheel={(e) => e.stopPropagation()}
-          className="overflow-x-auto custom-scrollbar"
-        >
-          <table ref={tableRef} className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top" {...props}>
-            {children}
-          </table>
-        </div>
+        <Tooltip content={copied ? "Copied!" : "Copy table"} side="top">
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy table"
+            className="p-1 rounded-md text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer"
+          >
+            {copied ? (
+              <Check size={13} className="text-emerald-500 shrink-0" />
+            ) : (
+              <Copy size={13} className="shrink-0" />
+            )}
+          </button>
+        </Tooltip>
       </div>
-    </TableHeadersContext.Provider>
+
+      <div 
+        ref={scrollContainerRef}
+        onScroll={(e) => {
+          e.stopPropagation();
+          handleScroll(e);
+        }}
+        onWheel={(e) => e.stopPropagation()}
+        className="overflow-x-auto custom-scrollbar"
+      >
+        <table ref={tableRef} className="w-full text-left text-sm border-collapse bg-app-table-bg [&_td]:align-top [&_th]:align-top" {...props}>
+          {children}
+        </table>
+      </div>
+    </div>
   );
 };
 
@@ -324,18 +252,10 @@ const MarkdownTableBody: React.FC<{ children?: React.ReactNode; [key: string]: a
 
 const MarkdownTableRow: React.FC<{ node?: any; children?: React.ReactNode; [key: string]: any }> = ({ node, children, ...props }) => {
   const rowText = extractTableRowText(node, children);
-  const indexedChildren = React.Children.toArray(children)
-    .filter((c: any) => !(typeof c === "string" && !c.trim()))
-    .map((child, colIndex) => {
-      if (React.isValidElement(child)) {
-        return React.cloneElement(child as React.ReactElement<any>, { colIndex });
-      }
-      return child;
-    });
   return (
     <TableRowContext.Provider value={rowText}>
       <tr className="hover:bg-app-item-hover transition-colors align-top" {...props}>
-        {indexedChildren}
+        {children}
       </tr>
     </TableRowContext.Provider>
   );
@@ -786,10 +706,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
             thead: MarkdownTableHeader,
             tbody: MarkdownTableBody,
             tr: MarkdownTableRow,
-            th: ({ node, children, colIndex, ...props }: any) => (
+            th: ({ node, children, ...props }: any) => (
               <TableCellRenderer
                 isHeader={true}
-                colIndex={colIndex}
                 node={node}
                 documents={documents}
                 onOpenDocument={onOpenDocument}
@@ -800,10 +719,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                 {children}
               </TableCellRenderer>
             ),
-            td: ({ node, children, colIndex, ...props }: any) => (
+            td: ({ node, children, ...props }: any) => (
               <TableCellRenderer
                 isHeader={false}
-                colIndex={colIndex}
                 node={node}
                 documents={documents}
                 onOpenDocument={onOpenDocument}
