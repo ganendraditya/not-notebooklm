@@ -290,10 +290,12 @@ export function parseCitationsInReactNode(
         )
       );
 
-      const isPureDocNumber = /^(?:\[?\d{1,3}\]?|dokumen\s*\[?\d{1,3}\]?)$/i.test(contextSentence.trim());
+      // If the citation tag is in a table cell or has no substantive claim text,
+      // it is a bare document index/badge (e.g. "| [1] |"), NOT a citation on an empirical claim!
+      const isBareDocBadge = searchBase.includes("|") && (!contextSentence || contextSentence.length < 3);
 
-      if (isDocColumn || isAuthorTag || isPaperTitle || isPureDocNumber) {
-        // Document identity column, author/year tag, paper title, or pure document number badge: render as plain text, NOT a citation button
+      if (isDocColumn || isAuthorTag || isPaperTitle || isBareDocBadge) {
+        // Document identity column, author/year tag, paper title, or bare document badge: render as plain text, NOT a citation button
         parts.push(match[0]);
         lastIndex = regex.lastIndex;
         continue;
