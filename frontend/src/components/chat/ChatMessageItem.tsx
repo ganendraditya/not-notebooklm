@@ -162,9 +162,12 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
     return false;
   };
 
+  const isPureDocNumberCell = /^(?:\[?\d{1,3}\]?|dokumen\s*\[?\d{1,3}\]?)$/i.test(cellClean.trim());
+
   // Column 0 is the document identity column, as are author and title columns
   const isIdentityCol = !isHeader && (
     colIndex === 0 ||
+    isPureDocNumberCell ||
     isMetadataHeader(currentHeader) ||
     isAuthorOrTitleCell(cellClean, documents)
   );
@@ -321,12 +324,14 @@ const MarkdownTableBody: React.FC<{ children?: React.ReactNode; [key: string]: a
 
 const MarkdownTableRow: React.FC<{ node?: any; children?: React.ReactNode; [key: string]: any }> = ({ node, children, ...props }) => {
   const rowText = extractTableRowText(node, children);
-  const indexedChildren = React.Children.map(children, (child, colIndex) => {
-    if (React.isValidElement(child)) {
-      return React.cloneElement(child as React.ReactElement<any>, { colIndex });
-    }
-    return child;
-  });
+  const indexedChildren = React.Children.toArray(children)
+    .filter((c: any) => !(typeof c === "string" && !c.trim()))
+    .map((child, colIndex) => {
+      if (React.isValidElement(child)) {
+        return React.cloneElement(child as React.ReactElement<any>, { colIndex });
+      }
+      return child;
+    });
   return (
     <TableRowContext.Provider value={rowText}>
       <tr className="hover:bg-app-item-hover transition-colors align-top" {...props}>

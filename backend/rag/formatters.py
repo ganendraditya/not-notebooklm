@@ -10,12 +10,16 @@ from typing import Tuple, Dict, Any
 
 def is_negative_or_empty(val: str) -> bool:
     """Checks if cell text indicates an explicit absence or negative state."""
-    clean = re.sub(r'[\(\)\[\]]', '', val.lower()).strip()
+    clean = re.sub(r'[\(\)\[\]*`_]', '', val.lower()).strip()
     return bool(
         not clean
-        or re.search(r'^(tidak\s+(disebutkan|ada|eksplisit|tersedia)|belum\s+disebutkan|n/?a|-|\s*)$', clean)
+        or re.search(r'^(tidak\s+(disebutkan|dijelaskan|dibahas|tercantum|ada|eksplisit|tersedia)|belum\s+disebutkan|not\s+(explicitly\s+)?(stated|mentioned|discussed|reported)|unspecified|none\s+stated|n/?a|-|\s*)$', clean)
         or 'tidak disebutkan' in clean
+        or 'tidak dijelaskan' in clean
+        or 'tidak dibahas' in clean
         or 'tidak terdapat' in clean
+        or 'not explicitly stated' in clean
+        or 'not mentioned' in clean
     )
 
 

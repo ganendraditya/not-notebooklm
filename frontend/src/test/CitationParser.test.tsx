@@ -268,4 +268,20 @@ describe("CitationParser", () => {
     expect(capturedCtxs[1].sentence).toContain("Position Attention Module");
     expect(capturedCtxs[1].sentence).not.toContain("Integrates Vision Transformer");
   });
+
+  it("suppresses citation buttons on universal unstated aspect claims like 'Tidak disebutkan secara eksplisit'", () => {
+    const docs = [{ id: 1, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }];
+    const textIndo = "Limitasi / kendala: Tidak disebutkan secara eksplisit dalam naskah [1].";
+    const textEng = "Hyperparameters: Not explicitly stated in the text [1].";
+
+    const resIndo = parseCitationsInReactNode(textIndo, docs);
+    const { container: cIndo } = render(<div>{resIndo}</div>);
+    expect(cIndo.querySelectorAll("button").length).toBe(0);
+    expect(cIndo.textContent).toContain("Tidak disebutkan secara eksplisit dalam naskah [1].");
+
+    const resEng = parseCitationsInReactNode(textEng, docs);
+    const { container: cEng } = render(<div>{resEng}</div>);
+    expect(cEng.querySelectorAll("button").length).toBe(0);
+    expect(cEng.textContent).toContain("Not explicitly stated in the text [1].");
+  });
 });

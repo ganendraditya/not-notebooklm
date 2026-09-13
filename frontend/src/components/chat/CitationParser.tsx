@@ -13,12 +13,16 @@ export interface CitationContext {
 }
 
 export function isNegativeOrEmptyCitation(val: string): boolean {
-  const clean = val.toLowerCase().replace(/[\(\)\[\]]/g, "").trim();
+  const clean = val.toLowerCase().replace(/[\(\)\[\]*`_]/g, "").trim();
   return (
     !clean ||
-    /^(tidak\s+(disebutkan|ada|eksplisit|tersedia)|belum\s+disebutkan|n\/?a|-|\s*)$/i.test(clean) ||
+    /^(tidak\s+(disebutkan|dijelaskan|dibahas|tercantum|ada|eksplisit|tersedia)|belum\s+disebutkan|not\s+(explicitly\s+)?(stated|mentioned|discussed|reported)|unspecified|none\s+stated|n\/?a|-|\s*)$/i.test(clean) ||
     clean.includes("tidak disebutkan") ||
-    clean.includes("tidak terdapat")
+    clean.includes("tidak dijelaskan") ||
+    clean.includes("tidak dibahas") ||
+    clean.includes("tidak terdapat") ||
+    clean.includes("not explicitly stated") ||
+    clean.includes("not mentioned")
   );
 }
 
@@ -235,10 +239,10 @@ export function parseCitationsInReactNode(
         cleanedForBoundary.lastIndexOf("? ")
       );
 
-      const finalStart = Math.max(
-        clauseStartRel !== -1 ? clauseStartRel + 1 : 0,
-        sentenceBoundary !== -1 ? sentenceBoundary + 1 : 0
-      );
+      const isTableCell = searchBase.includes("|");
+      const finalStart = (isTableCell || clauseStartRel !== -1)
+        ? (clauseStartRel !== -1 ? clauseStartRel + 1 : 0)
+        : (sentenceBoundary !== -1 ? sentenceBoundary + 1 : 0);
 
       // Find end of clause or sentence
       const nextClauseEnd = Math.min(
@@ -251,8 +255,6 @@ export function parseCitationsInReactNode(
       let finalEndRel = matchInScope + match[0].length;
       if (nextSentenceEnd !== -1 && (nextClauseEnd === -1 || nextSentenceEnd <= nextClauseEnd)) {
         finalEndRel += nextSentenceEnd + 1;
-      } else if (nextClauseEnd !== -1) {
-        finalEndRel += nextClauseEnd;
       } else if (nextClauseEnd !== -1) {
         finalEndRel += nextClauseEnd;
       } else {
@@ -288,8 +290,10 @@ export function parseCitationsInReactNode(
         )
       );
 
-      if (isDocColumn || isAuthorTag || isPaperTitle) {
-        // Document identity column, author/year tag, or paper title: render as plain text, NOT a citation button
+      const isPureDocNumber = /^(?:\[?\d{1,3}\]?|dokumen\s*\[?\d{1,3}\]?)$/i.test(contextSentence.trim());
+
+      if (isDocColumn || isAuthorTag || isPaperTitle || isPureDocNumber) {
+        // Document identity column, author/year tag, paper title, or pure document number badge: render as plain text, NOT a citation button
         parts.push(match[0]);
         lastIndex = regex.lastIndex;
         continue;
@@ -325,6 +329,9 @@ export function parseCitationsInReactNode(
       effectiveNums = effectiveNums.filter(num => {
         const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
         if (!doc) return false;
+
+        // Universal Factuality: Never render a citation button for an unstated / negative claim
+        if (contextSentence && isNegativeOrEmptyCitation(contextSentence)) return false;
 
         if (hasCitationMap) {
           const aiQuotesForDoc = citationMap[num.toString()] || citationMap[`[${num}]`];

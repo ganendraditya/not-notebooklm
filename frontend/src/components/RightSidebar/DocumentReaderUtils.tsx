@@ -282,22 +282,37 @@ export function getHighlightedContent(
 
   for (let i = 0; i < rawSentences.length; i++) {
     const sTrim = rawSentences[i].trim();
-    if (/^(?:#{1,6}\s+|\*{0,2}(?:[IVX\d]+[\.\s]+|[A-Z\s]{4,}:|\d+\.)\s*)([A-Z\s]{3,})/i.test(sTrim)) {
-      const sLower = sTrim.toLowerCase();
-      if (/reference|daftar\s+pustaka|bibliography/i.test(sLower)) {
+    // Only detect section category if the line is genuinely a standalone heading
+    const isHeading = (
+      sTrim.startsWith("#") ||
+      (sTrim.startsWith("**") && sTrim.endsWith("**") && sTrim.length < 80) ||
+      (/^(?:#{1,6}\s+|\*{0,2}(?:[IVX\d]+[\.\s\-]+|[A-Z\s]{4,}:|\d+\.)\s*)([A-Z\s]{3,})/i.test(sTrim) && sTrim.length < 80 && !sTrim.includes(". "))
+    );
+
+    if (isHeading) {
+      let cleanHeader = sTrim.replace(/[*_#~`:]/g, "").trim().toLowerCase();
+      cleanHeader = cleanHeader.replace(/^(?:[ivx\d]+[\.\s\-]+|[a-z]\.|\d+\.)\s*/i, "").trim();
+
+      if (/^(?:references?|daftar\s+pustaka|bibliography)\b/i.test(cleanHeader)) {
         activeSection = "REFERENCES";
         if (refSectionIndex === -1) refSectionIndex = i;
-      } else if (/future|saran|rekomendasi|future\s+direction|pengembangan\s+selanjutnya/i.test(sLower)) {
+      } else if (/^(?:future|saran|rekomendasi|future\s+directions?|pengembangan\s+selanjutnya)\b/i.test(cleanHeader) ||
+                 /(?:future\s+directions?|future\s+work|rekomendasi)/i.test(cleanHeader)) {
         activeSection = "FUTURE_WORK";
-      } else if (/limitation|limitasi|keterbatasan|kelemahan/i.test(sLower)) {
+      } else if (/^(?:limitations?|limitasi|keterbatasan|kelemahan)\b/i.test(cleanHeader) ||
+                 /(?:limitations?|keterbatasan)/i.test(cleanHeader)) {
         activeSection = "LIMITATIONS";
-      } else if (/conclusion|kesimpulan/i.test(sLower)) {
+      } else if (/^(?:conclusions?|kesimpulan)\b/i.test(cleanHeader) ||
+                 /(?:conclusions?|kesimpulan)/i.test(cleanHeader)) {
         activeSection = "CONCLUSION";
-      } else if (/result|hasil|evaluasi|evaluation|performance|pembahasan|finding/i.test(sLower)) {
+      } else if (/^(?:results?|hasil|evaluasi|evaluation|performance|pembahasan|findings?)\b/i.test(cleanHeader) ||
+                 /(?:results?\s+and\s+discussion|hasil\s+dan\s+pembahasan)/i.test(cleanHeader)) {
         activeSection = "RESULTS";
-      } else if (/method|metodologi|metode|proposed|arsitektur|framework|system\s+design/i.test(sLower)) {
+      } else if (/^(?:methods?|metodologi|metode|proposed|arsitektur|framework|system\s+design)\b/i.test(cleanHeader) ||
+                 /(?:methodology|proposed\s+method)/i.test(cleanHeader)) {
         activeSection = "METHODOLOGY";
-      } else if (/related\s+work|literature|tinjauan\s+pustaka|penelitian\s+terkait/i.test(sLower)) {
+      } else if (/^(?:related\s+work|literature|tinjauan\s+pustaka|penelitian\s+terkait)\b/i.test(cleanHeader) ||
+                 /(?:literature\s+and\s+related\s+work|related\s+works?)/i.test(cleanHeader)) {
         activeSection = "RELATED_WORK";
       }
     }
@@ -529,11 +544,13 @@ export function getHighlightedContent(
     if (score > 0) {
       if (queryIntent === "FUTURE_WORK") {
         if (sec === "RELATED_WORK") return 0; // Strictly prohibit literature review for future work!
+        if (sec === "LIMITATIONS") return 0; // Strictly prohibit limitations section for future work!
         if (sec === "FUTURE_WORK") score += 60;
         else if (sec === "CONCLUSION") score += 25;
         else if (sec === "METHODOLOGY") score = Math.max(0, score - 30);
       } else if (queryIntent === "LIMITATIONS") {
         if (sec === "RELATED_WORK") return 0; // Strictly prohibit literature review for limitations!
+        if (sec === "FUTURE_WORK") return 0; // Strictly prohibit future work for limitations!
         if (sec === "LIMITATIONS") score += 60;
         else if (sec === "CONCLUSION") score += 20;
       } else if (queryIntent === "RESULTS") {
