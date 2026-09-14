@@ -60,11 +60,32 @@ def test_start_sh_infisical_injected_flag():
 
 def test_start_sh_local_env_file():
     """Verify that local backend/.env is used when no secret manager is active in env."""
-    res = run_start_sh()
-    assert res.returncode == 0
-    # In repo root, backend/.env exists, so local backend/.env should be loaded
-    assert "Secrets loaded from local backend/.env" in res.stdout
-    assert "[Dry-Run] Secret management resolved successfully" in res.stdout
+    with tempfile.TemporaryDirectory() as temp_dir:
+        proj_dir = os.path.join(temp_dir, "project")
+        os.makedirs(os.path.join(proj_dir, "backend"), exist_ok=True)
+        with open(os.path.join(proj_dir, "backend", ".env"), "w") as f:
+            f.write("LLM_MODEL=test-model\n")
+
+        sh_path = os.path.join(proj_dir, "start.sh")
+        with open(START_SH_PATH, "r") as src, open(sh_path, "w") as dst:
+            dst.write(src.read())
+        os.chmod(sh_path, 0o755)
+
+        env = os.environ.copy()
+        for k in ["DOPPLER_ENVIRONMENT", "DOPPLER_CONFIG", "INFISICAL_PROJECT_ID", "INFISICAL_ENV", "INFISICAL_INJECTED", "INFISICAL_TOKEN"]:
+            env.pop(k, None)
+
+        res = subprocess.run(
+            ["bash", sh_path, "--dry-run"],
+            cwd=proj_dir,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        assert res.returncode == 0
+        assert "Secrets loaded from local backend/.env" in res.stdout
+        assert "[Dry-Run] Secret management resolved successfully" in res.stdout
 
 def test_start_sh_infisical_auto_launch_simulation():
     """Verify that Infisical auto-launch triggers when .infisical.json is present and infisical CLI exists."""
