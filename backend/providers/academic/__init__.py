@@ -1,6 +1,7 @@
 from providers.academic.crossref import fetch_crossref
 from providers.academic.openalex import fetch_openalex
 from providers.academic.europe_pmc import fetch_europe_pmc
+from providers.academic.duckduckgo import fetch_duckduckgo_fallback
 from providers.academic.metadata_fetchers import (
     fetch_openalex_metadata_by_doi,
     search_openalex_metadata_by_title,
@@ -22,6 +23,7 @@ __all__ = [
     "fetch_crossref",
     "fetch_openalex",
     "fetch_europe_pmc",
+    "fetch_duckduckgo_fallback",
     "fetch_openalex_metadata_by_doi",
     "search_openalex_metadata_by_title",
     "fetch_crossref_metadata_by_doi",

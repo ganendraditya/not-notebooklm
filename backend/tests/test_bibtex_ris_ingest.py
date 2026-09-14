@@ -18,6 +18,32 @@ from rag.format_parsers import (
 
 client = TestClient(app)
 
+def _generate_mock_pdf_bytes() -> bytes:
+    import pymupdf
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((50, 72), "Attention Is All You Need\nAbstract: The dominant sequence transduction models are based on complex recurrent or convolutional neural networks.")
+    data = doc.tobytes()
+    doc.close()
+    if len(data) < 1000:
+        data = data + b" " * (1000 - len(data))
+    return data
+
+MOCK_ATTENTION_PDF_BYTES = _generate_mock_pdf_bytes()
+
+def mock_resolve_and_fetch_authentic_pdf(doi="", title="", direct_url="", candidate_pdf_url=""):
+    combined = f"{doi} {title} {direct_url} {candidate_pdf_url}".lower()
+    if "arxiv" in combined or "attention" in combined:
+        return MOCK_ATTENTION_PDF_BYTES
+    return None
+
+@pytest.fixture(autouse=True)
+def mock_academic_pdf_resolver(monkeypatch):
+    """Hermetic isolation: prevent live HTTP requests to Semantic Scholar / Crossref / Unpaywall during tests."""
+    monkeypatch.setattr("services.document.upload_service.resolve_and_fetch_authentic_pdf", mock_resolve_and_fetch_authentic_pdf)
+    monkeypatch.setattr("services.document.content_service.resolve_and_fetch_authentic_pdf", mock_resolve_and_fetch_authentic_pdf)
+    monkeypatch.setattr("providers.academic.pdf_racing_resolver.resolve_and_fetch_authentic_pdf", mock_resolve_and_fetch_authentic_pdf)
+
 SAMPLE_BIB_MULTI = """
 @article{vaswani2017attention,
   author    = {Ashish Vaswani and Noam Shazeer and Niki Parmar},

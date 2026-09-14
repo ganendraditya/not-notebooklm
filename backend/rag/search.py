@@ -9,7 +9,7 @@ from utils.text_processing import (
     is_valid_academic_title,
     clean_doi,
 )
-from providers.academic import fetch_europe_pmc, fetch_openalex, fetch_crossref
+from providers.academic import fetch_europe_pmc, fetch_openalex, fetch_crossref, fetch_duckduckgo_fallback
 from services.search import (
     plan_academic_search,
     judge_and_filter_papers_with_llm,
@@ -261,6 +261,23 @@ def search_academic_papers_planned(
     if len(results) < limit:
         extra_cr = fetch_crossref(en_query or id_query, limit - len(results), min_year, open_access_only, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(extra_cr)
+
+    # 4. Web Search Fallback via DuckDuckGo if primary academic providers yielded insufficient papers
+    if len(results) < limit:
+        needed_ddg = limit - len(results)
+        search_kw = en_query or id_query or native_query
+        ddg_papers = fetch_duckduckgo_fallback(
+            term=search_kw,
+            target_count=needed_ddg,
+            min_year=min_year,
+            open_access_only=open_access_only,
+            is_valid_academic_title_fn=is_valid_academic_title,
+            is_candidate_duplicate_fn=is_candidate_duplicate_local,
+            is_matching_topic_fn=is_matching_topic_local,
+            mark_candidate_seen_fn=mark_candidate_seen_local
+        )
+        if ddg_papers:
+            results.extend(ddg_papers)
 
     # 4. Semantic Reranking with FlashRank (Cross-Encoder)
     if len(results) > limit:

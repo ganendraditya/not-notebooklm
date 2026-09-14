@@ -234,6 +234,7 @@ def test_network_failure_fallback_graceful(monkeypatch):
         raise requests.exceptions.ConnectTimeout("Mocked network timeout")
         
     monkeypatch.setattr(requests, "get", mock_get_fail)
+    monkeypatch.setattr("rag.search.fetch_duckduckgo_fallback", lambda *args, **kwargs: [])
     
     plan = {
         "en_query": "machine learning",

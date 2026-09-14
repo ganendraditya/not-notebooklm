@@ -7,7 +7,7 @@ import requests
 import threading
 import concurrent.futures
 
-from utils.pdf_utils import is_authentic_pdf_bytes
+from utils.pdf_utils import is_authentic_pdf_bytes, verify_pdf_title_match
 from utils.text_processing import clean_doi as normalize_doi
 from providers.scrapers.oa_fetcher import try_fetch_open_access_pdf
 
@@ -172,8 +172,9 @@ def resolve_and_fetch_authentic_pdf(
                 fast_url
             ).rstrip('/')
         pdf_bytes = try_fetch_open_access_pdf(fast_url, timeout_sec=4)
-        if pdf_bytes:
-            return pdf_bytes
+        if pdf_bytes and is_authentic_pdf_bytes(pdf_bytes, min_size=1000):
+            if not title or verify_pdf_title_match(pdf_bytes, title):
+                return pdf_bytes
 
     stop_event = threading.Event()
     winning_result: List[bytes] = []
@@ -181,6 +182,9 @@ def resolve_and_fetch_authentic_pdf(
 
     def set_winner(data: Optional[bytes]):
         if not data or not is_authentic_pdf_bytes(data, min_size=1000):
+            return
+        if title and not verify_pdf_title_match(data, title):
+            logger.warning(f"[PDF Racing Resolver] Discarded candidate PDF due to title mismatch with: '{title[:60]}...'")
             return
         with lock:
             if not winning_result:
