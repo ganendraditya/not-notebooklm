@@ -265,7 +265,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
                <div className="w-8 h-8 rounded-full border-2 border-app-border border-t-blue-500 animate-spin" />
                <p className="text-xs text-app-text-muted font-medium animate-pulse">{t('right.loading')}</p>
             </div>
-          ) : activeChatId && viewingDoc && paperDetails?.has_full_pdf !== false && !viewingDoc.filename?.toLowerCase().endsWith('.txt') ? (
+          ) : activeChatId && viewingDoc && paperDetails?.has_full_pdf ? (
             <object
               data={`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/stream#toolbar=1&navpanes=0`}
               type="application/pdf"

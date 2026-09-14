@@ -1,5 +1,5 @@
-﻿import { useState, useRef, useEffect, useCallback } from "react";
-import { Document, CitationGroundingHighlight } from "@/stores/documentStore";
+﻿import { useState, useEffect, useCallback } from "react";
+import { Document, CitationGroundingHighlight, useDocumentStore } from "@/stores/documentStore";
 
 export interface PaperDetailData {
   id: number;
@@ -141,6 +141,8 @@ export function usePaperDetails({
     }
   }, [activeChatId, onViewingDocChange]);
 
+  const updateDocumentsList = useDocumentStore((s) => s.updateDocumentsList);
+
   useEffect(() => {
     if (!viewingDoc || !activeChatId) {
       setPaperDetails(null);
@@ -149,10 +151,18 @@ export function usePaperDetails({
     }
 
     // 1. Instant cache check (0ms) - eliminates skeleton flicker completely
-    const cached = getCachedPaperDetails(activeChatId, viewingDoc.id);
+    // Skip cache for .txt docs since backend may upgrade them to .pdf via on-demand OA fetch
+    const isTxtDoc = viewingDoc.filename?.toLowerCase().endsWith('.txt');
+    const cached = !isTxtDoc ? getCachedPaperDetails(activeChatId, viewingDoc.id) : null;
     if (cached && (cached.id === viewingDoc.id || cached.filename === viewingDoc.filename)) {
       setPaperDetails(cached);
       setIsLoadingDetails(false);
+      // Sync store if backend upgraded filename (e.g. .txt -> .pdf via on-demand OA fetch)
+      if (cached.filename && cached.filename !== viewingDoc.filename) {
+        updateDocumentsList((prev) =>
+          prev.map((d) => d.id === viewingDoc.id ? { ...d, filename: cached.filename, has_full_pdf: cached.has_full_pdf, is_oa: cached.is_oa } : d)
+        );
+      }
       return;
     }
 
@@ -165,6 +175,12 @@ export function usePaperDetails({
         if (!isMounted) return;
         if (data) {
           setPaperDetails(data);
+          // Sync store if backend upgraded filename (e.g. .txt -> .pdf via on-demand OA fetch)
+          if (data.filename && data.filename !== viewingDoc.filename) {
+            updateDocumentsList((prev) =>
+              prev.map((d) => d.id === viewingDoc.id ? { ...d, filename: data.filename, has_full_pdf: data.has_full_pdf, is_oa: data.is_oa } : d)
+            );
+          }
         } else {
           setPaperDetails(null);
         }
@@ -176,7 +192,7 @@ export function usePaperDetails({
     return () => {
       isMounted = false;
     };
-  }, [viewingDoc, activeChatId, backendUrl]);
+  }, [viewingDoc, activeChatId, backendUrl, updateDocumentsList]);
 
   useEffect(() => {
     if (groundingHighlight?.sentence || (groundingHighlight?.aiQuotes && groundingHighlight.aiQuotes.length > 0)) {

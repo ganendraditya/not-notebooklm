@@ -11,8 +11,10 @@ from fastapi import UploadFile
 
 from database import Document, commit_with_retry
 from utils.file_utils import UPLOAD_DIR, sanitize_safe_filename, MAX_SOURCES_PER_CHAT
+from utils.pdf_utils import is_authentic_pdf_bytes
 from services.document.metadata_extractor import extract_hybrid_document_metadata
 from rag.format_parsers import extract_bibtex_entries, extract_ris_entries
+from providers.academic.pdf_racing_resolver import resolve_and_fetch_authentic_pdf
 
 logger = logging.getLogger("uvicorn.error")
 _METADATA_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4)
@@ -141,13 +143,8 @@ async def handle_bib_or_ris_split_upload(
     base_root, _ = os.path.splitext(clean_fname)
 
     for idx, entry in enumerate(entries):
-        # Generate clean safe per-entry filename ending in .txt
         entry_key = sanitize_safe_filename(entry.get("key") or entry.get("title") or f"{base_root}_{idx + 1}")
         entry_key = entry_key[:45].strip("._-") or f"ref_{idx + 1}"
-        # Standardize non-PDF bibliography entries as .txt with clean human-readable contents
-        entry_fname = f"{entry_key}_{idx + 1}.txt" if len(entries) > 1 else f"{entry_key}.txt"
-        storage_fname = f"{clean_chat_id}_{entry_fname}"
-        entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
 
         authors_list = entry.get("authors", [])
         authors_json = json.dumps(authors_list, ensure_ascii=False) if authors_list else None
@@ -156,37 +153,68 @@ async def handle_bib_or_ris_split_upload(
         if not url and doi:
             url = f"https://doi.org/{doi}"
 
-        title = entry.get("title") or entry_fname
+        title = entry.get("title") or entry_key
 
-        # Write clean human-readable text file with title, authors, year, DOI, and abstract
-        content_lines = [f"Title: {title}"]
-        if authors_list:
-            content_lines.append(f"Authors: {', '.join(authors_list)}")
-        if entry.get("year"):
-            content_lines.append(f"Year: {entry.get('year')}")
-        if entry.get("journal"):
-            content_lines.append(f"Journal/Venue: {entry.get('journal')}")
-        if doi:
-            content_lines.append(f"DOI: {doi}")
-        if url:
-            content_lines.append(f"URL: {url}")
-        content_lines.append("")
-        if entry.get("abstract"):
-            content_lines.append("Abstract:")
-            content_lines.append(entry.get("abstract"))
+        # Proactively attempt authentic open-access PDF resolution via DOI / URL
+        has_downloaded_pdf = False
+        pdf_bytes = None
+        if doi or url:
+            try:
+                pdf_bytes = await asyncio.to_thread(
+                    resolve_and_fetch_authentic_pdf,
+                    doi=doi,
+                    title=title,
+                    direct_url=url or "",
+                    candidate_pdf_url=""
+                )
+                if pdf_bytes and is_authentic_pdf_bytes(pdf_bytes, min_size=1000):
+                    has_downloaded_pdf = True
+            except Exception as e:
+                logger.debug(f"[Bib/RIS PDF Fetch Warning]: {e}")
+
+        if has_downloaded_pdf and pdf_bytes:
+            entry_fname = f"{entry_key}_{idx + 1}.pdf" if len(entries) > 1 else f"{entry_key}.pdf"
+            storage_fname = f"{clean_chat_id}_{entry_fname}"
+            entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
+            with open(entry_file_path, "wb") as pf:
+                pf.write(pdf_bytes)
+            is_oa = True
+            access_status = "Open Access (Full PDF Available)"
+            metric_name = "Peer-Reviewed"
         else:
-            content_lines.append("Abstract:")
-            content_lines.append("No abstract available in citation metadata.")
+            entry_fname = f"{entry_key}_{idx + 1}.txt" if len(entries) > 1 else f"{entry_key}.txt"
+            storage_fname = f"{clean_chat_id}_{entry_fname}"
+            entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
 
-        entry_content = "\n".join(content_lines)
-        with open(entry_file_path, "w", encoding="utf-8") as ef:
-            ef.write(entry_content)
+            # Write clean human-readable text file with title, authors, year, DOI, and abstract
+            content_lines = [f"Title: {title}"]
+            if authors_list:
+                content_lines.append(f"Authors: {', '.join(authors_list)}")
+            if entry.get("year"):
+                content_lines.append(f"Year: {entry.get('year')}")
+            if entry.get("journal"):
+                content_lines.append(f"Journal/Venue: {entry.get('journal')}")
+            if doi:
+                content_lines.append(f"DOI: {doi}")
+            if url:
+                content_lines.append(f"URL: {url}")
+            content_lines.append("")
+            if entry.get("abstract"):
+                content_lines.append("Abstract:")
+                content_lines.append(entry.get("abstract"))
+            else:
+                content_lines.append("Abstract:")
+                content_lines.append("No abstract available in citation metadata.")
+
+            with open(entry_file_path, "w", encoding="utf-8") as ef:
+                ef.write("\n".join(content_lines))
+
+            is_oa = False
+            access_status = "Publication Brief & Abstract (Uploaded)"
+            metric_name = "Uploaded Reference"
 
         from services import storage_adapter
         storage_adapter.upload_file(entry_file_path, s3_key=storage_fname)
-
-        metric_name = "Uploaded Reference"
-        access_status = "Publication Brief & Abstract (Uploaded)"
 
         db_doc = Document(
             chat_id=chat_id,
@@ -200,7 +228,7 @@ async def handle_bib_or_ris_split_upload(
             url=url,
             abstract=entry.get("abstract", ""),
             abstract_type="official" if entry.get("abstract") else "ai_summary",
-            is_oa=False,
+            is_oa=is_oa,
             access_status=access_status,
             quality_tier=4
         )
@@ -217,8 +245,8 @@ async def handle_bib_or_ris_split_upload(
             "doi": doi,
             "url": url,
             "abstract": entry.get("abstract", ""),
-            "is_valid_pdf": False,
-            "is_verified_academic": False,
+            "is_valid_pdf": has_downloaded_pdf,
+            "is_verified_academic": has_downloaded_pdf,
             "access_status": access_status
         }
         results.append((db_doc, entry_file_path, enriched))

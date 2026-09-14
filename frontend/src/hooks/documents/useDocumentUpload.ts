@@ -125,7 +125,7 @@ export function useDocumentUpload({
   const handleUploadBatch = async (files: File[]) => {
     let targetChatId = activeChatId;
     if (!targetChatId && onEnsureChatSession) {
-      targetChatId = await onEnsureChatSession(t("ui.defaultChatTitle") || "New Project");
+      targetChatId = await onEnsureChatSession(t("ui.newChat") || "New chat");
     }
     if (!targetChatId) return;
 
