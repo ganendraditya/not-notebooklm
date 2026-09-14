@@ -25,6 +25,7 @@ from services.document import (
     handle_bib_or_ris_split_upload,
     clean_chat_duplicates,
     get_document_full_content,
+    check_and_fetch_authentic_pdf_on_demand,
 )
 from services.storage_service import (
     delete_document_by_id,
@@ -68,6 +69,8 @@ async def upload_document(
             responses = []
             for idx, (doc, fpath, enriched) in enumerate(split_results):
                 background_tasks.add_task(rag.ingest_document, fpath, chat_id)
+                if doc.doi:
+                    background_tasks.add_task(check_and_fetch_authentic_pdf_on_demand, doc, fpath)
                 responses.append(models.DocumentResponse(
                     id=doc.id,
                     filename=doc.filename,

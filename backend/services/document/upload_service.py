@@ -144,8 +144,9 @@ async def handle_bib_or_ris_split_upload(
         # Generate clean safe per-entry filename
         entry_key = sanitize_safe_filename(entry.get("key") or entry.get("title") or f"{base_root}_{idx + 1}")
         entry_key = entry_key[:45].strip("._-") or f"ref_{idx + 1}"
-        entry_fname = f"{entry_key}{ext}"
-        storage_fname = f"{clean_chat_id}_{idx + 1}_{entry_fname}"
+        # Ensure filename matches disk storage name 1:1 so get_doc_file_path resolves it
+        entry_fname = f"{entry_key}_{idx + 1}{ext}" if len(entries) > 1 else f"{entry_key}{ext}"
+        storage_fname = f"{clean_chat_id}_{entry_fname}"
         entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
 
         # Write single entry file

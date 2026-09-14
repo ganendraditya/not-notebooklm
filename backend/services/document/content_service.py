@@ -54,8 +54,9 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Any, file_path: str) -> T
                 base_name = os.path.basename(file_path)
                 target_path = file_path
 
-                if base_name.lower().endswith(".txt"):
-                    pdf_base_name = base_name[:-4] + ".pdf"
+                if base_name.lower().endswith((".txt", ".bib", ".bibtex", ".ris")):
+                    ext_len = len(os.path.splitext(base_name)[1])
+                    pdf_base_name = base_name[:-ext_len] + ".pdf"
                     target_path = os.path.join(dir_name, pdf_base_name)
                     try:
                         from database import SessionLocal, Document as DBDocument
@@ -179,7 +180,22 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
             except Exception as e:
                 res_data["content"] = f"Error reading document: {str(e)}"
         else:
-            res_data["content"] = f"# {doc.title}\n\n*Document file is registered as a reference source.*"
+            md_lines = [f"# {doc.title}"]
+            if doc.year:
+                md_lines[0] += f" ({doc.year})"
+            md_lines.append("")
+            if db_doi:
+                md_lines.append(f"**DOI:** [{db_doi}](https://doi.org/{db_doi})  ")
+            if res_data.get("journal"):
+                md_lines.append(f"**Journal/Venue:** {res_data['journal']}  ")
+            if res_data.get("url"):
+                md_lines.append(f"**URL:** [{res_data['url']}]({res_data['url']})  ")
+            md_lines.append("")
+            if doc.abstract:
+                md_lines.append(f"## Abstract & Overview\n\n{doc.abstract}\n")
+            else:
+                md_lines.append("*Full manuscript is restricted/paywalled by publisher. Abstract and citation metadata are registered.*")
+            res_data["content"] = "\n".join(md_lines)
 
         is_user_upload = (
             doc.journal_metric in ("Uploaded Document", "BibTeX Reference", "RIS Reference")
@@ -187,15 +203,15 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         )
         res_data["is_uploaded"] = is_user_upload
 
-        if is_user_upload:
-            res_data["is_oa"] = False
-            res_data["access_status"] = doc.access_status or "Uploaded Document"
-            res_data["has_full_pdf"] = is_authentic_pdf
-            res_data["is_abstract_only"] = False
-        elif is_authentic_pdf:
+        if is_authentic_pdf:
             res_data["is_oa"] = True
             res_data["access_status"] = "Open Access (Full PDF Available)"
             res_data["has_full_pdf"] = True
+            res_data["is_abstract_only"] = False
+        elif is_user_upload:
+            res_data["is_oa"] = False
+            res_data["access_status"] = doc.access_status or "Uploaded Document"
+            res_data["has_full_pdf"] = False
             res_data["is_abstract_only"] = False
         else:
             res_data["has_full_pdf"] = False

@@ -159,12 +159,21 @@ def test_upload_bibtex_multi_entry_splits_documents(monkeypatch):
         res_content = client.get(f"/chats/{chat_id}/documents/{doc_id}/content")
         assert res_content.status_code == 200
         content_data = res_content.json()
-        assert content_data["is_uploaded"] is True
-        assert content_data["access_status"] == "BibTeX Reference"
         assert "Attention Is All You Need" in content_data["title"]
         assert len(content_data["authors"]) > 0
         assert content_data["doi"] == "10.48550/arXiv.1706.03762"
-        assert "Attention Is All You Need" in content_data["content"]
+        # Attention Is All You Need is Open Access on arXiv, so authentic PDF is resolved!
+        assert content_data["is_oa"] is True
+        assert content_data["has_full_pdf"] is True
+
+        # Check doc 3 (ResNet - IEEE paywalled), which remains registered with full abstract
+        doc3_id = docs_data[2]["id"]
+        res_c3 = client.get(f"/chats/{chat_id}/documents/{doc3_id}/content")
+        assert res_c3.status_code == 200
+        c3_data = res_c3.json()
+        assert "Deep Residual Learning" in c3_data["title"]
+        assert "Deeper neural networks are more difficult to train" in c3_data["content"]
+        assert c3_data["doi"] == "10.1109/CVPR.2016.90"
 
         # 5. Delete one document and verify remaining 2 documents persist cleanly
         res_del = client.delete(f"/chats/{chat_id}/documents/{doc_id}")
@@ -203,9 +212,9 @@ def test_upload_ris_multi_entry_splits_documents(monkeypatch):
         res_content = client.get(f"/chats/{chat_id}/documents/{doc2_id}/content")
         assert res_content.status_code == 200
         c_data = res_content.json()
-        assert c_data["access_status"] == "RIS Reference"
         assert c_data["year"] == "2019"
         assert c_data["doi"] == "10.18653/v1/N19-1423"
+        assert "Deep bidirectional language representations" in c_data["content"] or "BERT" in c_data["content"]
 
     finally:
         client.delete(f"/chats/{chat_id}")
