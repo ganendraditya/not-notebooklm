@@ -39,7 +39,17 @@ if [ "$1" = "--dry-run" ] || [ "$DRY_RUN" = "1" ]; then
 fi
 
 # Cleanup child processes on exit/interrupt
-trap 'echo "Shutting down servers..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit' SIGINT SIGTERM
+trap 'echo "Shutting down servers..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; if command -v lsof &>/dev/null; then lsof -ti :8000 -sTCP:LISTEN 2>/dev/null | xargs kill -9 2>/dev/null || true; fi; exit' SIGINT SIGTERM
+
+# Port Guard: Ensure port 8000 is clean and not held by an orphaned process from a previous run
+if command -v lsof &>/dev/null; then
+    PIDS_8000=$(lsof -ti :8000 -sTCP:LISTEN 2>/dev/null)
+    if [ -n "$PIDS_8000" ]; then
+        echo "[Port Guard] Releasing port 8000 from stale process ($PIDS_8000)..."
+        kill -9 $PIDS_8000 2>/dev/null || true
+        sleep 0.5
+    fi
+fi
 
 echo "Starting Backend on http://localhost:8000..."
 cd "$ROOT_DIR/backend"

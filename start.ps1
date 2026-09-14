@@ -57,6 +57,18 @@ if ($DryRun -or ($env:DRY_RUN -eq "1")) {
     exit 0
 }
 
+# Port Guard: Ensure port 8000 is clean and not held by an orphaned process from a previous run
+try {
+    $port8000 = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+    if ($port8000) {
+        $port8000 | ForEach-Object {
+            Write-Host "[Port Guard] Releasing port 8000 from stale process (PID: $($_.OwningProcess))..."
+            Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Milliseconds 500
+    }
+} catch {}
+
 Write-Host "Starting NotbookLM..."
 
 # Start Backend
