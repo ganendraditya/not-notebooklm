@@ -4,15 +4,15 @@ An open-source academic research assistant and document workspace designed to ru
 
 ![NotbookLM Workspace](docs/assets/workspace-preview.png)
 
-Instead of relying on proprietary cloud lock-in, NotbookLM operates locally by default—combining embedded relational storage (SQLite), in-process vector indexing (Qdrant), and local file processing. It streamlines retrieval, filtering, and synthesis of scholarly publications from global academic repositories—including **OpenAlex**, **Crossref**, **arXiv**, **Unpaywall**, and web fallbacks—delivering structured comparative matrices and grounded citations linked directly to source papers.
+Instead of relying on proprietary cloud lock-in, NotbookLM operates locally by default—combining embedded relational storage (SQLite), in-process vector indexing (Qdrant), and local file processing. It streamlines retrieval, filtering, and synthesis of scholarly publications from global academic repositories—including **OpenAlex**, **Crossref**, and **Europe PMC**, with full-text PDF resolution via **arXiv** and **Unpaywall**—delivering structured comparative matrices and grounded citations linked directly to source papers.
 
 Internet connectivity is required out-of-the-box for live academic discovery, PDF resolution, and external LLM APIs. If you need a fully offline or private setup for self-uploaded documents, you can manually configure your own local inference stack—such as pointing `LLM_BASE_URL` to a local runner (e.g., Ollama, vLLM) and caching embedding weights locally.
 
 ### Highlights
 
 * **Deterministic Workspace Citation Indexing:** Every document retains a fixed, immutable citation number (`1.`, `2.`, `3.`) across all turns of the conversation. When a document is removed, the system cleanly rearranges remaining indices without numeric fragmentation.
-* **Automated Literature Discovery:** Queries global academic registries (OpenAlex, Crossref, arXiv, and web fallbacks) with iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
-* **Full-Text PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent resolvers (arXiv, Unpaywall, OpenAlex) while enriching paper records with journal quartiles and citation counts.
+* **Automated Literature Discovery:** Queries global academic registries (**OpenAlex**, **Crossref**, and **Europe PMC**) with iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
+* **Full-Text PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent racing resolvers (**arXiv**, **Unpaywall**, **OpenAlex**, **Europe PMC**) while enriching paper records with journal quartiles and citation counts.
 * **Cell-Level Citation Matrices & Markdown Export:** Synthesizes literature into structured comparative review matrices with verifiable citations embedded directly in individual table cells, accompanied by 1-click Markdown table copy and native KaTeX math equation rendering.
 * **Interactive Split-Pane Reader & Jump-to-Highlight:** Bidirectional citation navigation—clicking any citation badge in a response or table cell automatically opens the document reader, scrolls to the page, and highlights the exact supporting passage.
 * **Targeted Document Focus:** One-click "Ask about this document" mode focuses questions exclusively on an individual paper without deselecting other workspace files.
@@ -25,13 +25,13 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 ## Workflow & Core Capabilities
 
 ### 1. Literature Discovery & Granular Ingestion
-Search across OpenAlex, Crossref, arXiv, and academic registries. NotbookLM screens candidate publications and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select candidates with tri-state selection controls, batch-import with live progress tracking (`Adding x/y...`), and cancel individual downloads granularly from the sidebar without leaving orphan files.
+Search across OpenAlex, Crossref, Europe PMC, and connected academic registries. NotbookLM screens candidate publications and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select candidates with tri-state selection controls, batch-import with live progress tracking (`Adding x/y...`), and cancel individual downloads granularly from the sidebar without leaving orphan files.
 
 ![Literature Discovery](docs/assets/literature-discovery.png)
 
 ### 2. Deterministic Source Management & Multi-Format Ingestion
 Imported and uploaded sources appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
-* **Format Badges:** Visual tags identify source filetypes—`PDF`, `DOC` (Word), `TXT`, `MD`, `BIB`, and `RIS`.
+* **Format Badges:** Visual tags identify source filetypes—`PDF`, `DOC` (Word), `TXT`, `MD`, `BIB`, and `RIS` (bibliographic collections like BibTeX and RIS are parsed into structured, searchable Markdown entries).
 * **Deterministic Indices & Auto-Reindex:** A source's citation number remains consistent throughout the entire conversation. Deleting a source automatically compacts and shifts remaining document indices cleanly.
 * **Verified Paper vs. Local Manuscript:** Authentic journal publications retain official publisher metadata, while local documents (such as theses, student projects, or CVs) are cleanly cataloged without artificial journal labels.
 * **Bulk ZIP Export:** Download original documents individually or bundle multiple selected sources into a single organized ZIP package.
@@ -205,7 +205,7 @@ Populate your credentials into `backend/.env`:
 ```bash
 cp backend/.env.example backend/.env
 ```
-The application reads configuration through standard environment variables. If you prefer managing credentials without plaintext `.env` files, `./start.sh` (Linux/macOS) and `.\start.ps1` (Windows) also support injecting secrets via external secret managers such as [Doppler](https://www.doppler.com) (`doppler run -- ./start.sh` or `doppler run -- powershell -File .\start.ps1`) or [Infisical](https://infisical.com).
+The application reads configuration through standard environment variables. If you prefer managing credentials without plaintext `.env` files, `./start.sh` (Linux/macOS) and `.\start.ps1` (Windows) also support secret injection via [Doppler](https://www.doppler.com) (automatic CLI detection or `doppler run -- ./start.sh`) or [Infisical](https://infisical.com) (`infisical run -- ./start.sh`).
 
 ---
 
