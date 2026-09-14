@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripFileExtension, cleanDoi, normalizeTitle, isMatchingPaper } from "@/lib/sourceUtils";
+import { stripFileExtension, cleanDoi, normalizeTitle, isMatchingPaper, peekBibliographyTitles } from "@/lib/sourceUtils";
 
 describe("sourceUtils (Non-Regex Academic Source Matching)", () => {
   it("strips common academic file extensions safely without regex", () => {
@@ -7,7 +7,56 @@ describe("sourceUtils (Non-Regex Academic Source Matching)", () => {
     expect(stripFileExtension("paper.final.txt")).toBe("paper.final");
     expect(stripFileExtension("report.docx")).toBe("report");
     expect(stripFileExtension("notes.md")).toBe("notes");
+    expect(stripFileExtension("library.bib")).toBe("library");
+    expect(stripFileExtension("export.ris")).toBe("export");
     expect(stripFileExtension("normal_text")).toBe("normal_text");
+  });
+
+  it("extracts titles from BibTeX file before uploading", async () => {
+    const bibContent = `
+@article{vaswani2017,
+  author = {Ashish Vaswani},
+  title = {Attention Is All You Need},
+  year = {2017}
+}
+@inproceedings{devlin2019,
+  author = {Jacob Devlin},
+  title = {BERT: Pre-training of Deep Bidirectional Transformers},
+  year = {2019}
+}
+`;
+    const file = new File([bibContent], "collection.bib", { type: "application/x-bibtex" });
+    const titles = await peekBibliographyTitles(file);
+    expect(titles).toHaveLength(2);
+    expect(titles[0]).toBe("Attention Is All You Need");
+    expect(titles[1]).toBe("BERT: Pre-training of Deep Bidirectional Transformers");
+  });
+
+  it("extracts titles from RIS file before uploading", async () => {
+    const risContent = `
+TY  - JOUR
+TI  - YOLOv4: Optimal Speed and Accuracy
+AU  - Bochkovskiy, Alexey
+PY  - 2020
+ER  - 
+
+TY  - CONF
+TI  - Mask R-CNN
+AU  - He, Kaiming
+PY  - 2017
+ER  - 
+`;
+    const file = new File([risContent], "cv.ris", { type: "application/x-research-info-systems" });
+    const titles = await peekBibliographyTitles(file);
+    expect(titles).toHaveLength(2);
+    expect(titles[0]).toBe("YOLOv4: Optimal Speed and Accuracy");
+    expect(titles[1]).toBe("Mask R-CNN");
+  });
+
+  it("returns empty array for non-bib/ris files", async () => {
+    const file = new File(["binary pdf content"], "paper.pdf", { type: "application/pdf" });
+    const titles = await peekBibliographyTitles(file);
+    expect(titles).toEqual([]);
   });
 
   it("cleans and standardizes DOIs safely without regex", () => {

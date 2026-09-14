@@ -11,11 +11,52 @@ export function stripFileExtension(filename?: string): string {
   const lastDot = trimmed.lastIndexOf(".");
   if (lastDot > 0) {
     const ext = trimmed.slice(lastDot).toLowerCase();
-    if (ext === ".pdf" || ext === ".txt" || ext === ".docx" || ext === ".doc" || ext === ".md") {
+    if (ext === ".pdf" || ext === ".txt" || ext === ".docx" || ext === ".doc" || ext === ".md" || ext === ".bib" || ext === ".bibtex" || ext === ".ris") {
       return trimmed.slice(0, lastDot).trim();
     }
   }
   return trimmed;
+}
+
+export async function peekBibliographyTitles(file: File): Promise<string[]> {
+  try {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!ext || !['bib', 'bibtex', 'ris'].includes(ext)) return [];
+    const text = await file.text();
+    if (ext === 'bib' || ext === 'bibtex') {
+      const titles: string[] = [];
+      const entryStartRegex = /@([a-zA-Z]+)\s*[\{\(]\s*([^,\s]+)\s*,/gi;
+      let m;
+      while ((m = entryStartRegex.exec(text)) !== null) {
+        const type = m[1].toLowerCase();
+        if (['comment', 'string', 'preamble'].includes(type)) continue;
+        const key = m[2].trim();
+        const afterStart = text.substring(m.index, m.index + 3000);
+        const titleMatch = afterStart.match(/title\s*=\s*(?:\{([\s\S]*?)\}|"([\s\S]*?)")/i);
+        const rawTitle = titleMatch ? (titleMatch[1] || titleMatch[2]) : key;
+        const cleanTitle = rawTitle.replace(/[\{\}]/g, "").replace(/\s+/g, " ").trim();
+        if (cleanTitle) {
+          titles.push(cleanTitle);
+        }
+      }
+      return titles;
+    } else if (ext === 'ris') {
+      const titles: string[] = [];
+      const lines = text.split(/\r?\n/);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("TI  -") || trimmed.startsWith("T1  -") || trimmed.startsWith("TI -") || trimmed.startsWith("T1 -")) {
+          const dashIdx = trimmed.indexOf("-");
+          const title = trimmed.substring(dashIdx + 1).trim();
+          if (title) titles.push(title);
+        }
+      }
+      return titles;
+    }
+  } catch {
+    return [];
+  }
+  return [];
 }
 
 export function cleanDoi(rawDoi?: string): string {
