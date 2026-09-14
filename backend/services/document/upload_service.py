@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from fastapi import UploadFile
 
 from database import Document, commit_with_retry
-from utils.file_utils import UPLOAD_DIR, sanitize_safe_filename
+from utils.file_utils import UPLOAD_DIR, sanitize_safe_filename, MAX_SOURCES_PER_CHAT
 from services.document.metadata_extractor import extract_hybrid_document_metadata
+from rag.format_parsers import extract_bibtex_entries, extract_ris_entries
 
 logger = logging.getLogger("uvicorn.error")
 _METADATA_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4)
@@ -85,3 +86,120 @@ async def handle_document_upload(chat_id: str, file: UploadFile, db: Session) ->
     db.refresh(db_doc)
 
     return db_doc, file_path, enriched
+
+
+async def handle_bib_or_ris_split_upload(
+    chat_id: str,
+    file: UploadFile,
+    ext: str,
+    db: Session
+) -> list[Tuple[Document, str, Dict[str, Any]]]:
+    """
+    Splits multi-entry BibTeX or RIS file into individual standalone Document records.
+    Each entry becomes its own searchable document in the workspace with clean metadata.
+    """
+    clean_chat_id = sanitize_safe_filename(chat_id)
+    clean_fname = sanitize_safe_filename(file.filename or "uploaded_collection")
+
+    # Read uploaded file content
+    content_bytes = await file.read()
+    raw_text = content_bytes.decode("utf-8", errors="replace")
+
+    if ext in (".bib", ".bibtex"):
+        entries = extract_bibtex_entries(raw_text)
+    elif ext == ".ris":
+        entries = extract_ris_entries(raw_text)
+    else:
+        entries = []
+
+    if not entries:
+        # Fallback: rewind file pointer for regular single document upload handler
+        await file.seek(0)
+        return []
+
+    # Also archive the master collection file on disk
+    master_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
+    try:
+        with open(master_path, "wb") as f:
+            f.write(content_bytes)
+        from services import storage_adapter
+        storage_adapter.upload_file(master_path, s3_key=f"{clean_chat_id}_{clean_fname}")
+    except Exception as e:
+        logger.debug(f"[Master bib/ris archive error]: {e}")
+
+    existing_count = db.query(Document).filter(Document.chat_id == chat_id).count()
+    remaining_slots = max(0, MAX_SOURCES_PER_CHAT - existing_count)
+    if remaining_slots == 0:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source limit reached! This conversation already contains {existing_count}/{MAX_SOURCES_PER_CHAT} sources."
+        )
+
+    entries = entries[:remaining_slots]
+    results = []
+    base_root, _ = os.path.splitext(clean_fname)
+
+    for idx, entry in enumerate(entries):
+        # Generate clean safe per-entry filename
+        entry_key = sanitize_safe_filename(entry.get("key") or entry.get("title") or f"{base_root}_{idx + 1}")
+        entry_key = entry_key[:45].strip("._-") or f"ref_{idx + 1}"
+        entry_fname = f"{entry_key}{ext}"
+        storage_fname = f"{clean_chat_id}_{idx + 1}_{entry_fname}"
+        entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
+
+        # Write single entry file
+        entry_content = entry.get("raw") or entry.get("markdown") or ""
+        with open(entry_file_path, "w", encoding="utf-8") as ef:
+            ef.write(entry_content)
+
+        from services import storage_adapter
+        storage_adapter.upload_file(entry_file_path, s3_key=storage_fname)
+
+        authors_list = entry.get("authors", [])
+        authors_json = json.dumps(authors_list, ensure_ascii=False) if authors_list else None
+        metric_name = "BibTeX Reference" if ext in (".bib", ".bibtex") else "RIS Reference"
+
+        doi = entry.get("doi", "").strip()
+        url = entry.get("url", "").strip()
+        if not url and doi:
+            url = f"https://doi.org/{doi}"
+
+        title = entry.get("title") or entry_fname
+
+        db_doc = Document(
+            chat_id=chat_id,
+            filename=entry_fname,
+            title=title,
+            authors=authors_json,
+            year=entry.get("year", ""),
+            journal=entry.get("journal", ""),
+            journal_metric=metric_name,
+            doi=doi,
+            url=url,
+            abstract=entry.get("abstract", ""),
+            abstract_type="official" if entry.get("abstract") else "ai_summary",
+            is_oa=False,
+            access_status=metric_name,
+            quality_tier=4
+        )
+        db.add(db_doc)
+        commit_with_retry(db)
+        db.refresh(db_doc)
+
+        enriched = {
+            "title": title,
+            "authors": authors_list,
+            "year": entry.get("year", ""),
+            "journal": entry.get("journal", ""),
+            "journal_metric": metric_name,
+            "doi": doi,
+            "url": url,
+            "abstract": entry.get("abstract", ""),
+            "is_valid_pdf": False,
+            "is_verified_academic": False,
+            "access_status": metric_name
+        }
+        results.append((db_doc, entry_file_path, enriched))
+
+    return results

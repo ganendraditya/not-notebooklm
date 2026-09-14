@@ -1,0 +1,45 @@
+TY  - JOUR
+TI  - YOLOv4: Optimal Speed and Accuracy of Object Detection
+AU  - Bochkovskiy, Alexey
+AU  - Wang, Chien-Yao
+AU  - Liao, Hong-Yuan Mark
+PY  - 2020
+JO  - arXiv preprint
+DO  - 10.48550/arXiv.2004.10934
+UR  - https://arxiv.org/abs/2004.10934
+AB  - There are a huge number of features which are said to improve Convolutional Neural Network (CNN) accuracy. Practical testing of such combinations of features on large datasets, and theoretical justification of the result, is required. We combine such features including Weighted-Residual-Connections (WRC), Cross-Stage-Partial-connections (CSP), Cross mini-Batch Normalization (CmBN), Self-adversarial-training (SAT) and Mish-activation. We use new features: WRC, CSP, CmBN, SAT, Mish activation, Mosaic data augmentation, CmBN, DropBlock regularization, and CIoU loss, and combine some of them to achieve state-of-the-art results: 43.5% AP for MS COCO dataset at a real-time speed of ~65 FPS on Tesla V100.
+ER  - 
+
+TY  - CONF
+TI  - Mask R-CNN
+AU  - He, Kaiming
+AU  - Gkioxari, Georgia
+AU  - Dollar, Piotr
+AU  - Girshick, Ross
+PY  - 2017
+JO  - Proceedings of the IEEE International Conference on Computer Vision (ICCV)
+DO  - 10.1109/ICCV.2017.322
+UR  - https://doi.org/10.1109/ICCV.2017.322
+AB  - We present a conceptually simple, flexible, and general framework for object instance segmentation. Our approach efficiently detects objects in an image while simultaneously generating a high-quality segmentation mask for each instance. The method, called Mask R-CNN, extends Faster R-CNN by adding a branch for predicting an object mask in parallel with the existing branch for bounding box recognition. Mask R-CNN is simple to train and adds only a small overhead to Faster R-CNN, running at 5 fps.
+ER  - 
+
+TY  - CONF
+TI  - An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale
+AU  - Dosovitskiy, Alexey
+AU  - Beyer, Lucas
+AU  - Kolesnikov, Alexander
+AU  - Weissenborn, Dirk
+AU  - Zhai, Xiaohua
+AU  - Unterthiner, Thomas
+AU  - Dehghani, Mostafa
+AU  - Minderer, Matthias
+AU  - Heigold, Georg
+AU  - Gelly, Sylvain
+AU  - Uszkoreit, Jakob
+AU  - Houlsby, Neil
+PY  - 2021
+JO  - International Conference on Learning Representations (ICLR)
+DO  - 10.48550/arXiv.2010.11929
+UR  - https://arxiv.org/abs/2010.11929
+AB  - While the Transformer architecture has become the de-facto standard for natural language processing tasks, its applications to computer vision remain limited. In vision, attention is either applied in conjunction with convolutional networks, or used to replace certain components of convolutional networks while keeping their overall structure in place. We show that this reliance on CNNs is not necessary and a pure transformer applied directly to sequences of image patches can perform very well on image classification tasks.
+ER  - 

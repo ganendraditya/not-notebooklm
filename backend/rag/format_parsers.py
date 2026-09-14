@@ -71,64 +71,236 @@ def parse_docx_file(file_path: str) -> str:
 
     return ""
 
+def extract_bibtex_entries(text: str) -> list:
+    """
+    Extracts structured bibliographic entries from BibTeX content.
+    Handles nested braces in fields, multiple authors, and clean metadata extraction.
+    """
+    entries = []
+    entry_start_regex = re.compile(r'@([a-zA-Z]+)\s*([\{\(])\s*([^,\s]+)\s*,', re.IGNORECASE)
+    pos = 0
+    while pos < len(text):
+        m = entry_start_regex.search(text, pos)
+        if not m:
+            break
+        entry_type = m.group(1).lower()
+        delimiter = m.group(2)
+        closing_char = '}' if delimiter == '{' else ')'
+        key = m.group(3).strip()
+
+        if entry_type in ('comment', 'string', 'preamble'):
+            pos = m.end()
+            continue
+
+        # Track brace depth to accurately locate matching closing delimiter
+        depth = 1
+        start_body = m.end()
+        cur = start_body
+        in_quotes = False
+        while cur < len(text) and depth > 0:
+            char = text[cur]
+            if char == '"' and cur > 0 and text[cur - 1] != '\\':
+                in_quotes = not in_quotes
+            elif not in_quotes:
+                if char == delimiter:
+                    depth += 1
+                elif char == closing_char:
+                    depth -= 1
+            cur += 1
+
+        entry_body = text[start_body:cur - 1] if depth == 0 else text[start_body:]
+        raw_entry = text[m.start():cur].strip()
+
+        fields = {}
+        # Match field = {val} or field = "val" or field = val
+        field_iter = re.finditer(
+            r'([a-zA-Z0-9_\-]+)\s*=\s*(?:\{([\s\S]*?)\}|"([\s\S]*?)"|([a-zA-Z0-9_\-]+))(?:\s*[,|\n|\r])',
+            entry_body + '\n,'
+        )
+        for fm in field_iter:
+            fname = fm.group(1).lower()
+            fval = fm.group(2) if fm.group(2) is not None else (fm.group(3) if fm.group(3) is not None else fm.group(4))
+            if fval:
+                cleaned_val = re.sub(r'[\{\}]', '', fval).strip()
+                cleaned_val = re.sub(r'\s+', ' ', cleaned_val)
+                fields[fname] = cleaned_val
+
+        raw_title = fields.get('title', key.replace('_', ' '))
+        # Clean title from LaTeX commands like \textbf{}, \emph{}
+        clean_title = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', raw_title).strip()
+        
+        author_raw = fields.get('author', '')
+        authors = []
+        if author_raw:
+            raw_author_parts = re.split(r'\s+and\s+', author_raw, flags=re.IGNORECASE)
+            for a in raw_author_parts:
+                cleaned_a = re.sub(r'[\{\}]', '', a).strip()
+                # If author is formatted as "Last, First", convert to "First Last" for clean display
+                if ',' in cleaned_a:
+                    parts = [p.strip() for p in cleaned_a.split(',', 1)]
+                    cleaned_a = f"{parts[1]} {parts[0]}".strip()
+                if cleaned_a:
+                    authors.append(cleaned_a)
+
+        raw_year = fields.get('year', '')
+        year_m = re.search(r'\b(19\d\d|20\d\d)\b', raw_year)
+        year = year_m.group(1) if year_m else raw_year
+
+        journal = fields.get('journal', fields.get('booktitle', fields.get('publisher', '')))
+        raw_doi = fields.get('doi', '')
+        doi = re.sub(r'^https?://(?:dx\.)?doi\.org/', '', raw_doi).strip()
+        url = fields.get('url', '')
+        abstract = fields.get('abstract', '')
+
+        # Build clean structured Markdown summary
+        md_lines = [f"### {clean_title}"]
+        if authors:
+            md_lines.append(f"- **Authors**: {', '.join(authors)}")
+        if year:
+            md_lines.append(f"- **Year**: {year}")
+        if journal:
+            md_lines.append(f"- **Journal/Venue**: {journal}")
+        if doi:
+            md_lines.append(f"- **DOI**: [{doi}](https://doi.org/{doi})")
+        elif url:
+            md_lines.append(f"- **URL**: [{url}]({url})")
+        if abstract:
+            md_lines.append(f"- **Abstract**: {abstract}")
+
+        entries.append({
+            'key': key,
+            'type': entry_type,
+            'title': clean_title,
+            'authors': authors,
+            'year': year,
+            'journal': journal,
+            'doi': doi,
+            'abstract': abstract,
+            'url': url,
+            'raw': raw_entry,
+            'markdown': "\n".join(md_lines)
+        })
+        pos = cur
+
+    return entries
+
+
+def extract_ris_entries(text: str) -> list:
+    """
+    Extracts structured bibliographic entries from RIS citation library content.
+    Handles multiline tags, multiple authors, and clean metadata extraction.
+    """
+    entries = []
+    current_fields = {}
+    authors = []
+    raw_lines = []
+
+    for line in text.splitlines():
+        raw_lines.append(line)
+        trimmed = line.strip()
+        if not trimmed:
+            continue
+
+        if trimmed.startswith("ER  -") or trimmed == "ER -" or trimmed == "ER-":
+            if current_fields or authors:
+                raw_title = current_fields.get("TI", current_fields.get("T1", current_fields.get("CT", "Untitled Reference")))
+                clean_title = re.sub(r'\s+', ' ', raw_title).strip()
+
+                raw_year = current_fields.get("PY", current_fields.get("Y1", ""))
+                year_m = re.search(r'\b(19\d\d|20\d\d)\b', raw_year)
+                year = year_m.group(1) if year_m else raw_year.strip()
+
+                journal = current_fields.get("JO", current_fields.get("JF", current_fields.get("T2", current_fields.get("JA", ""))))
+                raw_doi = current_fields.get("DO", "")
+                doi = re.sub(r'^https?://(?:dx\.)?doi\.org/', '', raw_doi).strip()
+                url = current_fields.get("UR", "")
+                abstract = current_fields.get("AB", current_fields.get("N2", ""))
+
+                # Clean formatted author names
+                cleaned_authors = []
+                for a in authors:
+                    c_a = a.strip()
+                    if ',' in c_a:
+                        parts = [p.strip() for p in c_a.split(',', 1)]
+                        c_a = f"{parts[1]} {parts[0]}".strip()
+                    if c_a:
+                        cleaned_authors.append(c_a)
+
+                md_lines = [f"### {clean_title}"]
+                if cleaned_authors:
+                    md_lines.append(f"- **Authors**: {', '.join(cleaned_authors)}")
+                if year:
+                    md_lines.append(f"- **Year**: {year}")
+                if journal:
+                    md_lines.append(f"- **Journal/Venue**: {journal}")
+                if doi:
+                    md_lines.append(f"- **DOI**: [{doi}](https://doi.org/{doi})")
+                elif url:
+                    md_lines.append(f"- **URL**: [{url}]({url})")
+                if abstract:
+                    md_lines.append(f"- **Abstract**: {abstract}")
+
+                entries.append({
+                    'type': current_fields.get("TY", "JOUR"),
+                    'title': clean_title,
+                    'authors': cleaned_authors,
+                    'year': year,
+                    'journal': journal,
+                    'doi': doi,
+                    'abstract': abstract,
+                    'url': url,
+                    'raw': "\n".join(raw_lines).strip(),
+                    'markdown': "\n".join(md_lines)
+                })
+            current_fields = {}
+            authors = []
+            raw_lines = []
+        elif len(trimmed) >= 4 and (trimmed[2:6] == "  - " or trimmed[2:4] == "- "):
+            tag = trimmed[:2].strip()
+            dash_idx = trimmed.find("-")
+            val = trimmed[dash_idx + 1:].strip()
+            if tag in ("AU", "A1", "A2"):
+                authors.append(val)
+            elif tag in ("AB", "N2"):
+                if tag in current_fields:
+                    current_fields[tag] += " " + val
+                else:
+                    current_fields[tag] = val
+            elif tag in ("TI", "T1"):
+                if tag in current_fields:
+                    current_fields[tag] += " " + val
+                else:
+                    current_fields[tag] = val
+            else:
+                current_fields[tag] = val
+        elif authors or current_fields:
+            # Continuation line of previous multiline tag
+            if "AB" in current_fields:
+                current_fields["AB"] += " " + trimmed
+            elif "N2" in current_fields:
+                current_fields["N2"] += " " + trimmed
+            elif "TI" in current_fields:
+                current_fields["TI"] += " " + trimmed
+            elif "T1" in current_fields:
+                current_fields["T1"] += " " + trimmed
+
+    return entries
+
+
 def parse_bibtex_text(text: str) -> str:
     """Converts BibTeX bibliographic references into clean structured Markdown summaries."""
-    entries = []
-    raw_entries = re.findall(r'@(\w+)\s*\{\s*([^,]+),([\s\S]*?)\n\}', text, re.IGNORECASE)
-    for entry_type, key, body in raw_entries:
-        fields = {}
-        for m in re.finditer(r'(\w+)\s*=\s*(?:\{([\s\S]*?)\}|"([\s\S]*?)"|(\w+))', body):
-            k = m.group(1).lower()
-            v = m.group(2) if m.group(2) is not None else (m.group(3) if m.group(3) is not None else m.group(4))
-            if v:
-                fields[k] = re.sub(r'\s+', ' ', v.strip())
-        title = fields.get('title', key)
-        author = fields.get('author', 'Unknown Author')
-        year = fields.get('year', '')
-        journal = fields.get('journal', fields.get('booktitle', ''))
-        doi = fields.get('doi', '')
-        abstract = fields.get('abstract', '')
-        md_entry = f"### {title}\n- **Authors**: {author}\n"
-        if year: md_entry += f"- **Year**: {year}\n"
-        if journal: md_entry += f"- **Journal/Venue**: {journal}\n"
-        if doi: md_entry += f"- **DOI**: [{doi}](https://doi.org/{doi})\n"
-        if abstract: md_entry += f"- **Abstract**: {abstract}\n"
-        entries.append(md_entry)
-    return "\n\n---\n\n".join(entries) if entries else text
+    entries = extract_bibtex_entries(text)
+    if not entries:
+        return text
+    return "\n\n---\n\n".join(e["markdown"] for e in entries)
+
 
 def parse_ris_text(text: str) -> str:
     """Converts RIS citation library format into clean structured Markdown summaries."""
-    entries = []
-    current_entry = {}
-    authors = []
-    for line in text.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith("ER  -"):
-            if current_entry:
-                title = current_entry.get("TI", current_entry.get("T1", "Untitled Work"))
-                year = current_entry.get("PY", current_entry.get("Y1", ""))
-                journal = current_entry.get("JO", current_entry.get("JF", current_entry.get("T2", "")))
-                doi = current_entry.get("DO", "")
-                abstract = current_entry.get("AB", current_entry.get("N2", ""))
-                md_entry = f"### {title}\n"
-                if authors: md_entry += f"- **Authors**: {', '.join(authors)}\n"
-                if year: md_entry += f"- **Year**: {year}\n"
-                if journal: md_entry += f"- **Journal/Venue**: {journal}\n"
-                if doi: md_entry += f"- **DOI**: [{doi}](https://doi.org/{doi})\n"
-                if abstract: md_entry += f"- **Abstract**: {abstract}\n"
-                entries.append(md_entry)
-            current_entry = {}
-            authors = []
-        elif line[:6].endswith("- "):
-            tag = line[:2].strip()
-            val = line[6:].strip()
-            if tag in ("AU", "A1"):
-                authors.append(val)
-            else:
-                current_entry[tag] = val
-    return "\n\n---\n\n".join(entries) if entries else text
+    entries = extract_ris_entries(text)
+    if not entries:
+        return text
+    return "\n\n---\n\n".join(e["markdown"] for e in entries)
 
 def parse_csv_file(file_path: str) -> str:
     """Formats CSV/TSV table into readable Markdown table."""

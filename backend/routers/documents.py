@@ -2,6 +2,7 @@ import os
 import re
 import time
 import logging
+from typing import Union, List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
@@ -21,6 +22,7 @@ from utils.pdf_utils import (
 )
 from services.document import (
     handle_document_upload,
+    handle_bib_or_ris_split_upload,
     clean_chat_duplicates,
     get_document_full_content,
 )
@@ -36,7 +38,7 @@ from services.highlight_service import get_ai_highlight_passages
 router = APIRouter(tags=["documents"])
 logger = logging.getLogger("uvicorn.error")
 
-@router.post("/chats/{chat_id}/upload", response_model=models.DocumentResponse)
+@router.post("/chats/{chat_id}/upload", response_model=Union[List[models.DocumentResponse], models.DocumentResponse])
 async def upload_document(
     chat_id: str, 
     background_tasks: BackgroundTasks,
@@ -58,7 +60,25 @@ async def upload_document(
     existing_count = db.query(Document).filter(Document.chat_id == chat_id).count()
     if existing_count >= MAX_SOURCES_PER_CHAT:
         raise HTTPException(status_code=400, detail=f"Source limit reached! This conversation already contains {existing_count}/{MAX_SOURCES_PER_CHAT} sources.")
-        
+
+    # Multi-entry bibliographic file handling (.bib, .ris)
+    if ext in (".bib", ".bibtex", ".ris"):
+        split_results = await handle_bib_or_ris_split_upload(chat_id, file, ext, db)
+        if split_results:
+            responses = []
+            for idx, (doc, fpath, enriched) in enumerate(split_results):
+                background_tasks.add_task(rag.ingest_document, fpath, chat_id)
+                responses.append(models.DocumentResponse(
+                    id=doc.id,
+                    filename=doc.filename,
+                    title=doc.title or doc.filename,
+                    created_at=doc.created_at,
+                    index=existing_count + idx + 1,
+                    has_full_pdf=False,
+                    is_oa=False
+                ))
+            return responses
+
     db_doc, file_path, enriched = await handle_document_upload(chat_id, file, db)
 
     # Schedule vector store indexing in background

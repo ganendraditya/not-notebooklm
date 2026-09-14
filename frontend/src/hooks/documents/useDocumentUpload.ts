@@ -62,8 +62,14 @@ export function useDocumentUpload({
       });
       
       if (res.ok) {
-        const newDoc = await res.json();
-        onDocumentAdded?.(newDoc, chatId);
+        const result = await res.json();
+        if (Array.isArray(result)) {
+          result.forEach((doc: Document) => {
+            onDocumentAdded?.(doc, chatId);
+          });
+        } else {
+          onDocumentAdded?.(result, chatId);
+        }
         setInternalPendingSources(prev => prev.filter(p => p.id !== sourceId));
       } else {
         const errorData = await res.json().catch(() => ({}));
