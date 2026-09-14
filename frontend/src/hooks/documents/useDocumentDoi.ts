@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Document, PendingSourceItem } from "@/stores/documentStore";
+import { Document, PendingSourceItem, useDocumentStore } from "@/stores/documentStore";
 
 export function useDocumentDoi({
   activeChatId,
@@ -36,11 +36,13 @@ export function useDocumentDoi({
       abortControllersRef.current.delete(sourceId);
     }
     setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+    useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => p.id !== sourceId));
   };
 
   const importDoi = async (chatId: string, doi: string, sourceId: string) => {
     if (cancelledIdsRef.current.has(sourceId)) {
       setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+      useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => p.id !== sourceId));
       return;
     }
 
@@ -48,6 +50,9 @@ export function useDocumentDoi({
     abortControllersRef.current.set(sourceId, controller);
 
     setDoiPendingSources(prev => prev.map(p => 
+      p.id === sourceId ? { ...p, status: "uploading" } : p
+    ));
+    useDocumentStore.getState().updatePendingSourcesList(prev => prev.map(p => 
       p.id === sourceId ? { ...p, status: "uploading" } : p
     ));
     
@@ -66,23 +71,30 @@ export function useDocumentDoi({
 
       if (controller.signal.aborted || cancelledIdsRef.current.has(sourceId)) {
         setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+        useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => p.id !== sourceId));
         return;
       }
 
       const doc = await res.json();
       if (controller.signal.aborted || cancelledIdsRef.current.has(sourceId)) {
         setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+        useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => p.id !== sourceId));
         return;
       }
 
       onDocumentAdded?.(doc, chatId);
       setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+      useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => p.id !== sourceId));
     } catch (error: any) {
       if (error.name === "AbortError" || controller.signal.aborted || cancelledIdsRef.current.has(sourceId)) {
         setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+        useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => p.id !== sourceId));
         return;
       }
       setDoiPendingSources(prev => prev.map(p => 
+        p.id === sourceId ? { ...p, status: "error", error: error.message || "Import failed" } : p
+      ));
+      useDocumentStore.getState().updatePendingSourcesList(prev => prev.map(p => 
         p.id === sourceId ? { ...p, status: "error", error: error.message || "Import failed" } : p
       ));
     } finally {
@@ -94,12 +106,6 @@ export function useDocumentDoi({
   const handleImportDoi = async (doi: string) => {
     if (!doi.trim()) return;
 
-    let targetChatId = activeChatId;
-    if (!targetChatId && onEnsureChatSession) {
-      targetChatId = await onEnsureChatSession(t("ui.defaultChatTitle") || "New Project");
-    }
-    if (!targetChatId) return;
-
     const sourceId = Math.random().toString(36).substring(7);
     const newPending: PendingSourceItem = {
       id: sourceId,
@@ -109,7 +115,24 @@ export function useDocumentDoi({
       status: "uploading"
     };
 
+    // 1. Dispatch immediately to store (0ms)
     setDoiPendingSources(prev => [...prev, newPending]);
+    useDocumentStore.getState().updatePendingSourcesList(prev => [...prev, newPending]);
+
+    let targetChatId = activeChatId;
+    if (!targetChatId && onEnsureChatSession) {
+      try {
+        targetChatId = await onEnsureChatSession(t("ui.newChat") || "New chat");
+      } catch (e) {
+        console.error("Failed to ensure chat session:", e);
+      }
+    }
+    if (!targetChatId) {
+      setDoiPendingSources(prev => prev.filter(p => p.id !== sourceId));
+      useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => p.id !== sourceId));
+      return;
+    }
+
     await importDoi(targetChatId, doi, sourceId);
   };
 

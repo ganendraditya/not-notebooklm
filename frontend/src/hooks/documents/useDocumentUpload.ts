@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Document, PendingSourceItem } from "@/stores/documentStore";
+import { Document, PendingSourceItem, useDocumentStore } from "@/stores/documentStore";
 import { peekBibliographyTitles } from "@/lib/sourceUtils";
 
 export function useDocumentUpload({
@@ -44,6 +44,7 @@ export function useDocumentUpload({
       abortControllersRef.current.delete(sourceId);
     }
     setInternalPendingSources(prev => prev.filter(p => !p.id.startsWith(baseId) && p.id !== sourceId));
+    useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => !p.id.startsWith(baseId) && p.id !== sourceId));
   };
 
   const uploadFile = async (
@@ -55,6 +56,7 @@ export function useDocumentUpload({
   ) => {
     if (cancelledIdsRef.current.has(sourceId)) {
       setInternalPendingSources(prev => prev.filter(p => !associatedPendingIds.includes(p.id)));
+      useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => !associatedPendingIds.includes(p.id)));
       return;
     }
 
@@ -65,6 +67,9 @@ export function useDocumentUpload({
     formData.append("file", file);
     
     setInternalPendingSources(prev => prev.map(p => 
+      associatedPendingIds.includes(p.id) ? { ...p, status: "uploading" } : p
+    ));
+    useDocumentStore.getState().updatePendingSourcesList(prev => prev.map(p => 
       associatedPendingIds.includes(p.id) ? { ...p, status: "uploading" } : p
     ));
     
@@ -79,19 +84,20 @@ export function useDocumentUpload({
         const result = await res.json();
         const docs: Document[] = Array.isArray(result) ? result : [result];
 
-        // Progressive resolution: resolve each document with smooth pacing so loading animation is visible
+        // Progressive resolution: resolve each document with smooth visual pacing so loading animation is visible
         for (let i = 0; i < docs.length; i++) {
           const doc = docs[i];
           const matchingPendingId = associatedPendingIds[i] || associatedPendingIds[0];
 
           if (!cancelledIdsRef.current.has(matchingPendingId) && !cancelledIdsRef.current.has(sourceId)) {
-            // Brief visual pacing (180ms) when multiple entries exist so each item transition is visible
+            // Paced transition (220ms) so each item smoothly transitions from pending spinner to finalized document card
             if (docs.length > 1 || (progressTracker && progressTracker.total > 1)) {
-              await new Promise(resolve => setTimeout(resolve, 180));
+              await new Promise(resolve => setTimeout(resolve, 220));
             }
 
             onDocumentAdded?.(doc, chatId);
             setInternalPendingSources(prev => prev.filter(p => p.id !== matchingPendingId));
+            useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => p.id !== matchingPendingId));
 
             if (progressTracker) {
               progressTracker.current++;
@@ -101,6 +107,7 @@ export function useDocumentUpload({
         }
         // Ensure any remaining pending ids for this batch task are cleaned up
         setInternalPendingSources(prev => prev.filter(p => !associatedPendingIds.includes(p.id)));
+        useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => !associatedPendingIds.includes(p.id)));
       } else {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.detail || "Upload failed");
@@ -108,9 +115,13 @@ export function useDocumentUpload({
     } catch (error: any) {
       if (error.name === "AbortError" || cancelledIdsRef.current.has(sourceId)) {
         setInternalPendingSources(prev => prev.filter(p => !associatedPendingIds.includes(p.id)));
+        useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => !associatedPendingIds.includes(p.id)));
         return;
       }
       setInternalPendingSources(prev => prev.map(p => 
+        associatedPendingIds.includes(p.id) ? { ...p, status: "error", error: error.message || "Upload failed" } : p
+      ));
+      useDocumentStore.getState().updatePendingSourcesList(prev => prev.map(p => 
         associatedPendingIds.includes(p.id) ? { ...p, status: "error", error: error.message || "Upload failed" } : p
       ));
       setUploadFeedback(`Upload failed: ${error.message || "Could not process file"}`);
@@ -123,15 +134,11 @@ export function useDocumentUpload({
   };
 
   const handleUploadBatch = async (files: File[]) => {
-    let targetChatId = activeChatId;
-    if (!targetChatId && onEnsureChatSession) {
-      targetChatId = await onEnsureChatSession(t("ui.newChat") || "New chat");
-    }
-    if (!targetChatId) return;
+    if (!files || files.length === 0) return;
 
     if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
 
-    // Disassemble multi-entry bibliography files (BibTeX, RIS) into individual pending cards
+    // 1. Disassemble multi-entry bibliography files (BibTeX, RIS) into individual pending cards IMMEDIATELY
     const batchTasks: { file: File; baseId: string; pendingIds: string[] }[] = [];
     const allPending: PendingSourceItem[] = [];
 
@@ -168,8 +175,28 @@ export function useDocumentUpload({
       setUploadFeedback(`Detected ${totalSources} sources in upload queue. Loading...`);
     }
 
+    // 2. Dispatch pending items to store IMMEDIATELY (0ms) so spinners appear right away
     setInternalPendingSources(prev => [...prev, ...allPending]);
+    useDocumentStore.getState().updatePendingSourcesList(prev => [...prev, ...allPending]);
 
+    // 3. Ensure chat session exists
+    let targetChatId = activeChatId;
+    if (!targetChatId && onEnsureChatSession) {
+      try {
+        targetChatId = await onEnsureChatSession(t("ui.newChat") || "New chat");
+      } catch (err) {
+        console.error("Failed to ensure chat session:", err);
+      }
+    }
+    if (!targetChatId) {
+      const pendingIdSet = new Set(allPending.map(p => p.id));
+      setInternalPendingSources(prev => prev.filter(p => !pendingIdSet.has(p.id)));
+      useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => !pendingIdSet.has(p.id)));
+      setUploadFeedback("Failed to create chat session for upload.");
+      return;
+    }
+
+    // 4. Sequentially process upload tasks
     const progressTracker = totalSources > 1 ? { current: 0, total: totalSources } : undefined;
 
     for (const task of batchTasks) {

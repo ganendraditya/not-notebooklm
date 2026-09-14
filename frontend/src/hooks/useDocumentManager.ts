@@ -67,9 +67,15 @@ export function useDocumentManager({
   // 5. Downloads
   const download = useDocumentDownload({ activeChatId, backendUrl, t });
 
-  // Merge Pending Sources
+  // Merge and deduplicate Pending Sources cleanly across global store and local dispatchers
   const pendingSources = useMemo(() => {
-    return [...upload.internalPendingSources, ...doi.doiPendingSources, ...externalPendingSources];
+    const map = new Map<string, any>();
+    [...externalPendingSources, ...upload.internalPendingSources, ...doi.doiPendingSources].forEach(p => {
+      if (p && p.id && !map.has(p.id)) {
+        map.set(p.id, p);
+      }
+    });
+    return Array.from(map.values());
   }, [upload.internalPendingSources, doi.doiPendingSources, externalPendingSources]);
 
   // Facade wrappers for UI bindings

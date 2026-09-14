@@ -397,7 +397,6 @@ export default function ChatClient() {
               <div className={`h-full min-w-0 ${mobileTab === "chat" ? "hidden lg:block" : "w-full lg:w-auto"}`}>
                 <ErrorBoundary fallbackTitle="Panel sumber referensi mengalami kendala">
                   <RightSidebar 
-                    key={activeChatId || "new-chat"}
                     activeChatId={activeChatId} 
                     documents={documents} 
                     pendingSources={pendingSources}

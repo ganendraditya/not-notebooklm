@@ -31,10 +31,29 @@ export async function peekBibliographyTitles(file: File): Promise<string[]> {
         const type = m[1].toLowerCase();
         if (['comment', 'string', 'preamble'].includes(type)) continue;
         const key = m[2].trim();
-        const afterStart = text.substring(m.index, m.index + 3000);
-        const titleMatch = afterStart.match(/title\s*=\s*(?:\{([\s\S]*?)\}|"([\s\S]*?)")/i);
-        const rawTitle = titleMatch ? (titleMatch[1] || titleMatch[2]) : key;
-        const cleanTitle = rawTitle.replace(/[\{\}]/g, "").replace(/\s+/g, " ").trim();
+        const afterStart = text.substring(m.index, m.index + 4000);
+        
+        let cleanTitle = "";
+        const titleKeyMatch = afterStart.match(/title\s*=\s*([\{"])/i);
+        if (titleKeyMatch && titleKeyMatch.index !== undefined) {
+          const delim = titleKeyMatch[1];
+          const valStart = titleKeyMatch.index + titleKeyMatch[0].length;
+          if (delim === '"') {
+            const endIdx = afterStart.indexOf('"', valStart);
+            if (endIdx !== -1) cleanTitle = afterStart.substring(valStart, endIdx);
+          } else {
+            let depth = 1;
+            let c = valStart;
+            while (c < afterStart.length && depth > 0) {
+              if (afterStart[c] === '{') depth++;
+              else if (afterStart[c] === '}') depth--;
+              c++;
+            }
+            cleanTitle = afterStart.substring(valStart, depth === 0 ? c - 1 : c);
+          }
+        }
+        
+        cleanTitle = (cleanTitle || key).replace(/[\{\}]/g, "").replace(/\s+/g, " ").trim();
         if (cleanTitle) {
           titles.push(cleanTitle);
         }
@@ -45,9 +64,9 @@ export async function peekBibliographyTitles(file: File): Promise<string[]> {
       const lines = text.split(/\r?\n/);
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith("TI  -") || trimmed.startsWith("T1  -") || trimmed.startsWith("TI -") || trimmed.startsWith("T1 -")) {
-          const dashIdx = trimmed.indexOf("-");
-          const title = trimmed.substring(dashIdx + 1).trim();
+        const risMatch = trimmed.match(/^(?:TI|T1)\s*-\s*(.+)$/i);
+        if (risMatch && risMatch[1]) {
+          const title = risMatch[1].trim();
           if (title) titles.push(title);
         }
       }
