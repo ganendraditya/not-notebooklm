@@ -296,15 +296,27 @@ export function parseCitationsInReactNode(
   parentFullText?: string,
   citationMap?: Record<string, string[]>,
   elementPrefix: string = "node",
-  isDocColumn: boolean = false
+  isDocColumn: boolean = false,
+  contextCursor?: { pos: number }
 ): React.ReactNode {
+  const cursor = contextCursor || { pos: 0 };
   if (typeof node === "string") {
     // Determine the full text available (use parent/container text if node is a partial string)
     const effectiveFullText = parentFullText || node;
+    const searchBase = effectiveFullText;
+    let baseIndex = searchBase.indexOf(node, cursor.pos);
+    if (baseIndex === -1) {
+      baseIndex = searchBase.indexOf(node);
+    }
+    if (baseIndex === -1) {
+      baseIndex = 0;
+    }
+    cursor.pos = baseIndex + node.length;
+
     // Support standard and double bracket citations: [1], [[1]], [1]], [1, 2], [1]-[3], [Dokumen 1], [Document 1]
     // Also support fallback prefixes like [M-01], [T-01], [M-1], [T-1], [ref-1], [P-01], Dokumen [1], Dokumen 1:, Paper 1, Source 1, and isolated numbers in parenthesis like (1), (2)
     // Citation numbers correspond to document indices (1 to 500)
-    const regex = /(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}(\d{1,3})\s*\]{1,2}|(\d{1,3})(?::|\b))|\((\d{1,3})\))/gi;
+    const regex = /(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*(\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*)\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}(\d{1,3})\s*\]{1,2}|(\d{1,3}):)|\((\d{1,3})\))/gi;
     const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let match;
@@ -317,11 +329,6 @@ export function parseCitationsInReactNode(
 
       // Extract precise context sentence/clause for grounding
       let contextSentence = "";
-      const searchBase = effectiveFullText || node;
-      let baseIndex = searchBase.indexOf(node);
-      if (baseIndex === -1) {
-        baseIndex = 0;
-      }
       const actualMatchIndex = baseIndex + matchIndex;
 
       let scopeStart = 0;
@@ -380,7 +387,7 @@ export function parseCitationsInReactNode(
       }
 
       contextSentence = scopeText.substring(finalStart, finalEndRel)
-        .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|\d{1,3}(?::|\b))|\(\d{1,3}\))/gi, "")
+        .replace(/(?:\[{1,2}(?:Dokumen|Document|Doc|Paper|M-|T-|P-|ref-)?\s*\d{1,3}(?:\s*,\s*\d{1,3}|\s*-\s*\d{1,3})*\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(?:\[{1,2}\d{1,3}\s*\]{1,2}|(\d{1,3})(?::|\b))|\((\d{1,3})\))/gi, "")
         .replace(/<[^>]+>/g, " ")
         .replace(/^[|\s*#_:-]+|[|\s*#_:-]+$/g, "")
         .trim();
@@ -498,7 +505,7 @@ export function parseCitationsInReactNode(
 
   if (Array.isArray(node)) {
     return node.map((child, idx) => (
-      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap, `${elementPrefix}-${idx}`, isDocColumn)}</React.Fragment>
+      <React.Fragment key={idx}>{parseCitationsInReactNode(child, documents, onOpenDocument, activeCitationKey, parentFullText, citationMap, `${elementPrefix}-${idx}`, isDocColumn, cursor)}</React.Fragment>
     ));
   }
 
@@ -519,7 +526,8 @@ export function parseCitationsInReactNode(
         parentFullText,
         citationMap,
         elementPrefix,
-        isDocColumn
+        isDocColumn,
+        cursor
       );
 
       // Check if parsedChildren actually contains an interactive citation button

@@ -68,7 +68,8 @@ In the future, the 3D CNN model can undergo training with synthetic data to enab
 Furthermore, the use of multi-view synthetic data could be beneficial to improve accuracy.
 `;
     const recQuery = "Penambahan data sintetis dan multi-perspective; eksplorasi 3D CNN untuk masa depan";
-    const result = getHighlightedContent(paperWithSections, recQuery);
+    const aiQuotes = ["In the future, the 3D CNN model can undergo training with synthetic data to enable a comparison of results."];
+    const result = getHighlightedContent(paperWithSections, recQuery, undefined, 0, aiQuotes);
 
     // Must match the FUTURE DIRECTIONS section
     expect(result.matchCount).toBeGreaterThanOrEqual(1);
@@ -95,5 +96,49 @@ Kemudian setelah dilakukan rotasi langkah berikutnya adalah dengan menambah efek
 
     // Both distinct sections must be preserved as 2 separate match clusters for 1/2 and 2/2 navigation
     expect(result.matchCount).toBe(2);
+  });
+
+  it("never highlights short isolated headings like 'Nomor Kendaraan' outside the evidence passage", () => {
+    const paper = `
+# Deteksi Plat Nomor
+## Pendahuluan
+Oleh karena itu pada penelitian ini dilakukan deteksi objek plat nomor kendaraan menggunakan metode CNN, selanjutnya, untuk mengenali teks pelat kendaraan digunakan metode Optical Character Recogniton (OCR)[7].
+
+<u>Nomor Kendaraan</u>
+
+Pada bagian pengenalan, fitur diekstraksi dan diklasifikasikan menggunakan model CNN.
+`;
+
+    const aiQuotes = [
+      "Oleh karena itu pada penelitian ini dilakukan deteksi objek plat nomor kendaraan menggunakan metode CNN, selanjutnya, untuk mengenali teks pelat kendaraan digunakan metode Optical Character Recogniton (OCR)[7].",
+      "Pada bagian pengenalan, fitur diekstraksi dan diklasifikasikan menggunakan model CNN."
+    ];
+
+    const result = getHighlightedContent(paper, "OCR dan CNN", undefined, 0, aiQuotes);
+
+    // Only the 2 substantive sentences must be matched (2 clusters), NOT the isolated heading 'Nomor Kendaraan'
+    expect(result.matchCount).toBe(2);
+  });
+
+  it("highlights full multiline table data continuously as one single cluster", () => {
+    const paper = `
+Sebelum dilakukan pelatihan maka dataset dilakukan pemisahan (split) data terlebih dahulu sesuai pada Tabel 1. berikut.
+
+<u>Tabel 1. Pemisahan data</u>
+Training set 80%
+Validation set 15%
+Testing set 5%
+
+Kemudian tahapan berikutnya adalah pelatihan YOLOv11s.
+`;
+
+    const aiQuotes = [
+      "Sebelum dilakukan pelatihan maka dataset dilakukan pemisahan (split) data terlebih dahulu sesuai pada Tabel 1. berikut.\n\n<u>Tabel 1. Pemisahan data</u>\nTraining set 80%\nValidation set 15%\nTesting set 5%"
+    ];
+
+    const result = getHighlightedContent(paper, "Split data 80:15:5", undefined, 0, aiQuotes);
+
+    // The whole table and intro sentence must be highlighted continuously as ONE cluster
+    expect(result.matchCount).toBe(1);
   });
 });

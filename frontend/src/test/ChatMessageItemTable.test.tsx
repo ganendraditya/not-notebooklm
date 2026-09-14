@@ -415,4 +415,97 @@ describe("ChatMessageItem Table & Cleanliness", () => {
     // Col 3: • mAP@0.5: 0,995 [2] -> 1 button
     expect(tds[7].querySelectorAll("button").length).toBe(1);
   });
+
+  it("extracts distinct sentence contexts for multiple citation buttons in the same table cell", () => {
+    const onOpenDocument = vi.fn();
+    const documents = [
+      { id: 109, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }
+    ];
+
+    const rawContent = `| No | Parameter | Dokumen [1] |
+| :---: | :--- | :--- |
+| **1** | **Karakteristik Data** | • Total 100 citra (75 data latih, 25 data uji) [1].<br>• Anotasi via LabelImg [1].<br>• Format gambar 1200x800 px [1]. |`;
+
+    const { container } = renderWithI18n(
+      <InChatMessageComponent
+        msg={{ role: "assistant", content: rawContent, created_at: new Date().toISOString() }}
+        activeChatId="test-chat"
+        backendUrl="http://localhost:8000"
+        documents={documents}
+        onOpenDocument={onOpenDocument}
+      />
+    );
+
+    const buttons = container.querySelectorAll("button[aria-label*='Source [1]']");
+    expect(buttons.length).toBe(3);
+
+    // Click Bullet 1
+    (buttons[0] as HTMLElement).click();
+    expect(onOpenDocument).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sentence: expect.stringContaining("Total 100 citra"),
+      })
+    );
+
+    // Click Bullet 2
+    (buttons[1] as HTMLElement).click();
+    expect(onOpenDocument).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sentence: expect.stringContaining("Anotasi via LabelImg"),
+      })
+    );
+
+    // Click Bullet 3
+    (buttons[2] as HTMLElement).click();
+    expect(onOpenDocument).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        sentence: expect.stringContaining("Format gambar 1200x800"),
+      })
+    );
+  });
+
+  it("verifies row-based table with multiple bullets extract correct unique sentences", () => {
+    const onOpenDocument = vi.fn();
+    const documents = [
+      { id: 109, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }
+    ];
+
+    const rawContent = `| No | Judul Dokumen | Metode |
+| :---: | :--- | :--- |
+| **1** | Deteksi Plat Nomor (2023) | • Total **100 citra** (75 data latih, 25 data uji).<br>• Anotasi via *LabelImg*.<br>• Format gambar 1200x800 px. |`;
+
+    const { container } = renderWithI18n(
+      <InChatMessageComponent
+        msg={{ role: "assistant", content: rawContent, created_at: new Date().toISOString() }}
+        activeChatId="test-chat"
+        backendUrl="http://localhost:8000"
+        documents={documents}
+        onOpenDocument={onOpenDocument}
+      />
+    );
+
+    const buttons = container.querySelectorAll("td button[aria-label*='Source [1]']");
+    expect(buttons.length).toBe(3);
+
+    (buttons[0] as HTMLElement).click();
+    expect(onOpenDocument).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sentence: expect.stringContaining("Total") })
+    );
+
+    (buttons[1] as HTMLElement).click();
+    expect(onOpenDocument).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sentence: expect.stringContaining("LabelImg") })
+    );
+
+    (buttons[2] as HTMLElement).click();
+    expect(onOpenDocument).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ sentence: expect.stringContaining("1200x800") })
+    );
+  });
 });

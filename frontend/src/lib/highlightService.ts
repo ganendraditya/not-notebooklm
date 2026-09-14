@@ -8,8 +8,16 @@
 const highlightCache = new Map<string, string[]>();
 const inFlightRequests = new Map<string, Promise<string[]>>();
 
+export function normalizeClaim(claim: string): string {
+  const c = (claim || "")
+    .replace(/^[•\s*#_:-]+|[•\s*#_.:!-]+$/g, "")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+  return c.toLowerCase().replace(/\s+/g, " ");
+}
+
 export function computeClaimKey(chatId: string, docId: number, claim: string): string {
-  const norm = (claim || "").trim().toLowerCase().replace(/\s+/g, " ");
+  const norm = normalizeClaim(claim);
   return `${chatId}:${docId}:${norm}`;
 }
 

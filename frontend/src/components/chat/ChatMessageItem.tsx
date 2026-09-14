@@ -117,7 +117,7 @@ const TableCellRenderer: React.FC<TableCellRendererProps> = ({
     align === "center" ? "text-center" :
     "text-left";
 
-  const isDocNumberCell = /^\s*(?:\[?\d{1,3}\]?|dokumen\s*\[?\d{1,3}\]?)\s*$/i.test(cellRawText);
+  const isDocNumberCell = /^\s*(?:[*_`#\s]*\[?\d{1,3}\]?[*_`#\s]*|dokumen\s*\[?\d{1,3}\]?)\s*$/i.test(cellRawText);
 
   if (isHeader) {
     return (

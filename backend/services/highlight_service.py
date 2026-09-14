@@ -13,9 +13,15 @@ from utils.file_utils import get_doc_file_path
 
 logger = logging.getLogger("uvicorn.error")
 
+def normalize_claim(claim: str) -> str:
+    """Normalizes claim string by removing bullets, wrapping punctuation, and collapsing whitespace."""
+    c = re.sub(r'^[•\s*#_:-]+|[•\s*#_.:!-]+$', '', (claim or '')).strip()
+    c = re.sub(r'\s+([.,;:!?])', r'\1', c)
+    return " ".join(c.lower().split())
+
 def compute_claim_hash(claim: str) -> str:
     """Computes stable SHA256 hash of normalized claim text."""
-    norm = " ".join((claim or "").strip().lower().split())
+    norm = normalize_claim(claim)
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
 # In-memory LRU cache: (chat_id, doc_id, claim_hash) -> List[str]
@@ -40,22 +46,25 @@ def _set_in_cache(chat_id: str, doc_id: int, claim: str, passages: List[str]) ->
 
 
 FAST_HIGHLIGHT_SYSTEM_PROMPT = """You are an academic document evidence locator.
-Given a specific claim or finding from a research paper summary or table cell, locate and return the EXACT verbatim sentence(s) in the source document that substantiate, discuss, or introduce this finding.
+Given a specific claim or finding from a research paper summary or table cell, locate and return the EXACT verbatim text passages in the source document that substantiate, discuss, prove, or introduce this finding.
 
 RULES:
-1. Return EXACT VERBATIM sentence(s) copied character-for-character directly from the document text.
-2. CORE EVIDENCE FOCUS:
+1. Return EXACT VERBATIM passages copied character-for-character directly from the document text.
+2. TABLE DATA & NUMERICAL SPLITS (CRITICAL):
+   - When the claim mentions specific metrics, split percentages, dataset ratios, or numbers (e.g. '80:15:5' or 'Akurasi 95% vs 80%') that reside in a table or structured rows:
+     You MUST include the exact table rows or lines containing those numbers (e.g. '_Training set_ 80%\\n_Validation set_ 15%\\n_Testing set_ 5%') alongside the sentence introducing the table! Do not stop at just the introductory sentence.
+3. CORE EVIDENCE FOCUS:
    - Summary claims often include descriptive phrases (e.g. "single-stage object detection", "metode deep learning", "arsitektur mutakhir", or "klasifikasi real-time").
    - Locate the substantive sentence(s) where the authors discuss, introduce, or evaluate the core technique, dataset, or metric (e.g. if the claim is "YOLOv5 (single-stage object detection) untuk klasifikasi real-time", find the sentence where the authors describe implementing YOLOv5 for vehicle detection/classification).
    - Do NOT return empty [] just because a descriptive adjective or summary phrase was added. Find the core empirical sentence!
-3. MULTI-PART EVIDENCE (CRITICAL):
+4. MULTI-PART EVIDENCE (CRITICAL):
    - If the claim mentions multiple distinct techniques, metrics, or parameters (e.g. resizing dimensions like "640x640" AND augmentation methods like "Cutout" or "rotasi 15°", or multiple evaluation scores like "mAP 0.938" AND "akurasi 98.5%"):
-     You MUST find and return the exact verbatim sentence for EACH distinct fact mentioned in the claim, even if they appear in completely different sections or paragraphs.
-4. STRICTLY FORBIDDEN:
-   - Do NOT paraphrase, summarize, merge sentences, or invent any words. Sentences must exist verbatim in the document.
-   - Do NOT return paper titles, author lists, or unrelated headings. Return substantive sentences that provide the empirical proof.
-5. Return ONLY a JSON array of strings containing the exact sentences, with no markdown formatting or code blocks:
-["Exact verbatim sentence 1 from document.", "Exact verbatim sentence 2 from document."]
+     You MUST find and return the exact verbatim passage for EACH distinct fact mentioned in the claim, even if they appear in completely different sections or paragraphs.
+5. STRICTLY FORBIDDEN:
+   - Do NOT paraphrase, summarize, merge sentences, or invent any words. Passages must exist verbatim in the document.
+   - Do NOT return paper titles, author lists, or unrelated headings. Return substantive sentences/tables that provide the empirical proof.
+6. Return ONLY a JSON array of strings containing the exact passages, with no markdown formatting or code blocks:
+["Exact verbatim passage 1 from document.", "Exact verbatim passage 2 from document."]
 
 If the document truly does not discuss the topic at all, return:
 []"""
@@ -165,7 +174,7 @@ async def get_ai_highlight_passages(
     prompt = (
         f"USER CLAIM TO PROVE / GROUND:\n\"{claim_clean}\"\n\n"
         f"DOCUMENT TEXT:\n{context_window}\n\n"
-        f"TASK: Locate 1 to 2 exact verbatim sentences in the document text proving the claim. Return strictly a JSON array."
+        f"TASK: Locate the exact verbatim passages/sentences proving the claim (including table rows or data if cited). Return strictly a JSON array of verbatim strings."
     )
 
     try:
@@ -198,7 +207,7 @@ async def get_ai_highlight_passages(
             ]
             # Verify passages actually exist in document text to prevent hallucinations
             verified_passages = []
-            for vp in valid_passages[:5]:
+            for vp in valid_passages:
                 # Relaxed whitespace comparison
                 vp_normalized = " ".join(vp.split())
                 full_text_normalized = " ".join(full_text.split())
@@ -305,10 +314,13 @@ def extract_citations_and_claims(markdown: str) -> List[Tuple[int, str]]:
     seen = set()
     unique_pairs = []
     for doc_num, claim in pairs:
-        key = (doc_num, " ".join(claim.lower().split()))
+        norm_c = normalize_claim(claim)
+        if len(norm_c) < 10:
+            continue
+        key = (doc_num, norm_c)
         if key not in seen:
             seen.add(key)
-            unique_pairs.append((doc_num, claim))
+            unique_pairs.append((doc_num, norm_c))
     return unique_pairs
 
 

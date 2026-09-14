@@ -56,6 +56,56 @@ export interface HighlightMatchResult {
 
 // Helper: Dynamic semantic grounding matcher for scientific claims & quotes (NotebookLM Style)
 // Primary path: AI-decided verbatim quotes from CITATION_MAP. Fallback: Contextual semantic matcher.
+function findQuoteSpan(fullText: string, quote: string): [number, number] | null {
+  if (!quote || quote.trim().length < 5) return null;
+  const rawQ = quote.trim();
+
+  // Tier 1: Exact index
+  const exactIdx = fullText.indexOf(rawQ);
+  if (exactIdx !== -1) return [exactIdx, exactIdx + rawQ.length];
+
+  // Tier 2: Whitespace-flexible regex
+  const escaped = rawQ.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  try {
+    const rx = new RegExp(escaped, "i");
+    const m = rx.exec(fullText);
+    if (m) return [m.index, m.index + m[0].length];
+  } catch (e) {}
+
+  // Tier 3: Markdown-aware regex allowing optional markdown tags (_, *, <u>, </u>) between words
+  const cleanQ = rawQ.replace(/<[^>]+>/g, " ").replace(/[*_~`]/g, "").trim();
+  const words = cleanQ.split(/\s+/).filter(w => w.length >= 1);
+  if (words.length < 3) return null;
+
+  const mdSeparator = "(?:[\\s*_~`]|<[^>]+>)+";
+  try {
+    const rxFullPattern = words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(mdSeparator);
+    const rxFull = new RegExp(rxFullPattern, "i");
+    const m = rxFull.exec(fullText);
+    if (m) return [m.index, m.index + m[0].length];
+  } catch (e) {}
+
+  // Tier 4: Anchor fallback using head (first 4 words) and tail (last 4 words)
+  if (words.length >= 6) {
+    try {
+      const headPattern = words.slice(0, 4).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(mdSeparator);
+      const tailPattern = words.slice(-4).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(mdSeparator);
+      const rxHead = new RegExp(headPattern, "i");
+      const rxTail = new RegExp(tailPattern, "i");
+      const mHead = rxHead.exec(fullText);
+      if (mHead) {
+        const afterHead = fullText.substring(mHead.index);
+        const mTail = rxTail.exec(afterHead);
+        if (mTail && mTail.index < 4000) {
+          const endPos = mHead.index + mTail.index + mTail[0].length;
+          return [mHead.index, endPos];
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
 export function getHighlightedContent(
   fullText: string, 
   targetQuery?: string, 
@@ -67,11 +117,17 @@ export function getHighlightedContent(
 
   // Tokenize document text into atomic chunks while strictly preserving all original whitespace and linebreaks
   const rawSentences: string[] = [];
-  // Match headings, sentence chunks ending in punctuation (.!?), or paragraph breaks (\n\n), strictly preserving original formatting without shattering wrapped single lines
+  const chunkOffsets: { start: number; end: number; idx: number }[] = [];
   const tokenRegex = /(?:^\s*#{1,6}\s+[^\n]*\n?|^\s*\*{2}[^\n*]+\*{2}\s*\n?|[\s\S]*?(?:(?<!\b[IVX\d])(?<!\d)(?<!\d\s)[.!?]+(?=\s|$)|\n\s*\n))|[\s\S]+/gm;
   let match;
+  let sIdx = 0;
   while ((match = tokenRegex.exec(fullText)) !== null) {
     if (match[0].length > 0) {
+      chunkOffsets.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        idx: sIdx++,
+      });
       rawSentences.push(match[0]);
     }
   }
@@ -79,7 +135,7 @@ export function getHighlightedContent(
 
   // 0. AI-DRIVEN GROUNDING PATH (PRIMARY):
   // When aiQuotes are explicitly provided (from on-demand Fast LLM or CITATION_MAP),
-  // strictly highlight all AI-determined verbatim evidence passages.
+  // strictly highlight all AI-determined verbatim evidence passages using exact character span detection.
   if (aiQuotes !== undefined && aiQuotes !== null) {
     if (aiQuotes.length === 0) {
       return { nodes: <span>{fullText}</span>, matchCount: 0 };
@@ -88,69 +144,17 @@ export function getHighlightedContent(
     const aiHighlightedIndices = new Set<number>();
     const aiClusters: number[][] = [];
 
-    // All quotes in aiQuotes represent authentic AI-located evidence passages for this citation.
-    // Process all of them without discarding secondary multi-part evidence!
+    // Locate exact character span of each quote directly within fullText.
+    // This perfectly handles multiline table rows and multi-sentence evidence without fragmentation,
+    // while completely eliminating false-positive substring matches on short isolated headings (like "Nomor Kendaraan").
     aiQuotes.forEach(quote => {
-      if (!quote || quote.trim().length < 5) return;
-      const cleanQuote = quote.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-      const quoteWords = cleanQuote.split(/\s+/).filter(w => w.length >= 2);
-      if (quoteWords.length === 0) return;
-
-      // Extract numeric tokens from the quote (e.g. "92", "23", "0", "718") for metric-aware matching
-      const quoteNumbers = cleanQuote.match(/\b\d+\b/g) || [];
-
-      // Check for exact substring match (bidirectional)
-      let foundExact = false;
-      rawSentences.forEach((s, idx) => {
-        // Skip title and section headings in matches
-        if (/^#{1,6}\s+/i.test(s.trim())) return;
-        const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-        if (sClean.length >= 15 && (sClean.includes(cleanQuote) || cleanQuote.includes(sClean))) {
-          aiHighlightedIndices.add(idx);
-          foundExact = true;
-        }
-      });
-
-      if (!foundExact) {
-        // High-precision keyword overlap with numeric bonus
-        let bestSentenceIdx = -1;
-        let highestScore = 0;
-
-        rawSentences.forEach((s, idx) => {
-          // Never highlight headings or titles on quote matching
-          if (/^#{1,6}\s+/i.test(s.trim())) return;
-          const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-          // Skip very short fragments and metadata lines
-          if (sClean.length < 15) return;
-          if (/https?\s|doi\s|issn|available online|halaman/.test(sClean)) return;
-
-          let wordOverlap = 0;
-          quoteWords.forEach(qw => {
-            if (sClean.includes(qw)) wordOverlap++;
-          });
-          const wordRatio = wordOverlap / quoteWords.length;
-
-          // Count how many numeric tokens from the quote appear in this sentence
-          let numericHits = 0;
-          if (quoteNumbers.length > 0) {
-            const sNumbers = sClean.match(/\b\d+\b/g) || [];
-            const sNumSet = new Set(sNumbers);
-            quoteNumbers.forEach(n => { if (sNumSet.has(n)) numericHits++; });
-          }
-          // ponytail: numeric bonus â€” upgrade path: use decimal-aware matching (e.g. "92.23" as single token)
-          const numericBonus = quoteNumbers.length > 0 ? (numericHits / quoteNumbers.length) * 0.25 : 0;
-          const combinedScore = wordRatio + numericBonus;
-
-          // Require at least 25% word overlap for quote matching to avoid title/abstract drift
-          if (wordRatio >= 0.25 && combinedScore > highestScore) {
-            highestScore = combinedScore;
-            bestSentenceIdx = idx;
+      const span = findQuoteSpan(fullText, quote);
+      if (span) {
+        chunkOffsets.forEach(chunk => {
+          if (chunk.start < span[1] && chunk.end > span[0]) {
+            aiHighlightedIndices.add(chunk.idx);
           }
         });
-
-        if (bestSentenceIdx !== -1) {
-          aiHighlightedIndices.add(bestSentenceIdx);
-        }
       }
     });
 
@@ -186,10 +190,10 @@ export function getHighlightedContent(
           {rawSentences.map((sentence, idx) => {
             const isHighlighted = aiHighlightedIndices.has(idx);
             if (isHighlighted) {
-              const match = sentence.match(/^(\s*)([\s\S]*?)(\s*)$/);
-              const leadingSpace = match ? match[1] : "";
-              const coreText = match ? match[2] : sentence;
-              const trailingSpace = match ? match[3] : "";
+              const m = sentence.match(/^(\s*)([\s\S]*?)(\s*)$/);
+              const leadingSpace = m ? m[1] : "";
+              const coreText = m ? m[2] : sentence;
+              const trailingSpace = m ? m[3] : "";
 
               if (!coreText) {
                 return <span key={idx}>{sentence}</span>;
@@ -385,367 +389,7 @@ export function getHighlightedContent(
     }
   }
 
-  // 3. FALLBACK CONTEXTUAL SEMANTIC GROUNDING PATH (keyword scoring):
-  // Identify if query contains explicit metrics, ratios, or evaluation terms
-  const hasMetricOrData = Boolean(
-    targetQuery && (
-      /\d+(?:[,.]\d+)?%?|\b\d+:\d+\b|\bakurasi\b|\bmetode\b|\bhasil\b|\bdataset\b|\bsensitivitas\b|\bspesifisitas\b|\bpresisi\b|\brecall\b/i.test(targetQuery)
-    )
-  );
-
-  // Guard against conversational fluff / empty queries unless numerical/metric data is present
-  const isGenericCitationQuery = !targetQuery || (
-    targetQuery.trim().length < 3 && !hasMetricOrData
-  ) || (
-    /^(?:berdasarkan|dokumen|referensi|sumber|menurut|daftar\s+pustaka|sitasi\s+rujukan|paper|jurnal|artikel|kesimpulan|rincian)\b/i.test(targetQuery.trim()) &&
-    !hasMetricOrData
-  ) || (
-    /^\s*(?:santoso|rahma|et\s+al|dr\.|prof\.)/i.test(targetQuery.trim()) && targetQuery.length < 80
-  );
-
-  if (isGenericCitationQuery) {
-    return { nodes: <span>{fullText}</span>, matchCount: 0 };
-  }
-
-  // Identify where the bibliography / reference list starts to avoid grounding on references
-  let refSectionIndex = -1;
-  for (let i = 0; i < rawSentences.length; i++) {
-    const sTrim = rawSentences[i].trim();
-    const isHeading = (
-      sTrim.startsWith("#") ||
-      (sTrim.startsWith("**") && sTrim.endsWith("**") && sTrim.length < 80) ||
-      (/^[A-Z\s]{4,40}$/.test(sTrim)) ||
-      (/^(?:#{1,6}\s+|\*{0,2}(?:[IVX\d]+[\.\s\-]+|[A-Z\s]{4,}:|\d+\.)\s*)([A-Z\s]{3,})/i.test(sTrim) && sTrim.length < 80 && !/[a-zA-Z]{2,}\.\s+[A-Z]/.test(sTrim))
-    );
-
-    if (isHeading) {
-      const cleanHeader = sTrim.replace(/[*_#~`:]/g, "").trim().toLowerCase();
-      if (/^(?:references?|daftar\s+pustaka|bibliography)\b/i.test(cleanHeader)) {
-        refSectionIndex = i;
-        break;
-      }
-    }
-  }
-
-  // Normalize query & strip LaTeX delimiters ($C=10$, \gamma=1 -> c=10, gamma=1) and diacritics
-  const normQuery = (targetQuery || "")
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/\$([^$]+)\$/g, "$1")
-    .replace(/\\(?:gamma|alpha|beta|sigma|lambda|theta)\b/gi, (m) => m.substring(1));
-  
-  // Extract explicit numerical metrics with decimals or %: e.g. "69,15%", "84.37%", "0.87", "77%"
-  const rawMetricMatches = (normQuery.match(/\b\d+[,.]\d+%?|\b\d+%/g) || []);
-  const metricsSet = new Set(
-    rawMetricMatches.map(m => m.toLowerCase().replace(/,/g, ".").replace(/%/g, ""))
-  );
-
-  // Extract split ratios: e.g. "90:10", "80:20", "60:40"
-  const ratioMatches = (normQuery.match(/\b\d+\s*:\s*\d+\b/g) || []).map(r => r.replace(/\s+/g, ""));
-
-  // Extract explicit integer numbers >= 3 digits (e.g. 1500 from "1.500" or 900), excluding 4-digit publication years (1900-2099)
-  const rawNumberMatches = (normQuery.match(/\b\d+(?:[.,]\d+)?\b/g) || [])
-    .map(n => n.replace(/[.,]/g, ""))
-    .filter(n => n.length >= 3 && !metricsSet.has(n) && !/^(?:19|20)\d{2}$/.test(n));
-  const numberSet = new Set(rawNumberMatches);
-
-  // Extract parameter bindings: e.g. "c=10", "gamma=1", "k=5", "fold=10"
-  const paramBindings = (normQuery.match(/\b[a-z_]+\s*=\s*\d+(?:[,.]\d+)?\b/g) || []).map(p => p.replace(/\s+/g, ""));
-
-  // Extract all content words (no hardcoded stopword lists — language-agnostic)
-  const allQueryWords = normQuery
-    .replace(/[^a-zA-Z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter(w => w.length >= 2 && !/^\d+$/.test(w));
-
-  // Extract explicit benchmark dataset or model entities: e.g. "dada-2000", "yolov8", "resnet-50", "imagenet-1k", "swin-t"
-  const datasetModelMatches = (normQuery.match(/\b[a-z]{2,}[-_]?\d+[a-z\d]*\b/gi) || [])
-    .map(e => e.toLowerCase());
-
-  // Build 2-word and 3-word n-grams from ALL query words (language-agnostic phrase matching)
-  const queryPhrases: string[] = [];
-  for (let i = 0; i < allQueryWords.length - 1; i++) {
-    queryPhrases.push(`${allQueryWords[i]} ${allQueryWords[i + 1]}`);
-    if (i < allQueryWords.length - 2) {
-      queryPhrases.push(`${allQueryWords[i]} ${allQueryWords[i + 1]} ${allQueryWords[i + 2]}`);
-    }
-  }
-
-  // Calculate scores for each sentence with universal entity, phrase, and metric weighting
-  let maxSingleScore = 0;
-  let bestSentenceIdx = -1;
-  const sentenceScores = rawSentences.map((s, idx) => {
-    if (refSectionIndex !== -1 && idx >= refSectionIndex) {
-      return 0;
-    }
-
-    const sTrim = s.trim();
-    const sLower = s.toLowerCase();
-    
-    // Ignore bibliography, page numbers, journal header lines, URL lines, and short metadata fragments
-    if (/https?:\/\/|doi\.org|\bvol(?:ume)?\s*\d+|\bp-issn\b|\be-issn\b|\bissn\b|\bhalaman\b|\bavailable online\b|\.ac\.id|\.org\/index/i.test(sLower)) {
-      return 0;
-    }
-    // Skip markdown headings (e.g. # Document Title, ## Section Header), author blocks, and short fragments
-    if (/^#{1,6}\s+/i.test(sTrim)) {
-      return 0;
-    }
-    if (idx < 15 && (/^Billy Gunawan|Universitas|Fakultas Teknik|Nanawi|@gmail|@informatics/i.test(sTrim))) {
-      return 0;
-    }
-    if (sTrim.length < 10) {
-      return 0;
-    }
-
-    const sNormalizedDiacritics = sLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const sNormalizedNumbers = sNormalizedDiacritics
-      .replace(/(\d+)\s*[,.]\s*(\d+)/g, "$1.$2")
-      .replace(/(\d+)\s+%/g, "$1%");
-    const sClean = sNormalizedNumbers.replace(/[^a-zA-Z0-9\s]/g, " ");
-    const sWords = new Set(sClean.split(/\s+/).filter(w => w.length >= 2));
-
-    let score = 0;
-
-    // 1. Parameter bindings match (e.g. "c=10", "gamma=1" matching "c = 10", "c=10", "gamma = 1") (Weight: 35 points)
-    paramBindings.forEach(pb => {
-      const parts = pb.split("=");
-      if (parts.length === 2) {
-        const paramName = parts[0];
-        const paramVal = parts[1];
-        const paramRegex = new RegExp(`\\b${paramName}\\s*=\\s*${paramVal}\\b`, "i");
-        if (paramRegex.test(sLower) || (sWords.has(paramName) && sNormalizedNumbers.includes(paramVal))) {
-          score += 35;
-        }
-      }
-    });
-
-    // 2. Exact Decimal/Percentage/Value Metric match
-    // Matches "0,87", "0.87", "87%", "87", "0,88", "0.88", "77.78"
-    metricsSet.forEach(m => {
-      const mComma = m.replace(/\./g, ",");
-      const isDecimalMatch = sNormalizedNumbers.includes(m) || sLower.includes(mComma);
-      if (isDecimalMatch) {
-        score += 40;
-      } else if (m.startsWith("0.")) {
-        // Convert decimal to percentage or integer representation: e.g. 0.87 -> 87% / 87
-        const pctInt = `${Math.round(parseFloat(m) * 100)}`;
-        if (sNormalizedNumbers.includes(`${pctInt}%`) || sClean.includes(pctInt)) {
-          score += 40;
-        }
-      } else if (/^\d+$/.test(m) && parseInt(m, 10) > 10) {
-        // Integer percentage representation: e.g. 87 -> 0.87 or 87%
-        const decVal = (parseInt(m, 10) / 100).toFixed(2);
-        if (sNormalizedNumbers.includes(decVal) || sLower.includes(decVal.replace(/\./g, ","))) {
-          score += 40;
-        }
-      }
-    });
-
-    // 3. Split ratio match (e.g. "90:10" matching "90:10" or "90% data latih dan 10% data uji") (Weight: 30 points)
-    ratioMatches.forEach(r => {
-      const parts = r.split(":");
-      if (sLower.includes(r) || (parts.length === 2 && sNormalizedNumbers.includes(parts[0]) && sNormalizedNumbers.includes(parts[1]))) {
-        score += 30;
-      }
-    });
-
-    // 4. Integer count match (e.g. 1500 or 900) (Weight: 35 points)
-    numberSet.forEach(n => {
-      const nWithDot = n.length === 4 ? `${n[0]}.${n.slice(1)}` : n;
-      if (sClean.includes(n) || sLower.includes(nWithDot)) {
-        score += 35;
-      }
-    });
-
-    // 5. Specific keyphrase n-grams (e.g. "akurasi tertinggi", "model terbaik", "kata positif", "sentimen netral")
-    queryPhrases.forEach(ph => {
-      if (sClean.includes(ph)) {
-        score += 20;
-      }
-    });
-
-    // 6. Benchmark Dataset or Named Model entities match (Weight: 40 points)
-    datasetModelMatches.forEach(entity => {
-      const normEntity = entity.replace(/[-_]/g, " ");
-      if (sLower.includes(entity) || sClean.includes(entity) || sClean.includes(normEntity)) {
-        score += 40;
-      }
-    });
-
-    // 7. Individual word overlap matching (Weight: 4 points each — lower weight since no stopword filtering;
-    //    the n-gram phrases above carry more discriminative signal)
-    allQueryWords.forEach(w => {
-      if (sWords.has(w) || sClean.includes(w)) {
-        score += 4;
-      }
-    });
-
-    if (score > maxSingleScore) {
-      maxSingleScore = score;
-      bestSentenceIdx = idx;
-    }
-
-    return score;
-  });
-
-  // Dynamic Focused Evidence Selection (NotebookLM Style):
-  const highlightedIndices = new Set<number>();
-  const clusters: number[][] = [];
-
-  const hasHardEvidence = hasMetricOrData || metricsSet.size > 0 || ratioMatches.length > 0 || numberSet.size > 0 || paramBindings.length > 0 || datasetModelMatches.length > 0;
-  const minRequiredScore = hasHardEvidence ? 20 : 40;
-
-  if (maxSingleScore >= minRequiredScore) {
-    // Selectivity threshold: Keep top evidence sentences matching query claims
-    // (must be within 70% of maxSingleScore to retain valid secondary evidence clusters for 1/2, 1/3 navigation)
-    const threshold = Math.max(minRequiredScore, maxSingleScore * 0.70);
-    
-    // Pick candidate sentences meeting threshold
-    const candidateIndices: number[] = [];
-    sentenceScores.forEach((sc, idx) => {
-      if (sc >= threshold) {
-        candidateIndices.push(idx);
-      }
-    });
-
-    // Group candidates into initial clusters
-    const initialClusters: number[][] = [];
-    let curClust: number[] = [];
-    candidateIndices.forEach(idx => {
-      if (curClust.length === 0) {
-        curClust.push(idx);
-      } else if (idx === curClust[curClust.length - 1] + 1) {
-        curClust.push(idx);
-      } else {
-        initialClusters.push(curClust);
-        curClust = [idx];
-      }
-    });
-    if (curClust.length > 0) {
-      initialClusters.push(curClust);
-    }
-
-    // Rank clusters by peak sentence score
-    initialClusters.sort((a, b) => {
-      const maxA = Math.max(...a.map(i => sentenceScores[i] || 0));
-      const maxB = Math.max(...b.map(i => sentenceScores[i] || 0));
-      return maxB - maxA;
-    });
-
-    // Keep up to the top 3 highest-scoring qualified clusters (e.g. Abstract, Methodology, Results)
-    // to enable interactive arrow navigation (1/2, 1/3) while preventing fragmented low-confidence scatter
-    const peakScore = Math.max(...(initialClusters[0]?.map(i => sentenceScores[i] || 0) || [0]));
-    const qualifiedClusters = initialClusters.filter(clust => {
-      const clustPeak = Math.max(...clust.map(i => sentenceScores[i] || 0));
-      return clustPeak >= Math.max(minRequiredScore, peakScore * 0.70);
-    });
-    const topClusters = (qualifiedClusters.length > 0 ? qualifiedClusters : initialClusters).slice(0, 3);
-    topClusters.forEach(clust => {
-      clust.forEach(idx => highlightedIndices.add(idx));
-    });
-  }
-
-  // Fallback: If no match above threshold, highlight best matching sentence ONLY if it scored >= minRequiredScore (strict significance)
-  if (highlightedIndices.size === 0 && bestSentenceIdx !== -1 && maxSingleScore >= minRequiredScore) {
-    highlightedIndices.add(bestSentenceIdx);
-  }
-
-  // If still nothing matched, return unhighlighted text (no random highlight)
-  if (highlightedIndices.size === 0) {
-    return {
-      nodes: <span>{fullText}</span>,
-      matchCount: 0
-    };
-  }
-
-  // Group highlighted contiguous indices into distinct clusters/passages
-  const sortedIndices = Array.from(highlightedIndices).sort((a, b) => a - b);
-  let currentCluster: number[] = [];
-  sortedIndices.forEach(idx => {
-    if (currentCluster.length === 0) {
-      currentCluster.push(idx);
-    } else {
-      const last = currentCluster[currentCluster.length - 1];
-      if (idx === last + 1) {
-        currentCluster.push(idx);
-      } else {
-        clusters.push([...currentCluster]);
-        currentCluster = [idx];
-      }
-    }
-  });
-  if (currentCluster.length > 0) {
-    clusters.push(currentCluster);
-  }
-
-  // Map each highlighted sentence index to its cluster index
-  const indexToClusterMap = new Map<number, number>();
-  clusters.forEach((clust, cIdx) => {
-    clust.forEach(idx => {
-      indexToClusterMap.set(idx, cIdx);
-    });
-  });
-
-  const nodes = (
-    <>
-      {rawSentences.map((sentence, idx) => {
-        const isHighlighted = highlightedIndices.has(idx);
-        if (isHighlighted) {
-          const match = sentence.match(/^(\s*)([\s\S]*?)(\s*)$/);
-          const leadingSpace = match ? match[1] : "";
-          const coreText = match ? match[2] : sentence;
-          const trailingSpace = match ? match[3] : "";
-
-          if (!coreText) {
-            return <span key={idx}>{sentence}</span>;
-          }
-
-          const clusterIdx = indexToClusterMap.get(idx) ?? 0;
-          const isClusterAnchor = clusters[clusterIdx]?.[0] === idx;
-          const isActiveCluster = clusterIdx === activeMatchIndex;
-
-          return (
-            <React.Fragment key={idx}>
-              {leadingSpace && <span>{leadingSpace}</span>}
-              <mark
-                data-highlight-active={isActiveCluster ? "true" : undefined}
-                data-cluster-index={clusterIdx}
-                ref={(el) => {
-                  if (el && isClusterAnchor && highlightRefsMap) {
-                    highlightRefsMap.current.set(clusterIdx, el);
-                  }
-                }}
-                className={`font-medium px-0.5 py-0 rounded-none inline transition-colors ${
-                  isActiveCluster
-                    ? "bg-amber-400/60 dark:bg-amber-400/40 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/60 dark:ring-amber-400/50"
-                    : "bg-amber-200/50 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
-                }`}
-                title={`Evidence Match ${clusterIdx + 1} of ${clusters.length}`}
-              >
-                {coreText}
-              </mark>
-              {trailingSpace && <span>{trailingSpace}</span>}
-            </React.Fragment>
-          );
-        }
-        return <span key={idx}>{sentence}</span>;
-      })}
-    </>
-  );
-
-  // Find which cluster contains the highest scoring evidence sentence
-  let bestClusterIndex = 0;
-  clusters.forEach((clust, cIdx) => {
-    if (clust.includes(bestSentenceIdx)) {
-      bestClusterIndex = cIdx;
-    }
-  });
-
-  return {
-    nodes,
-    matchCount: clusters.length,
-    initialActiveIndex: bestClusterIndex
-  };
+  return { nodes: <span>{fullText}</span>, matchCount: 0 };
 }
 
 export const formatReadableDate = (dateStr?: string, yearFallback?: string) => {
