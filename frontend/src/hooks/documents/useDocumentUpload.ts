@@ -16,8 +16,10 @@ export function useDocumentUpload({
   t: any;
 }) {
   const [internalPendingSources, setInternalPendingSources] = useState<PendingSourceItem[]>([]);
+  const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const cancelledIdsRef = useRef<Set<string>>(new Set());
+  const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const controllers = abortControllersRef.current;
@@ -26,6 +28,7 @@ export function useDocumentUpload({
       controllers.forEach(controller => controller.abort());
       controllers.clear();
       cancelled.clear();
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
     };
   }, []);
 
@@ -47,7 +50,8 @@ export function useDocumentUpload({
     chatId: string, 
     file: File, 
     sourceId: string,
-    associatedPendingIds: string[] = [sourceId]
+    associatedPendingIds: string[] = [sourceId],
+    progressTracker?: { current: number; total: number }
   ) => {
     if (cancelledIdsRef.current.has(sourceId)) {
       setInternalPendingSources(prev => prev.filter(p => !associatedPendingIds.includes(p.id)));
@@ -73,13 +77,29 @@ export function useDocumentUpload({
       
       if (res.ok) {
         const result = await res.json();
-        if (Array.isArray(result)) {
-          result.forEach((doc: Document) => {
+        const docs: Document[] = Array.isArray(result) ? result : [result];
+
+        // Progressive resolution: resolve each document with smooth pacing so loading animation is visible
+        for (let i = 0; i < docs.length; i++) {
+          const doc = docs[i];
+          const matchingPendingId = associatedPendingIds[i] || associatedPendingIds[0];
+
+          if (!cancelledIdsRef.current.has(matchingPendingId) && !cancelledIdsRef.current.has(sourceId)) {
+            // Brief visual pacing (180ms) when multiple entries exist so each item transition is visible
+            if (docs.length > 1 || (progressTracker && progressTracker.total > 1)) {
+              await new Promise(resolve => setTimeout(resolve, 180));
+            }
+
             onDocumentAdded?.(doc, chatId);
-          });
-        } else {
-          onDocumentAdded?.(result, chatId);
+            setInternalPendingSources(prev => prev.filter(p => p.id !== matchingPendingId));
+
+            if (progressTracker) {
+              progressTracker.current++;
+              setUploadFeedback(`Importing sources (${progressTracker.current}/${progressTracker.total})...`);
+            }
+          }
         }
+        // Ensure any remaining pending ids for this batch task are cleaned up
         setInternalPendingSources(prev => prev.filter(p => !associatedPendingIds.includes(p.id)));
       } else {
         const errorData = await res.json().catch(() => ({}));
@@ -93,6 +113,9 @@ export function useDocumentUpload({
       setInternalPendingSources(prev => prev.map(p => 
         associatedPendingIds.includes(p.id) ? { ...p, status: "error", error: error.message || "Upload failed" } : p
       ));
+      setUploadFeedback(`Upload failed: ${error.message || "Could not process file"}`);
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = setTimeout(() => setUploadFeedback(null), 4000);
     } finally {
       abortControllersRef.current.delete(sourceId);
       cancelledIdsRef.current.delete(sourceId);
@@ -105,6 +128,8 @@ export function useDocumentUpload({
       targetChatId = await onEnsureChatSession(t("ui.defaultChatTitle") || "New Project");
     }
     if (!targetChatId) return;
+
+    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
 
     // Disassemble multi-entry bibliography files (BibTeX, RIS) into individual pending cards
     const batchTasks: { file: File; baseId: string; pendingIds: string[] }[] = [];
@@ -138,19 +163,34 @@ export function useDocumentUpload({
       }
     }
 
+    const totalSources = allPending.length;
+    if (totalSources > 1) {
+      setUploadFeedback(`Detected ${totalSources} sources in upload queue. Loading...`);
+    }
+
     setInternalPendingSources(prev => [...prev, ...allPending]);
+
+    const progressTracker = totalSources > 1 ? { current: 0, total: totalSources } : undefined;
 
     for (const task of batchTasks) {
       if (cancelledIdsRef.current.has(task.baseId)) {
         continue;
       }
-      await uploadFile(targetChatId, task.file, task.baseId, task.pendingIds);
+      await uploadFile(targetChatId, task.file, task.baseId, task.pendingIds, progressTracker);
+    }
+
+    if (totalSources > 1) {
+      setUploadFeedback(`Successfully imported ${totalSources} sources.`);
+      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      feedbackTimeoutRef.current = setTimeout(() => setUploadFeedback(null), 3500);
     }
   };
 
   return {
     internalPendingSources,
     setInternalPendingSources,
+    uploadFeedback,
+    setUploadFeedback,
     handleUploadBatch,
     uploadFile,
     cancelUpload

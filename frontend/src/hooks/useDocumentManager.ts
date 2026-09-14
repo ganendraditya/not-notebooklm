@@ -146,6 +146,8 @@ export function useDocumentManager({
     pendingSources,
     internalPendingSources: upload.internalPendingSources,
     setInternalPendingSources: upload.setInternalPendingSources,
+    uploadFeedback: upload.uploadFeedback,
+    setUploadFeedback: upload.setUploadFeedback,
     handleUploadBatch: handleUploadBatchWrap,
     handleImportDoi: handleImportDoiWrap,
     cancelPendingSource,
