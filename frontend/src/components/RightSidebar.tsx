@@ -7,7 +7,7 @@ import { getHighlightedContent, formatReadableDate, HighlightMatchResult } from 
 import { useDocumentManager } from "@/hooks/useDocumentManager";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Plus, Check, AlertCircle, PanelRight, Loader2 } from "lucide-react";
+import { Plus, Check, AlertCircle, PanelRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Document, CitationGroundingHighlight, PendingSourceItem } from "@/stores/documentStore";
 import { useTranslation } from "@/lib/i18n";
@@ -75,7 +75,6 @@ export default function RightSidebar({
     activeMenuId, setActiveMenuId,
     isCleaningDuplicates,
     cleanFeedback,
-    uploadFeedback,
     isAddSourcesModalOpen, setIsAddSourcesModalOpen,
     doiInput, setDoiInput,
     setInternalPendingSources,
@@ -447,30 +446,6 @@ export default function RightSidebar({
             <span>{t('ui.addSources')}</span>
           </Button>
         </div>
-
-        {/* Dynamic Upload Feedback Notification */}
-        {uploadFeedback && (() => {
-          const isError = uploadFeedback.toLowerCase().includes("fail") || uploadFeedback.toLowerCase().includes("error");
-          const isSuccess = uploadFeedback.toLowerCase().includes("success");
-          return (
-            <div className={`w-full px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150 ${
-              isError
-                ? "bg-rose-500/10 border border-rose-500/20 text-rose-300"
-                : isSuccess
-                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
-                : "bg-blue-500/10 border border-blue-500/20 text-blue-300"
-            }`}>
-              {isError ? (
-                <AlertCircle size={13} className="text-rose-400 shrink-0" />
-              ) : isSuccess ? (
-                <Check size={13} className="text-emerald-400 shrink-0" />
-              ) : (
-                <Loader2 size={13} className="animate-spin text-blue-400 shrink-0" />
-              )}
-              <span className="text-[12px]">{uploadFeedback}</span>
-            </div>
-          );
-        })()}
 
         {/* Dynamic Clean Feedback Notification */}
         {cleanFeedback && (() => {

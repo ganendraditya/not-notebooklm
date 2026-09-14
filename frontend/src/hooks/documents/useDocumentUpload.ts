@@ -16,10 +16,8 @@ export function useDocumentUpload({
   t: any;
 }) {
   const [internalPendingSources, setInternalPendingSources] = useState<PendingSourceItem[]>([]);
-  const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const cancelledIdsRef = useRef<Set<string>>(new Set());
-  const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const controllers = abortControllersRef.current;
@@ -28,7 +26,6 @@ export function useDocumentUpload({
       controllers.forEach(controller => controller.abort());
       controllers.clear();
       cancelled.clear();
-      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
     };
   }, []);
 
@@ -101,7 +98,6 @@ export function useDocumentUpload({
 
             if (progressTracker) {
               progressTracker.current++;
-              setUploadFeedback(`Importing sources (${progressTracker.current}/${progressTracker.total})...`);
             }
           }
         }
@@ -124,9 +120,6 @@ export function useDocumentUpload({
       useDocumentStore.getState().updatePendingSourcesList(prev => prev.map(p => 
         associatedPendingIds.includes(p.id) ? { ...p, status: "error", error: error.message || "Upload failed" } : p
       ));
-      setUploadFeedback(`Upload failed: ${error.message || "Could not process file"}`);
-      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = setTimeout(() => setUploadFeedback(null), 4000);
     } finally {
       abortControllersRef.current.delete(sourceId);
       cancelledIdsRef.current.delete(sourceId);
@@ -135,8 +128,6 @@ export function useDocumentUpload({
 
   const handleUploadBatch = async (files: File[]) => {
     if (!files || files.length === 0) return;
-
-    if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
 
     // 1. Disassemble multi-entry bibliography files (BibTeX, RIS) into individual pending cards IMMEDIATELY
     const batchTasks: { file: File; baseId: string; pendingIds: string[] }[] = [];
@@ -171,9 +162,6 @@ export function useDocumentUpload({
     }
 
     const totalSources = allPending.length;
-    if (totalSources > 1) {
-      setUploadFeedback(`Detected ${totalSources} sources in upload queue. Loading...`);
-    }
 
     // 2. Dispatch pending items to store IMMEDIATELY (0ms) so spinners appear right away
     setInternalPendingSources(prev => [...prev, ...allPending]);
@@ -192,7 +180,6 @@ export function useDocumentUpload({
       const pendingIdSet = new Set(allPending.map(p => p.id));
       setInternalPendingSources(prev => prev.filter(p => !pendingIdSet.has(p.id)));
       useDocumentStore.getState().updatePendingSourcesList(prev => prev.filter(p => !pendingIdSet.has(p.id)));
-      setUploadFeedback("Failed to create chat session for upload.");
       return;
     }
 
@@ -205,19 +192,11 @@ export function useDocumentUpload({
       }
       await uploadFile(targetChatId, task.file, task.baseId, task.pendingIds, progressTracker);
     }
-
-    if (totalSources > 1) {
-      setUploadFeedback(`Successfully imported ${totalSources} sources.`);
-      if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
-      feedbackTimeoutRef.current = setTimeout(() => setUploadFeedback(null), 3500);
-    }
   };
 
   return {
     internalPendingSources,
     setInternalPendingSources,
-    uploadFeedback,
-    setUploadFeedback,
     handleUploadBatch,
     uploadFile,
     cancelUpload
