@@ -198,8 +198,8 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
             res_data["content"] = "\n".join(md_lines)
 
         is_user_upload = (
-            doc.journal_metric in ("Uploaded Document", "BibTeX Reference", "RIS Reference")
-            or doc.access_status in ("Uploaded Document", "BibTeX Reference", "RIS Reference")
+            doc.journal_metric in ("Uploaded Document", "Uploaded Reference", "BibTeX Reference", "RIS Reference")
+            or doc.access_status in ("Uploaded Document", "Publication Brief & Abstract (Uploaded)", "BibTeX Reference", "RIS Reference")
         )
         res_data["is_uploaded"] = is_user_upload
 

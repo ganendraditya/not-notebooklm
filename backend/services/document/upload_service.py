@@ -141,32 +141,52 @@ async def handle_bib_or_ris_split_upload(
     base_root, _ = os.path.splitext(clean_fname)
 
     for idx, entry in enumerate(entries):
-        # Generate clean safe per-entry filename
+        # Generate clean safe per-entry filename ending in .txt
         entry_key = sanitize_safe_filename(entry.get("key") or entry.get("title") or f"{base_root}_{idx + 1}")
         entry_key = entry_key[:45].strip("._-") or f"ref_{idx + 1}"
-        # Ensure filename matches disk storage name 1:1 so get_doc_file_path resolves it
-        entry_fname = f"{entry_key}_{idx + 1}{ext}" if len(entries) > 1 else f"{entry_key}{ext}"
+        # Standardize non-PDF bibliography entries as .txt with clean human-readable contents
+        entry_fname = f"{entry_key}_{idx + 1}.txt" if len(entries) > 1 else f"{entry_key}.txt"
         storage_fname = f"{clean_chat_id}_{entry_fname}"
         entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
 
-        # Write single entry file
-        entry_content = entry.get("raw") or entry.get("markdown") or ""
-        with open(entry_file_path, "w", encoding="utf-8") as ef:
-            ef.write(entry_content)
-
-        from services import storage_adapter
-        storage_adapter.upload_file(entry_file_path, s3_key=storage_fname)
-
         authors_list = entry.get("authors", [])
         authors_json = json.dumps(authors_list, ensure_ascii=False) if authors_list else None
-        metric_name = "BibTeX Reference" if ext in (".bib", ".bibtex") else "RIS Reference"
-
         doi = entry.get("doi", "").strip()
         url = entry.get("url", "").strip()
         if not url and doi:
             url = f"https://doi.org/{doi}"
 
         title = entry.get("title") or entry_fname
+
+        # Write clean human-readable text file with title, authors, year, DOI, and abstract
+        content_lines = [f"Title: {title}"]
+        if authors_list:
+            content_lines.append(f"Authors: {', '.join(authors_list)}")
+        if entry.get("year"):
+            content_lines.append(f"Year: {entry.get('year')}")
+        if entry.get("journal"):
+            content_lines.append(f"Journal/Venue: {entry.get('journal')}")
+        if doi:
+            content_lines.append(f"DOI: {doi}")
+        if url:
+            content_lines.append(f"URL: {url}")
+        content_lines.append("")
+        if entry.get("abstract"):
+            content_lines.append("Abstract:")
+            content_lines.append(entry.get("abstract"))
+        else:
+            content_lines.append("Abstract:")
+            content_lines.append("No abstract available in citation metadata.")
+
+        entry_content = "\n".join(content_lines)
+        with open(entry_file_path, "w", encoding="utf-8") as ef:
+            ef.write(entry_content)
+
+        from services import storage_adapter
+        storage_adapter.upload_file(entry_file_path, s3_key=storage_fname)
+
+        metric_name = "Uploaded Reference"
+        access_status = "Publication Brief & Abstract (Uploaded)"
 
         db_doc = Document(
             chat_id=chat_id,
@@ -181,7 +201,7 @@ async def handle_bib_or_ris_split_upload(
             abstract=entry.get("abstract", ""),
             abstract_type="official" if entry.get("abstract") else "ai_summary",
             is_oa=False,
-            access_status=metric_name,
+            access_status=access_status,
             quality_tier=4
         )
         db.add(db_doc)
@@ -199,7 +219,7 @@ async def handle_bib_or_ris_split_upload(
             "abstract": entry.get("abstract", ""),
             "is_valid_pdf": False,
             "is_verified_academic": False,
-            "access_status": metric_name
+            "access_status": access_status
         }
         results.append((db_doc, entry_file_path, enriched))
 
