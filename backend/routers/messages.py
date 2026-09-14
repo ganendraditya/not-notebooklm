@@ -51,6 +51,14 @@ def save_stream_assistant_response(chat_id: str, resp_text: str) -> None:
     finally:
         bg_db.close()
 
+    # Automatically trigger Fast LLM background grounding worker
+    # This pre-finds and locks exact verbatim evidence sentences into SQLite citation_highlights table
+    try:
+        from services.highlight_service import auto_ground_response_citations
+        asyncio.create_task(auto_ground_response_citations(chat_id, resp_text))
+    except Exception as e:
+        logger.debug(f"[Auto-Ground Trigger Warning]: {e}")
+
 
 @router.post("/chats/{chat_id}/message/stream")
 @router.post("/chats/{chat_id}/message_stream")
@@ -270,6 +278,12 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
                 if bg_chat:
                     bg_chat.updated_at = get_utc_now()
                 commit_with_retry(bg_db)
+
+                try:
+                    from services.highlight_service import auto_ground_response_citations
+                    asyncio.create_task(auto_ground_response_citations(chat_id, resp_text))
+                except Exception:
+                    pass
                 
                 await emitter.emit_done(
                     final_text=resp_text,

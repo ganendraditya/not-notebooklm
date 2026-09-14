@@ -1,5 +1,8 @@
 import os
+import hashlib
+import logging
 from collections import OrderedDict
+from typing import Optional
 import pymupdf4llm
 
 from .format_parsers import (
@@ -15,6 +18,8 @@ from .academic_chunker import (
     split_markdown_into_academic_sections,
 )
 
+logger = logging.getLogger(__name__)
+
 # Bounded LRU cache for parsed markdown content (prevents unbounded memory leak)
 _MAX_PARSED_CACHE_SIZE = 200
 _PARSED_MARKDOWN_CACHE: OrderedDict = OrderedDict()
@@ -27,12 +32,40 @@ def get_file_cache_key(file_path: str) -> str:
     except Exception:
         return file_path
 
+def get_disk_cache_path(file_path: str) -> Optional[str]:
+    """Generates a stable cache file path in .parsed_cache based on file content/stat fingerprint."""
+    try:
+        from utils.file_utils import PARSED_CACHE_DIR
+        cache_key = get_file_cache_key(file_path)
+        hashed_name = hashlib.sha256(cache_key.encode("utf-8")).hexdigest()
+        return os.path.join(PARSED_CACHE_DIR, f"{hashed_name}.parsed.md")
+    except Exception:
+        return None
+
 def parse_document_to_markdown(file_path: str) -> str:
-    """Parses any supported document format into Markdown text with in-memory bounded LRU caching."""
+    """
+    Parses any supported document format into Markdown text with dual-tier caching:
+    1. In-memory bounded LRU cache (0ms)
+    2. Persistent disk cache (.parsed_cache, <5ms)
+    """
     cache_key = get_file_cache_key(file_path)
     if cache_key in _PARSED_MARKDOWN_CACHE:
         _PARSED_MARKDOWN_CACHE.move_to_end(cache_key)
         return _PARSED_MARKDOWN_CACHE[cache_key]
+
+    # Check persistent disk cache before invoking expensive CPU parsers
+    disk_cache_file = get_disk_cache_path(file_path)
+    if disk_cache_file and os.path.exists(disk_cache_file):
+        try:
+            with open(disk_cache_file, "r", encoding="utf-8", errors="replace") as cf:
+                disk_text = cf.read()
+            if disk_text and disk_text.strip():
+                _PARSED_MARKDOWN_CACHE[cache_key] = disk_text
+                if len(_PARSED_MARKDOWN_CACHE) > _MAX_PARSED_CACHE_SIZE:
+                    _PARSED_MARKDOWN_CACHE.popitem(last=False)
+                return disk_text
+        except Exception as e:
+            logger.debug(f"[Parsed Cache Disk Read Error]: {e}")
 
     ext = os.path.splitext(file_path)[1].lower()
     filename = os.path.basename(file_path)
@@ -94,6 +127,16 @@ def parse_document_to_markdown(file_path: str) -> str:
     if not md_text or not md_text.strip():
         raise ValueError(f"Could not extract readable text from {filename}")
         
+    # Persist parsed markdown to disk cache for instantaneous re-loads across restarts/refreshes
+    if disk_cache_file:
+        try:
+            tmp_cache = f"{disk_cache_file}.tmp_{os.getpid()}"
+            with open(tmp_cache, "w", encoding="utf-8") as cf:
+                cf.write(md_text)
+            os.replace(tmp_cache, disk_cache_file)
+        except Exception as e:
+            logger.debug(f"[Parsed Cache Disk Write Error]: {e}")
+
     _PARSED_MARKDOWN_CACHE[cache_key] = md_text
     if len(_PARSED_MARKDOWN_CACHE) > _MAX_PARSED_CACHE_SIZE:
         _PARSED_MARKDOWN_CACHE.popitem(last=False)

@@ -643,6 +643,236 @@ def test_clean_duplicate_documents_endpoints():
     assert res_under.json()["status"] == "success"
 
 
+def test_on_demand_highlight_service():
+    """Verify get_ai_highlight_passages extracts and verifies passages from document."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from services.highlight_service import get_ai_highlight_passages
+
+    sample_doc = "Dataset yang digunakan terdiri dari 1.588 citra lalu lintas dengan 3 kelas utama. Model dilatih dengan YOLOv5."
+    mock_json_response = '["Dataset yang digunakan terdiri dari 1.588 citra lalu lintas dengan 3 kelas utama."]'
+
+    mock_llm_resp = AsyncMock()
+    mock_llm_resp.message.content = mock_json_response
+
+    async def _test():
+        with patch("services.highlight_service.acall_fast_with_fallback", new=AsyncMock(return_value=mock_llm_resp)):
+            res = await get_ai_highlight_passages(
+                chat_id="test_chat",
+                doc_id=999,
+                doc_filename="doc.pdf",
+                claim="1.588 citra; 3 kelas",
+                doc_fallback_text=sample_doc,
+            )
+            assert len(res) == 1
+            assert "1.588" in res[0]
+
+            # Test cache hit
+            res_cached = await get_ai_highlight_passages(
+                chat_id="test_chat",
+                doc_id=999,
+                doc_filename="doc.pdf",
+                claim="1.588 citra; 3 kelas",
+                doc_fallback_text=sample_doc,
+            )
+            assert res_cached == res
+
+    asyncio.run(_test())
+
+
+def test_highlight_endpoint():
+    """Verify POST /chats/{chat_id}/highlight endpoint returns correct schema."""
+    res_chat = client.post("/chats", json={"title": "Highlight Test Chat"})
+    assert res_chat.status_code == 200
+    chat_id = res_chat.json()["id"]
+
+    res_empty = client.post(f"/chats/{chat_id}/highlight", json={"claim": ""})
+    assert res_empty.status_code == 200
+    assert res_empty.json()["passages"] == []
+
+
+def test_parsed_markdown_disk_cache(tmp_path):
+    """Verify parsed markdown is cached to disk and read back instantly."""
+    from rag.parsers import parse_document_to_markdown, get_disk_cache_path, _PARSED_MARKDOWN_CACHE
+
+    test_file = tmp_path / "sample.txt"
+    test_file.write_text("Hello World! This is an academic test document.", encoding="utf-8")
+    test_path = str(test_file)
+
+    # First call parses and writes to disk cache
+    content = parse_document_to_markdown(test_path)
+    assert "Hello World!" in content
+
+    disk_path = get_disk_cache_path(test_path)
+    assert disk_path is not None
+    assert os.path.exists(disk_path)
+
+    # Clear memory cache to prove disk cache is read
+    _PARSED_MARKDOWN_CACHE.clear()
+    cached_content = parse_document_to_markdown(test_path)
+    assert cached_content == content
+
+
+def test_citation_highlight_db_persistence():
+    """Verify citation highlight results are stored and restored from SQLite across cache purges."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from database import SessionLocal, CitationHighlight
+    from services.highlight_service import get_ai_highlight_passages, _HIGHLIGHT_CACHE
+
+    chat_id = "test_persistence_chat"
+    doc_id = 888
+    claim = "98.2% akurasi pada pengujian"
+    doc_text = "Metode yang diusulkan mencapai 98.2% akurasi pada pengujian akhir."
+    mock_resp = AsyncMock()
+    mock_resp.message.content = '["Metode yang diusulkan mencapai 98.2% akurasi pada pengujian akhir."]'
+
+    db = SessionLocal()
+    try:
+        # 1. Run with LLM mock and DB persistence
+        with patch("services.highlight_service.acall_fast_with_fallback", new=AsyncMock(return_value=mock_resp)):
+            res = asyncio.run(get_ai_highlight_passages(
+                chat_id=chat_id,
+                doc_id=doc_id,
+                doc_filename="test.pdf",
+                claim=claim,
+                doc_fallback_text=doc_text,
+                db=db,
+            ))
+            assert len(res) == 1
+            assert "98.2%" in res[0]
+
+        # 2. Check that it was written to SQLite
+        row = db.query(CitationHighlight).filter(
+            CitationHighlight.chat_id == chat_id,
+            CitationHighlight.doc_id == doc_id,
+        ).first()
+        assert row is not None
+        assert "98.2%" in row.passages_json
+
+        # 3. Clear in-memory RAM cache completely
+        _HIGHLIGHT_CACHE.clear()
+
+        # 4. Call again WITHOUT LLM mock (if LLM is called, it would fail or use real API)
+        # Because it hits SQLite DB, it returns immediately with 0 errors!
+        res_from_db = asyncio.run(get_ai_highlight_passages(
+            chat_id=chat_id,
+            doc_id=doc_id,
+            doc_filename="test.pdf",
+            claim=claim,
+            doc_fallback_text=doc_text,
+            db=db,
+        ))
+        assert res_from_db == res
+    finally:
+        # Clean up test rows
+        db.query(CitationHighlight).filter(CitationHighlight.chat_id == chat_id).delete()
+        db.commit()
+        db.close()
+
+
+def test_workspace_documents_ordering_contract():
+    """Verify backend and RAG engine guarantee deterministic 1-based document ordering matching frontend citations."""
+    from database import SessionLocal, Document as DBDocument
+
+    res_chat = client.post("/chats", json={"title": "Ordering Contract Test"})
+    assert res_chat.status_code == 200
+    chat_id = res_chat.json()["id"]
+
+    db = SessionLocal()
+    try:
+        # Add 3 documents in non-sequential/reversed order
+        d3 = DBDocument(chat_id=chat_id, filename="Paper3_SVM.txt", title="SVM Paper")
+        d1 = DBDocument(chat_id=chat_id, filename="Paper1_CNN.pdf", title="CNN Paper")
+        d2 = DBDocument(chat_id=chat_id, filename="Paper2_YOLO.txt", title="YOLO Paper")
+
+        db.add_all([d3, d1, d2])
+        db.commit()
+
+        # 1. Test GET /chats/{chat_id} endpoint contract
+        res_detail = client.get(f"/chats/{chat_id}")
+        assert res_detail.status_code == 200
+        docs_from_api = res_detail.json()["documents"]
+        assert len(docs_from_api) == 3
+
+        # API must return them strictly sorted by id ascending with 1-based index
+        assert docs_from_api[0]["index"] == 1
+        assert docs_from_api[0]["id"] == min(d.id for d in [d1, d2, d3])
+        assert docs_from_api[1]["index"] == 2
+        assert docs_from_api[2]["index"] == 3
+
+        # 2. Test RAG engine internal query contract
+        engine_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).order_by(DBDocument.id.asc()).all()
+        assert len(engine_docs) == 3
+
+        for i in range(3):
+            assert engine_docs[i].id == docs_from_api[i]["id"]
+            assert engine_docs[i].filename == docs_from_api[i]["filename"]
+    finally:
+        db.query(DBDocument).filter(DBDocument.chat_id == chat_id).delete()
+        db.commit()
+        db.close()
+
+
+def test_auto_ground_worker_and_claim_extractor():
+    """Verify background worker automatically extracts claims and pre-locks evidence into SQLite."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from database import SessionLocal, Document as DBDocument, CitationHighlight
+    from services.highlight_service import extract_citations_and_claims, auto_ground_response_citations, get_ai_highlight_passages
+
+    sample_table = """| No | Judul & Tahun | Metode & Dataset | Temuan Utama & Metrik Performa |
+| :---: | :--- | :--- | :--- |
+| **1** | **Deteksi Plat Nomor...** | • Metode: CNN + OCR.<br>• Dataset: 100 citra. | • Akurasi 98%, Presisi 98%. |
+| **2** | **Deteksi Objek Plat...** | • Metode: YOLOv5n + TRBA.<br>• Dataset: 3.200 citra. | • mAP 0,893 dan F1-score 0,887. |"""
+
+    pairs = extract_citations_and_claims(sample_table)
+    assert len(pairs) >= 4
+    doc_nums = [p[0] for p in pairs]
+    assert 1 in doc_nums
+    assert 2 in doc_nums
+
+    chat_id = "test_auto_ground_chat"
+    db = SessionLocal()
+    try:
+        d1 = DBDocument(chat_id=chat_id, filename="Paper1.pdf", title="Deteksi Plat Nomor", snippet="Akurasi 98%, Presisi 98% terbukti pada uji.")
+        d2 = DBDocument(chat_id=chat_id, filename="Paper2.txt", title="Deteksi Objek Plat", snippet="mAP 0,893 dan F1-score 0,887 tercapai.")
+        db.add_all([d1, d2])
+        db.commit()
+
+        mock_resp = AsyncMock()
+        mock_resp.message.content = '["Akurasi 98%, Presisi 98% terbukti pada uji."]'
+
+        with patch("services.highlight_service.acall_fast_with_fallback", new=AsyncMock(return_value=mock_resp)):
+            grounded = asyncio.run(auto_ground_response_citations(chat_id, sample_table))
+            assert grounded > 0
+
+        # Check that rows were created in citation_highlights SQLite table
+        highlights = db.query(CitationHighlight).filter(CitationHighlight.chat_id == chat_id).all()
+        assert len(highlights) > 0
+
+        # Now query get_ai_highlight_passages WITHOUT mock - must return instantly from SQLite
+        passages = asyncio.run(get_ai_highlight_passages(
+            chat_id=chat_id,
+            doc_id=d1.id,
+            doc_filename=d1.filename,
+            claim="Akurasi 98%, Presisi 98%.",
+            db=db
+        ))
+        assert len(passages) == 1
+        assert "98%" in passages[0]
+    finally:
+        db.query(CitationHighlight).filter(CitationHighlight.chat_id == chat_id).delete()
+        db.query(DBDocument).filter(DBDocument.chat_id == chat_id).delete()
+        db.commit()
+        db.close()
+
+
+
+
+
+
+
 
 
 

@@ -3,6 +3,127 @@
 import React from "react";
 import { Document as DocType } from "@/stores/documentStore";
 import { Tooltip } from "@/components/ui/tooltip";
+import { fetchOrPrefetchHighlights } from "@/lib/highlightService";
+import { prefetchDocumentContent } from "@/hooks/usePaperDetails";
+
+export interface CitationScopeContextValue {
+  activeChatId?: string | null;
+  backendUrl?: string;
+}
+
+export const CitationScopeContext = React.createContext<CitationScopeContextValue>({
+  activeChatId: null,
+  backendUrl: "",
+});
+
+export interface CitationChipProps {
+  num: number;
+  doc?: DocType;
+  docTitle: string;
+  contextSentence: string;
+  citeUniqueKey: string;
+  isSelected: boolean;
+  aiQuotesForDoc?: string[];
+  onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
+}
+
+export const CitationChip: React.FC<CitationChipProps> = ({
+  num,
+  doc,
+  docTitle,
+  contextSentence,
+  citeUniqueKey,
+  isSelected,
+  aiQuotesForDoc,
+  onOpenDocument,
+}) => {
+  const { activeChatId, backendUrl } = React.useContext(CitationScopeContext);
+
+  // Proactive background prefetch:
+  // When this citation button is rendered in the chat stream or table,
+  // trigger background evidence search AND pre-warm document content so evidence and reader are ready before click!
+  React.useEffect(() => {
+    if (activeChatId && backendUrl && doc?.id) {
+      prefetchDocumentContent(backendUrl, activeChatId, doc.id);
+      if (contextSentence) {
+        fetchOrPrefetchHighlights(
+          backendUrl,
+          activeChatId,
+          doc.id,
+          num,
+          contextSentence,
+          aiQuotesForDoc || []
+        );
+      }
+    }
+  }, [activeChatId, backendUrl, doc?.id, num, contextSentence, aiQuotesForDoc]);
+
+  const handleMouseEnter = () => {
+    if (activeChatId && backendUrl && doc?.id) {
+      prefetchDocumentContent(backendUrl, activeChatId, doc.id);
+      if (contextSentence) {
+        fetchOrPrefetchHighlights(
+          backendUrl,
+          activeChatId,
+          doc.id,
+          num,
+          contextSentence,
+          aiQuotesForDoc || []
+        );
+      }
+    }
+  };
+
+  if (!doc) return null;
+
+  const tooltipContent = (
+    <div className="flex flex-col gap-1 text-left max-w-[280px] not-italic select-none">
+      <div className="text-[11.5px] font-semibold text-white leading-snug line-clamp-2">
+        <span className="text-blue-400 font-mono font-bold mr-1 inline-block">[{num}]</span>
+        <span>{docTitle}</span>
+      </div>
+      <div className="text-[10px] text-neutral-400 font-normal leading-tight">
+        Click to view source and highlight AI-verified evidence
+      </div>
+    </div>
+  );
+
+  return (
+    <Tooltip
+      key={citeUniqueKey}
+      content={tooltipContent}
+      side="top"
+      sideOffset={6}
+      className="p-2 whitespace-normal"
+    >
+      <button
+        type="button"
+        onMouseEnter={handleMouseEnter}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (doc && onOpenDocument) {
+            onOpenDocument(doc, {
+              sentence: contextSentence,
+              num: num,
+              citationKey: citeUniqueKey,
+              aiQuotes: aiQuotesForDoc,
+            });
+          }
+        }}
+        className={`inline-flex items-center justify-center min-w-6 px-1 h-5 text-[10px] font-mono font-bold not-italic normal-case tracking-normal rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-none shadow-sm ${
+          isSelected
+            ? "bg-amber-400 text-black border border-amber-300 font-extrabold shadow-amber-400/20"
+            : "text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70"
+        }`}
+        aria-label={`Source [${num}]: ${docTitle}`}
+      >
+        <span className="sr-only">[</span>
+        <span className="not-italic inline-block leading-none">{num}</span>
+        <span className="sr-only">]</span>
+      </button>
+    </Tooltip>
+  );
+};
 
 export interface CitationContext {
   sentence: string;
@@ -124,9 +245,11 @@ export function enhanceTableCitations(markdown: string): string {
         } else {
           // Row-mapped document table: if leading cell identifies Document [X], ensure content cells have [X]
           const firstCell = cells[0] || "";
-          const rowDocMatch = firstCell.match(/\[(\d{1,3})\]/);
+          const cleanFirst = firstCell.replace(/<[^>]+>/g, "").trim();
+          // Matches: [1], **1**, *1*, `1`, plain 1, Paper 1, Dokumen [1], etc.
+          const rowDocMatch = cleanFirst.match(/(?:\[{1,2}(?:Dokumen|Document|Paper|Source)?\s*(\d{1,3})\s*\]{1,2}|(?:Dokumen|Document|Paper|Source)\s*(\d{1,3})|^[*_`#\s]*(\d{1,3})[*_`#\s]*$)/i);
           if (rowDocMatch && cells.length > 1) {
-            const docNum = rowDocMatch[1];
+            const docNum = rowDocMatch[1] || rowDocMatch[2] || rowDocMatch[3];
             const newCells = [firstCell];
             for (let i = 1; i < cells.length; i++) {
               const h = headerNames[i] || "";
@@ -300,23 +423,24 @@ export function parseCitationsInReactNode(
         });
       }
 
+      const getDocumentByNum = (targetNum: number) => {
+        if (!documents || documents.length === 0) return undefined;
+        const byIndex = documents.find(d => (d.index ? d.index === targetNum : false));
+        if (byIndex) return byIndex;
+        const sorted = [...documents].sort((a, b) => (a.id || 0) - (b.id || 0));
+        return sorted[targetNum - 1];
+      };
+
       let effectiveNums = nums;
 
       // Only render clickable citation buttons for citations that have an existing document
-      // and verifiable highlight quotes or substantive empirical claim content
-      const hasCitationMap = citationMap && Object.keys(citationMap).length > 0;
+      // and substantive empirical claim content (never for unstated/negative claims)
       effectiveNums = effectiveNums.filter(num => {
-        const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
+        const doc = getDocumentByNum(num);
         if (!doc) return false;
 
         // Universal Factuality: Never render a citation button for an unstated / negative claim
         if (contextSentence && isNegativeOrEmptyCitation(contextSentence)) return false;
-
-        if (hasCitationMap) {
-          const aiQuotesForDoc = citationMap[num.toString()] || citationMap[`[${num}]`];
-          // If citation map is present, ONLY render a button if this document has evidence quotes
-          return Boolean(aiQuotesForDoc && aiQuotesForDoc.length > 0);
-        }
 
         return true;
       });
@@ -336,7 +460,7 @@ export function parseCitationsInReactNode(
         parts.push(
           <span key={`cite-grp-${elementPrefix}-${matchIndex}-${sentenceSnippet}`} className="inline-flex items-center gap-0.5 mx-0.5 align-baseline not-italic font-normal">
             {effectiveNums.map((num, i) => {
-              const doc = documents?.find(d => (d.index ? d.index === num : false)) || documents?.[num - 1];
+              const doc = getDocumentByNum(num);
               const docTitle = doc?.title || doc?.filename.replace(/\.pdf$/i, "") || `Referenced Source [${num}]`;
               const aiQuotesForDoc = citationMap?.[num.toString()] || citationMap?.[`[${num}]`];
 
@@ -344,51 +468,18 @@ export function parseCitationsInReactNode(
               const citeUniqueKey = `cite-${elementPrefix}-${sentenceSnippet}-${num}-${matchIndex}-${i}`;
               const isSelected = Boolean(activeCitationKey && activeCitationKey === citeUniqueKey);
 
-              const tooltipContent = (
-                <div className="flex flex-col gap-1 text-left max-w-[280px] not-italic select-none">
-                  <div className="text-[11.5px] font-semibold text-white leading-snug line-clamp-2">
-                    <span className="text-blue-400 font-mono font-bold mr-1 inline-block">[{num}]</span>
-                    <span>{docTitle}</span>
-                  </div>
-                  <div className="text-[10px] text-neutral-400 font-normal leading-tight">
-                    Click to view source and highlight AI-verified evidence
-                  </div>
-                </div>
-              );
-
               return (
-                <Tooltip
+                <CitationChip
                   key={citeUniqueKey}
-                  content={tooltipContent}
-                  side="top"
-                  sideOffset={6}
-                  className="p-2 whitespace-normal"
-                >
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (doc && onOpenDocument) {
-                        onOpenDocument(doc, {
-                          sentence: contextSentence,
-                          num: num,
-                          citationKey: citeUniqueKey,
-                          aiQuotes: aiQuotesForDoc
-                        });
-                      }
-                    }}
-                    className={`inline-flex items-center justify-center min-w-6 px-1 h-5 text-[10px] font-mono font-bold not-italic normal-case tracking-normal rounded cursor-pointer transition-all duration-150 transform hover:scale-105 active:scale-95 select-none shadow-sm ${
-                      isSelected
-                        ? "bg-amber-400 text-black border border-amber-300 font-extrabold shadow-amber-400/20"
-                        : "text-blue-300 hover:text-blue-100 bg-blue-500/15 hover:bg-blue-500/35 border border-blue-500/30 hover:border-blue-400/70"
-                    }`}
-                    aria-label={`Source [${num}]: ${docTitle}`}
-                  >
-                    <span className="sr-only">[</span>
-                    <span className="not-italic inline-block leading-none">{num}</span>
-                    <span className="sr-only">]</span>
-                  </button>
-                </Tooltip>
+                  num={num}
+                  doc={doc}
+                  docTitle={docTitle}
+                  contextSentence={contextSentence}
+                  citeUniqueKey={citeUniqueKey}
+                  isSelected={isSelected}
+                  aiQuotesForDoc={aiQuotesForDoc}
+                  onOpenDocument={onOpenDocument}
+                />
               );
             })}
           </span>

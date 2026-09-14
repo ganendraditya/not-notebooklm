@@ -68,8 +68,8 @@ def list_files(category: Optional[str] = None, db: Session = Depends(get_db)):
 
     if os.path.exists(UPLOAD_DIR):
         for root, dirs, files in os.walk(UPLOAD_DIR):
-            # Prune temporary directories so exports are not enumerated as library files
-            dirs[:] = [d for d in dirs if d != "temp_zips"]
+            # Prune temporary and internal cache directories so exports/caches are not enumerated as library files
+            dirs[:] = [d for d in dirs if d != "temp_zips" and not d.startswith(".")]
             for file in files:
                 file_path = os.path.join(root, file)
                 try:

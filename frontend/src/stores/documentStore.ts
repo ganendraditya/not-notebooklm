@@ -65,6 +65,17 @@ export const unregisterPendingCancelCallback = (id: string) => {
   cancelCallbacksMap.delete(id);
 };
 
+function normalizeAndSortDocuments(docs: Document[]): Document[] {
+  if (!docs || docs.length === 0) return [];
+  // Sort deterministically by ID ascending (matching backend ordering)
+  const sorted = [...docs].sort((a, b) => (a.id || 0) - (b.id || 0));
+  // Guarantee clean 1-based index matching [1]...[N] citations
+  return sorted.map((d, idx) => ({
+    ...d,
+    index: idx + 1,
+  }));
+}
+
 export const useDocumentStore = create<DocumentStore>((set) => ({
   documents: [],
   pendingSources: [],
@@ -72,14 +83,14 @@ export const useDocumentStore = create<DocumentStore>((set) => ({
   viewingDoc: null,
   groundingHighlight: null,
 
-  setDocuments: (documents) => set({ documents }),
+  setDocuments: (documents) => set({ documents: normalizeAndSortDocuments(documents) }),
   setPendingSources: (pendingSources) => set({ pendingSources }),
   setTargetedSource: (targetedSource) => set({ targetedSource }),
   setViewingDoc: (viewingDoc) => set({ viewingDoc }),
   setGroundingHighlight: (groundingHighlight) => set({ groundingHighlight }),
   
-  addDocument: (doc) => set((state) => ({ documents: [...state.documents, doc] })),
-  updateDocumentsList: (updater) => set((state) => ({ documents: updater(state.documents) })),
+  addDocument: (doc) => set((state) => ({ documents: normalizeAndSortDocuments([...state.documents, doc]) })),
+  updateDocumentsList: (updater) => set((state) => ({ documents: normalizeAndSortDocuments(updater(state.documents)) })),
   updatePendingSourcesList: (updater) => set((state) => ({ pendingSources: updater(state.pendingSources) })),
   cancelPendingItem: (id: string) => {
     const cb = cancelCallbacksMap.get(id);

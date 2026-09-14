@@ -94,4 +94,10 @@ class BulkDeleteChatsRequest(BaseModel):
 class RenameDocumentRequest(BaseModel):
     title: str
 
+class HighlightRequest(BaseModel):
+    claim: str
+    doc_id: Optional[int] = None
+    doc_num: Optional[int] = None
+
+
 

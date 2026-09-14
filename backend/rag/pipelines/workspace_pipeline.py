@@ -277,7 +277,8 @@ async def handle_workspace_analysis_pipeline(
 
     clean_text, llm_citations = extract_structured_citations(raw_content)
 
-    # Merge RAG pre-stored verbatim evidence map with LLM citations
+    # Initial document-level evidence quotes from Main LLM and RAG index
+    # Note: Precise per-cell evidence highlighting is handled on-demand via the Fast LLM highlight service.
     merged_citations: Dict[str, List[str]] = {**pre_stored_rag_map}
     for k, v in llm_citations.items():
         clean_k = str(k).strip("[]")

@@ -3,7 +3,7 @@
 import { DocumentReader } from "./RightSidebar/DocumentReader";
 import { DocumentListPanel } from "./RightSidebar/DocumentListPanel";
 import { usePaperDetails } from "@/hooks/usePaperDetails";
-import { getHighlightedContent, formatReadableDate } from "./RightSidebar/DocumentReaderUtils";
+import { getHighlightedContent, formatReadableDate, HighlightMatchResult } from "./RightSidebar/DocumentReaderUtils";
 import { useDocumentManager } from "@/hooks/useDocumentManager";
 
 import { useState, useRef, useEffect, useMemo } from "react";
@@ -15,6 +15,7 @@ import { SourcesToolbar } from "./RightSidebar/SourcesToolbar";
 import { RightSidebarModals } from "./RightSidebar/RightSidebarModals";
 import { DownloadManager } from "@/components/DownloadManager";
 import { Tooltip } from "@/components/ui/tooltip";
+import { getCachedHighlightPassages, fetchOrPrefetchHighlights } from "@/lib/highlightService";
 
 interface RightSidebarProps {
   activeChatId: string | null;
@@ -62,8 +63,9 @@ export default function RightSidebar({
     activeChatId, 
     backendUrl, 
     externalViewingDoc, 
-    onViewingDocChange,
-    groundingHighlight 
+    onViewingDocChange, 
+    groundingHighlight,
+    documents
   });
   const {
     selectedDocs,
@@ -123,19 +125,76 @@ export default function RightSidebar({
   const [activeMatchIndex, setActiveMatchIndex] = useState<number>(0);
   const [totalMatches, setTotalMatches] = useState<number>(0);
   const highlightRefsMap = useRef<Map<number, HTMLElement>>(new Map());
+  const [aiPassages, setAiPassages] = useState<string[] | null>(null);
+  const [isHighlightLoading, setIsHighlightLoading] = useState<boolean>(false);
 
   const currentContent = paperDetails?.content || (viewingDoc as any)?.content || "";
 
-  const highlightResult = useMemo(() => {
+  // On-demand Fast LLM evidence lookup:
+  // When user clicks a citation chip [X] on a specific claim or table cell,
+  // query the backend highlight service (or use pre-warmed background cache) to find the exact verbatim sentences.
+  useEffect(() => {
+    if (!groundingHighlight?.sentence || !activeChatId || !groundingHighlight.docId) {
+      setAiPassages(null);
+      setIsHighlightLoading(false);
+      return;
+    }
+
+    // 1. Instant cache hit from pre-warmed background fetch or prior click
+    const cached = getCachedHighlightPassages(activeChatId, groundingHighlight.docId, groundingHighlight.sentence);
+    if (cached !== undefined) {
+      setAiPassages(cached);
+      setIsHighlightLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsHighlightLoading(true);
+    setAiPassages(null);
+
+    fetchOrPrefetchHighlights(
+      backendUrl,
+      activeChatId,
+      groundingHighlight.docId,
+      groundingHighlight.num,
+      groundingHighlight.sentence,
+      groundingHighlight.aiQuotes || []
+    )
+      .then(passages => {
+        if (!cancelled) {
+          setAiPassages(passages);
+          setIsHighlightLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const fb = groundingHighlight.aiQuotes || [];
+          setAiPassages(fb);
+          setIsHighlightLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [groundingHighlight?.clickId, groundingHighlight?.sentence, groundingHighlight?.docId, groundingHighlight?.num, activeChatId, backendUrl]);
+
+  const highlightResult = useMemo<HighlightMatchResult>(() => {
+    if (isHighlightLoading) {
+      return { nodes: <span>{currentContent}</span>, matchCount: 0, initialActiveIndex: undefined };
+    }
+
+    const effectiveQuotes = aiPassages !== null ? aiPassages : groundingHighlight?.aiQuotes;
+
     return getHighlightedContent(
       currentContent,
       groundingHighlight?.sentence || "",
       // eslint-disable-next-line react-hooks/refs
       highlightRefsMap,
       activeMatchIndex,
-      groundingHighlight?.aiQuotes
+      effectiveQuotes
     );
-  }, [currentContent, groundingHighlight?.sentence, groundingHighlight?.aiQuotes, activeMatchIndex]);
+  }, [currentContent, groundingHighlight?.sentence, groundingHighlight?.aiQuotes, aiPassages, isHighlightLoading, activeMatchIndex]);
 
   useEffect(() => {
     setTotalMatches(highlightResult.matchCount);
@@ -155,7 +214,7 @@ export default function RightSidebar({
 
   // Auto-scroll to current active highlighted cluster
   useEffect(() => {
-    if (!isLoadingDetails) {
+    if (!isLoadingDetails && !isHighlightLoading) {
       const timer = setTimeout(() => {
         let targetEl = highlightRefsMap.current.get(activeMatchIndex);
         if (!targetEl) {
@@ -173,7 +232,7 @@ export default function RightSidebar({
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [isLoadingDetails, activeMatchIndex, groundingHighlight?.clickId, activeTab, paperDetails?.content]);
+  }, [isLoadingDetails, isHighlightLoading, activeMatchIndex, groundingHighlight?.clickId, activeTab, paperDetails?.content]);
 
   // Local memory cache for instant viewer loading without repeated network/parsing overhead
   // Close sort menu on click outside
@@ -274,6 +333,7 @@ export default function RightSidebar({
           viewingDoc={viewingDoc}
           paperDetails={paperDetails}
           isLoadingDetails={isLoadingDetails}
+          isHighlightLoading={isHighlightLoading}
           isAcademicPaper={isAcademicPaper}
           activeTab={activeTab}
           setActiveTab={setActiveTab}

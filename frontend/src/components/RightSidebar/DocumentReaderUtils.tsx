@@ -77,160 +77,14 @@ export function getHighlightedContent(
   }
   if (rawSentences.length === 0) return { nodes: <span>{fullText}</span>, matchCount: 0 };
 
-  // 0. DIRECT CLAIM TEXT GROUNDING PATH:
-  // The targetQuery (= cell text / sentence around the citation) IS the actual claim from the document.
-  // Try to find it DIRECTLY in the document text FIRST, before falling back to aiQuotes or keyword scoring.
-  // This is critical for table cells where the LLM wrote verbatim content from the paper (e.g. journal names,
-  // dataset descriptions, methodology details) — the cell text itself should be found in the source document.
-  // Uses n-gram sequence matching (language-agnostic, no hardcoded word lists).
-  if (targetQuery && targetQuery.trim().length > 20) {
-    const directHighlightedIndices = new Set<number>();
-    const cleanTarget = targetQuery.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-    const allTargetWords = cleanTarget.split(/\s+/).filter(w => w.length >= 2);
-
-    if (allTargetWords.length >= 4) {
-      // Try exact substring match first (very strict — requires full phrase containment)
-      rawSentences.forEach((s, idx) => {
-        if (/^#{1,6}\s+/i.test(s.trim())) return;
-        const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-        if (sClean.length >= 15 && (sClean.includes(cleanTarget) || cleanTarget.includes(sClean))) {
-          directHighlightedIndices.add(idx);
-        }
-      });
-
-      // If no exact substring match, use n-gram sequence matching (language-agnostic)
-      // Extract 3-word and 4-word consecutive n-grams from the target text.
-      // A sentence that contains many of these n-grams is very likely the source.
-      if (directHighlightedIndices.size === 0) {
-        const trigrams: string[] = [];
-        const quadgrams: string[] = [];
-        for (let i = 0; i <= allTargetWords.length - 3; i++) {
-          trigrams.push(`${allTargetWords[i]} ${allTargetWords[i+1]} ${allTargetWords[i+2]}`);
-          if (i <= allTargetWords.length - 4) {
-            quadgrams.push(`${allTargetWords[i]} ${allTargetWords[i+1]} ${allTargetWords[i+2]} ${allTargetWords[i+3]}`);
-          }
-        }
-        const allNgrams = [...quadgrams, ...trigrams];
-        if (allNgrams.length === 0) {
-          // Not enough words for n-grams — skip direct path
-        } else {
-          let bestIdx = -1;
-          let bestScore = 0;
-
-          rawSentences.forEach((s, idx) => {
-            if (/^#{1,6}\s+/i.test(s.trim())) return;
-            const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-            if (sClean.length < 15) return;
-
-            let ngramHits = 0;
-            allNgrams.forEach(ng => {
-              if (sClean.includes(ng)) ngramHits++;
-            });
-
-            // Require at least 30% of n-grams found AND at least 2 n-gram hits
-            const ngramRatio = ngramHits / allNgrams.length;
-            if (ngramRatio >= 0.30 && ngramHits >= 2 && ngramHits > bestScore) {
-              bestScore = ngramHits;
-              bestIdx = idx;
-            }
-          });
-
-          if (bestIdx !== -1) {
-            directHighlightedIndices.add(bestIdx);
-            // Also include immediately adjacent sentences if they share n-grams (multi-sentence cells)
-            [bestIdx - 1, bestIdx + 1].forEach(adj => {
-              if (adj >= 0 && adj < rawSentences.length) {
-                const adjClean = rawSentences[adj].toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
-                if (adjClean.length < 15 || /^#{1,6}\s+/i.test(rawSentences[adj].trim())) return;
-                let adjHits = 0;
-                allNgrams.forEach(ng => { if (adjClean.includes(ng)) adjHits++; });
-                if (allNgrams.length > 0 && adjHits / allNgrams.length >= 0.20 && adjHits >= 2) {
-                  directHighlightedIndices.add(adj);
-                }
-              }
-            });
-          }
-        }
-      }
-
-      // If we found direct matches, render them immediately — no need for aiQuotes fallback
-      if (directHighlightedIndices.size > 0) {
-        const sortedIndices = Array.from(directHighlightedIndices).sort((a, b) => a - b);
-        const directClusters: number[][] = [];
-        let curClust: number[] = [];
-        sortedIndices.forEach(idx => {
-          if (curClust.length === 0) {
-            curClust.push(idx);
-          } else if (idx === curClust[curClust.length - 1] + 1) {
-            curClust.push(idx);
-          } else {
-            directClusters.push([...curClust]);
-            curClust = [idx];
-          }
-        });
-        if (curClust.length > 0) directClusters.push(curClust);
-
-        const indexToClusterMap = new Map<number, number>();
-        directClusters.forEach((clust, cIdx) => {
-          clust.forEach(idx => indexToClusterMap.set(idx, cIdx));
-        });
-
-        const nodes = (
-          <>
-            {rawSentences.map((sentence, idx) => {
-              const isHighlighted = directHighlightedIndices.has(idx);
-              if (isHighlighted) {
-                const match = sentence.match(/^(\s*)([\s\S]*?)(\s*)$/);
-                const leadingSpace = match ? match[1] : "";
-                const coreText = match ? match[2] : sentence;
-                const trailingSpace = match ? match[3] : "";
-                if (!coreText) return <span key={idx}>{sentence}</span>;
-
-                const clusterIdx = indexToClusterMap.get(idx) ?? 0;
-                const isClusterAnchor = directClusters[clusterIdx]?.[0] === idx;
-                const isActiveCluster = clusterIdx === activeMatchIndex;
-
-                return (
-                  <React.Fragment key={idx}>
-                    {leadingSpace && <span>{leadingSpace}</span>}
-                    <mark
-                      data-highlight-active={isActiveCluster ? "true" : undefined}
-                      data-cluster-index={clusterIdx}
-                      ref={(el) => {
-                        if (el && isClusterAnchor && highlightRefsMap) {
-                          highlightRefsMap.current.set(clusterIdx, el);
-                        }
-                      }}
-                      className={`font-medium px-0.5 py-0 rounded-none inline transition-colors ${
-                        isActiveCluster
-                          ? "bg-amber-400/60 dark:bg-amber-400/40 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/60 dark:ring-amber-400/50"
-                          : "bg-amber-200/50 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
-                      }`}
-                      title={`Direct Evidence ${clusterIdx + 1} of ${directClusters.length}`}
-                    >
-                      {coreText}
-                    </mark>
-                    {trailingSpace && <span>{trailingSpace}</span>}
-                  </React.Fragment>
-                );
-              }
-              return <span key={idx}>{sentence}</span>;
-            })}
-          </>
-        );
-
-        return {
-          nodes,
-          matchCount: directClusters.length,
-          initialActiveIndex: 0
-        };
-      }
+  // 0. AI-DRIVEN GROUNDING PATH (PRIMARY):
+  // When aiQuotes are explicitly provided (from on-demand Fast LLM or CITATION_MAP),
+  // strictly highlight the AI-determined verbatim evidence passages.
+  if (aiQuotes !== undefined && aiQuotes !== null) {
+    if (aiQuotes.length === 0) {
+      return { nodes: <span>{fullText}</span>, matchCount: 0 };
     }
-  }
 
-  // 1. AI-DRIVEN GROUNDING PATH (FALLBACK):
-  // If direct claim text search above found nothing, try AI-provided verbatim quote(s) via CITATION_MAP.
-  if (aiQuotes && aiQuotes.length > 0) {
     const aiHighlightedIndices = new Set<number>();
     const aiClusters: number[][] = [];
 
@@ -401,6 +255,160 @@ export function getHighlightedContent(
         matchCount: aiClusters.length,
         initialActiveIndex: 0
       };
+    }
+
+    // Zero-hallucination: When AI quotes are explicitly requested but none matched the text,
+    // do NOT fall back to algorithmic token guessing (which causes false positives).
+    return { nodes: <span>{fullText}</span>, matchCount: 0 };
+  }
+
+  // 1. DIRECT CLAIM TEXT GROUNDING PATH (FALLBACK):
+  // If AI quotes are not present or didn't match, try to find targetQuery directly in the document text.
+  // This is critical for table cells where the LLM wrote verbatim content from the paper (e.g. journal names,
+  // dataset descriptions, methodology details) — the cell text itself should be found in the source document.
+  // Uses n-gram sequence matching (language-agnostic, no hardcoded word lists).
+  if (targetQuery && targetQuery.trim().length > 20) {
+    const directHighlightedIndices = new Set<number>();
+    const cleanTarget = targetQuery.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+    const allTargetWords = cleanTarget.split(/\s+/).filter(w => w.length >= 2);
+
+    if (allTargetWords.length >= 4) {
+      // Try exact substring match first (very strict — requires full phrase containment)
+      rawSentences.forEach((s, idx) => {
+        if (/^#{1,6}\s+/i.test(s.trim())) return;
+        const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+        if (sClean.length >= 15 && (sClean.includes(cleanTarget) || cleanTarget.includes(sClean))) {
+          directHighlightedIndices.add(idx);
+        }
+      });
+
+      // If no exact substring match, use n-gram sequence matching (language-agnostic)
+      // Extract 3-word and 4-word consecutive n-grams from the target text.
+      // A sentence that contains many of these n-grams is very likely the source.
+      if (directHighlightedIndices.size === 0) {
+        const trigrams: string[] = [];
+        const quadgrams: string[] = [];
+        for (let i = 0; i <= allTargetWords.length - 3; i++) {
+          trigrams.push(`${allTargetWords[i]} ${allTargetWords[i+1]} ${allTargetWords[i+2]}`);
+          if (i <= allTargetWords.length - 4) {
+            quadgrams.push(`${allTargetWords[i]} ${allTargetWords[i+1]} ${allTargetWords[i+2]} ${allTargetWords[i+3]}`);
+          }
+        }
+        const allNgrams = [...quadgrams, ...trigrams];
+        if (allNgrams.length === 0) {
+          // Not enough words for n-grams — skip direct path
+        } else {
+          let bestIdx = -1;
+          let bestScore = 0;
+
+          rawSentences.forEach((s, idx) => {
+            if (/^#{1,6}\s+/i.test(s.trim())) return;
+            const sClean = s.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+            if (sClean.length < 15) return;
+
+            let ngramHits = 0;
+            allNgrams.forEach(ng => {
+              if (sClean.includes(ng)) ngramHits++;
+            });
+
+            // Require at least 30% of n-grams found AND at least 2 n-gram hits
+            const ngramRatio = ngramHits / allNgrams.length;
+            if (ngramRatio >= 0.30 && ngramHits >= 2 && ngramHits > bestScore) {
+              bestScore = ngramHits;
+              bestIdx = idx;
+            }
+          });
+
+          if (bestIdx !== -1) {
+            directHighlightedIndices.add(bestIdx);
+            // Also include immediately adjacent sentences if they share n-grams (multi-sentence cells)
+            [bestIdx - 1, bestIdx + 1].forEach(adj => {
+              if (adj >= 0 && adj < rawSentences.length) {
+                const adjClean = rawSentences[adj].toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
+                if (adjClean.length < 15 || /^#{1,6}\s+/i.test(rawSentences[adj].trim())) return;
+                let adjHits = 0;
+                allNgrams.forEach(ng => { if (adjClean.includes(ng)) adjHits++; });
+                if (allNgrams.length > 0 && adjHits / allNgrams.length >= 0.20 && adjHits >= 2) {
+                  directHighlightedIndices.add(adj);
+                }
+              }
+            });
+          }
+        }
+      }
+
+      // If we found direct matches, render them immediately — no need for aiQuotes fallback
+      if (directHighlightedIndices.size > 0) {
+        const sortedIndices = Array.from(directHighlightedIndices).sort((a, b) => a - b);
+        const directClusters: number[][] = [];
+        let curClust: number[] = [];
+        sortedIndices.forEach(idx => {
+          if (curClust.length === 0) {
+            curClust.push(idx);
+          } else if (idx === curClust[curClust.length - 1] + 1) {
+            curClust.push(idx);
+          } else {
+            directClusters.push([...curClust]);
+            curClust = [idx];
+          }
+        });
+        if (curClust.length > 0) directClusters.push(curClust);
+
+        const indexToClusterMap = new Map<number, number>();
+        directClusters.forEach((clust, cIdx) => {
+          clust.forEach(idx => indexToClusterMap.set(idx, cIdx));
+        });
+
+        const nodes = (
+          <>
+            {rawSentences.map((sentence, idx) => {
+              const isHighlighted = directHighlightedIndices.has(idx);
+              if (isHighlighted) {
+                const match = sentence.match(/^(\s*)([\s\S]*?)(\s*)$/);
+                const leadingSpace = match ? match[1] : "";
+                const coreText = match ? match[2] : sentence;
+                const trailingSpace = match ? match[3] : "";
+                if (!coreText) return <span key={idx}>{sentence}</span>;
+
+                const clusterIdx = indexToClusterMap.get(idx) ?? 0;
+                const isClusterAnchor = directClusters[clusterIdx]?.[0] === idx;
+                const isActiveCluster = clusterIdx === activeMatchIndex;
+
+                return (
+                  <React.Fragment key={idx}>
+                    {leadingSpace && <span>{leadingSpace}</span>}
+                    <mark
+                      data-highlight-active={isActiveCluster ? "true" : undefined}
+                      data-cluster-index={clusterIdx}
+                      ref={(el) => {
+                        if (el && isClusterAnchor && highlightRefsMap) {
+                          highlightRefsMap.current.set(clusterIdx, el);
+                        }
+                      }}
+                      className={`font-medium px-0.5 py-0 rounded-none inline transition-colors ${
+                        isActiveCluster
+                          ? "bg-amber-400/60 dark:bg-amber-400/40 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/60 dark:ring-amber-400/50"
+                          : "bg-amber-200/50 dark:bg-amber-500/20 text-amber-950 dark:text-amber-100"
+                      }`}
+                      title={`Direct Evidence ${clusterIdx + 1} of ${directClusters.length}`}
+                    >
+                      {coreText}
+                    </mark>
+                    {trailingSpace && <span>{trailingSpace}</span>}
+                  </React.Fragment>
+                );
+              }
+              return <span key={idx}>{sentence}</span>;
+            })}
+          </>
+        );
+
+        return {
+          nodes,
+          matchCount: directClusters.length,
+          initialActiveIndex: 0
+        };
+      }
     }
   }
 

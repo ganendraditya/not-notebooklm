@@ -31,6 +31,7 @@ from services.storage_service import (
 from services.export_service import (
     generate_bulk_zip_stream,
 )
+from services.highlight_service import get_ai_highlight_passages
 
 router = APIRouter(tags=["documents"])
 logger = logging.getLogger("uvicorn.error")
@@ -260,3 +261,41 @@ def download_prepared_zip(chat_id: str, task_id: str, background_tasks: Backgrou
         media_type="application/zip",
         headers={"Content-Disposition": make_content_disposition("attachment", f"NotbookLM_Sources_{chat_id[:8]}.zip")}
     )
+
+
+@router.post("/chats/{chat_id}/highlight")
+async def get_document_highlight(
+    chat_id: str,
+    req: models.HighlightRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    On-demand AI highlight:
+    When a user clicks a citation chip [X] in a chat message or table cell,
+    the Fast LLM locates the exact 1-2 verbatim sentences in document [X] that substantiate the claim.
+    """
+    if not req.claim or not req.claim.strip():
+        return {"passages": []}
+
+    doc = None
+    if req.doc_id:
+        doc = db.query(Document).filter(Document.id == req.doc_id, Document.chat_id == chat_id).first()
+    elif req.doc_num:
+        docs = db.query(Document).filter(Document.chat_id == chat_id).order_by(Document.id.asc()).all()
+        if 1 <= req.doc_num <= len(docs):
+            doc = docs[req.doc_num - 1]
+
+    if not doc:
+        return {"passages": []}
+
+    fallback_text = doc.abstract or doc.snippet or ""
+    passages = await get_ai_highlight_passages(
+        chat_id=chat_id,
+        doc_id=doc.id,
+        doc_filename=doc.filename,
+        claim=req.claim,
+        doc_fallback_text=fallback_text,
+        db=db,
+    )
+    return {"passages": passages}
+

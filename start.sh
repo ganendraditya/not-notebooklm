@@ -30,6 +30,9 @@ trap 'echo "Shutting down servers..."; kill $BACKEND_PID $FRONTEND_PID 2>/dev/nu
 
 echo "Starting Backend on http://localhost:8000..."
 cd "$ROOT_DIR/backend"
+if [ ! -d "venv" ]; then
+    python3 -m venv venv 2>/dev/null || python -m venv venv
+fi
 source venv/bin/activate
 uvicorn main:app --reload --port 8000 &
 BACKEND_PID=$!

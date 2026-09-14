@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 import React from "react";
-import { parseCitationsInReactNode } from "../components/chat/CitationParser";
+import { parseCitationsInReactNode, enhanceTableCitations } from "../components/chat/CitationParser";
 
 describe("CitationParser", () => {
   it("parses bracket citations like [1] and [2] correctly into interactive buttons", () => {
@@ -283,5 +283,18 @@ describe("CitationParser", () => {
     const { container: cEng } = render(<div>{resEng}</div>);
     expect(cEng.querySelectorAll("button").length).toBe(0);
     expect(cEng.textContent).toContain("Not explicitly stated in the text [1].");
+  });
+
+  it("enhances row-based table with No column (**1**, **2**) by attaching citation tags to claim cells", () => {
+    const rawTable = `| No | Judul & Tahun | Metode & Dataset | Temuan Utama & Metrik Performa |
+| :---: | :--- | :--- | :--- |
+| **1** | **Deteksi Plat Nomor...** *(Yanuangga, 2023)* | • Metode: CNN + OCR.<br>• Dataset: 100 citra. | • Akurasi 98%, Presisi 98%.<br>• Pembacaan OCR: Akurasi 88%. |
+| **2** | **Deteksi Objek Plat...** *(Susilo, 2024)* | • Metode: YOLOv5n + TRBA.<br>• Dataset: 3.200 citra. | • mAP 0,893 dan F1-score 0,887.<br>• Akurasi karakter 83,08%. |`;
+
+    const enhanced = enhanceTableCitations(rawTable);
+    expect(enhanced).toContain("[1]");
+    expect(enhanced).toContain("[2]");
+    expect(enhanced).toContain("Akurasi 98%, Presisi 98% [1].");
+    expect(enhanced).toContain("mAP 0,893 dan F1-score 0,887 [2].");
   });
 });

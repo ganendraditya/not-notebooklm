@@ -257,7 +257,7 @@ async def query_chat(
     db = SessionLocal()
     local_docs = []
     try:
-        db_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).all()
+        db_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).order_by(DBDocument.id.asc()).all()
         local_docs = [d.filename for d in db_docs]
     finally:
         db.close()

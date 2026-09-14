@@ -87,8 +87,8 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Any, file_path: str) -> T
                 is_authentic_pdf = True
                 
                 try:
-                    import pymupdf4llm
-                    new_content = await asyncio.to_thread(pymupdf4llm.to_markdown, file_path)
+                    from rag.parsers import parse_document_to_markdown
+                    new_content = await asyncio.to_thread(parse_document_to_markdown, file_path)
                 except Exception:
                     pass
         except Exception as e:

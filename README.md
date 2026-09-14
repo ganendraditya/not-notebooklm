@@ -1,6 +1,6 @@
 # NotbookLM
 
-An open-source academic research assistant and document workspace designed to run locally on your own machine. Inspired by tools like Google Notebook / Gemini Notebook (previously NotebookLM), Consensus, and Elicit, NotbookLM bridges conversational AI with verifiable academic literature synthesis.
+An open-source academic research assistant and document workspace designed to run locally on your own machine. Inspired by tools like Google Notebook / Gemini Notebook (previously NotebookLM), Consensus, and Elicit—NotbookLM bridges conversational AI with verifiable academic literature synthesis.
 
 ![NotbookLM Workspace](docs/assets/workspace-preview.png)
 
@@ -100,7 +100,9 @@ For active development directly on your machine.
 > 2. **Dedicated Vector Server:** Run a standalone Qdrant container (`docker run -d -p 6333:6333 qdrant/qdrant`) and configure `QDRANT_URL=http://localhost:6333` in `backend/.env` for independent indexing and lower backend memory usage.
 > 3. **Docker Compose:** Alternatively, running `docker compose up -d` (Option 1) manages these services automatically.
 
-#### 1. Backend Setup (FastAPI)
+#### 1. Initial Setup (Dependencies & Configuration)
+
+**Backend:**
 ```bash
 cd backend
 python -m venv venv
@@ -112,17 +114,36 @@ source venv/bin/activate
 
 pip install -r requirements.txt
 cp .env.example .env
-# Edit backend/.env with your configuration
-
-uvicorn main:app --reload --port 8000
+# Edit backend/.env with your LLM configuration
+cd ..
 ```
 
-#### 2. Frontend Setup (Next.js)
+**Frontend:**
 ```bash
 cd frontend
 npm install
-npm run dev
+cd ..
 ```
+
+#### 2. Start Servers
+
+##### Recommended: One-Click Startup Script
+Launch both backend and frontend servers simultaneously with a single command from the project root:
+
+- **Linux / macOS:**
+  ```bash
+  ./start.sh
+  ```
+- **Windows (PowerShell):**
+  ```powershell
+  .\start.ps1
+  ```
+
+##### Alternative: Manual Startup (Separate Terminals)
+If you prefer running services in separate terminal windows for dedicated logs:
+- **Backend:** `cd backend && source venv/bin/activate && uvicorn main:app --reload --port 8000` (or `.\venv\Scripts\activate` on Windows)
+- **Frontend:** `cd frontend && npm run dev`
+
 Open `http://localhost:3000` in your browser.
 
 ---
@@ -184,7 +205,7 @@ Populate your credentials into `backend/.env`:
 ```bash
 cp backend/.env.example backend/.env
 ```
-The application reads configuration through standard environment variables. If you prefer managing credentials without plaintext `.env` files, `./start.sh` also supports injecting secrets via external secret managers such as [Doppler](https://www.doppler.com) (`doppler run -- ./start.sh`) or [Infisical](https://infisical.com).
+The application reads configuration through standard environment variables. If you prefer managing credentials without plaintext `.env` files, `./start.sh` (Linux/macOS) and `.\start.ps1` (Windows) also support injecting secrets via external secret managers such as [Doppler](https://www.doppler.com) (`doppler run -- ./start.sh` or `doppler run -- powershell -File .\start.ps1`) or [Infisical](https://infisical.com).
 
 ---
 

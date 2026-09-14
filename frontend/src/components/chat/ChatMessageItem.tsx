@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { ChatMessage } from "@/stores/chatStore";
 import { Document as DocType, registerPendingCancelCallback, unregisterPendingCancelCallback, useDocumentStore } from "@/stores/documentStore";
-import { parseCitationsInReactNode, CitationContext, enhanceTableCitations } from "./CitationParser";
+import { parseCitationsInReactNode, CitationContext, enhanceTableCitations, CitationScopeContext } from "./CitationParser";
 import { useTranslation } from "@/lib/i18n";
 import { consumeSSEStream } from "@/lib/sse";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -582,14 +582,15 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
   const isPartiallySelected = selectedCount > 0 && selectedCount < novelSourcesCount;
 
   return (
-    <div className={`mb-3 flex ${isUser ? "justify-end" : "justify-start w-full"} font-sans group`}>
-      <div 
-        className={`relative leading-relaxed tracking-wide ${
-          isUser 
-            ? "inline-block max-w-[95%] sm:max-w-[85%] bg-app-user-bubble border border-app-border text-app-text px-5 py-3.5 rounded-[1.5rem] rounded-tr-sm shadow-md"
-            : "w-full max-w-full text-app-text"
-        }`}
-      >
+    <CitationScopeContext.Provider value={{ activeChatId, backendUrl }}>
+      <div className={`mb-3 flex ${isUser ? "justify-end" : "justify-start w-full"} font-sans group`}>
+        <div 
+          className={`relative leading-relaxed tracking-wide ${
+            isUser 
+              ? "inline-block max-w-[95%] sm:max-w-[85%] bg-app-user-bubble border border-app-border text-app-text px-5 py-3.5 rounded-[1.5rem] rounded-tr-sm shadow-md"
+              : "w-full max-w-full text-app-text"
+          }`}
+        >
         {isUser && msg.attachments && msg.attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2 pb-2 border-b border-app-divider">
             {msg.attachments.map((att, idx) => {
@@ -955,8 +956,9 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
           )}
         </div>
       )}
-    </div>
-    </div>
-    </div>
+      </div>
+      </div>
+      </div>
+    </CitationScopeContext.Provider>
   );
 });

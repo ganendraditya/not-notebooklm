@@ -104,6 +104,17 @@ class ChatMessage(Base):
     
     chat_session = relationship("ChatSession", back_populates="messages")
 
+class CitationHighlight(Base):
+    __tablename__ = "citation_highlights"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(String, ForeignKey("chat_sessions.id"), index=True)
+    doc_id = Column(Integer, index=True)
+    claim_hash = Column(String, index=True)
+    claim = Column(Text)
+    passages_json = Column(Text) # JSON-serialized list of verbatim string quotes
+    created_at = Column(DateTime, default=get_utc_now)
+
 Base.metadata.create_all(bind=engine)
 
 def auto_migrate_schema():
@@ -159,6 +170,20 @@ def auto_migrate_schema():
             # Ensure foreign key indexes for performance
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_documents_chat_id ON documents (chat_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_chat_messages_chat_id ON chat_messages (chat_id)"))
+
+            # CitationHighlights table & composite index
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS citation_highlights (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chat_id VARCHAR,
+                    doc_id INTEGER,
+                    claim_hash VARCHAR,
+                    claim TEXT,
+                    passages_json TEXT,
+                    created_at DATETIME
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_citation_highlights_lookup ON citation_highlights (chat_id, doc_id, claim_hash)"))
 
     except Exception as e:
         logger.warning(f"[DB Migration Warning]: {e}")

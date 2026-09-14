@@ -22,6 +22,7 @@ export interface DocumentReaderProps {
   viewingDoc: DocType | null;
   paperDetails: PaperDetailData | null;
   isLoadingDetails: boolean;
+  isHighlightLoading?: boolean;
   isAcademicPaper?: boolean;
   activeTab: "preview" | "pdf";
   setActiveTab: (tab: "preview" | "pdf") => void;
@@ -48,6 +49,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
   viewingDoc,
   paperDetails,
   isLoadingDetails,
+  isHighlightLoading = false,
   isAcademicPaper = false,
   activeTab,
   setActiveTab,

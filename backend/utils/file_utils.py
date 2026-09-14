@@ -6,9 +6,11 @@ from typing import Optional
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "uploads"))
 TEMP_ZIPS_DIR = os.path.join(UPLOAD_DIR, "temp_zips")
 CHAT_MEDIA_DIR = os.path.join(UPLOAD_DIR, "chat_media")
+PARSED_CACHE_DIR = os.path.join(UPLOAD_DIR, ".parsed_cache")
 os.makedirs(TEMP_ZIPS_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
+os.makedirs(PARSED_CACHE_DIR, exist_ok=True)
 
 MAX_SOURCES_PER_CHAT = 300
 

@@ -33,28 +33,69 @@ interface UsePaperDetailsProps {
   externalViewingDoc?: Document | null;
   onViewingDocChange?: (doc: Document | null) => void;
   groundingHighlight?: CitationGroundingHighlight | null;
+  documents?: Document[];
 }
 
-const MAX_CACHE_ENTRIES = 30;
+const MAX_PAPER_CACHE_ENTRIES = 50;
+const globalPaperDetailsCache = new Map<string, PaperDetailData>();
+const globalInFlightPaperRequests = new Map<string, Promise<PaperDetailData | null>>();
 
-function getFromLruCache<K, V>(cache: Map<K, V>, key: K): V | undefined {
-  if (!cache.has(key)) return undefined;
-  const val = cache.get(key)!;
-  cache.delete(key);
-  cache.set(key, val);
-  return val;
+function getPaperCacheKey(chatId: string, docId: number): string {
+  return `${chatId}:${docId}`;
 }
 
-function setInLruCache<K, V>(cache: Map<K, V>, key: K, value: V, maxSize: number = MAX_CACHE_ENTRIES) {
-  if (cache.has(key)) {
-    cache.delete(key);
-  } else if (cache.size >= maxSize) {
-    const oldestKey = cache.keys().next().value;
+export function getCachedPaperDetails(chatId: string, docId: number): PaperDetailData | undefined {
+  return globalPaperDetailsCache.get(getPaperCacheKey(chatId, docId));
+}
+
+export function setCachedPaperDetails(chatId: string, docId: number, data: PaperDetailData): void {
+  const key = getPaperCacheKey(chatId, docId);
+  if (globalPaperDetailsCache.has(key)) {
+    globalPaperDetailsCache.delete(key);
+  } else if (globalPaperDetailsCache.size >= MAX_PAPER_CACHE_ENTRIES) {
+    const oldestKey = globalPaperDetailsCache.keys().next().value;
     if (oldestKey !== undefined) {
-      cache.delete(oldestKey);
+      globalPaperDetailsCache.delete(oldestKey);
     }
   }
-  cache.set(key, value);
+  globalPaperDetailsCache.set(key, data);
+}
+
+export async function prefetchDocumentContent(
+  backendUrl: string,
+  chatId: string,
+  docId: number
+): Promise<PaperDetailData | null> {
+  if (!chatId || !docId || !backendUrl) return null;
+  const key = getPaperCacheKey(chatId, docId);
+
+  if (globalPaperDetailsCache.has(key)) {
+    return globalPaperDetailsCache.get(key)!;
+  }
+
+  if (globalInFlightPaperRequests.has(key)) {
+    return globalInFlightPaperRequests.get(key)!;
+  }
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(`${backendUrl}/chats/${chatId}/documents/${docId}/content`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && !data.error) {
+        setCachedPaperDetails(chatId, docId, data);
+        return data;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      globalInFlightPaperRequests.delete(key);
+    }
+  })();
+
+  globalInFlightPaperRequests.set(key, promise);
+  return promise;
 }
 
 export function usePaperDetails({
@@ -63,13 +104,12 @@ export function usePaperDetails({
   externalViewingDoc,
   onViewingDocChange,
   groundingHighlight,
+  documents,
 }: UsePaperDetailsProps) {
   const [viewingDoc, setViewingDocState] = useState<Document | null>(externalViewingDoc || null);
   const [paperDetails, setPaperDetails] = useState<PaperDetailData | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"preview" | "pdf">("preview");
-
-  const paperDetailsCacheRef = useRef<Map<number, PaperDetailData>>(new Map());
 
   const setViewingDoc = useCallback((doc: Document | null) => {
     setViewingDocState(doc);
@@ -81,6 +121,16 @@ export function usePaperDetails({
   useEffect(() => {
     setViewingDocState(externalViewingDoc || null);
   }, [externalViewingDoc]);
+
+  // Proactive background pre-warming: pre-fetch full text content for workspace documents
+  useEffect(() => {
+    if (!activeChatId || !documents || documents.length === 0) return;
+    documents.forEach(doc => {
+      if (doc?.id) {
+        prefetchDocumentContent(backendUrl, activeChatId, doc.id);
+      }
+    });
+  }, [activeChatId, documents, backendUrl]);
 
   // Whenever active chat changes, always reset viewingDoc and paperDetails to exit reader mode and show default sources list
   useEffect(() => {
@@ -94,41 +144,35 @@ export function usePaperDetails({
   useEffect(() => {
     if (!viewingDoc || !activeChatId) {
       setPaperDetails(null);
+      setIsLoadingDetails(false);
       return;
     }
 
-    const cached = getFromLruCache(paperDetailsCacheRef.current, viewingDoc.id);
+    // 1. Instant cache check (0ms) - eliminates skeleton flicker completely
+    const cached = getCachedPaperDetails(activeChatId, viewingDoc.id);
     if (cached && (cached.id === viewingDoc.id || cached.filename === viewingDoc.filename)) {
       setPaperDetails(cached);
       setIsLoadingDetails(false);
       return;
     }
 
-    setPaperDetails(null);
+    // 2. Fetch if not yet in cache
     setIsLoadingDetails(true);
-    
     let isMounted = true;
 
-    fetch(`${backendUrl}/chats/${activeChatId}/documents/${viewingDoc.id}/content`)
-      .then(res => res.json())
+    prefetchDocumentContent(backendUrl, activeChatId, viewingDoc.id)
       .then(data => {
         if (!isMounted) return;
-        if (data && !data.error) {
-          setInLruCache(paperDetailsCacheRef.current, viewingDoc.id, data);
+        if (data) {
           setPaperDetails(data);
         } else {
           setPaperDetails(null);
         }
       })
-      .catch(err => {
-        if (!isMounted) return;
-        console.error("Failed to load paper details:", err);
-        setPaperDetails(null);
-      })
       .finally(() => {
         if (isMounted) setIsLoadingDetails(false);
       });
-      
+
     return () => {
       isMounted = false;
     };
