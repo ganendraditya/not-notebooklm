@@ -23,7 +23,6 @@ export interface CitationChipProps {
   contextSentence: string;
   citeUniqueKey: string;
   isSelected: boolean;
-  aiQuotesForDoc?: string[];
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
 }
 
@@ -34,7 +33,6 @@ export const CitationChip: React.FC<CitationChipProps> = ({
   contextSentence,
   citeUniqueKey,
   isSelected,
-  aiQuotesForDoc,
   onOpenDocument,
 }) => {
   const { activeChatId, backendUrl } = React.useContext(CitationScopeContext);
@@ -51,12 +49,11 @@ export const CitationChip: React.FC<CitationChipProps> = ({
           activeChatId,
           doc.id,
           num,
-          contextSentence,
-          aiQuotesForDoc || []
+          contextSentence
         );
       }
     }
-  }, [activeChatId, backendUrl, doc?.id, num, contextSentence, aiQuotesForDoc]);
+  }, [activeChatId, backendUrl, doc?.id, num, contextSentence]);
 
   const handleMouseEnter = () => {
     if (activeChatId && backendUrl && doc?.id) {
@@ -67,8 +64,7 @@ export const CitationChip: React.FC<CitationChipProps> = ({
           activeChatId,
           doc.id,
           num,
-          contextSentence,
-          aiQuotesForDoc || []
+          contextSentence
         );
       }
     }
@@ -106,7 +102,6 @@ export const CitationChip: React.FC<CitationChipProps> = ({
               sentence: contextSentence,
               num: num,
               citationKey: citeUniqueKey,
-              aiQuotes: aiQuotesForDoc,
             });
           }
         }}
@@ -477,7 +472,6 @@ export function parseCitationsInReactNode(
                   contextSentence={contextSentence}
                   citeUniqueKey={citeUniqueKey}
                   isSelected={isSelected}
-                  aiQuotesForDoc={aiQuotesForDoc}
                   onOpenDocument={onOpenDocument}
                 />
               );

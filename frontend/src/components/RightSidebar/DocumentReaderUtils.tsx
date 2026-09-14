@@ -79,7 +79,7 @@ export function getHighlightedContent(
 
   // 0. AI-DRIVEN GROUNDING PATH (PRIMARY):
   // When aiQuotes are explicitly provided (from on-demand Fast LLM or CITATION_MAP),
-  // strictly highlight the AI-determined verbatim evidence passages.
+  // strictly highlight all AI-determined verbatim evidence passages.
   if (aiQuotes !== undefined && aiQuotes !== null) {
     if (aiQuotes.length === 0) {
       return { nodes: <span>{fullText}</span>, matchCount: 0 };
@@ -88,31 +88,9 @@ export function getHighlightedContent(
     const aiHighlightedIndices = new Set<number>();
     const aiClusters: number[][] = [];
 
-    // If multiple quotes exist for this document, prioritize quotes matching the clicked cell context (targetQuery)
-    let selectedQuotes = aiQuotes;
-    if (aiQuotes.length > 1 && targetQuery && targetQuery.trim().length > 3) {
-      const cleanTarget = targetQuery.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim();
-      const targetTokens = new Set(cleanTarget.split(/\s+/).filter(w => w.length >= 3));
-
-      // Score each quote against the clicked targetQuery
-      const scoredQuotes = aiQuotes.map(q => {
-        const qClean = q.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ");
-        let hits = 0;
-        targetTokens.forEach(t => {
-          if (qClean.includes(t)) hits++;
-        });
-        return { quote: q, score: hits };
-      });
-
-      const maxScore = Math.max(...scoredQuotes.map(sq => sq.score));
-      // If one or more quotes are relevant to the clicked cell, include them
-      // Require at least 20% of target tokens to match to avoid false positives on metadata cells
-      if (maxScore > 0 && maxScore >= targetTokens.size * 0.2) {
-        selectedQuotes = scoredQuotes.filter(sq => sq.score >= maxScore * 0.6).map(sq => sq.quote);
-      }
-    }
-
-    selectedQuotes.forEach(quote => {
+    // All quotes in aiQuotes represent authentic AI-located evidence passages for this citation.
+    // Process all of them without discarding secondary multi-part evidence!
+    aiQuotes.forEach(quote => {
       if (!quote || quote.trim().length < 5) return;
       const cleanQuote = quote.toLowerCase().replace(/[^a-zA-Z0-9\s]/g, " ").trim().replace(/\s+/g, " ");
       const quoteWords = cleanQuote.split(/\s+/).filter(w => w.length >= 2);
@@ -256,16 +234,11 @@ export function getHighlightedContent(
         initialActiveIndex: 0
       };
     }
-
-    // Zero-hallucination: When AI quotes are explicitly requested but none matched the text,
-    // do NOT fall back to algorithmic token guessing (which causes false positives).
-    return { nodes: <span>{fullText}</span>, matchCount: 0 };
   }
 
   // 1. DIRECT CLAIM TEXT GROUNDING PATH (FALLBACK):
-  // If AI quotes are not present or didn't match, try to find targetQuery directly in the document text.
-  // This is critical for table cells where the LLM wrote verbatim content from the paper (e.g. journal names,
-  // dataset descriptions, methodology details) — the cell text itself should be found in the source document.
+  // If AI quotes are not present or didn't match, find targetQuery directly in the document text.
+  // This handles table cells where the LLM wrote descriptive content from the paper.
   // Uses n-gram sequence matching (language-agnostic, no hardcoded word lists).
   if (targetQuery && targetQuery.trim().length > 20) {
     const directHighlightedIndices = new Set<number>();

@@ -75,4 +75,25 @@ Furthermore, the use of multi-view synthetic data could be beneficial to improve
     // Should NOT match the RELATED WORK section
     expect(result.matchCount).toBeLessThanOrEqual(2);
   });
+
+  it("highlights multiple distinct evidence sentences (1/2, 2/2) without discarding either quote", () => {
+    const paper = `
+# Road Sign Paper
+## Preprocessing
+Pada tahapan ini yaitu merubah ukuran gambar input menjadi 640 x 640 pixel.
+
+## Augmentasi Data
+Kemudian setelah dilakukan rotasi langkah berikutnya adalah dengan menambah efek Cutout dengan tujuan objek tertutup masih terdeteksi.
+`;
+
+    const aiQuotes = [
+      "Pada tahapan ini yaitu merubah ukuran gambar input menjadi 640 x 640 pixel.",
+      "Kemudian setelah dilakukan rotasi langkah berikutnya adalah dengan menambah efek Cutout dengan tujuan objek tertutup masih terdeteksi."
+    ];
+
+    const result = getHighlightedContent(paper, "Resize 640x640 dan efek Cutout", undefined, 0, aiQuotes);
+
+    // Both distinct sections must be preserved as 2 separate match clusters for 1/2 and 2/2 navigation
+    expect(result.matchCount).toBe(2);
+  });
 });

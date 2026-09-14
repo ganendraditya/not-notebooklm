@@ -157,8 +157,7 @@ export default function RightSidebar({
       activeChatId,
       groundingHighlight.docId,
       groundingHighlight.num,
-      groundingHighlight.sentence,
-      groundingHighlight.aiQuotes || []
+      groundingHighlight.sentence
     )
       .then(passages => {
         if (!cancelled) {
@@ -168,8 +167,7 @@ export default function RightSidebar({
       })
       .catch(() => {
         if (!cancelled) {
-          const fb = groundingHighlight.aiQuotes || [];
-          setAiPassages(fb);
+          setAiPassages([]);
           setIsHighlightLoading(false);
         }
       });
@@ -184,7 +182,7 @@ export default function RightSidebar({
       return { nodes: <span>{currentContent}</span>, matchCount: 0, initialActiveIndex: undefined };
     }
 
-    const effectiveQuotes = aiPassages !== null ? aiPassages : groundingHighlight?.aiQuotes;
+    const effectiveQuotes = (aiPassages && aiPassages.length > 0) ? aiPassages : undefined;
 
     return getHighlightedContent(
       currentContent,
@@ -194,7 +192,7 @@ export default function RightSidebar({
       activeMatchIndex,
       effectiveQuotes
     );
-  }, [currentContent, groundingHighlight?.sentence, groundingHighlight?.aiQuotes, aiPassages, isHighlightLoading, activeMatchIndex]);
+  }, [currentContent, groundingHighlight?.sentence, aiPassages, isHighlightLoading, activeMatchIndex]);
 
   useEffect(() => {
     setTotalMatches(highlightResult.matchCount);

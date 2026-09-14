@@ -39,55 +39,61 @@ def _set_in_cache(chat_id: str, doc_id: int, claim: str, passages: List[str]) ->
         _HIGHLIGHT_CACHE.popitem(last=False)
 
 
-FAST_HIGHLIGHT_SYSTEM_PROMPT = """You are a precise academic document evidence locator.
-Given a specific claim or factual statement from a research paper summary/table, locate the EXACT verbatim sentence(s) in the source document that substantiate this claim.
+FAST_HIGHLIGHT_SYSTEM_PROMPT = """You are an academic document evidence locator.
+Given a specific claim or finding from a research paper summary or table cell, locate and return the EXACT verbatim sentence(s) in the source document that substantiate, discuss, or introduce this finding.
 
 RULES:
-1. Return 1 to 2 EXACT VERBATIM sentences copied character-for-character directly from the document text.
-2. STRICTLY FORBIDDEN: Do NOT paraphrase, summarize, merge sentences, or invent any words.
-3. If the claim mentions specific metrics, numbers, dataset sizes, model names, or split ratios (e.g. "1.588", "1.056", "302", "9157", "YOLOv5", "mAP 0,938"):
-   Find and return the sentences containing those exact figures or factual details.
-4. Do NOT return paper titles, author lists, or unrelated headings. Return substantive sentences that provide the proof.
+1. Return EXACT VERBATIM sentence(s) copied character-for-character directly from the document text.
+2. CORE EVIDENCE FOCUS:
+   - Summary claims often include descriptive phrases (e.g. "single-stage object detection", "metode deep learning", "arsitektur mutakhir", or "klasifikasi real-time").
+   - Locate the substantive sentence(s) where the authors discuss, introduce, or evaluate the core technique, dataset, or metric (e.g. if the claim is "YOLOv5 (single-stage object detection) untuk klasifikasi real-time", find the sentence where the authors describe implementing YOLOv5 for vehicle detection/classification).
+   - Do NOT return empty [] just because a descriptive adjective or summary phrase was added. Find the core empirical sentence!
+3. MULTI-PART EVIDENCE (CRITICAL):
+   - If the claim mentions multiple distinct techniques, metrics, or parameters (e.g. resizing dimensions like "640x640" AND augmentation methods like "Cutout" or "rotasi 15°", or multiple evaluation scores like "mAP 0.938" AND "akurasi 98.5%"):
+     You MUST find and return the exact verbatim sentence for EACH distinct fact mentioned in the claim, even if they appear in completely different sections or paragraphs.
+4. STRICTLY FORBIDDEN:
+   - Do NOT paraphrase, summarize, merge sentences, or invent any words. Sentences must exist verbatim in the document.
+   - Do NOT return paper titles, author lists, or unrelated headings. Return substantive sentences that provide the empirical proof.
 5. Return ONLY a JSON array of strings containing the exact sentences, with no markdown formatting or code blocks:
 ["Exact verbatim sentence 1 from document.", "Exact verbatim sentence 2 from document."]
 
-If no evidence exists in the text, return:
+If the document truly does not discuss the topic at all, return:
 []"""
 
 
-def _prepare_relevant_context(full_text: str, claim: str, max_chars: int = 40000) -> str:
-    """If full_text is longer than max_chars, prioritize paragraphs containing tokens from claim."""
+def _prepare_relevant_context(full_text: str, claim: str, max_chars: int = 120000) -> str:
+    """Preserves full document text in natural reading order up to max_chars."""
     if len(full_text) <= max_chars:
         return full_text
 
-    # Extract distinct key tokens from claim (especially numbers and capitalized words)
-    tokens = set(re.findall(r'\b(?:\d+(?:[.,]\d+)?|[A-Za-z0-9_-]{3,})\b', claim))
+    # Extract distinct key tokens from claim
+    tokens = set(re.findall(r'\b(?:\d+(?:[.,]\d+)?|[A-Za-z0-9_-]{3,})\b', claim.lower()))
     paragraphs = full_text.split("\n\n")
 
-    scored_paragraphs = []
-    for p in paragraphs:
+    scored = []
+    for idx, p in enumerate(paragraphs):
         p_clean = p.strip()
         if not p_clean:
             continue
-        p_tokens = set(re.findall(r'\b(?:\d+(?:[.,]\d+)?|[A-Za-z0-9_-]{3,})\b', p_clean))
+        p_tokens = set(re.findall(r'\b(?:\d+(?:[.,]\d+)?|[A-Za-z0-9_-]{3,})\b', p_clean.lower()))
         overlap = len(tokens.intersection(p_tokens))
-        scored_paragraphs.append((overlap, p_clean))
+        scored.append((overlap, idx, p_clean))
 
-    # Keep paragraphs with highest token overlap first
-    scored_paragraphs.sort(key=lambda x: x[0], reverse=True)
-
-    selected = []
+    scored_by_overlap = sorted(scored, key=lambda x: x[0], reverse=True)
+    selected_indices = set()
     total_len = 0
-    for _, p in scored_paragraphs:
+    for _, idx, p in scored_by_overlap:
         if total_len + len(p) + 2 > max_chars:
             break
-        selected.append(p)
+        selected_indices.add(idx)
         total_len += len(p) + 2
 
-    if not selected:
+    # Always preserve natural reading order of selected paragraphs
+    ordered_selected = [p for _, idx, p in scored if idx in selected_indices]
+    if not ordered_selected:
         return full_text[:max_chars]
 
-    return "\n\n".join(selected)
+    return "\n\n".join(ordered_selected)
 
 
 async def get_ai_highlight_passages(
@@ -192,7 +198,7 @@ async def get_ai_highlight_passages(
             ]
             # Verify passages actually exist in document text to prevent hallucinations
             verified_passages = []
-            for vp in valid_passages[:3]:
+            for vp in valid_passages[:5]:
                 # Relaxed whitespace comparison
                 vp_normalized = " ".join(vp.split())
                 full_text_normalized = " ".join(full_text.split())
@@ -231,22 +237,8 @@ async def get_ai_highlight_passages(
     except Exception as err:
         logger.warning(f"[Highlight Service] Fast LLM highlight error: {err}")
 
-    # Fallback: empty list if AI could not find verbatim evidence
+    # Fallback: return empty list without permanently locking it in SQLite
     _set_in_cache(chat_id, doc_id, claim_clean, [])
-    if db is not None:
-        try:
-            from database import CitationHighlight, commit_with_retry
-            empty_entry = CitationHighlight(
-                chat_id=chat_id,
-                doc_id=doc_id,
-                claim_hash=claim_hash,
-                claim=claim_clean,
-                passages_json="[]",
-            )
-            db.add(empty_entry)
-            commit_with_retry(db)
-        except Exception:
-            pass
     return []
 
 

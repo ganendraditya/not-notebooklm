@@ -37,8 +37,7 @@ export async function fetchOrPrefetchHighlights(
   chatId: string,
   docId: number,
   docNum: number | undefined,
-  claim: string,
-  fallbackQuotes: string[] = []
+  claim: string
 ): Promise<string[]> {
   const claimClean = (claim || "").trim();
   if (!claimClean || !chatId || !docId || !backendUrl) {
@@ -73,11 +72,12 @@ export async function fetchOrPrefetchHighlights(
 
       const data = await res.json();
       const passages: string[] = Array.isArray(data.passages) ? data.passages : [];
-      highlightCache.set(key, passages);
+      if (passages.length > 0) {
+        highlightCache.set(key, passages);
+      }
       return passages;
     } catch {
-      highlightCache.set(key, fallbackQuotes);
-      return fallbackQuotes;
+      return [];
     } finally {
       inFlightRequests.delete(key);
     }
