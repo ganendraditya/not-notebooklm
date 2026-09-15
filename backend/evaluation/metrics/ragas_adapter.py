@@ -44,7 +44,7 @@ def evaluate_batch_with_ragas(
 
     base_url = os.getenv("LLM_BASE_URL", "http://localhost:20128/v1")
     api_key = os.getenv("LLM_API_KEY", "")
-    model = os.getenv("LLM_MODEL", "gpt-4o")
+    model = os.getenv("LLM_EVAL_MODEL") or os.getenv("LLM_MODEL", "gpt-4o")
     gemini_key = os.getenv("GEMINI_API_KEY")
 
     try:

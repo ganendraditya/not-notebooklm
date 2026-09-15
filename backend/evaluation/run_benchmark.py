@@ -425,7 +425,11 @@ async def main():
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")
     parser.add_argument("--cross-framework", action="store_true", help="Run comprehensive multi-framework evaluation (Ragas, DeepEval, TruLens, LlamaIndex)")
     parser.add_argument("--include-ragas", action="store_true", help="Run batch Ragas evaluation across results")
+    parser.add_argument("--eval-model", type=str, default=None, help="Override evaluator model (defaults to LLM_EVAL_MODEL or LLM_MODEL)")
     args = parser.parse_args()
+
+    if args.eval_model:
+        os.environ["LLM_EVAL_MODEL"] = args.eval_model
 
     cases, dataset_path = load_benchmark_cases(dataset=args.dataset, limit=args.limit, category=args.category)
     print(f"\n[Benchmark] Loaded {len(cases)} test cases from {dataset_path.name}")
