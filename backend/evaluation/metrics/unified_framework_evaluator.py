@@ -13,6 +13,9 @@ import logging
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 
+# Set DeepEval per-attempt timeout override to 180s to prevent premature retry timeouts on large contexts
+os.environ.setdefault("DEEPEVAL_PER_ATTEMPT_TIMEOUT_SECONDS_OVERRIDE", "180")
+
 logger = logging.getLogger("unified_eval")
 
 # Compatibility shims for langchain_community deprecation

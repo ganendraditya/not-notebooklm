@@ -49,6 +49,7 @@ antislop.md
 
 # Evaluation caches & large datasets
 .promptfoo/
+backend/evaluation/reports/checkpoint_*.json
 backend/evaluation/datasets/alce/
 backend/evaluation/datasets/attributed_qa/
 backend/evaluation/datasets/crag/

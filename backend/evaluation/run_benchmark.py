@@ -441,6 +441,7 @@ async def main():
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")
     parser.add_argument("--cross-framework", action="store_true", help="Run comprehensive multi-framework evaluation (Ragas, DeepEval, TruLens, LlamaIndex)")
     parser.add_argument("--include-ragas", action="store_true", help="Run batch Ragas evaluation across results")
+    parser.add_argument("--reset-checkpoint", action="store_true", help="Ignore existing checkpoint and start fresh")
     args = parser.parse_args()
 
     cases, dataset_path = load_benchmark_cases(dataset=args.dataset, split=args.split, limit=args.limit, category=args.category)
@@ -449,15 +450,56 @@ async def main():
     main_llm = get_main_llm()
     eval_llm = get_fast_llm()
 
+    checkpoint_file = REPORTS_DIR / f"checkpoint_{args.dataset}_{args.split}.json"
+    cached_turn_results = {}
+    cached_cross_reports = {}
+    cached_ragas_records = {}
+
+    if checkpoint_file.exists() and not args.reset_checkpoint:
+        try:
+            with open(checkpoint_file, "r", encoding="utf-8") as f:
+                chk_data = json.load(f)
+                for r in chk_data.get("results", []):
+                    cached_turn_results[r["sample_id"]] = TurnEvaluationResult(**r)
+                for cr in chk_data.get("cross_reports", []):
+                    cached_cross_reports[cr["sample_id"]] = FrameworkScoreReport(**cr)
+                for rr in chk_data.get("ragas_records", []):
+                    cached_ragas_records[rr.get("question", "")] = rr
+            print(f"[Benchmark] Resuming from checkpoint with {len(cached_turn_results)} previously completed cases.")
+        except Exception as e:
+            logger.warning(f"Could not load checkpoint: {e}")
+
     results: List[TurnEvaluationResult] = []
     cross_reports: List[FrameworkScoreReport] = []
     ragas_records: List[Dict[str, Any]] = []
+
+    def save_checkpoint_now():
+        try:
+            with open(checkpoint_file, "w", encoding="utf-8") as f:
+                json.dump({
+                    "results": [r.model_dump() for r in results],
+                    "cross_reports": [cr.model_dump() for cr in cross_reports],
+                    "ragas_records": ragas_records
+                }, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.warning(f"Failed saving checkpoint: {e}")
 
     for i, case in enumerate(cases, start=1):
         cid = case["id"]
         cat = case.get("category", "")
         print(f"\n[{i}/{len(cases)}] Running {cid} ({cat})...")
         print(f"Query: {case['query'][:75]}...")
+
+        # Check if already in checkpoint
+        if cid in cached_turn_results and (not args.cross_framework or cid in cached_cross_reports):
+            print(f"-> [Cached] Loaded {cid} from checkpoint.")
+            res = cached_turn_results[cid]
+            results.append(res)
+            if cid in cached_cross_reports:
+                cross_reports.append(cached_cross_reports[cid])
+            if case["query"] in cached_ragas_records:
+                ragas_records.append(cached_ragas_records[case["query"]])
+            continue
 
         try:
             if cat == "search_discovery":
@@ -501,12 +543,15 @@ async def main():
             # Collect for Ragas batch if eligible
             if (args.include_ragas or args.cross_framework) and cat in ("single_fact", "multi_comparative") and not case.get("unanswerable"):
                 clean_ans = re.sub(r'<!--.*?-->', '', res.raw_response, flags=re.DOTALL).strip()
-                ragas_records.append({
+                r_item = {
                     "question": case["query"],
                     "answer": clean_ans or res.query,
                     "contexts": retrieved_chunks,
                     "ground_truth": case.get("ground_truth", "")
-                })
+                }
+                ragas_records.append(r_item)
+
+            save_checkpoint_now()
 
         except Exception as e:
             logger.error(f"Failed executing case {cid}: {e}", exc_info=True)
@@ -520,6 +565,7 @@ async def main():
                 passed=False,
                 feedback=[f"Runner execution exception: {e}"]
             ))
+            save_checkpoint_now()
 
     # Optional Ragas batch evaluation
     ragas_scores = None
