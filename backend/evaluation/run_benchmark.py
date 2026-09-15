@@ -248,7 +248,8 @@ def print_cross_framework_table(reports: List[FrameworkScoreReport], ragas_score
 def export_cross_framework_report(
     reports: List[FrameworkScoreReport],
     ragas_scores: Optional[Dict[str, Any]] = None,
-    dataset_name: str = "qasper"
+    dataset_name: str = "qasper",
+    elapsed_seconds: Optional[float] = None
 ) -> Path:
     """Exports a publication-grade two-tier Markdown report with highlighted core pillars and full ledger."""
     output_path = REPORTS_DIR / "benchmark_cross_framework.md"
@@ -258,7 +259,7 @@ def export_cross_framework_report(
 
     mean_grounded = round(sum(r.mean_groundedness for r in reports) / total, 3) if total > 0 else 0.0
     mean_rel = round(sum(r.mean_relevancy for r in reports) / total, 3) if total > 0 else 0.0
-    valid_corr = [r.llamaindex_correctness for r in reports if r.llamaindex_correctness is not None]
+    valid_corr = [r.mean_correctness or r.llamaindex_correctness for r in reports if (r.mean_correctness or r.llamaindex_correctness) is not None]
     mean_corr = round(sum(valid_corr) / len(valid_corr), 3) if valid_corr else 0.0
     mean_verbatim = round(sum(r.verbatim_fidelity_score for r in reports) / total, 3) if total > 0 else 0.0
     mean_consensus = round(sum(r.overall_consensus for r in reports) / total, 3) if total > 0 else 0.0
@@ -287,26 +288,12 @@ def export_cross_framework_report(
     li_f_raw = f"{sum(li_faith)/len(li_faith):.3f}" if li_faith else "N/A"
     li_r_str = f"{sum(li_rel)/len(li_rel):.3f}" if li_rel else "N/A"
 
-    # Continuous 4-framework mean (excluding binary LlamaIndex)
-    cont_faith_list = []
-    if de_faith: cont_faith_list.append(sum(de_faith)/len(de_faith))
-    if tru_ground: cont_faith_list.append(sum(tru_ground)/len(tru_ground))
-    if pf_scores: cont_faith_list.append(sum(pf_scores)/len(pf_scores))
-    if ragas_faith is not None: cont_faith_list.append(ragas_faith)
-    cont_mean_str = f"{sum(cont_faith_list)/len(cont_faith_list):.3f}" if cont_faith_list else "N/A"
-
-    cont_rel_list = []
-    if de_rel: cont_rel_list.append(sum(de_rel)/len(de_rel))
-    if tru_rel: cont_rel_list.append(sum(tru_rel)/len(tru_rel))
-    if pf_rel_scores: cont_rel_list.append(sum(pf_rel_scores)/len(pf_rel_scores))
-    if ragas_rel is not None: cont_rel_list.append(ragas_rel)
-    cont_rel_mean_str = f"{sum(cont_rel_list)/len(cont_rel_list):.3f}" if cont_rel_list else "N/A"
-
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    timing_str = f" | Total Wall-Clock Time: {int(elapsed_seconds // 60)}m {int(elapsed_seconds % 60)}s" if elapsed_seconds is not None else ""
 
     md_lines = [
         "# Not-NotebookLM Multi-Framework Scientific Benchmark Report",
-        f"*Evaluated across 5 Industry-Standard Frameworks on AllenAI QASPER | Generated: {timestamp}*",
+        f"*Evaluated across 5 Industry-Standard Frameworks on AllenAI QASPER | Generated: {timestamp}{timing_str}*",
         "",
         "## Tier 1: Executive Summary (3 Core Consensus Pillars)",
         "> *Analogous to mAP and Recall in Computer Vision, these three core pillars represent the primary continuous consensus across all evaluation judges.*",
@@ -460,6 +447,7 @@ async def main():
 
     cases, dataset_path = load_benchmark_cases(dataset=args.dataset, split=args.split, limit=args.limit, category=args.category)
     print(f"\n[Benchmark] Loaded {len(cases)} test cases from {dataset_path.name}")
+    bench_start_time = time.time()
 
     main_llm = get_main_llm()
     eval_llm = get_fast_llm()
@@ -649,18 +637,28 @@ async def main():
             logger.warning(f"Ragas batch evaluation failed: {e}")
 
     # Print Terminal Tables & Export Reports
+    elapsed_sec = time.time() - bench_start_time
+    mins, secs = divmod(int(elapsed_sec), 60)
+
     if args.cross_framework and final_cross_reports:
         print_cross_framework_table(
             final_cross_reports,
             ragas_score=ragas_scores.get("ragas_faithfulness") if ragas_scores else None,
             ragas_rel=ragas_scores.get("ragas_answer_relevancy") if ragas_scores else None
         )
-        cf_report_file = export_cross_framework_report(final_cross_reports, ragas_scores=ragas_scores, dataset_name=args.dataset)
+        cf_report_file = export_cross_framework_report(
+            final_cross_reports,
+            ragas_scores=ragas_scores,
+            dataset_name=args.dataset,
+            elapsed_seconds=elapsed_sec
+        )
         print(f"\n✓ Cross-Framework Markdown Report saved to: {cf_report_file}")
     else:
         print_scorecard_table(final_results)
         report_file = export_markdown_report(final_results, ragas_scores=ragas_scores, dataset_name=args.dataset)
         print(f"\n✓ Markdown Benchmark Report successfully saved to: {report_file}")
+
+    print(f"\n⏱️ Total Benchmark Wall-Clock Time: {mins}m {secs}s ({elapsed_sec:.1f}s)")
 
 
 if __name__ == "__main__":
