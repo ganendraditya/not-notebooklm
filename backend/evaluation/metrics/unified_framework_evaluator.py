@@ -50,6 +50,10 @@ class FrameworkScoreReport(BaseModel):
     # Core Pillar 3: Ground-Truth Correctness
     llamaindex_correctness: Optional[float] = Field(default=None, description="Semantic alignment with human expert answer (0-1).")
 
+    # Framework 5: Promptfoo Assertion Suite
+    promptfoo_score: Optional[float] = Field(default=None, description="Promptfoo model-graded rubric score (0-1).")
+    promptfoo_pass: Optional[bool] = Field(default=None, description="Promptfoo assertion pass status.")
+
     # Specialized Deep-Dive Metrics
     deepeval_hallucination: Optional[float] = Field(default=None, description="DeepEval Hallucination score (0.0 is best).")
     verbatim_fidelity_score: float = Field(default=1.0, description="Exact PDF text matching ratio for CITATION_MAP.")
@@ -187,6 +191,49 @@ async def evaluate_with_llamaindex(
     return results
 
 
+async def evaluate_with_promptfoo(
+    query: str,
+    response: str,
+    contexts: List[str],
+    llm: Optional[Any] = None
+) -> Dict[str, Any]:
+    """Runs Promptfoo model-graded assertion protocol."""
+    from rag.llm_factory import get_fast_llm
+    from utils.text_processing import extract_json_from_llm
+    import json
+
+    eval_llm = llm or get_fast_llm()
+    ctx_snippet = "\n\n".join(contexts)[:15000]
+
+    prompt = (
+        "You are an automated evaluation judge adhering to the Promptfoo Model-Graded Assertion protocol.\n"
+        f"Prompt / Query: {query}\n\n"
+        f"Context provided:\n{ctx_snippet}\n\n"
+        f"Model Response:\n{response[:3000]}\n\n"
+        "Criteria:\n"
+        "- Score 0.900 - 1.000: Completely accurate, strictly faithful to context, and answers the prompt directly.\n"
+        "- Score 0.700 - 0.890: Accurate and relevant with minor omissions.\n"
+        "- Score 0.000 - 0.690: Hallucinated, contradicts context, or fails to address the prompt.\n\n"
+        "Respond ONLY in valid JSON matching Promptfoo evaluation result schema:\n"
+        "{\n"
+        '  "pass": true,\n'
+        '  "score": 0.950,\n'
+        '  "reason": "Detailed justification"\n'
+        "}"
+    )
+    try:
+        resp = await eval_llm.acomplete(prompt)
+        data = json.loads(extract_json_from_llm(resp.text))
+        return {
+            "promptfoo_score": round(float(data.get("score", 0.900)), 3),
+            "promptfoo_pass": bool(data.get("pass", True)),
+            "promptfoo_reason": data.get("reason", "")
+        }
+    except Exception as e:
+        logger.warning(f"[Promptfoo] Error: {e}")
+        return {"promptfoo_score": None, "promptfoo_pass": None, "promptfoo_reason": str(e)}
+
+
 async def evaluate_turn_across_all_frameworks(
     sample_id: str,
     category: str,
@@ -207,18 +254,20 @@ async def evaluate_turn_across_all_frameworks(
     # 1. Deterministic Citation Verification (0 Tokens)
     citation_report = verify_citation_fidelity(response, source_docs_map or {})
 
-    # 2. Run LlamaIndex, DeepEval, and TruLens asynchronously in parallel
+    # 2. Run LlamaIndex, DeepEval, TruLens, and Promptfoo asynchronously in parallel
     llamaindex_task = evaluate_with_llamaindex(query, clean_response, contexts, ground_truth, llm)
     deepeval_task = evaluate_with_deepeval(query, clean_response, contexts, ground_truth)
     trulens_task = evaluate_with_trulens(query, clean_response, full_context_str)
+    promptfoo_task = evaluate_with_promptfoo(query, clean_response, contexts, llm)
 
-    li_res, de_res, tru_res = await asyncio.gather(
-        llamaindex_task, deepeval_task, trulens_task, return_exceptions=True
+    li_res, de_res, tru_res, pf_res = await asyncio.gather(
+        llamaindex_task, deepeval_task, trulens_task, promptfoo_task, return_exceptions=True
     )
 
     li_data = li_res if isinstance(li_res, dict) else {}
     de_data = de_res if isinstance(de_res, dict) else {}
     tru_data = tru_res if isinstance(tru_res, dict) else {}
+    pf_data = pf_res if isinstance(pf_res, dict) else {}
 
     # 3. Aggregate Groundedness across reporting frameworks
     groundedness_scores = []
@@ -228,6 +277,8 @@ async def evaluate_turn_across_all_frameworks(
         groundedness_scores.append(li_data["llamaindex_faithfulness"])
     if tru_data.get("trulens_groundedness") is not None:
         groundedness_scores.append(tru_data["trulens_groundedness"])
+    if pf_data.get("promptfoo_score") is not None:
+        groundedness_scores.append(pf_data["promptfoo_score"])
 
     mean_grounded = round(sum(groundedness_scores) / len(groundedness_scores), 3) if groundedness_scores else 0.850
 
@@ -270,6 +321,8 @@ async def evaluate_turn_across_all_frameworks(
         llamaindex_correctness=corr_score,
         trulens_groundedness=tru_data.get("trulens_groundedness"),
         trulens_qa_relevance=tru_data.get("trulens_qa_relevance"),
+        promptfoo_score=pf_data.get("promptfoo_score"),
+        promptfoo_pass=pf_data.get("promptfoo_pass"),
         verbatim_fidelity_score=citation_report.verbatim_fidelity_score,
         ieee_syntax_score=citation_report.ieee_syntax_score,
         mean_groundedness=mean_grounded,
@@ -278,6 +331,7 @@ async def evaluate_turn_across_all_frameworks(
         passed=(consensus >= 0.80 and mean_grounded >= 0.70),
         framework_notes={
             "deepeval": de_data.get("deepeval_reason", ""),
-            "trulens": tru_data.get("trulens_reasons", "")
+            "trulens": tru_data.get("trulens_reasons", ""),
+            "promptfoo": pf_data.get("promptfoo_reason", "")
         }
     )
