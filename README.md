@@ -10,9 +10,11 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 
 ### Highlights
 
-* **Deterministic Workspace Citation Indexing:** Every document retains a fixed, immutable citation number (`1.`, `2.`, `3.`) across all turns of the conversation. When a document is removed, the system cleanly rearranges remaining indices without numeric fragmentation.
-* **Automated Literature Discovery:** Queries global academic registries (**OpenAlex**, **Crossref**, and **Europe PMC**) with automatic **DuckDuckGo** web search fallback when academic registries yield sparse results, iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
-* **Full-Text PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent racing resolvers (**arXiv**, **Unpaywall**, **OpenAlex**, **Europe PMC**) while enriching paper records with journal quartiles and citation counts.
+* **Deterministic Workspace Citation Indexing:** Every document retains a fixed, immutable citation number (`1.`, `2.`, `3.`) across all turns of the conversation based on a deterministic ID-ascending contract. When a document is removed, the system cleanly rearranges remaining indices without numeric fragmentation.
+* **Automated Literature Discovery & Web Fallback:** Queries global academic registries (**OpenAlex**, **Crossref**, and **Europe PMC**) with automatic **DuckDuckGo** web search fallback when academic registries yield sparse results, iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
+* **Full-Text PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent racing resolvers (**arXiv**, **Unpaywall**, **OpenAlex**, **Europe PMC**) with in-memory title verification, while enriching paper records with journal quartiles and citation counts.
+* **Multi-Format Ingestion & Bibliography Splitting:** Ingests PDF, DOCX, TXT, and Markdown files. Multi-entry BibTeX (`.bib`) and RIS (`.ris`) collections are automatically disassembled on upload into standalone workspace documents with optimistic loading spinners and real-time open-access PDF resolution.
+* **Asynchronous Auto-Grounding & SQLite Persistence:** Citation grounding runs asynchronously after generation via Fast LLM and is persisted in SQLite (`citation_highlights`). A 4-tier matching engine (exact verbatim, n-gram intersection, fallback span, and multi-bullet context cursor) accurately highlights supporting passages in the document reader.
 * **Cell-Level Citation Matrices & Markdown Export:** Synthesizes literature into structured comparative review matrices with verifiable citations embedded directly in individual table cells, accompanied by 1-click Markdown table copy and native KaTeX math equation rendering.
 * **Interactive Split-Pane Reader & Jump-to-Highlight:** Bidirectional citation navigation—clicking any citation badge in a response or table cell automatically opens the document reader, scrolls to the page, and highlights the exact supporting passage.
 * **Targeted Document Focus:** One-click "Ask about this document" mode focuses questions exclusively on an individual paper without deselecting other workspace files.
@@ -31,20 +33,23 @@ Search across OpenAlex, Crossref, Europe PMC, with intelligent **DuckDuckGo** sc
 
 ### 2. Deterministic Source Management & Multi-Format Ingestion
 Imported and uploaded sources appear in the right-hand **Sources** panel with permanent numeric citation indices (`1.`, `2.`, ...):
-* **Format Badges:** Visual tags identify source filetypes—`PDF`, `DOC` (Word), `TXT`, `MD`, `BIB`, and `RIS` (bibliographic collections like BibTeX and RIS are parsed into structured, searchable Markdown entries).
+* **Format Badges & Document Status:** Visual tags reflect source state—`PDF` (red) indicates an authentic manuscript PDF acquired via open-access resolvers, while `TXT` (gray) represents structured publication briefs with abstracts for paywalled references or uploaded text notes. Additional tags identify uploaded document formats like `DOC` (Word) and `MD` (Markdown).
+* **Automated Bibliography Disassembly:** Uploading multi-entry `.bib` or `.ris` files automatically splits each reference into an individual workspace entry. Client-side title extraction creates instant optimistic loading cards with spinners while concurrent background racing attempts to resolve full open-access PDFs via DOI before falling back to structured publication briefs.
 * **Deterministic Indices & Auto-Reindex:** A source's citation number remains consistent throughout the entire conversation. Deleting a source automatically compacts and shifts remaining document indices cleanly.
 * **Verified Paper vs. Local Manuscript:** Authentic journal publications retain official publisher metadata, while local documents (such as theses, student projects, or CVs) are cleanly cataloged without artificial journal labels.
 * **Bulk ZIP Export:** Download original documents individually or bundle multiple selected sources into a single organized ZIP package.
 
 ### 3. Integrated Document Reader & Targeted Focus
 Inspect full manuscripts directly within the workspace:
-* **Dual-View Inspection:** Stream authentic publication PDFs or switch to extracted full-text for citation navigation.
+* **Dual-View Inspection:** Stream authentic publication PDFs directly in the browser or switch to extracted full-text for citation navigation.
 * **Ask About This Document:** Focus queries exclusively on a single source with one click, bypassing manual workspace deselection.
 * **Multi-Format Citation Generator:** Export clean, verified academic citations across APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS.
 
 ### 4. Grounded Synthesis & Bidirectional Citation Highlighting
 Synthesize multiple papers into comparative review matrices. Each finding is tagged with traceable citation badges (`[1]`, `[2]`). Clicking any citation opens the document reader and automatically scrolls to highlight the exact supporting sentence in the source text:
 * **Cell-Level Evidence:** Citations are anchored to specific table cells for verifiable metric-by-metric comparison.
+* **4-Tier Highlight Matching:** Resolves citations using exact verbatim quotes, n-gram token intersection, character span fallback, and context cursors designed specifically for multi-bullet comparison tables.
+* **Asynchronous Grounding & Persistence:** Fast LLM grounding runs asynchronously in the background and caches results directly in SQLite (`citation_highlights`), ensuring instant jump-to-highlight on return visits.
 * **1-Click Markdown Copy:** Copy sanitized Markdown tables directly into Notion, Obsidian, Typora, or Word.
 * **KaTeX Mathematics:** Seamlessly renders mathematical notation, formulas, and matrices ($E = mc^2$, $\sum$, $\int$).
 
@@ -139,12 +144,21 @@ Launch both backend and frontend servers simultaneously with a single command fr
   .\start.ps1
   ```
 
+Both startup scripts include an integrated **Port Guard** that automatically detects and safely terminates orphaned processes on ports 8000 and 3000, preventing `Address already in use` launch errors.
+
 ##### Alternative: Manual Startup (Separate Terminals)
 If you prefer running services in separate terminal windows for dedicated logs:
 - **Backend:** `cd backend && source venv/bin/activate && uvicorn main:app --reload --port 8000` (or `.\venv\Scripts\activate` on Windows)
 - **Frontend:** `cd frontend && npm run dev`
 
 Open `http://localhost:3000` in your browser.
+
+##### Pre-Flight Verification Script
+Mirror the automated GitHub Actions CI pipeline locally before committing or creating pull requests:
+```bash
+./check.sh
+```
+Runs frontend linting, unit tests (`vitest`), Next.js production build, backend syntax compilation, and the full pytest suite. Flags: `--frontend` (`-f`) or `--backend` (`-b`) to run targeted checks.
 
 ---
 
@@ -205,18 +219,20 @@ Populate your credentials into `backend/.env`:
 ```bash
 cp backend/.env.example backend/.env
 ```
-The application reads configuration through standard environment variables. If you prefer managing credentials without plaintext `.env` files, `./start.sh` (Linux/macOS) and `.\start.ps1` (Windows) also support secret injection via [Doppler](https://www.doppler.com) (automatic CLI detection or `doppler run -- ./start.sh`) or [Infisical](https://infisical.com) (`infisical run -- ./start.sh`).
+The application reads configuration through standard environment variables. If you prefer managing credentials without plaintext `.env` files, `./start.sh` (Linux/macOS) and `.\start.ps1` (Windows) feature automatic CLI detection and parity for both [Doppler](https://www.doppler.com) and [Infisical](https://infisical.com) (auto-detects active vault sessions or supports explicit wrappers like `doppler run -- ./start.sh` or `infisical run -- ./start.sh`).
 
 ---
 
 ## Architecture & Tech Stack
 
 * **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS, Zustand State Management, Base UI.
-* **Backend:** FastAPI, SQLAlchemy (SQLite), LlamaIndex.
+* **Backend:** FastAPI, SQLAlchemy (SQLite with WAL mode for chat sessions & citation persistence), LlamaIndex.
+* **Literature Discovery:** Multi-engine scholarly search via **OpenAlex**, **Crossref**, **Europe PMC**, and **DuckDuckGo** web search fallback.
+* **PDF Resolvers:** Concurrent racing resolvers across **arXiv**, **Unpaywall**, **OpenAlex**, and **Europe PMC** with in-memory title verification.
 * **Storage:** Unified Storage Adapter supporting Local Disk and S3-compatible Object Storage (Cloudflare R2, MinIO, AWS S3).
 * **Vector Store:** Qdrant (supports remote Docker instance or embedded local disk fallback).
 * **Embeddings:** Local multilingual embeddings (`intfloat/multilingual-e5-small`) or Google Gemini embeddings.
-* **LLM Engine:** OpenAI-compatible adapter (`OpenAILike`) with tiered model roles and automatic error fallback.
+* **LLM Engine:** OpenAI-compatible adapter (`OpenAILike`) with tiered model roles (Primary, Fast, Fallback) and automated error recovery.
 
 ---
 
