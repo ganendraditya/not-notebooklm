@@ -70,7 +70,7 @@ class FrameworkScoreReport(BaseModel):
 def _get_env_credentials():
     base_url = os.getenv("LLM_BASE_URL", "http://localhost:20128/v1")
     api_key = os.getenv("LLM_API_KEY", "")
-    model_name = os.getenv("LLM_EVAL_MODEL") or os.getenv("LLM_MODEL", "gpt-4o")
+    model_name = os.getenv("LLM_MODEL", "gpt-4o")
     return base_url, api_key, model_name
 
 

@@ -1,11 +1,12 @@
 """
 Loader for the official AllenAI QASPER (Question Answering on Scientific Papers) dataset.
-Extracts representative research paper QA pairs and converts full papers into markdown.
+Extracts exactly 25 curated benchmark questions across diverse arXiv papers with full text.
 """
 
 import os
 import re
 import json
+import shutil
 import urllib.request
 import logging
 from pathlib import Path
@@ -17,14 +18,22 @@ DATASETS_DIR = Path(__file__).resolve().parent
 QASPER_PAPERS_DIR = DATASETS_DIR / "qasper_papers"
 QASPER_PAPERS_DIR.mkdir(parents=True, exist_ok=True)
 
+BACKEND_DIR = DATASETS_DIR.parent.parent
+UPLOADS_DIR = BACKEND_DIR / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
 OUTPUT_BENCHMARK_FILE = DATASETS_DIR / "international_qasper.json"
 
-# Selected high-quality paper IDs from QASPER validation split
 TARGET_PAPER_IDS = [
-    "1801.05147",  # Adversarial Learning for Chinese NER from Crowd Annotations (Fact + Unanswerable)
-    "1909.00512",  # Geometry of BERT, ELMo, and GPT-2 Embeddings (Representations & Math)
-    "1909.02027",  # Intent Classification & Out-of-Scope Prediction (Classifiers & Benchmarks)
-    "1805.08241",  # Sparse and Constrained Attention for NMT (Attention Mechanisms)
+    "1912.01214",  # Cross-lingual Pre-training for Zero-shot NMT
+    "1810.08699",  # pioNER: Datasets and Baselines for Armenian NER
+    "1609.00425",  # Identifying Dogmatism in Social Media
+    "1801.05147",  # Adversarial Learning for Chinese NER from Crowd Annotations
+    "1811.00383",  # Addressing Word-order Divergence in Multilingual NMT
+    "1909.09067",  # A Corpus for Automatic Readability Assessment
+    "1704.06194",  # Improved Neural Relation Detection for KBQA
+    "1909.00512",  # Geometry of BERT, ELMo, and GPT-2 Embeddings
+    "2003.03106",  # Clinical Text Sensitive Data Detection with BERT
 ]
 
 
@@ -51,9 +60,9 @@ def format_full_paper_markdown(row: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def fetch_and_build_qasper_benchmark(max_samples: int = 8) -> Path:
-    """Fetches official rows from Hugging Face dataset server and builds the benchmark JSON."""
-    logger.info("Fetching validation split from AllenAI QASPER...")
+def fetch_and_build_qasper_benchmark(target_count: int = 25) -> Path:
+    """Fetches official validation rows from Hugging Face and curates exactly 25 cases."""
+    print("Fetching validation split from AllenAI QASPER...")
     api_url = "https://datasets-server.huggingface.co/rows?dataset=allenai/qasper&config=qasper&split=validation&offset=0&limit=30"
     
     req = urllib.request.Request(api_url, headers={"User-Agent": "Mozilla/5.0"})
@@ -71,14 +80,18 @@ def fetch_and_build_qasper_benchmark(max_samples: int = 8) -> Path:
             continue
 
         title = row.get("title", "")
-        # Save paper text to markdown file
         paper_filename = f"qasper_{pid}.txt"
         paper_path = QASPER_PAPERS_DIR / paper_filename
         
+        # Save paper text to markdown file
         md_text = format_full_paper_markdown(row)
         with open(paper_path, "w", encoding="utf-8") as pf:
             pf.write(md_text)
         saved_papers[pid] = paper_filename
+
+        # Also copy to uploads directory for RAG pipeline ingestion
+        upload_dest = UPLOADS_DIR / paper_filename
+        shutil.copyfile(paper_path, upload_dest)
 
         qas = row.get("qas", {})
         questions = qas.get("question", [])
@@ -92,7 +105,6 @@ def fetch_and_build_qasper_benchmark(max_samples: int = 8) -> Path:
             first_ans = answers[0]
             is_unanswerable = bool(first_ans.get("unanswerable", False))
             
-            # Extract ground truth text
             gt_text = ""
             if is_unanswerable:
                 gt_text = "This information is not mentioned or provided in the paper."
@@ -125,19 +137,22 @@ def fetch_and_build_qasper_benchmark(max_samples: int = 8) -> Path:
                 "unanswerable": is_unanswerable
             })
 
-            if len(benchmark_cases) >= max_samples:
+            if len(benchmark_cases) >= target_count:
                 break
         
-        if len(benchmark_cases) >= max_samples:
+        if len(benchmark_cases) >= target_count:
             break
+
+    # Truncate to exact target count
+    benchmark_cases = benchmark_cases[:target_count]
 
     with open(OUTPUT_BENCHMARK_FILE, "w", encoding="utf-8") as f:
         json.dump(benchmark_cases, f, indent=2, ensure_ascii=False)
 
-    print(f"✓ Saved {len(benchmark_cases)} official QASPER benchmark cases to: {OUTPUT_BENCHMARK_FILE}")
-    print(f"✓ Saved {len(saved_papers)} paper text files to: {QASPER_PAPERS_DIR}")
+    print(f"✓ Saved exactly {len(benchmark_cases)} official QASPER benchmark cases to: {OUTPUT_BENCHMARK_FILE}")
+    print(f"✓ Saved {len(saved_papers)} paper text files to: {QASPER_PAPERS_DIR} and {UPLOADS_DIR}")
     return OUTPUT_BENCHMARK_FILE
 
 
 if __name__ == "__main__":
-    fetch_and_build_qasper_benchmark()
+    fetch_and_build_qasper_benchmark(target_count=25)
