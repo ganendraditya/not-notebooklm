@@ -194,36 +194,37 @@ def print_scorecard_table(results: List[TurnEvaluationResult]):
 
 def print_cross_framework_table(reports: List[FrameworkScoreReport], ragas_score: Optional[float] = None, ragas_rel: Optional[float] = None):
     """Prints a clear tabular terminal scorecard comparing all 5 frameworks with exact quantitative scores."""
-    print("\n" + "=" * 135)
-    print(f"{'NOT-NOTEBOOKLM MULTI-FRAMEWORK SCIENTIFIC BENCHMARK (CONSENSUS LEDGER)':^135}")
-    print("=" * 135)
+    print("\n" + "=" * 145)
+    print(f"{'NOT-NOTEBOOKLM MULTI-FRAMEWORK SCIENTIFIC BENCHMARK (CONSENSUS LEDGER)':^145}")
+    print("=" * 145)
     header = (
-        f"{'ID':<18} | {'DeepEval':<9} | {'TruLens':<9} | {'LlamaIdx':<9} | {'Promptfoo':<9} | "
+        f"{'ID':<18} | {'DeepEval':<9} | {'TruLens':<9} | {'Promptfoo':<9} | {'RAGAS':<9} | {'LlamaIdx':<9} | "
         f"{'MeanFaith':<9} | {'MeanRel':<9} | {'Correct':<8} | {'Verbatim':<8} | {'Consensus':<9} | {'Status':<6}"
     )
     print(header)
-    print("-" * 135)
+    print("-" * 145)
 
     for r in reports:
         de_str = f"{r.deepeval_faithfulness:.3f}" if r.deepeval_faithfulness is not None else "N/A"
         tru_str = f"{r.trulens_groundedness:.3f}" if r.trulens_groundedness is not None else "N/A"
-        li_str = f"{r.llamaindex_faithfulness:.3f}" if r.llamaindex_faithfulness is not None else "N/A"
         pf_str = f"{r.promptfoo_score:.3f}" if r.promptfoo_score is not None else "N/A"
+        rag_str = f"{r.ragas_faithfulness:.3f}" if r.ragas_faithfulness is not None else "N/A"
+        li_str = f"{r.llamaindex_faithfulness:.3f}" if r.llamaindex_faithfulness is not None else "N/A"
         corr_str = f"{r.llamaindex_correctness:.3f}" if r.llamaindex_correctness is not None else "N/A"
         status_str = "PASS" if r.passed else "FAIL"
 
         row = (
-            f"{r.sample_id:<18} | {de_str:<9} | {tru_str:<9} | {li_str:<9} | {pf_str:<9} | "
+            f"{r.sample_id:<18} | {de_str:<9} | {tru_str:<9} | {pf_str:<9} | {rag_str:<9} | {li_str:<9} | "
             f"{r.mean_groundedness:<9.3f} | {r.mean_relevancy:<9.3f} | {corr_str:<8} | "
             f"{r.verbatim_fidelity_score:<8.3f} | {r.overall_consensus:<9.3f} | {status_str:<6}"
         )
         print(row)
 
-    print("=" * 135)
+    print("=" * 145)
     if ragas_score is not None:
         rel_msg = f" | RAGAS Answer Relevancy: {ragas_rel:.3f}" if ragas_rel is not None else ""
-        print(f"[*] RAGAS Official Batch Faithfulness: {ragas_score:.3f}{rel_msg}")
-        print("=" * 135)
+        print(f"[*] RAGAS Batch Scores: Faithfulness: {ragas_score:.3f}{rel_msg}")
+        print("=" * 145)
 
 
 def export_cross_framework_report(
@@ -244,6 +245,36 @@ def export_cross_framework_report(
     mean_verbatim = round(sum(r.verbatim_fidelity_score for r in reports) / total, 3) if total > 0 else 0.0
     mean_consensus = round(sum(r.overall_consensus for r in reports) / total, 3) if total > 0 else 0.0
 
+    # Calculate individual framework averages
+    de_faith = [r.deepeval_faithfulness for r in reports if r.deepeval_faithfulness is not None]
+    de_rel = [r.deepeval_relevancy for r in reports if r.deepeval_relevancy is not None]
+    tru_ground = [r.trulens_groundedness for r in reports if r.trulens_groundedness is not None]
+    tru_rel = [r.trulens_qa_relevance for r in reports if r.trulens_qa_relevance is not None]
+    pf_scores = [r.promptfoo_score for r in reports if r.promptfoo_score is not None]
+    li_faith = [r.llamaindex_faithfulness for r in reports if r.llamaindex_faithfulness is not None]
+    li_rel = [r.llamaindex_relevancy for r in reports if r.llamaindex_relevancy is not None]
+
+    ragas_faith = ragas_scores.get("ragas_faithfulness") if ragas_scores else None
+    ragas_rel = ragas_scores.get("ragas_answer_relevancy") if ragas_scores else None
+
+    de_f_str = f"{sum(de_faith)/len(de_faith):.3f}" if de_faith else "N/A"
+    de_r_str = f"{sum(de_rel)/len(de_rel):.3f}" if de_rel else "N/A"
+    tru_g_str = f"{sum(tru_ground)/len(tru_ground):.3f}" if tru_ground else "N/A"
+    tru_r_str = f"{sum(tru_rel)/len(tru_rel):.3f}" if tru_rel else "N/A"
+    pf_f_str = f"{sum(pf_scores)/len(pf_scores):.3f}" if pf_scores else "N/A"
+    ragas_f_str = f"{ragas_faith:.3f}" if ragas_faith is not None else "N/A"
+    ragas_r_str = f"{ragas_rel:.3f}" if ragas_rel is not None else "N/A"
+    li_f_raw = f"{sum(li_faith)/len(li_faith):.3f}" if li_faith else "N/A"
+    li_r_str = f"{sum(li_rel)/len(li_rel):.3f}" if li_rel else "N/A"
+
+    # Continuous 4-framework mean (excluding binary LlamaIndex)
+    cont_faith_list = []
+    if de_faith: cont_faith_list.append(sum(de_faith)/len(de_faith))
+    if tru_ground: cont_faith_list.append(sum(tru_ground)/len(tru_ground))
+    if pf_scores: cont_faith_list.append(sum(pf_scores)/len(pf_scores))
+    if ragas_faith is not None: cont_faith_list.append(ragas_faith)
+    cont_mean_str = f"{sum(cont_faith_list)/len(cont_faith_list):.3f}" if cont_faith_list else "N/A"
+
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     md_lines = [
@@ -257,12 +288,14 @@ def export_cross_framework_report(
         f"- **Consensus Pass Rate:** **{pass_rate}%** ({passed_count}/{total} cases passed)",
         f"- **Composite Consensus Score:** **{mean_consensus:.3f}** / 1.000",
         "",
-        "| Core Evaluation Pillar | Multi-Judge Consensus | Target Threshold | Industry Standing |",
+        "| Core Evaluation Pillar | Multi-Judge Consensus | Target Threshold | Frameworks Included in Mean |",
         "| :--- | :---: | :---: | :--- |",
-        f"| **Pillar 1: Groundedness (Anti-Hallucination)** | **{mean_grounded:.3f}** | >= 0.850 | Cross-verified by DeepEval, TruLens & LlamaIndex |",
-        f"| **Pillar 2: Answer Relevancy & Completeness** | **{mean_rel:.3f}** | >= 0.850 | Optimal Query Fulfillment |",
-        f"| **Pillar 3: Ground-Truth Correctness** | **{mean_corr:.3f}** | >= 0.800 | Aligned with Human Expert Annotators |",
-        f"| **Product Invariant: PDF Citation Fidelity** | **{mean_verbatim * 100:.1f}%** | >= 90.0% | Authentic Source Text Match |",
+        f"| **Pillar 1: Groundedness (Anti-Hallucination)** | **{mean_grounded:.3f}** | >= 0.850 | **5 Frameworks:** DeepEval ({de_f_str}) + TruLens ({tru_g_str}) + Promptfoo ({pf_f_str}) + Ragas ({ragas_f_str}) + LlamaIndex ({li_f_raw}) |",
+        f"| **Pillar 2: Answer Relevancy & Completeness** | **{mean_rel:.3f}** | >= 0.850 | **4 Frameworks:** DeepEval ({de_r_str}) + TruLens ({tru_r_str}) + Ragas ({ragas_r_str}) + LlamaIndex ({li_r_str}) |",
+        f"| **Pillar 3: Ground-Truth Correctness** | **{mean_corr:.3f}** | >= 0.800 | Aligned with Human Expert Annotators (QASPER Ground Truth) |",
+        f"| **Product Invariant: PDF Citation Fidelity** | **{mean_verbatim * 100:.1f}%** | >= 90.0% | Deterministic Substring & Fuzzy Match on raw PDF text |",
+        "",
+        f"> **Continuous 4-Framework Groundedness (Excluding LlamaIndex Binary):** **`{cont_mean_str}`**",
         "",
         "---",
         "",
@@ -271,53 +304,28 @@ def export_cross_framework_report(
         "### A. Framework-by-Framework Scorecard Breakdown",
         "| Evaluation Framework | Groundedness / Faithfulness | Answer Relevancy | Evaluator Type / Algorithm |",
         "| :--- | :---: | :---: | :--- |",
-    ]
-
-    # Calculate individual framework averages
-    de_faith = [r.deepeval_faithfulness for r in reports if r.deepeval_faithfulness is not None]
-    de_rel = [r.deepeval_relevancy for r in reports if r.deepeval_relevancy is not None]
-    tru_ground = [r.trulens_groundedness for r in reports if r.trulens_groundedness is not None]
-    tru_rel = [r.trulens_qa_relevance for r in reports if r.trulens_qa_relevance is not None]
-    li_faith = [r.llamaindex_faithfulness for r in reports if r.llamaindex_faithfulness is not None]
-    li_rel = [r.llamaindex_relevancy for r in reports if r.llamaindex_relevancy is not None]
-    pf_scores = [r.promptfoo_score for r in reports if r.promptfoo_score is not None]
-
-    ragas_faith = ragas_scores.get("ragas_faithfulness") if ragas_scores else None
-    ragas_rel = ragas_scores.get("ragas_answer_relevancy") if ragas_scores else None
-
-    ragas_f_str = f"{ragas_faith:.3f}" if ragas_faith is not None else "N/A"
-    ragas_r_str = f"{ragas_rel:.3f}" if ragas_rel is not None else "N/A"
-
-    de_f_str = f"{sum(de_faith)/len(de_faith):.3f}" if de_faith else "N/A"
-    de_r_str = f"{sum(de_rel)/len(de_rel):.3f}" if de_rel else "N/A"
-    tru_g_str = f"{sum(tru_ground)/len(tru_ground):.3f}" if tru_ground else "N/A"
-    tru_r_str = f"{sum(tru_rel)/len(tru_rel):.3f}" if tru_rel else "N/A"
-    li_f_str = f"{sum(li_faith)/len(li_faith):.3f} *(Strict Binary)*" if li_faith else "N/A"
-    li_r_str = f"{sum(li_rel)/len(li_rel):.3f}" if li_rel else "N/A"
-    pf_str = f"{sum(pf_scores)/len(pf_scores):.3f}" if pf_scores else "N/A"
-
-    md_lines.extend([
         f"| **DeepEval** *(Confident AI)* | `{de_f_str}` | `{de_r_str}` | G-Eval probabilistic metric |",
         f"| **TruLens** *(TruEra)* | `{tru_g_str}` | `{tru_r_str}` | RAG Triad Groundedness with CoT |",
-        f"| **LlamaIndex** *(Native Core)* | `{li_f_str}` | `{li_r_str}` | Binary pass/fail context entailment |",
+        f"| **Promptfoo** *(Assertion Suite)* | `{pf_f_str}` | `Evaluated` | Model-graded test assertions (continuous score) |",
         f"| **RAGAS** *(Exploding Gradients)* | `{ragas_f_str}` | `{ragas_r_str}` | Multi-statement atomic NLI + Embeddings |",
-        f"| **Promptfoo** *(Assertion Suite)* | `{pf_str}` | `Evaluated` | Model-graded test assertions |",
+        f"| **LlamaIndex** *(Native Core)* | `{li_f_raw} (Binary)` | `{li_r_str}` | Strict binary pass/fail context entailment |",
         "",
         "### B. Case-by-Case Cross-Framework Matrix",
-        "| Case ID | DeepEval | TruLens | LlamaIndex | Promptfoo | Consensus Faith | Consensus Rel | Correctness | Verdict |",
-        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
-    ])
+        "| Case ID | DeepEval | TruLens | Promptfoo | RAGAS | LlamaIndex | Consensus Faith | Consensus Rel | Correctness | Verdict |",
+        "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
+    ]
 
     for r in reports:
         d_f = f"{r.deepeval_faithfulness:.3f}" if r.deepeval_faithfulness is not None else "N/A"
         t_g = f"{r.trulens_groundedness:.3f}" if r.trulens_groundedness is not None else "N/A"
-        l_f = f"{r.llamaindex_faithfulness:.3f}" if r.llamaindex_faithfulness is not None else "N/A"
         p_s = f"{r.promptfoo_score:.3f}" if r.promptfoo_score is not None else "N/A"
+        r_f = f"{r.ragas_faithfulness:.3f}" if r.ragas_faithfulness is not None else "N/A"
+        l_f = f"{r.llamaindex_faithfulness:.3f}" if r.llamaindex_faithfulness is not None else "N/A"
         c_v = f"{r.llamaindex_correctness:.3f}" if r.llamaindex_correctness is not None else "N/A"
         v_tag = "PASS" if r.passed else "FAIL"
 
         md_lines.append(
-            f"| `{r.sample_id}` | {d_f} | {t_g} | {l_f} | {p_s} | **{r.mean_groundedness:.3f}** | "
+            f"| `{r.sample_id}` | {d_f} | {t_g} | {p_s} | {r_f} | {l_f} | **{r.mean_groundedness:.3f}** | "
             f"**{r.mean_relevancy:.3f}** | {c_v} | `{v_tag}` |"
         )
 
@@ -501,6 +509,43 @@ async def main():
         try:
             ragas_scores = evaluate_batch_with_ragas(ragas_records)
             print(f"Ragas Faithfulness: {ragas_scores.get('ragas_faithfulness')} | Answer Relevancy: {ragas_scores.get('ragas_answer_relevancy')}")
+
+            # Map per-case Ragas scores into cross_reports to calculate true 5-judge consensus
+            if ragas_scores and cross_reports:
+                case_f = ragas_scores.get("case_faithfulness", [])
+                case_r = ragas_scores.get("case_relevancy", [])
+                for idx, rep in enumerate(cross_reports):
+                    if idx < len(case_f):
+                        rep.ragas_faithfulness = case_f[idx]
+                    if idx < len(case_r):
+                        rep.ragas_relevancy = case_r[idx]
+
+                    faiths = [
+                        v for v in [rep.deepeval_faithfulness, rep.trulens_groundedness, rep.promptfoo_score, rep.ragas_faithfulness, rep.llamaindex_faithfulness]
+                        if v is not None
+                    ]
+                    if faiths:
+                        rep.mean_groundedness = round(sum(faiths) / len(faiths), 3)
+
+                    rels = [
+                        v for v in [rep.deepeval_relevancy, rep.trulens_qa_relevance, rep.llamaindex_relevancy, rep.ragas_relevancy]
+                        if v is not None
+                    ]
+                    if rels:
+                        rep.mean_relevancy = round(sum(rels) / len(rels), 3)
+
+                    w_faith = 0.40
+                    w_rel = 0.25
+                    w_cit = 0.20
+                    w_corr = 0.15 if rep.llamaindex_correctness is not None else 0.0
+                    tot_w = w_faith + w_rel + w_cit + w_corr
+                    rep.overall_consensus = round((
+                        (rep.mean_groundedness * w_faith) +
+                        (rep.mean_relevancy * w_rel) +
+                        (rep.verbatim_fidelity_score * w_cit) +
+                        ((rep.llamaindex_correctness or 0.0) * w_corr)
+                    ) / tot_w, 3)
+                    rep.passed = (rep.overall_consensus >= 0.80 and rep.mean_groundedness >= 0.70)
         except Exception as e:
             logger.warning(f"Ragas batch evaluation failed: {e}")
 
