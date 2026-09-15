@@ -47,9 +47,6 @@ from .prompts import (
 )
 
 from .intent import (
-    is_simple_conversational,
-    is_technical_discussion,
-    is_sources_meta_query,
     classify_user_intent
 )
 
@@ -110,9 +107,6 @@ __all__ = [
     "get_search_synthesis_prompt",
     "get_workspace_analysis_system_prompt",
     # Intent
-    "is_simple_conversational",
-    "is_technical_discussion",
-    "is_sources_meta_query",
     "classify_user_intent",
     # Vector Store
     "embed_model",

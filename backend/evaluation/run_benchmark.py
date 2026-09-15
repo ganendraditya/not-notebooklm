@@ -18,6 +18,9 @@ if str(BACKEND_DIR) not in sys.path:
 
 load_dotenv(BACKEND_DIR / ".env")
 
+# Enforce deterministic greedy decoding (zero entropy) during benchmark evaluation
+os.environ["LLM_TEMPERATURE"] = "0.0"
+
 from rag.llm_factory import get_main_llm, get_fast_llm
 from rag.parsers import parse_document_to_markdown
 from utils.file_utils import get_doc_file_path

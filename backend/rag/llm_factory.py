@@ -24,6 +24,7 @@ def _get_env_config_signature():
         os.getenv("LLM_MODEL", "") or os.getenv("NINEROUTER_MODEL", ""),
         os.getenv("LLM_FAST_MODEL", "") or os.getenv("NINEROUTER_FAST_MODEL", ""),
         os.getenv("LLM_FALLBACK_MODEL", "") or os.getenv("NINEROUTER_FALLBACK_MODEL", ""),
+        os.getenv("LLM_TEMPERATURE", ""),
     )
 
 
@@ -36,6 +37,7 @@ def _get_gateway_credentials():
     - LLM_MODEL: Primary model for heavy reasoning & document synthesis
     - LLM_FAST_MODEL: (Optional) Lightweight model for rapid micro-tasks (defaults to LLM_MODEL)
     - LLM_FALLBACK_MODEL: (Optional) Safety fallback model if primary fails
+    - LLM_TEMPERATURE: Sampling temperature (defaults to 0.1 for natural generation, 0.0 for evaluation)
     Also supports backward-compatible NINEROUTER_* configuration variables.
     """
     api_key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
@@ -61,8 +63,13 @@ def _get_gateway_credentials():
         or os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
     )
 
+    try:
+        temperature = float(os.getenv("LLM_TEMPERATURE", "0.1").strip())
+    except (ValueError, TypeError):
+        temperature = 0.1
+
     has_gateway = bool(api_key and not api_key.startswith("your_") and api_key != "dummy_key")
-    return base_url, api_key, model, fast_model, fallback_model, has_gateway
+    return base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway
 
 
 def clear_llm_cache():
@@ -84,7 +91,7 @@ def get_main_llm(force_refresh: bool = False):
     if not force_refresh and _CACHED_MAIN_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_MAIN_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _get_gateway_credentials()
 
     _CACHED_MAIN_LLM = None
     if has_gateway:
@@ -96,6 +103,7 @@ def get_main_llm(force_refresh: bool = False):
                 is_chat_model=True,
                 is_function_calling_model=True,
                 max_tokens=16384,
+                temperature=temperature,
                 timeout=120.0
             )
         except Exception as e:
@@ -116,7 +124,7 @@ def get_fast_llm(force_refresh: bool = False):
     if not force_refresh and _CACHED_FAST_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_FAST_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _get_gateway_credentials()
 
     # Re-use main instance directly if models are identical
     if fast_model == model:
@@ -134,6 +142,7 @@ def get_fast_llm(force_refresh: bool = False):
                 is_chat_model=True,
                 is_function_calling_model=True,
                 max_tokens=4096,
+                temperature=temperature,
                 timeout=45.0
             )
         except Exception as e:
@@ -155,7 +164,7 @@ def get_fallback_llm():
     if _CACHED_FALLBACK_LLM is not None:
         return _CACHED_FALLBACK_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, has_gateway = _get_gateway_credentials()
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _get_gateway_credentials()
     if not has_gateway or not fallback_model or fallback_model == model:
         return None
 
@@ -167,6 +176,7 @@ def get_fallback_llm():
             is_chat_model=True,
             is_function_calling_model=True,
             max_tokens=16384,
+            temperature=temperature,
             timeout=120.0
         )
     except Exception as e:

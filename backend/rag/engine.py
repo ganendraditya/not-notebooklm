@@ -13,7 +13,6 @@ from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
 from .parsers import parse_document_to_markdown
 from .intent import (
-    is_simple_conversational,
     classify_user_intent
 )
 from .formatters import format_clean_response
@@ -62,9 +61,6 @@ async def generate_chat_title(first_user_message: str) -> str:
     if len(fallback_title) < 4:
         fallback_title = clean_prompt[:35]
     fallback_title = fallback_title.title()[:45].strip()
-
-    if is_simple_conversational(first_user_message):
-        return fallback_title or "New Research"
 
     # Use Fast LLM for rapid, lightweight title generation (with fallback cascade)
     title_prompt = (
