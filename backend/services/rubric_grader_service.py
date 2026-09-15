@@ -142,7 +142,7 @@ async def evaluate_response_grounding(
     try:
         prompt = build_grounding_rubric_prompt(
             query=query,
-            sources_context=sources_context[:25000], # Safe window slice
+            sources_context=sources_context[:60000], # Safe window slice for full/multi-paper audit
             draft_response=draft_response
         )
         resp = await llm.acomplete(prompt)

@@ -247,7 +247,7 @@ async def handle_workspace_analysis_pipeline(
         f"{get_workspace_analysis_system_prompt(total_doc_count)}\n\n"
         "CRITICAL INSTRUCTIONS FOR SYNTHESIS & ANALYSIS:\n"
         "- Respond strictly and proportionally to what the user asks. If the user asks a simple question (e.g. counting, listing, or checking status), answer directly and concisely without unsolicited long tables or essays.\n"
-        "- When the user explicitly asks to summarize, analyze, compare, or generate chapters/sections, write a rich, detailed academic text synthesizing the data.\n"
+        "- When the user explicitly asks to summarize, analyze, compare, or generate chapters/sections, write a structured, highly analytical synthesis. Cover all comparison dimensions asked by the user, maintain dense academic conciseness (avoid overly verbose repetitive preamble), and ensure all points and sentences are fully and cleanly concluded.\n"
         "- DO NOT refuse with excuses about copyright or partial text. Leverage the available document text fully.\n\n"
         "STRICT IEEE CITATION & CITATION_MAP REQUIREMENTS (MANDATORY BEFORE COMPLETION):\n"
         "1. IEEE CITATION POSITION: Citation tags [X] MUST ALWAYS appear BEFORE sentence-ending periods or punctuation (e.g. 'mencapai akurasi 93% [13].' or 'metode Swin [1], [2].'). NEVER place citation tags after the period (NEVER write 'akurasi 93%. [1]'). In table cells, place citation tags before the closing period of each bullet (e.g. '• Integrates DA-Blocks [2].').\n"
