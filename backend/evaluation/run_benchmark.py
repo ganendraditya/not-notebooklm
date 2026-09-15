@@ -8,7 +8,7 @@ import logging
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from dotenv import load_dotenv
 
 # Ensure backend root is on sys.path
@@ -27,7 +27,8 @@ from evaluation.metrics.ragas_adapter import evaluate_batch_with_ragas
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("eval_runner")
 
-BENCHMARK_DATASET_PATH = BACKEND_DIR / "evaluation" / "datasets" / "golden_benchmark.json"
+GOLDEN_DATASET_PATH = BACKEND_DIR / "evaluation" / "datasets" / "golden_benchmark.json"
+QASPER_DATASET_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_qasper.json"
 REPORTS_DIR = BACKEND_DIR / "evaluation" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -37,12 +38,17 @@ async def dummy_status_reporter(msg: str):
     pass
 
 
-def load_benchmark_cases(limit: Optional[int] = None, category: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Loads and filters benchmark test cases from golden_benchmark.json."""
-    if not BENCHMARK_DATASET_PATH.exists():
-        raise FileNotFoundError(f"Benchmark dataset not found at {BENCHMARK_DATASET_PATH}")
+def load_benchmark_cases(
+    dataset: str = "golden",
+    limit: Optional[int] = None,
+    category: Optional[str] = None
+) -> Tuple[List[Dict[str, Any]], Path]:
+    """Loads and filters benchmark test cases from chosen dataset."""
+    target_path = QASPER_DATASET_PATH if dataset == "qasper" else GOLDEN_DATASET_PATH
+    if not target_path.exists():
+        raise FileNotFoundError(f"Benchmark dataset not found at {target_path}")
     
-    with open(BENCHMARK_DATASET_PATH, "r", encoding="utf-8") as f:
+    with open(target_path, "r", encoding="utf-8") as f:
         cases = json.load(f)
 
     if category:
@@ -50,7 +56,7 @@ def load_benchmark_cases(limit: Optional[int] = None, category: Optional[str] = 
     if limit and limit > 0:
         cases = cases[:limit]
         
-    return cases
+    return cases, target_path
 
 
 def load_raw_doc_text(chat_id: str, fname: str) -> str:
@@ -188,11 +194,13 @@ def print_scorecard_table(results: List[TurnEvaluationResult]):
 def export_markdown_report(
     results: List[TurnEvaluationResult],
     ragas_scores: Optional[Dict[str, Any]] = None,
-    output_path: Optional[Path] = None
+    output_path: Optional[Path] = None,
+    dataset_name: str = "golden"
 ) -> Path:
     """Exports a publication-grade markdown summary for README.md."""
     if output_path is None:
-        output_path = REPORTS_DIR / "benchmark_latest.md"
+        filename = "benchmark_qasper.md" if dataset_name == "qasper" else "benchmark_latest.md"
+        output_path = REPORTS_DIR / filename
 
     total = len(results)
     passed_count = sum(1 for r in results if r.passed)
@@ -207,11 +215,18 @@ def export_markdown_report(
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
+    title_header = (
+        "# Not-NotebookLM Official AllenAI QASPER Benchmark Report\n*Evaluated on arXiv scientific research dataset (allenai/qasper)*"
+        if dataset_name == "qasper"
+        else "# Not-NotebookLM Automated RAG Benchmark Report"
+    )
+
     md_lines = [
-        "# Not-NotebookLM Automated RAG Benchmark Report",
+        title_header,
         f"*Generated on: {timestamp}*",
         "",
         "## Executive Summary",
+        f"- **Benchmark Track:** **{'International Official (AllenAI QASPER)' if dataset_name == 'qasper' else 'Core Golden Benchmark'}**",
         f"- **Overall Benchmark Status:** {'PASSED (Ready for Production)' if mean_composite >= 0.85 else 'REVIEW REQUIRED'}",
         f"- **Pass Rate:** **{pass_rate}%** ({passed_count}/{total} cases passed)",
         f"- **Mean Composite Score:** **{mean_composite:.3f}** / 1.000",
@@ -260,13 +275,14 @@ def export_markdown_report(
 
 async def main():
     parser = argparse.ArgumentParser(description="Not-NotebookLM Automated Evaluation Benchmark")
+    parser.add_argument("--dataset", type=str, default="golden", choices=["golden", "qasper"], help="Dataset to benchmark: 'golden' (multi-paper & domestic) or 'qasper' (official AllenAI QASPER)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")
     parser.add_argument("--include-ragas", action="store_true", help="Run batch Ragas evaluation across results")
     args = parser.parse_args()
 
-    cases = load_benchmark_cases(limit=args.limit, category=args.category)
-    print(f"\n[Benchmark] Loaded {len(cases)} test cases from {BENCHMARK_DATASET_PATH.name}")
+    cases, dataset_path = load_benchmark_cases(dataset=args.dataset, limit=args.limit, category=args.category)
+    print(f"\n[Benchmark] Loaded {len(cases)} test cases from {dataset_path.name}")
 
     main_llm = get_main_llm()
     eval_llm = get_fast_llm()
@@ -332,7 +348,7 @@ async def main():
             logger.warning(f"Ragas batch evaluation failed: {e}")
 
     # Export Markdown Report
-    report_file = export_markdown_report(results, ragas_scores=ragas_scores)
+    report_file = export_markdown_report(results, ragas_scores=ragas_scores, dataset_name=args.dataset)
     print(f"\n✓ Markdown Benchmark Report successfully saved to: {report_file}")
 
 
