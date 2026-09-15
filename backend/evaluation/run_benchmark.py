@@ -149,8 +149,11 @@ async def run_workspace_rag_benchmark_case(
         report_status=dummy_status_reporter
     )
 
-    # 2. Extract contexts used for LlamaIndex evaluation
-    contexts = list(source_docs_map.values())
+    # 2. Extract authentic retrieval context chunks aligned with query & response
+    from evaluation.metrics.standard_evaluator import extract_relevant_contexts
+    contexts = extract_relevant_contexts(query, response, source_docs_map, max_chunks=8)
+    if not contexts:
+        contexts = [t[:4000] for t in source_docs_map.values() if t]
 
     # 3. Evaluate turn
     result = await evaluate_rag_turn(
@@ -457,19 +460,24 @@ async def main():
 
             # Cross-framework evaluation across DeepEval, TruLens, LlamaIndex
             bench_chat = case.get("chat_id") or "fa005a59-540e-405d-8029-b7c2002b4fd4"
+            source_docs_map = {}
+            for idx, fname in enumerate(case.get("target_documents", []), start=1):
+                doc_text = load_raw_doc_text(bench_chat, fname)
+                source_docs_map[str(idx)] = doc_text
+            
+            from evaluation.metrics.standard_evaluator import extract_relevant_contexts
+            retrieved_chunks = extract_relevant_contexts(case["query"], res.raw_response, source_docs_map, max_chunks=8)
+            if not retrieved_chunks:
+                retrieved_chunks = [t[:4000] for t in source_docs_map.values() if t]
+
             if args.cross_framework and cat != "search_discovery":
                 print("   -> Running cross-framework suite (DeepEval, TruLens, LlamaIndex)...")
-                source_docs_map = {}
-                for idx, fname in enumerate(case.get("target_documents", []), start=1):
-                    doc_text = load_raw_doc_text(bench_chat, fname)
-                    source_docs_map[str(idx)] = doc_text
-                contexts = list(source_docs_map.values())
                 cf_report = await evaluate_turn_across_all_frameworks(
                     sample_id=cid,
                     category=cat,
                     query=case["query"],
                     response=res.raw_response,
-                    contexts=contexts,
+                    contexts=retrieved_chunks,
                     ground_truth=case.get("ground_truth"),
                     source_docs_map=source_docs_map,
                     llm=eval_llm
@@ -479,12 +487,11 @@ async def main():
 
             # Collect for Ragas batch if eligible
             if (args.include_ragas or args.cross_framework) and cat in ("single_fact", "multi_comparative") and not case.get("unanswerable"):
-                doc_ctxs = [load_raw_doc_text(bench_chat, fn)[:25000] for fn in case.get("target_documents", [])]
                 clean_ans = re.sub(r'<!--.*?-->', '', res.raw_response, flags=re.DOTALL).strip()
                 ragas_records.append({
                     "question": case["query"],
                     "answer": clean_ans or res.query,
-                    "contexts": [c for c in doc_ctxs if c] or [case.get("ground_truth", "")],
+                    "contexts": retrieved_chunks,
                     "ground_truth": case.get("ground_truth", "")
                 })
 

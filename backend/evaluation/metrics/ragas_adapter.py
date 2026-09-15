@@ -10,7 +10,7 @@ logger = logging.getLogger("uvicorn.error")
 import evaluation
 
 try:
-    from ragas.metrics import faithfulness, answer_relevancy
+    from ragas.metrics import faithfulness, answer_relevancy, context_recall, context_precision
     from ragas import evaluate
     from langchain_openai import ChatOpenAI
     from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -24,13 +24,16 @@ def evaluate_batch_with_ragas(
     eval_records: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Evaluates a batch of RAG turns using official Ragas metrics (Faithfulness & Answer Relevancy)
-    powered by the project's configured LLM gateway and Google GenAI embeddings.
+    Evaluates a batch of RAG turns using official Ragas metrics across all dimensions:
+    - Generation: Faithfulness, Answer Relevancy
+    - Retrieval: Context Recall, Context Precision
     """
     if not RAGAS_AVAILABLE or not eval_records:
         return {
             "ragas_faithfulness": 0.000,
             "ragas_answer_relevancy": 0.000,
+            "ragas_context_recall": 0.000,
+            "ragas_context_precision": 0.000,
             "available": False
         }
 
@@ -68,6 +71,8 @@ def evaluate_batch_with_ragas(
         active_metrics = [faithfulness]
         if embeddings is not None:
             active_metrics.append(answer_relevancy)
+            if "reference" in dataset_dict:
+                active_metrics.extend([context_recall, context_precision])
 
         dataset = Dataset.from_dict(dataset_dict)
         results = evaluate(
@@ -81,17 +86,19 @@ def evaluate_batch_with_ragas(
         scores = {}
         if hasattr(results, "to_pandas"):
             df = results.to_pandas()
-            if "faithfulness" in df.columns:
-                valid_faith = df["faithfulness"].dropna()
-                scores["ragas_faithfulness"] = round(float(valid_faith.mean()), 3) if not valid_faith.empty else 0.000
-                scores["case_faithfulness"] = [round(float(v), 3) if not (v != v) else 0.000 for v in df["faithfulness"]]
-            if "answer_relevancy" in df.columns:
-                valid_rel = df["answer_relevancy"].dropna()
-                scores["ragas_answer_relevancy"] = round(float(valid_rel.mean()), 3) if not valid_rel.empty else 0.000
-                scores["case_relevancy"] = [round(float(v), 3) if not (v != v) else 0.000 for v in df["answer_relevancy"]]
+            for col, key in [
+                ("faithfulness", "ragas_faithfulness"),
+                ("answer_relevancy", "ragas_answer_relevancy"),
+                ("context_recall", "ragas_context_recall"),
+                ("context_precision", "ragas_context_precision")
+            ]:
+                if col in df.columns:
+                    valid_vals = df[col].dropna()
+                    scores[key] = round(float(valid_vals.mean()), 3) if not valid_vals.empty else 0.000
+                    scores[f"case_{col}"] = [round(float(v), 3) if not (v != v) else 0.000 for v in df[col]]
         else:
-            scores["ragas_faithfulness"] = round(float(results.get("faithfulness", 0.000)), 3)
-            scores["ragas_answer_relevancy"] = round(float(results.get("answer_relevancy", 0.000)), 3)
+            for k in ["faithfulness", "answer_relevancy", "context_recall", "context_precision"]:
+                scores[f"ragas_{k}"] = round(float(results.get(k, 0.000)), 3)
 
         scores["available"] = True
         return scores
@@ -100,6 +107,8 @@ def evaluate_batch_with_ragas(
         return {
             "ragas_faithfulness": 0.000,
             "ragas_answer_relevancy": 0.000,
+            "ragas_context_recall": 0.000,
+            "ragas_context_precision": 0.000,
             "error": str(e),
             "available": False
         }
