@@ -136,13 +136,19 @@ async def evaluate_with_trulens(
 
         provider = TruLiteLLM(model_engine=f"openai/{model_name}", api_key=api_key, api_base=base_url)
 
+        # Extract 2-3 key claims for efficient CoT verification without combinatorial sentence bloat
+        clean_stmt = re.sub(r'#+\s*', '', response)
+        clean_stmt = re.sub(r'^\s*[-*•\d\.]+\s*', '', clean_stmt, flags=re.MULTILINE)
+        candidate_sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', clean_stmt) if len(s.strip()) >= 35]
+        target_statement = ' '.join(candidate_sentences[:3]) if candidate_sentences else response[:600]
+
         # Run TruLens QA Relevance and Groundedness CoT in parallel
         clean_context = context_text[:15000] if context_text else "No context."
         rel_task = asyncio.to_thread(provider.relevance, query, response)
         cot_task = asyncio.to_thread(
             provider.groundedness_measure_with_cot_reasons,
             clean_context,
-            response[:3000]
+            target_statement
         )
         rel_res, cot_res = await asyncio.gather(rel_task, cot_task, return_exceptions=True)
 

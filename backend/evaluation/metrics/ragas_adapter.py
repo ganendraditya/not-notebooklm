@@ -71,15 +71,15 @@ def evaluate_batch_with_ragas(
         active_metrics = [faithfulness]
         if embeddings is not None:
             active_metrics.append(answer_relevancy)
-            if "reference" in dataset_dict:
-                active_metrics.extend([context_recall, context_precision])
 
+        from ragas.run_config import RunConfig
         dataset = Dataset.from_dict(dataset_dict)
         results = evaluate(
             dataset=dataset,
             metrics=active_metrics,
             llm=ragas_llm,
             embeddings=embeddings,
+            run_config=RunConfig(timeout=240, max_retries=1, max_workers=3),
             raise_exceptions=False
         )
 

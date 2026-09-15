@@ -469,6 +469,7 @@ async def main():
     cached_turn_results = {}
     cached_cross_reports = {}
     cached_ragas_records = {}
+    cached_ragas_scores = None
 
     if checkpoint_file.exists() and not args.reset_checkpoint:
         try:
@@ -480,6 +481,7 @@ async def main():
                     cached_cross_reports[cr["sample_id"]] = FrameworkScoreReport(**cr)
                 for rr in chk_data.get("ragas_records", []):
                     cached_ragas_records[rr.get("question", "")] = rr
+                cached_ragas_scores = chk_data.get("ragas_scores")
             print(f"[Benchmark] Resuming from checkpoint with {len(cached_turn_results)} previously completed cases.")
         except Exception as e:
             logger.warning(f"Could not load checkpoint: {e}")
@@ -491,7 +493,7 @@ async def main():
     sem = asyncio.Semaphore(max(1, args.concurrency))
     lock = asyncio.Lock()
 
-    def save_checkpoint_now():
+    def save_checkpoint_now(final_ragas: Optional[Dict[str, Any]] = None):
         try:
             # Sort by case index for consistent serialization
             sorted_results = [r for _, r in sorted(results, key=lambda x: x[0])]
@@ -500,7 +502,8 @@ async def main():
                 json.dump({
                     "results": [r.model_dump() for r in sorted_results],
                     "cross_reports": [cr.model_dump() for cr in sorted_cr],
-                    "ragas_records": ragas_records
+                    "ragas_records": ragas_records,
+                    "ragas_scores": final_ragas or cached_ragas_scores
                 }, f, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.warning(f"Failed saving checkpoint: {e}")
@@ -600,54 +603,55 @@ async def main():
     final_cross_reports = [cr for _, cr in sorted(cross_reports, key=lambda x: x[0])]
 
     # Optional Ragas batch evaluation
-    ragas_scores = None
-    if (args.include_ragas or args.cross_framework) and ragas_records:
+    ragas_scores = cached_ragas_scores
+    if (args.include_ragas or args.cross_framework) and ragas_records and not ragas_scores:
         print("\n[Benchmark] Running batch evaluation with Ragas...")
         try:
             ragas_scores = evaluate_batch_with_ragas(ragas_records)
             print(f"Ragas Faithfulness: {ragas_scores.get('ragas_faithfulness')} | Answer Relevancy: {ragas_scores.get('ragas_answer_relevancy')}")
-
-            # Map per-case Ragas scores into cross_reports to calculate true 5-judge consensus
-            if ragas_scores and cross_reports:
-                case_f = ragas_scores.get("case_faithfulness", [])
-                case_r = ragas_scores.get("case_relevancy", [])
-                for idx, rep in enumerate(cross_reports):
-                    if idx < len(case_f):
-                        rep.ragas_faithfulness = case_f[idx]
-                    if idx < len(case_r):
-                        rep.ragas_relevancy = case_r[idx]
-
-                    # Pure Continuous Groundedness: DeepEval, TruLens, Promptfoo, Ragas (Excluding binary gatekeepers)
-                    faiths = [
-                        v for v in [rep.deepeval_faithfulness, rep.trulens_groundedness, rep.promptfoo_faithfulness or rep.promptfoo_score, rep.ragas_faithfulness]
-                        if v is not None
-                    ]
-                    if faiths:
-                        rep.mean_groundedness = round(sum(faiths) / len(faiths), 3)
-
-                    # Pure Continuous Relevancy: DeepEval, TruLens, Promptfoo, Ragas (Excluding binary gatekeepers)
-                    rels = [
-                        v for v in [rep.deepeval_relevancy, rep.trulens_qa_relevance, rep.promptfoo_relevancy, rep.ragas_relevancy]
-                        if v is not None
-                    ]
-                    if rels:
-                        rep.mean_relevancy = round(sum(rels) / len(rels), 3)
-
-                    w_faith = 0.40
-                    w_rel = 0.25
-                    w_cit = 0.20
-                    w_corr = 0.15 if (rep.mean_correctness or rep.llamaindex_correctness) is not None else 0.0
-                    tot_w = w_faith + w_rel + w_cit + w_corr
-                    eff_corr = rep.mean_correctness if rep.mean_correctness is not None else (rep.llamaindex_correctness or 0.0)
-                    rep.overall_consensus = round((
-                        (rep.mean_groundedness * w_faith) +
-                        (rep.mean_relevancy * w_rel) +
-                        (rep.verbatim_fidelity_score * w_cit) +
-                        (eff_corr * w_corr)
-                    ) / tot_w, 3)
-                    rep.passed = (rep.overall_consensus >= 0.80 and rep.mean_groundedness >= 0.70)
+            save_checkpoint_now(final_ragas=ragas_scores)
         except Exception as e:
             logger.warning(f"Ragas batch evaluation failed: {e}")
+
+    # Map per-case Ragas scores into cross_reports to calculate true 5-judge consensus
+    if ragas_scores and final_cross_reports:
+        case_f = ragas_scores.get("case_faithfulness", [])
+        case_r = ragas_scores.get("case_relevancy", [])
+        for idx, rep in enumerate(final_cross_reports):
+            if idx < len(case_f):
+                rep.ragas_faithfulness = case_f[idx]
+            if idx < len(case_r):
+                rep.ragas_relevancy = case_r[idx]
+
+            # Pure Continuous Groundedness: DeepEval, TruLens, Promptfoo, Ragas (Excluding binary gatekeepers)
+            faiths = [
+                v for v in [rep.deepeval_faithfulness, rep.trulens_groundedness, rep.promptfoo_faithfulness or rep.promptfoo_score, rep.ragas_faithfulness]
+                if v is not None
+            ]
+            if faiths:
+                rep.mean_groundedness = round(sum(faiths) / len(faiths), 3)
+
+            # Pure Continuous Relevancy: DeepEval, TruLens, Promptfoo, Ragas (Excluding binary gatekeepers)
+            rels = [
+                v for v in [rep.deepeval_relevancy, rep.trulens_qa_relevance, rep.promptfoo_relevancy, rep.ragas_relevancy]
+                if v is not None
+            ]
+            if rels:
+                rep.mean_relevancy = round(sum(rels) / len(rels), 3)
+
+            w_faith = 0.40
+            w_rel = 0.25
+            w_cit = 0.20
+            w_corr = 0.15 if (rep.mean_correctness or rep.llamaindex_correctness) is not None else 0.0
+            tot_w = w_faith + w_rel + w_cit + w_corr
+            eff_corr = rep.mean_correctness if rep.mean_correctness is not None else (rep.llamaindex_correctness or 0.0)
+            rep.overall_consensus = round((
+                (rep.mean_groundedness * w_faith) +
+                (rep.mean_relevancy * w_rel) +
+                (rep.verbatim_fidelity_score * w_cit) +
+                (eff_corr * w_corr)
+            ) / tot_w, 3)
+            rep.passed = (rep.overall_consensus >= 0.80 and rep.mean_groundedness >= 0.70)
 
     # Print Terminal Tables & Export Reports
     if args.cross_framework and final_cross_reports:
