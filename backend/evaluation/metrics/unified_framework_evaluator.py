@@ -269,12 +269,10 @@ async def evaluate_turn_across_all_frameworks(
     tru_data = tru_res if isinstance(tru_res, dict) else {}
     pf_data = pf_res if isinstance(pf_res, dict) else {}
 
-    # 3. Aggregate Groundedness across reporting frameworks
+    # 3. Aggregate Continuous Groundedness (Only continuous 0.0-1.0 evaluators, excluding binary gates)
     groundedness_scores = []
     if de_data.get("deepeval_faithfulness") is not None:
         groundedness_scores.append(de_data["deepeval_faithfulness"])
-    if li_data.get("llamaindex_faithfulness") is not None:
-        groundedness_scores.append(li_data["llamaindex_faithfulness"])
     if tru_data.get("trulens_groundedness") is not None:
         groundedness_scores.append(tru_data["trulens_groundedness"])
     if pf_data.get("promptfoo_score") is not None:
@@ -282,12 +280,10 @@ async def evaluate_turn_across_all_frameworks(
 
     mean_grounded = round(sum(groundedness_scores) / len(groundedness_scores), 3) if groundedness_scores else 0.850
 
-    # 4. Aggregate Relevancy across reporting frameworks
+    # 4. Aggregate Continuous Relevancy (Only continuous 0.0-1.0 evaluators, excluding binary gates)
     relevancy_scores = []
     if de_data.get("deepeval_relevancy") is not None:
         relevancy_scores.append(de_data["deepeval_relevancy"])
-    if li_data.get("llamaindex_relevancy") is not None:
-        relevancy_scores.append(li_data["llamaindex_relevancy"])
     if tru_data.get("trulens_qa_relevance") is not None:
         relevancy_scores.append(tru_data["trulens_qa_relevance"])
 

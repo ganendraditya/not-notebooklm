@@ -282,20 +282,19 @@ def export_cross_framework_report(
         f"*Evaluated across 5 Industry-Standard Frameworks on AllenAI QASPER | Generated: {timestamp}*",
         "",
         "## Tier 1: Executive Summary (3 Core Consensus Pillars)",
-        "> *Analogous to mAP and Recall in Computer Vision, these three core pillars represent the primary consensus across all evaluation judges.*",
+        "> *Analogous to mAP and Recall in Computer Vision, these three core pillars represent the primary continuous consensus across all evaluation judges.*",
         "",
         f"- **Overall Benchmark Status:** {'PASSED (Production Certified)' if mean_consensus >= 0.80 else 'REVIEW REQUIRED'}",
         f"- **Consensus Pass Rate:** **{pass_rate}%** ({passed_count}/{total} cases passed)",
         f"- **Composite Consensus Score:** **{mean_consensus:.3f}** / 1.000",
         "",
-        "| Core Evaluation Pillar | Multi-Judge Consensus | Target Threshold | Frameworks Included in Mean |",
+        "| Core Evaluation Pillar | Multi-Judge Consensus | Target Threshold | Continuous Frameworks Included in Mean |",
         "| :--- | :---: | :---: | :--- |",
-        f"| **Pillar 1: Groundedness (Anti-Hallucination)** | **{mean_grounded:.3f}** | >= 0.850 | **5 Frameworks:** DeepEval ({de_f_str}) + TruLens ({tru_g_str}) + Promptfoo ({pf_f_str}) + Ragas ({ragas_f_str}) + LlamaIndex ({li_f_raw}) |",
-        f"| **Pillar 2: Answer Relevancy & Completeness** | **{mean_rel:.3f}** | >= 0.850 | **4 Frameworks:** DeepEval ({de_r_str}) + TruLens ({tru_r_str}) + Ragas ({ragas_r_str}) + LlamaIndex ({li_r_str}) |",
+        f"| **Pillar 1: Groundedness (Anti-Hallucination)** | **{mean_grounded:.3f}** | >= 0.850 | **Continuous 4-Judge Mean:** DeepEval ({de_f_str}) + TruLens ({tru_g_str}) + Promptfoo ({pf_f_str}) + Ragas ({ragas_f_str}) |",
+        f"| **Pillar 2: Answer Relevancy & Completeness** | **{mean_rel:.3f}** | >= 0.850 | **Continuous 3-Judge Mean:** DeepEval ({de_r_str}) + TruLens ({tru_r_str}) + Ragas ({ragas_r_str}) |",
         f"| **Pillar 3: Ground-Truth Correctness** | **{mean_corr:.3f}** | >= 0.800 | Aligned with Human Expert Annotators (QASPER Ground Truth) |",
-        f"| **Product Invariant: PDF Citation Fidelity** | **{mean_verbatim * 100:.1f}%** | >= 90.0% | Deterministic Substring & Fuzzy Match on raw PDF text |",
-        "",
-        f"> **Continuous 4-Framework Groundedness (Excluding LlamaIndex Binary):** **`{cont_mean_str}`**",
+        f"| **Product Invariant: PDF Citation Fidelity** | **{mean_verbatim * 100:.1f}%** *(1.000)* | >= 90.0% | Deterministic Substring & Fuzzy Match on raw PDF text |",
+        f"| *Gatekeeper Check: LlamaIndex Strict Binary* | *{li_f_raw}* | *Pass/Fail Gate* | *Binary pass/fail context entailment (Explicitly excluded from continuous mean)* |",
         "",
         "---",
         "",
@@ -304,14 +303,14 @@ def export_cross_framework_report(
         "### A. Framework-by-Framework Scorecard Breakdown",
         "| Evaluation Framework | Groundedness / Faithfulness | Answer Relevancy | Evaluator Type / Algorithm |",
         "| :--- | :---: | :---: | :--- |",
-        f"| **DeepEval** *(Confident AI)* | `{de_f_str}` | `{de_r_str}` | G-Eval probabilistic metric |",
-        f"| **TruLens** *(TruEra)* | `{tru_g_str}` | `{tru_r_str}` | RAG Triad Groundedness with CoT |",
-        f"| **Promptfoo** *(Assertion Suite)* | `{pf_f_str}` | `Evaluated` | Model-graded test assertions (continuous score) |",
-        f"| **RAGAS** *(Exploding Gradients)* | `{ragas_f_str}` | `{ragas_r_str}` | Multi-statement atomic NLI + Embeddings |",
-        f"| **LlamaIndex** *(Native Core)* | `{li_f_raw} (Binary)` | `{li_r_str}` | Strict binary pass/fail context entailment |",
+        f"| **DeepEval** *(Confident AI)* | `{de_f_str}` | `{de_r_str}` | G-Eval probabilistic metric (0.000 - 1.000) |",
+        f"| **TruLens** *(TruEra)* | `{tru_g_str}` | `{tru_r_str}` | RAG Triad Groundedness with CoT (0.000 - 1.000) |",
+        f"| **Promptfoo** *(Assertion Suite)* | `{pf_f_str}` | `Evaluated` | Model-graded test assertions (0.000 - 1.000) |",
+        f"| **RAGAS** *(Exploding Gradients)* | `{ragas_f_str}` | `{ragas_r_str}` | Multi-statement atomic NLI + Embeddings (0.000 - 1.000) |",
+        f"| **LlamaIndex** *(Native Core)* | `{li_f_raw} (Binary)` | `{li_r_str}` | Strict binary pass/fail context entailment [0 or 1] |",
         "",
         "### B. Case-by-Case Cross-Framework Matrix",
-        "| Case ID | DeepEval | TruLens | Promptfoo | RAGAS | LlamaIndex | Consensus Faith | Consensus Rel | Correctness | Verdict |",
+        "| Case ID | DeepEval | TruLens | Promptfoo | RAGAS | LlamaIndex *(Binary)* | Consensus Faith | Consensus Rel | Correctness | Verdict |",
         "| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |",
     ]
 
@@ -520,15 +519,17 @@ async def main():
                     if idx < len(case_r):
                         rep.ragas_relevancy = case_r[idx]
 
+                    # Pure Continuous Groundedness: DeepEval, TruLens, Promptfoo, Ragas (Excluding binary gatekeepers)
                     faiths = [
-                        v for v in [rep.deepeval_faithfulness, rep.trulens_groundedness, rep.promptfoo_score, rep.ragas_faithfulness, rep.llamaindex_faithfulness]
+                        v for v in [rep.deepeval_faithfulness, rep.trulens_groundedness, rep.promptfoo_score, rep.ragas_faithfulness]
                         if v is not None
                     ]
                     if faiths:
                         rep.mean_groundedness = round(sum(faiths) / len(faiths), 3)
 
+                    # Pure Continuous Relevancy: DeepEval, TruLens, Ragas (Excluding binary gatekeepers)
                     rels = [
-                        v for v in [rep.deepeval_relevancy, rep.trulens_qa_relevance, rep.llamaindex_relevancy, rep.ragas_relevancy]
+                        v for v in [rep.deepeval_relevancy, rep.trulens_qa_relevance, rep.ragas_relevancy]
                         if v is not None
                     ]
                     if rels:
