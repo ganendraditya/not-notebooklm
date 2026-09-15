@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
+import packageInfo from "../../package.json";
 
 interface LeftSidebarProps {
   sessions: ChatSession[];
@@ -336,7 +337,7 @@ export default function LeftSidebar({
       {/* Desktop-only Footer: App Version & Settings Gear Button */}
       <div className="hidden lg:flex items-center justify-between px-4 py-3 border-t border-app-divider text-xs text-app-text-muted shrink-0">
         <span className="font-medium tracking-wide text-app-text-muted select-none">
-          NotbookLM <span className="text-[11px] text-app-text-dim font-mono">v1.1.0</span>
+          NotbookLM <span className="text-[11px] text-app-text-dim font-mono">v{packageInfo.version}</span>
         </span>
         <Tooltip content={t('ui.settings') || "Settings"} side="top">
           <button
