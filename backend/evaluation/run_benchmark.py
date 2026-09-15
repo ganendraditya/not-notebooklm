@@ -596,15 +596,15 @@ async def main():
 
                     # Pure Continuous Groundedness: DeepEval, TruLens, Promptfoo, Ragas (Excluding binary gatekeepers)
                     faiths = [
-                        v for v in [rep.deepeval_faithfulness, rep.trulens_groundedness, rep.promptfoo_score, rep.ragas_faithfulness]
+                        v for v in [rep.deepeval_faithfulness, rep.trulens_groundedness, rep.promptfoo_faithfulness or rep.promptfoo_score, rep.ragas_faithfulness]
                         if v is not None
                     ]
                     if faiths:
                         rep.mean_groundedness = round(sum(faiths) / len(faiths), 3)
 
-                    # Pure Continuous Relevancy: DeepEval, TruLens, Ragas (Excluding binary gatekeepers)
+                    # Pure Continuous Relevancy: DeepEval, TruLens, Promptfoo, Ragas (Excluding binary gatekeepers)
                     rels = [
-                        v for v in [rep.deepeval_relevancy, rep.trulens_qa_relevance, rep.ragas_relevancy]
+                        v for v in [rep.deepeval_relevancy, rep.trulens_qa_relevance, rep.promptfoo_relevancy, rep.ragas_relevancy]
                         if v is not None
                     ]
                     if rels:
