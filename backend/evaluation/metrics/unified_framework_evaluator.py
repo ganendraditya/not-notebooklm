@@ -50,8 +50,10 @@ class FrameworkScoreReport(BaseModel):
     llamaindex_relevancy: Optional[float] = Field(default=None, description="LlamaIndex query alignment score (0-1).")
     trulens_qa_relevance: Optional[float] = Field(default=None, description="TruLens QA relevance score (0-1).")
 
-    # Core Pillar 3: Ground-Truth Correctness
-    llamaindex_correctness: Optional[float] = Field(default=None, description="Semantic alignment with human expert answer (0-1).")
+    # Core Pillar 3: Ground-Truth Correctness (Dual-Judge Consensus)
+    llamaindex_correctness: Optional[float] = Field(default=None, description="LlamaIndex semantic alignment with human expert answer (0-1).")
+    promptfoo_correctness: Optional[float] = Field(default=None, description="Promptfoo model-graded correctness against ground truth (0-1).")
+    mean_correctness: Optional[float] = Field(default=None, description="Dual-judge consensus average for Pillar 3 Correctness (0-1).")
 
     # Framework 5: Promptfoo Assertion Suite
     promptfoo_faithfulness: Optional[float] = Field(default=None, description="Promptfoo model-graded faithfulness score (0-1).")
@@ -200,9 +202,10 @@ async def evaluate_with_promptfoo(
     query: str,
     response: str,
     contexts: List[str],
+    ground_truth: Optional[str] = None,
     llm: Optional[Any] = None
 ) -> Dict[str, Any]:
-    """Runs Promptfoo model-graded assertion protocol."""
+    """Runs Promptfoo model-graded assertion protocol for Faithfulness, Relevancy, and Correctness."""
     from rag.llm_factory import get_fast_llm
     from utils.text_processing import extract_json_from_llm
     import json
@@ -210,19 +213,28 @@ async def evaluate_with_promptfoo(
     eval_llm = llm or get_fast_llm()
     ctx_snippet = "\n\n".join(contexts)[:15000]
 
+    gt_clause = f"\nReference Ground Truth:\n{ground_truth}\n" if ground_truth else ""
+    correctness_instruction = (
+        "3. Correctness: Does the response capture all facts, numbers, and core entities specified in the Reference Ground Truth?\n"
+        if ground_truth else ""
+    )
+
     prompt = (
         "You are an automated evaluation judge adhering to the Promptfoo Model-Graded Assertion protocol.\n"
         f"Prompt / Query: {query}\n\n"
         f"Context provided:\n{ctx_snippet}\n\n"
-        f"Model Response:\n{response[:3000]}\n\n"
-        "Evaluate two orthogonal dimensions on a continuous scale from 0.000 to 1.000:\n"
+        f"Model Response:\n{response[:3000]}\n"
+        f"{gt_clause}\n"
+        "Evaluate the following orthogonal dimensions on a continuous scale from 0.000 to 1.000:\n"
         "1. Faithfulness: Are all statements, numbers, and claims strictly supported by the context without hallucination?\n"
-        "2. Answer Relevancy: How directly, thoroughly, and concisely does the response answer the user prompt?\n\n"
+        "2. Answer Relevancy: How directly, thoroughly, and concisely does the response answer the user prompt?\n"
+        f"{correctness_instruction}\n"
         "Respond ONLY in valid JSON matching Promptfoo evaluation result schema:\n"
         "{\n"
         '  "pass": true,\n'
         '  "faithfulness_score": 0.950,\n'
         '  "relevancy_score": 0.950,\n'
+        '  "correctness_score": 0.950,\n'
         '  "reason": "Detailed justification"\n'
         "}"
     )
@@ -231,9 +243,11 @@ async def evaluate_with_promptfoo(
         data = json.loads(extract_json_from_llm(resp.text))
         f_score = round(float(data.get("faithfulness_score", data.get("score", 0.900))), 3)
         r_score = round(float(data.get("relevancy_score", 0.900)), 3)
+        c_score = round(float(data.get("correctness_score", 0.900)), 3) if ground_truth else None
         return {
             "promptfoo_faithfulness": f_score,
             "promptfoo_relevancy": r_score,
+            "promptfoo_correctness": c_score,
             "promptfoo_score": round((f_score + r_score) / 2.0, 3),
             "promptfoo_pass": bool(data.get("pass", True)),
             "promptfoo_reason": data.get("reason", "")
@@ -243,6 +257,7 @@ async def evaluate_with_promptfoo(
         return {
             "promptfoo_faithfulness": None,
             "promptfoo_relevancy": None,
+            "promptfoo_correctness": None,
             "promptfoo_score": None,
             "promptfoo_pass": None,
             "promptfoo_reason": str(e)
@@ -273,7 +288,7 @@ async def evaluate_turn_across_all_frameworks(
     llamaindex_task = evaluate_with_llamaindex(query, clean_response, contexts, ground_truth, llm)
     deepeval_task = evaluate_with_deepeval(query, clean_response, contexts, ground_truth)
     trulens_task = evaluate_with_trulens(query, clean_response, full_context_str)
-    promptfoo_task = evaluate_with_promptfoo(query, clean_response, contexts, llm)
+    promptfoo_task = evaluate_with_promptfoo(query, clean_response, contexts, ground_truth, llm)
 
     li_res, de_res, tru_res, pf_res = await asyncio.gather(
         llamaindex_task, deepeval_task, trulens_task, promptfoo_task, return_exceptions=True
@@ -308,19 +323,27 @@ async def evaluate_turn_across_all_frameworks(
 
     mean_rel = round(sum(relevancy_scores) / len(relevancy_scores), 3) if relevancy_scores else 0.850
 
-    # 5. Composite Consensus Score
-    corr_score = li_data.get("llamaindex_correctness")
+    # 5. Pillar 3: Ground-Truth Correctness (Dual-Judge Consensus: LlamaIndex + Promptfoo)
+    corr_scores = []
+    if li_data.get("llamaindex_correctness") is not None:
+        corr_scores.append(li_data["llamaindex_correctness"])
+    if pf_data.get("promptfoo_correctness") is not None:
+        corr_scores.append(pf_data["promptfoo_correctness"])
+
+    mean_corr = round(sum(corr_scores) / len(corr_scores), 3) if corr_scores else None
+
+    # 6. Composite Consensus Score
     w_faith = 0.40
     w_rel = 0.25
     w_cit = 0.20
-    w_corr = 0.15 if corr_score is not None else 0.0
+    w_corr = 0.15 if mean_corr is not None else 0.0
     tot_w = w_faith + w_rel + w_cit + w_corr
 
     consensus = (
         (mean_grounded * w_faith) +
         (mean_rel * w_rel) +
         (citation_report.verbatim_fidelity_score * w_cit) +
-        ((corr_score or 0.0) * w_corr)
+        ((mean_corr or 0.0) * w_corr)
     ) / tot_w
     consensus = round(consensus, 3)
 
@@ -333,7 +356,9 @@ async def evaluate_turn_across_all_frameworks(
         deepeval_hallucination=de_data.get("deepeval_hallucination"),
         llamaindex_faithfulness=li_data.get("llamaindex_faithfulness"),
         llamaindex_relevancy=li_data.get("llamaindex_relevancy"),
-        llamaindex_correctness=corr_score,
+        llamaindex_correctness=li_data.get("llamaindex_correctness"),
+        promptfoo_correctness=pf_data.get("promptfoo_correctness"),
+        mean_correctness=mean_corr,
         trulens_groundedness=tru_data.get("trulens_groundedness"),
         trulens_qa_relevance=tru_data.get("trulens_qa_relevance"),
         promptfoo_faithfulness=pf_data.get("promptfoo_faithfulness"),

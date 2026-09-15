@@ -59,11 +59,13 @@ To balance executive readability (like mAP in Computer Vision) with full scienti
 2. **Pillar 2: Answer Relevancy Consensus**
    - *Definition:* How directly, accurately, and completely the response fulfills the user's specific research query without extraneous digression.
    - *Formula:*
-     $$\text{Consensus Relevancy} = \frac{\text{DeepEval} + \text{TruLens} + \text{Ragas}}{3}$$
+     $$\text{Consensus Relevancy} = \frac{\text{DeepEval} + \text{TruLens} + \text{Promptfoo} + \text{Ragas}}{4}$$
    - *Production Standard:* $\ge 0.850$.
 
-3. **Pillar 3: Ground-Truth Correctness (Human Expert Baseline)**
-   - *Definition:* Semantic and factual entity alignment between the generated response and the reference answer written by human peer-reviewers.
+3. **Pillar 3: Ground-Truth Correctness (Dual-Judge Consensus)**
+   - *Definition:* Semantic and factual entity alignment between the generated response and the reference answer written by human peer-reviewers, cross-validated by two independent continuous judges to eliminate single-point evaluator failure.
+   - *Formula:*
+     $$\text{Consensus Correctness} = \frac{\text{LlamaIndex Correctness} + \text{Promptfoo GT Alignment}}{2}$$
    - *Production Standard:* $\ge 0.800$.
 
 4. **Product Invariant: Interactive Citation Fidelity (Zero-Token Deterministic)**
@@ -157,14 +159,14 @@ To guarantee that RAG optimizations generalize to real-world scientific literatu
 All benchmarks are run headlessly from the project root without launching browsers or frontend servers:
 
 ```bash
-# 1. Run Validation Set (25 cases) for development / tuning:
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split val --cross-framework
+# 1. Run Validation Set (25 cases) with 2x concurrency:
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split val --cross-framework --concurrency 2
 
 # 2. Run Held-Out Blind Test Set (25 cases) for final release certification:
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split test --cross-framework
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split test --cross-framework --concurrency 2
 
 # 3. Full 50-case comprehensive audit across all papers:
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split all --cross-framework
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split all --cross-framework --concurrency 2
 
 # 4. Fast smoke-test (first N cases):
 PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split val --limit 3 --cross-framework

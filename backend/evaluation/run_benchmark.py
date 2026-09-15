@@ -316,7 +316,7 @@ def export_cross_framework_report(
         "| :--- | :---: | :---: | :--- |",
         f"| **Pillar 1: Groundedness (Anti-Hallucination)** | **{mean_grounded:.3f}** | >= 0.850 | **Continuous 4-Judge Mean:** DeepEval ({de_f_str}) + TruLens ({tru_g_str}) + Promptfoo ({pf_f_str}) + Ragas ({ragas_f_str}) |",
         f"| **Pillar 2: Answer Relevancy & Completeness** | **{mean_rel:.3f}** | >= 0.850 | **Continuous 4-Judge Mean:** DeepEval ({de_r_str}) + TruLens ({tru_r_str}) + Promptfoo ({pf_r_str}) + Ragas ({ragas_r_str}) |",
-        f"| **Pillar 3: Ground-Truth Correctness** | **{mean_corr:.3f}** | >= 0.800 | Aligned with Human Expert Annotators (QASPER Ground Truth) |",
+        f"| **Pillar 3: Ground-Truth Correctness** | **{mean_corr:.3f}** | >= 0.800 | Dual-Judge Consensus: LlamaIndex + Promptfoo GT Alignment |",
         f"| **Product Invariant: PDF Citation Fidelity** | **{mean_verbatim * 100:.1f}%** *(1.000)* | >= 90.0% | Deterministic Substring & Fuzzy Match on raw PDF text |",
         f"| *Gatekeeper Check: LlamaIndex Strict Binary* | *{li_f_raw}* | *Pass/Fail Gate* | *Binary pass/fail context entailment (Explicitly excluded from continuous mean)* |",
         "",
@@ -344,7 +344,8 @@ def export_cross_framework_report(
         p_s = f"{r.promptfoo_score:.3f}" if r.promptfoo_score is not None else "N/A"
         r_f = f"{r.ragas_faithfulness:.3f}" if r.ragas_faithfulness is not None else "N/A"
         l_f = f"{r.llamaindex_faithfulness:.3f}" if r.llamaindex_faithfulness is not None else "N/A"
-        c_v = f"{r.llamaindex_correctness:.3f}" if r.llamaindex_correctness is not None else "N/A"
+        c_val = r.mean_correctness if r.mean_correctness is not None else r.llamaindex_correctness
+        c_v = f"{c_val:.3f}" if c_val is not None else "N/A"
         v_tag = "PASS" if r.passed else "FAIL"
 
         md_lines.append(
@@ -450,6 +451,7 @@ async def main():
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")
     parser.add_argument("--cross-framework", action="store_true", help="Run comprehensive multi-framework evaluation (Ragas, DeepEval, TruLens, LlamaIndex)")
     parser.add_argument("--include-ragas", action="store_true", help="Run batch Ragas evaluation across results")
+    parser.add_argument("--concurrency", type=int, default=2, help="Max concurrent cases to run (default 2)")
     parser.add_argument("--reset-checkpoint", action="store_true", help="Ignore existing checkpoint and start fresh")
     args = parser.parse_args()
 
@@ -478,103 +480,120 @@ async def main():
         except Exception as e:
             logger.warning(f"Could not load checkpoint: {e}")
 
-    results: List[TurnEvaluationResult] = []
-    cross_reports: List[FrameworkScoreReport] = []
+    results: List[Tuple[int, TurnEvaluationResult]] = []
+    cross_reports: List[Tuple[int, FrameworkScoreReport]] = []
     ragas_records: List[Dict[str, Any]] = []
+
+    sem = asyncio.Semaphore(max(1, args.concurrency))
+    lock = asyncio.Lock()
 
     def save_checkpoint_now():
         try:
+            # Sort by case index for consistent serialization
+            sorted_results = [r for _, r in sorted(results, key=lambda x: x[0])]
+            sorted_cr = [cr for _, cr in sorted(cross_reports, key=lambda x: x[0])]
             with open(checkpoint_file, "w", encoding="utf-8") as f:
                 json.dump({
-                    "results": [r.model_dump() for r in results],
-                    "cross_reports": [cr.model_dump() for cr in cross_reports],
+                    "results": [r.model_dump() for r in sorted_results],
+                    "cross_reports": [cr.model_dump() for cr in sorted_cr],
                     "ragas_records": ragas_records
                 }, f, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.warning(f"Failed saving checkpoint: {e}")
 
-    for i, case in enumerate(cases, start=1):
+    async def execute_case_worker(i: int, case: Dict[str, Any]):
         cid = case["id"]
         cat = case.get("category", "")
-        print(f"\n[{i}/{len(cases)}] Running {cid} ({cat})...")
-        print(f"Query: {case['query'][:75]}...")
 
         # Check if already in checkpoint
         if cid in cached_turn_results and (not args.cross_framework or cid in cached_cross_reports):
-            print(f"-> [Cached] Loaded {cid} from checkpoint.")
-            res = cached_turn_results[cid]
-            results.append(res)
-            if cid in cached_cross_reports:
-                cross_reports.append(cached_cross_reports[cid])
-            if case["query"] in cached_ragas_records:
-                ragas_records.append(cached_ragas_records[case["query"]])
-            continue
+            print(f"[{i}/{len(cases)}] [Cached] Loaded {cid} from checkpoint.")
+            async with lock:
+                res = cached_turn_results[cid]
+                results.append((i, res))
+                if cid in cached_cross_reports:
+                    cross_reports.append((i, cached_cross_reports[cid]))
+                if case["query"] in cached_ragas_records:
+                    ragas_records.append(cached_ragas_records[case["query"]])
+            return
 
-        try:
-            if cat == "search_discovery":
-                res = await run_discovery_benchmark_case(case, eval_llm)
-            else:
-                res = await run_workspace_rag_benchmark_case(case, main_llm, eval_llm)
-            
-            results.append(res)
-            print(f"-> Composite Score: {res.composite_score:.2f} | Passed: {res.passed}")
-            if res.feedback:
-                for fb in res.feedback[:2]:
-                    print(f"   * {fb}")
+        async with sem:
+            print(f"\n[{i}/{len(cases)}] Running {cid} ({cat})...")
+            print(f"Query: {case['query'][:75]}...")
 
-            # Cross-framework evaluation across DeepEval, TruLens, LlamaIndex
-            bench_chat = case.get("chat_id") or "fa005a59-540e-405d-8029-b7c2002b4fd4"
-            source_docs_map = {}
-            for idx, fname in enumerate(case.get("target_documents", []), start=1):
-                doc_text = load_raw_doc_text(bench_chat, fname)
-                source_docs_map[str(idx)] = doc_text
-            
-            from evaluation.metrics.standard_evaluator import extract_relevant_contexts
-            retrieved_chunks = extract_relevant_contexts(case["query"], res.raw_response, source_docs_map, max_chunks=8)
-            if not retrieved_chunks:
-                retrieved_chunks = [t[:4000] for t in source_docs_map.values() if t]
+            try:
+                if cat == "search_discovery":
+                    res = await run_discovery_benchmark_case(case, eval_llm)
+                else:
+                    res = await run_workspace_rag_benchmark_case(case, main_llm, eval_llm)
+                
+                print(f"-> {cid} Composite Score: {res.composite_score:.2f} | Passed: {res.passed}")
+                if res.feedback:
+                    for fb in res.feedback[:2]:
+                        print(f"   * {fb}")
 
-            if args.cross_framework and cat != "search_discovery":
-                print("   -> Running cross-framework suite (DeepEval, TruLens, LlamaIndex)...")
-                cf_report = await evaluate_turn_across_all_frameworks(
+                # Cross-framework evaluation across DeepEval, TruLens, LlamaIndex
+                bench_chat = case.get("chat_id") or "fa005a59-540e-405d-8029-b7c2002b4fd4"
+                source_docs_map = {}
+                for idx, fname in enumerate(case.get("target_documents", []), start=1):
+                    doc_text = load_raw_doc_text(bench_chat, fname)
+                    source_docs_map[str(idx)] = doc_text
+                
+                from evaluation.metrics.standard_evaluator import extract_relevant_contexts
+                retrieved_chunks = extract_relevant_contexts(case["query"], res.raw_response, source_docs_map, max_chunks=8)
+                if not retrieved_chunks:
+                    retrieved_chunks = [t[:4000] for t in source_docs_map.values() if t]
+
+                cf_report = None
+                if args.cross_framework and cat != "search_discovery":
+                    cf_report = await evaluate_turn_across_all_frameworks(
+                        sample_id=cid,
+                        category=cat,
+                        query=case["query"],
+                        response=res.raw_response,
+                        contexts=retrieved_chunks,
+                        ground_truth=case.get("ground_truth"),
+                        source_docs_map=source_docs_map,
+                        llm=eval_llm
+                    )
+                    print(f"   -> {cid} Consensus Groundedness: {cf_report.mean_groundedness:.3f} | Relevancy: {cf_report.mean_relevancy:.3f}")
+
+                async with lock:
+                    results.append((i, res))
+                    if cf_report:
+                        cross_reports.append((i, cf_report))
+                    if (args.include_ragas or args.cross_framework) and cat in ("single_fact", "multi_comparative") and not case.get("unanswerable"):
+                        clean_ans = re.sub(r'<!--.*?-->', '', res.raw_response, flags=re.DOTALL).strip()
+                        ragas_records.append({
+                            "question": case["query"],
+                            "answer": clean_ans or res.query,
+                            "contexts": retrieved_chunks,
+                            "ground_truth": case.get("ground_truth", "")
+                        })
+                    save_checkpoint_now()
+
+            except Exception as e:
+                logger.error(f"Failed executing case {cid}: {e}", exc_info=True)
+                fail_res = TurnEvaluationResult(
                     sample_id=cid,
-                    category=cat,
                     query=case["query"],
-                    response=res.raw_response,
-                    contexts=retrieved_chunks,
-                    ground_truth=case.get("ground_truth"),
-                    source_docs_map=source_docs_map,
-                    llm=eval_llm
+                    category=cat,
+                    faithfulness_score=0.0,
+                    relevancy_score=0.0,
+                    composite_score=0.0,
+                    passed=False,
+                    feedback=[f"Runner execution exception: {e}"]
                 )
-                cross_reports.append(cf_report)
-                print(f"   -> Consensus Groundedness: {cf_report.mean_groundedness:.3f} | Relevancy: {cf_report.mean_relevancy:.3f}")
+                async with lock:
+                    results.append((i, fail_res))
+                    save_checkpoint_now()
 
-            # Collect for Ragas batch if eligible
-            if (args.include_ragas or args.cross_framework) and cat in ("single_fact", "multi_comparative") and not case.get("unanswerable"):
-                clean_ans = re.sub(r'<!--.*?-->', '', res.raw_response, flags=re.DOTALL).strip()
-                r_item = {
-                    "question": case["query"],
-                    "answer": clean_ans or res.query,
-                    "contexts": retrieved_chunks,
-                    "ground_truth": case.get("ground_truth", "")
-                }
-                ragas_records.append(r_item)
+    # Execute all cases with concurrency control
+    await asyncio.gather(*(execute_case_worker(i, case) for i, case in enumerate(cases, start=1)))
 
-            save_checkpoint_now()
-
-        except Exception as e:
-            logger.error(f"Failed executing case {cid}: {e}", exc_info=True)
-            results.append(TurnEvaluationResult(
-                sample_id=cid,
-                query=case["query"],
-                category=cat,
-                faithfulness_score=0.0,
-                relevancy_score=0.0,
-                composite_score=0.0,
-                passed=False,
-                feedback=[f"Runner execution exception: {e}"]
-            ))
-            save_checkpoint_now()
+    # Unwrap and sort results by original sequence
+    final_results = [r for _, r in sorted(results, key=lambda x: x[0])]
+    final_cross_reports = [cr for _, cr in sorted(cross_reports, key=lambda x: x[0])]
 
     # Optional Ragas batch evaluation
     ragas_scores = None
@@ -613,30 +632,31 @@ async def main():
                     w_faith = 0.40
                     w_rel = 0.25
                     w_cit = 0.20
-                    w_corr = 0.15 if rep.llamaindex_correctness is not None else 0.0
+                    w_corr = 0.15 if (rep.mean_correctness or rep.llamaindex_correctness) is not None else 0.0
                     tot_w = w_faith + w_rel + w_cit + w_corr
+                    eff_corr = rep.mean_correctness if rep.mean_correctness is not None else (rep.llamaindex_correctness or 0.0)
                     rep.overall_consensus = round((
                         (rep.mean_groundedness * w_faith) +
                         (rep.mean_relevancy * w_rel) +
                         (rep.verbatim_fidelity_score * w_cit) +
-                        ((rep.llamaindex_correctness or 0.0) * w_corr)
+                        (eff_corr * w_corr)
                     ) / tot_w, 3)
                     rep.passed = (rep.overall_consensus >= 0.80 and rep.mean_groundedness >= 0.70)
         except Exception as e:
             logger.warning(f"Ragas batch evaluation failed: {e}")
 
     # Print Terminal Tables & Export Reports
-    if args.cross_framework and cross_reports:
+    if args.cross_framework and final_cross_reports:
         print_cross_framework_table(
-            cross_reports,
+            final_cross_reports,
             ragas_score=ragas_scores.get("ragas_faithfulness") if ragas_scores else None,
             ragas_rel=ragas_scores.get("ragas_answer_relevancy") if ragas_scores else None
         )
-        cf_report_file = export_cross_framework_report(cross_reports, ragas_scores=ragas_scores, dataset_name=args.dataset)
+        cf_report_file = export_cross_framework_report(final_cross_reports, ragas_scores=ragas_scores, dataset_name=args.dataset)
         print(f"\n✓ Cross-Framework Markdown Report saved to: {cf_report_file}")
     else:
-        print_scorecard_table(results)
-        report_file = export_markdown_report(results, ragas_scores=ragas_scores, dataset_name=args.dataset)
+        print_scorecard_table(final_results)
+        report_file = export_markdown_report(final_results, ragas_scores=ragas_scores, dataset_name=args.dataset)
         print(f"\n✓ Markdown Benchmark Report successfully saved to: {report_file}")
 
 
