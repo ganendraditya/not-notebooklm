@@ -282,11 +282,12 @@ async def evaluate_turn_across_all_frameworks(
     contexts: List[str],
     ground_truth: Optional[str] = None,
     source_docs_map: Optional[Dict[str, str]] = None,
-    llm: Optional[Any] = None
+    llm: Optional[Any] = None,
+    fast_mode: bool = False
 ) -> FrameworkScoreReport:
     """
     Executes cross-framework evaluation battery for a single RAG turn.
-    Collects outputs from LlamaIndex, DeepEval, TruLens, and deterministic citation verifiers.
+    In fast_mode: skips heavy DeepEval and TruLens sentence-level loops, using Promptfoo + LlamaIndex + Ragas.
     """
     clean_response = re.sub(r'<!--.*?-->', '', response, flags=re.DOTALL).strip()
     full_context_str = "\n\n".join(contexts) if contexts else ""
@@ -294,20 +295,28 @@ async def evaluate_turn_across_all_frameworks(
     # 1. Deterministic Citation Verification (0 Tokens)
     citation_report = verify_citation_fidelity(response, source_docs_map or {})
 
-    # 2. Run LlamaIndex, DeepEval, TruLens, and Promptfoo asynchronously in parallel
+    # 2. Run evaluators asynchronously in parallel
     llamaindex_task = evaluate_with_llamaindex(query, clean_response, contexts, ground_truth, llm)
-    deepeval_task = evaluate_with_deepeval(query, clean_response, contexts, ground_truth)
-    trulens_task = evaluate_with_trulens(query, clean_response, full_context_str)
     promptfoo_task = evaluate_with_promptfoo(query, clean_response, contexts, ground_truth, llm)
 
-    li_res, de_res, tru_res, pf_res = await asyncio.gather(
-        llamaindex_task, deepeval_task, trulens_task, promptfoo_task, return_exceptions=True
-    )
-
-    li_data = li_res if isinstance(li_res, dict) else {}
-    de_data = de_res if isinstance(de_res, dict) else {}
-    tru_data = tru_res if isinstance(tru_res, dict) else {}
-    pf_data = pf_res if isinstance(pf_res, dict) else {}
+    if fast_mode:
+        li_res, pf_res = await asyncio.gather(
+            llamaindex_task, promptfoo_task, return_exceptions=True
+        )
+        li_data = li_res if isinstance(li_res, dict) else {}
+        de_data = {}
+        tru_data = {}
+        pf_data = pf_res if isinstance(pf_res, dict) else {}
+    else:
+        deepeval_task = evaluate_with_deepeval(query, clean_response, contexts, ground_truth)
+        trulens_task = evaluate_with_trulens(query, clean_response, full_context_str)
+        li_res, de_res, tru_res, pf_res = await asyncio.gather(
+            llamaindex_task, deepeval_task, trulens_task, promptfoo_task, return_exceptions=True
+        )
+        li_data = li_res if isinstance(li_res, dict) else {}
+        de_data = de_res if isinstance(de_res, dict) else {}
+        tru_data = tru_res if isinstance(tru_res, dict) else {}
+        pf_data = pf_res if isinstance(pf_res, dict) else {}
 
     # 3. Aggregate Continuous Groundedness (Only continuous 0.0-1.0 evaluators, excluding binary gates)
     groundedness_scores = []

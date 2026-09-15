@@ -454,6 +454,7 @@ async def main():
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")
     parser.add_argument("--cross-framework", action="store_true", help="Run comprehensive multi-framework evaluation (Ragas, DeepEval, TruLens, LlamaIndex)")
+    parser.add_argument("--fast", action="store_true", help="Fast-Val mode: Promptfoo + LlamaIndex + Ragas (skips heavy DeepEval & TruLens CoT loops)")
     parser.add_argument("--include-ragas", action="store_true", help="Run batch Ragas evaluation across results")
     parser.add_argument("--concurrency", type=int, default=2, help="Max concurrent cases to run (default 2)")
     parser.add_argument("--reset-checkpoint", action="store_true", help="Ignore existing checkpoint and start fresh")
@@ -552,7 +553,7 @@ async def main():
                     retrieved_chunks = [t[:4000] for t in source_docs_map.values() if t]
 
                 cf_report = None
-                if args.cross_framework and cat != "search_discovery":
+                if (args.cross_framework or args.fast) and cat != "search_discovery":
                     cf_report = await evaluate_turn_across_all_frameworks(
                         sample_id=cid,
                         category=cat,
@@ -561,7 +562,8 @@ async def main():
                         contexts=retrieved_chunks,
                         ground_truth=case.get("ground_truth"),
                         source_docs_map=source_docs_map,
-                        llm=eval_llm
+                        llm=eval_llm,
+                        fast_mode=args.fast
                     )
                     print(f"   -> {cid} Consensus Groundedness: {cf_report.mean_groundedness:.3f} | Relevancy: {cf_report.mean_relevancy:.3f}")
 
@@ -569,7 +571,7 @@ async def main():
                     results.append((i, res))
                     if cf_report:
                         cross_reports.append((i, cf_report))
-                    if (args.include_ragas or args.cross_framework) and cat in ("single_fact", "multi_comparative") and not case.get("unanswerable"):
+                    if (args.include_ragas or args.cross_framework or args.fast) and cat in ("single_fact", "multi_comparative") and not case.get("unanswerable"):
                         clean_ans = re.sub(r'<!--.*?-->', '', res.raw_response, flags=re.DOTALL).strip()
                         ragas_records.append({
                             "question": case["query"],
@@ -604,7 +606,7 @@ async def main():
 
     # Optional Ragas batch evaluation
     ragas_scores = cached_ragas_scores
-    if (args.include_ragas or args.cross_framework) and ragas_records and not ragas_scores:
+    if (args.include_ragas or args.cross_framework or args.fast) and ragas_records and not ragas_scores:
         print("\n[Benchmark] Running batch evaluation with Ragas...")
         try:
             ragas_scores = evaluate_batch_with_ragas(ragas_records)
@@ -613,7 +615,7 @@ async def main():
         except Exception as e:
             logger.warning(f"Ragas batch evaluation failed: {e}")
 
-    # Map per-case Ragas scores into cross_reports to calculate true 5-judge consensus
+    # Map per-case Ragas scores into cross_reports to calculate true multi-judge consensus
     if ragas_scores and final_cross_reports:
         case_f = ragas_scores.get("case_faithfulness", [])
         case_r = ragas_scores.get("case_relevancy", [])
@@ -654,7 +656,7 @@ async def main():
             rep.passed = (rep.overall_consensus >= 0.80 and rep.mean_groundedness >= 0.70)
 
     # Print Terminal Tables & Export Reports
-    if args.cross_framework and final_cross_reports:
+    if (args.cross_framework or args.fast) and final_cross_reports:
         print_cross_framework_table(
             final_cross_reports,
             ragas_score=ragas_scores.get("ragas_faithfulness") if ragas_scores else None,
