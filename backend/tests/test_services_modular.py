@@ -361,6 +361,34 @@ def test_storage_adapter_configuration_and_fallback():
             os.environ.pop("STORAGE_TYPE", None)
 
 
+def test_verify_pdf_title_match_sanity():
+    """Verify that in-memory title verification catches mismatches while tolerating LaTeX/HTML styling."""
+    from utils.pdf_utils import verify_pdf_title_match
+    import pymupdf
+
+    # Create dummy PDF with Attention Is All You Need on page 1
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((50, 72), "Attention Is All You Need\nAshish Vaswani, Noam Shazeer\nAbstract: The dominant sequence transduction models...")
+    attention_bytes = doc.tobytes()
+    doc.close()
+    if len(attention_bytes) < 1000:
+        attention_bytes += b" " * (1000 - len(attention_bytes))
+
+    # Exact and noisy matches should succeed
+    assert verify_pdf_title_match(attention_bytes, "Attention Is All You Need") is True
+    assert verify_pdf_title_match(attention_bytes, "<a>Attention $is all ^you need</a>") is True
+    assert verify_pdf_title_match(attention_bytes, "Attention is All you Need (2017)") is True
+
+    # Unrelated paper title (e.g. ResNet) must be rejected
+    assert verify_pdf_title_match(attention_bytes, "Deep Residual Learning for Image Recognition") is False
+
+    # Edge cases: empty title or small payload
+    assert verify_pdf_title_match(b"", "Attention Is All You Need") is True
+    assert verify_pdf_title_match(attention_bytes, "") is True
+
+
+
 
 
 

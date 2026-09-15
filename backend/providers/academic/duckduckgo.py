@@ -140,14 +140,11 @@ def fetch_duckduckgo_fallback(
 
     # Attempt 1: Query using duckduckgo_search official client
     try:
-        from duckduckgo_search import DDGS
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from duckduckgo_search import DDGS
         with DDGS() as ddgs:
-            # Query with academic literature modifiers for high scholarly signal
-            academic_query = f"{clean_query} (research paper OR journal OR arxiv OR doi OR pdf)"
-            ddg_results = ddgs.text(academic_query, max_results=target_count * 2)
-            if not ddg_results:
-                ddg_results = ddgs.text(clean_query, max_results=target_count * 2)
-            
+            ddg_results = ddgs.text(clean_query, max_results=target_count * 2)
             for item in ddg_results or []:
                 raw_items.append({
                     "title": item.get("title", ""),
@@ -160,10 +157,12 @@ def fetch_duckduckgo_fallback(
     # Attempt 2: Resilient SERP Parser Fallback if DDGS returned 0 results
     if not raw_items:
         try:
-            from duckduckgo_search import DDGS
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                from duckduckgo_search import DDGS
             with DDGS() as ddgs:
-                search_q = f"{clean_query} research paper OR journal OR arxiv"
-                resp = ddgs._get_url("GET", "https://www.bing.com/search", params={"q": search_q})
+                params = {"q": clean_query, "setlang": "en"}
+                resp = ddgs._get_url("GET", "https://www.bing.com/search", params=params)
                 if resp and resp.status_code == 200:
                     soup = BeautifulSoup(resp.text, "html.parser")
                     for li in soup.find_all("li", class_="b_algo"):

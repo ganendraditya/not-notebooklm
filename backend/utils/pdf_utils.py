@@ -46,6 +46,10 @@ def verify_pdf_title_match(pdf_bytes: bytes, expected_title: str) -> bool:
         return False
 
     text_lower = text.lower()
+    if not text_lower.strip():
+        # Scanned PDF without text layer: cannot verify text, allow
+        return True
+
     matched = sum(1 for kw in keywords if kw in text_lower)
     if len(keywords) == 1:
         return matched >= 1
