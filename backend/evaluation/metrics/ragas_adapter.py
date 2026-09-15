@@ -7,7 +7,7 @@ from datasets import Dataset
 logger = logging.getLogger("uvicorn.error")
 
 # Ensure Ragas compatibility shims
-from .standard_evaluator import dummy_vertex, dummy_llms
+import evaluation
 
 try:
     from ragas.metrics import faithfulness

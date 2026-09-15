@@ -46,3 +46,10 @@ CLAUDE.md
 antislop.md
 .cursorrules
 .windsurfrules
+
+# Evaluation caches & large datasets
+.promptfoo/
+backend/evaluation/datasets/alce/
+backend/evaluation/datasets/attributed_qa/
+backend/evaluation/datasets/crag/
+backend/evaluation/datasets/scifact/
