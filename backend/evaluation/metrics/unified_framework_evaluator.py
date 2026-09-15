@@ -136,16 +136,20 @@ async def evaluate_with_trulens(
 
         provider = TruLiteLLM(model_engine=f"openai/{model_name}", api_key=api_key, api_base=base_url)
 
-        # 1. TruLens QA Relevance
-        rel_score = await asyncio.to_thread(provider.relevance, query, response)
-
-        # 2. TruLens Groundedness CoT
+        # Run TruLens QA Relevance and Groundedness CoT in parallel
         clean_context = context_text[:15000] if context_text else "No context."
-        score, reasons = await asyncio.to_thread(
+        rel_task = asyncio.to_thread(provider.relevance, query, response)
+        cot_task = asyncio.to_thread(
             provider.groundedness_measure_with_cot_reasons,
             clean_context,
             response[:3000]
         )
+        rel_res, cot_res = await asyncio.gather(rel_task, cot_task, return_exceptions=True)
+
+        rel_score = rel_res if isinstance(rel_res, (int, float)) else None
+        score, reasons = (None, str(cot_res))
+        if isinstance(cot_res, tuple) and len(cot_res) == 2:
+            score, reasons = cot_res
 
         return {
             "trulens_groundedness": round(float(score), 3) if score is not None else None,
