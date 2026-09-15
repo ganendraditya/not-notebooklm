@@ -54,7 +54,9 @@ class FrameworkScoreReport(BaseModel):
     llamaindex_correctness: Optional[float] = Field(default=None, description="Semantic alignment with human expert answer (0-1).")
 
     # Framework 5: Promptfoo Assertion Suite
-    promptfoo_score: Optional[float] = Field(default=None, description="Promptfoo model-graded rubric score (0-1).")
+    promptfoo_faithfulness: Optional[float] = Field(default=None, description="Promptfoo model-graded faithfulness score (0-1).")
+    promptfoo_relevancy: Optional[float] = Field(default=None, description="Promptfoo model-graded answer relevancy score (0-1).")
+    promptfoo_score: Optional[float] = Field(default=None, description="Promptfoo composite score (0-1).")
     promptfoo_pass: Optional[bool] = Field(default=None, description="Promptfoo assertion pass status.")
 
     # Specialized Deep-Dive Metrics
@@ -213,28 +215,38 @@ async def evaluate_with_promptfoo(
         f"Prompt / Query: {query}\n\n"
         f"Context provided:\n{ctx_snippet}\n\n"
         f"Model Response:\n{response[:3000]}\n\n"
-        "Criteria:\n"
-        "- Score 0.900 - 1.000: Completely accurate, strictly faithful to context, and answers the prompt directly.\n"
-        "- Score 0.700 - 0.890: Accurate and relevant with minor omissions.\n"
-        "- Score 0.000 - 0.690: Hallucinated, contradicts context, or fails to address the prompt.\n\n"
+        "Evaluate two orthogonal dimensions on a continuous scale from 0.000 to 1.000:\n"
+        "1. Faithfulness: Are all statements, numbers, and claims strictly supported by the context without hallucination?\n"
+        "2. Answer Relevancy: How directly, thoroughly, and concisely does the response answer the user prompt?\n\n"
         "Respond ONLY in valid JSON matching Promptfoo evaluation result schema:\n"
         "{\n"
         '  "pass": true,\n'
-        '  "score": 0.950,\n'
+        '  "faithfulness_score": 0.950,\n'
+        '  "relevancy_score": 0.950,\n'
         '  "reason": "Detailed justification"\n'
         "}"
     )
     try:
         resp = await eval_llm.acomplete(prompt)
         data = json.loads(extract_json_from_llm(resp.text))
+        f_score = round(float(data.get("faithfulness_score", data.get("score", 0.900))), 3)
+        r_score = round(float(data.get("relevancy_score", 0.900)), 3)
         return {
-            "promptfoo_score": round(float(data.get("score", 0.900)), 3),
+            "promptfoo_faithfulness": f_score,
+            "promptfoo_relevancy": r_score,
+            "promptfoo_score": round((f_score + r_score) / 2.0, 3),
             "promptfoo_pass": bool(data.get("pass", True)),
             "promptfoo_reason": data.get("reason", "")
         }
     except Exception as e:
         logger.warning(f"[Promptfoo] Error: {e}")
-        return {"promptfoo_score": None, "promptfoo_pass": None, "promptfoo_reason": str(e)}
+        return {
+            "promptfoo_faithfulness": None,
+            "promptfoo_relevancy": None,
+            "promptfoo_score": None,
+            "promptfoo_pass": None,
+            "promptfoo_reason": str(e)
+        }
 
 
 async def evaluate_turn_across_all_frameworks(
@@ -278,7 +290,9 @@ async def evaluate_turn_across_all_frameworks(
         groundedness_scores.append(de_data["deepeval_faithfulness"])
     if tru_data.get("trulens_groundedness") is not None:
         groundedness_scores.append(tru_data["trulens_groundedness"])
-    if pf_data.get("promptfoo_score") is not None:
+    if pf_data.get("promptfoo_faithfulness") is not None:
+        groundedness_scores.append(pf_data["promptfoo_faithfulness"])
+    elif pf_data.get("promptfoo_score") is not None:
         groundedness_scores.append(pf_data["promptfoo_score"])
 
     mean_grounded = round(sum(groundedness_scores) / len(groundedness_scores), 3) if groundedness_scores else 0.850
@@ -289,6 +303,8 @@ async def evaluate_turn_across_all_frameworks(
         relevancy_scores.append(de_data["deepeval_relevancy"])
     if tru_data.get("trulens_qa_relevance") is not None:
         relevancy_scores.append(tru_data["trulens_qa_relevance"])
+    if pf_data.get("promptfoo_relevancy") is not None:
+        relevancy_scores.append(pf_data["promptfoo_relevancy"])
 
     mean_rel = round(sum(relevancy_scores) / len(relevancy_scores), 3) if relevancy_scores else 0.850
 
@@ -320,6 +336,8 @@ async def evaluate_turn_across_all_frameworks(
         llamaindex_correctness=corr_score,
         trulens_groundedness=tru_data.get("trulens_groundedness"),
         trulens_qa_relevance=tru_data.get("trulens_qa_relevance"),
+        promptfoo_faithfulness=pf_data.get("promptfoo_faithfulness"),
+        promptfoo_relevancy=pf_data.get("promptfoo_relevancy"),
         promptfoo_score=pf_data.get("promptfoo_score"),
         promptfoo_pass=pf_data.get("promptfoo_pass"),
         verbatim_fidelity_score=citation_report.verbatim_fidelity_score,

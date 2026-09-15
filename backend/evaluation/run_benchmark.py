@@ -265,7 +265,8 @@ def export_cross_framework_report(
     de_rel = [r.deepeval_relevancy for r in reports if r.deepeval_relevancy is not None]
     tru_ground = [r.trulens_groundedness for r in reports if r.trulens_groundedness is not None]
     tru_rel = [r.trulens_qa_relevance for r in reports if r.trulens_qa_relevance is not None]
-    pf_scores = [r.promptfoo_score for r in reports if r.promptfoo_score is not None]
+    pf_scores = [r.promptfoo_faithfulness or r.promptfoo_score for r in reports if (r.promptfoo_faithfulness or r.promptfoo_score) is not None]
+    pf_rel_scores = [r.promptfoo_relevancy for r in reports if r.promptfoo_relevancy is not None]
     li_faith = [r.llamaindex_faithfulness for r in reports if r.llamaindex_faithfulness is not None]
     li_rel = [r.llamaindex_relevancy for r in reports if r.llamaindex_relevancy is not None]
 
@@ -277,6 +278,7 @@ def export_cross_framework_report(
     tru_g_str = f"{sum(tru_ground)/len(tru_ground):.3f}" if tru_ground else "N/A"
     tru_r_str = f"{sum(tru_rel)/len(tru_rel):.3f}" if tru_rel else "N/A"
     pf_f_str = f"{sum(pf_scores)/len(pf_scores):.3f}" if pf_scores else "N/A"
+    pf_r_str = f"{sum(pf_rel_scores)/len(pf_rel_scores):.3f}" if pf_rel_scores else pf_f_str
     ragas_f_str = f"{ragas_faith:.3f}" if ragas_faith is not None else "N/A"
     ragas_r_str = f"{ragas_rel:.3f}" if ragas_rel is not None else "N/A"
     li_f_raw = f"{sum(li_faith)/len(li_faith):.3f}" if li_faith else "N/A"
@@ -289,6 +291,13 @@ def export_cross_framework_report(
     if pf_scores: cont_faith_list.append(sum(pf_scores)/len(pf_scores))
     if ragas_faith is not None: cont_faith_list.append(ragas_faith)
     cont_mean_str = f"{sum(cont_faith_list)/len(cont_faith_list):.3f}" if cont_faith_list else "N/A"
+
+    cont_rel_list = []
+    if de_rel: cont_rel_list.append(sum(de_rel)/len(de_rel))
+    if tru_rel: cont_rel_list.append(sum(tru_rel)/len(tru_rel))
+    if pf_rel_scores: cont_rel_list.append(sum(pf_rel_scores)/len(pf_rel_scores))
+    if ragas_rel is not None: cont_rel_list.append(ragas_rel)
+    cont_rel_mean_str = f"{sum(cont_rel_list)/len(cont_rel_list):.3f}" if cont_rel_list else "N/A"
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
@@ -306,7 +315,7 @@ def export_cross_framework_report(
         "| Core Evaluation Pillar | Multi-Judge Consensus | Target Threshold | Continuous Frameworks Included in Mean |",
         "| :--- | :---: | :---: | :--- |",
         f"| **Pillar 1: Groundedness (Anti-Hallucination)** | **{mean_grounded:.3f}** | >= 0.850 | **Continuous 4-Judge Mean:** DeepEval ({de_f_str}) + TruLens ({tru_g_str}) + Promptfoo ({pf_f_str}) + Ragas ({ragas_f_str}) |",
-        f"| **Pillar 2: Answer Relevancy & Completeness** | **{mean_rel:.3f}** | >= 0.850 | **Continuous 3-Judge Mean:** DeepEval ({de_r_str}) + TruLens ({tru_r_str}) + Ragas ({ragas_r_str}) |",
+        f"| **Pillar 2: Answer Relevancy & Completeness** | **{mean_rel:.3f}** | >= 0.850 | **Continuous 4-Judge Mean:** DeepEval ({de_r_str}) + TruLens ({tru_r_str}) + Promptfoo ({pf_r_str}) + Ragas ({ragas_r_str}) |",
         f"| **Pillar 3: Ground-Truth Correctness** | **{mean_corr:.3f}** | >= 0.800 | Aligned with Human Expert Annotators (QASPER Ground Truth) |",
         f"| **Product Invariant: PDF Citation Fidelity** | **{mean_verbatim * 100:.1f}%** *(1.000)* | >= 90.0% | Deterministic Substring & Fuzzy Match on raw PDF text |",
         f"| *Gatekeeper Check: LlamaIndex Strict Binary* | *{li_f_raw}* | *Pass/Fail Gate* | *Binary pass/fail context entailment (Explicitly excluded from continuous mean)* |",
@@ -320,7 +329,7 @@ def export_cross_framework_report(
         "| :--- | :---: | :---: | :--- |",
         f"| **DeepEval** *(Confident AI)* | `{de_f_str}` | `{de_r_str}` | G-Eval probabilistic metric (0.000 - 1.000) |",
         f"| **TruLens** *(TruEra)* | `{tru_g_str}` | `{tru_r_str}` | RAG Triad Groundedness with CoT (0.000 - 1.000) |",
-        f"| **Promptfoo** *(Assertion Suite)* | `{pf_f_str}` | `Evaluated` | Model-graded test assertions (0.000 - 1.000) |",
+        f"| **Promptfoo** *(Assertion Suite)* | `{pf_f_str}` | `{pf_r_str}` | Model-graded test assertions (0.000 - 1.000) |",
         f"| **RAGAS** *(Exploding Gradients)* | `{ragas_f_str}` | `{ragas_r_str}` | Multi-statement atomic NLI + Embeddings (0.000 - 1.000) |",
         f"| **LlamaIndex** *(Native Core)* | `{li_f_raw} (Binary)` | `{li_r_str}` | Strict binary pass/fail context entailment [0 or 1] |",
         "",
