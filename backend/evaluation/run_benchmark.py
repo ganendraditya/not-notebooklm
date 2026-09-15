@@ -30,6 +30,8 @@ logger = logging.getLogger("eval_runner")
 
 GOLDEN_DATASET_PATH = BACKEND_DIR / "evaluation" / "datasets" / "golden_benchmark.json"
 QASPER_DATASET_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_qasper.json"
+QASPER_VAL_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_qasper_val.json"
+QASPER_TEST_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_qasper_test.json"
 REPORTS_DIR = BACKEND_DIR / "evaluation" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -41,11 +43,21 @@ async def dummy_status_reporter(msg: str):
 
 def load_benchmark_cases(
     dataset: str = "golden",
+    split: str = "val",
     limit: Optional[int] = None,
     category: Optional[str] = None
 ) -> Tuple[List[Dict[str, Any]], Path]:
-    """Loads and filters benchmark test cases from chosen dataset."""
-    target_path = QASPER_DATASET_PATH if dataset == "qasper" else GOLDEN_DATASET_PATH
+    """Loads and filters benchmark test cases from chosen dataset and split."""
+    if dataset == "qasper":
+        if split == "test":
+            target_path = QASPER_TEST_PATH
+        elif split == "all":
+            target_path = QASPER_DATASET_PATH
+        else:
+            target_path = QASPER_VAL_PATH
+    else:
+        target_path = GOLDEN_DATASET_PATH
+
     if not target_path.exists():
         raise FileNotFoundError(f"Benchmark dataset not found at {target_path}")
     
@@ -424,13 +436,14 @@ def export_markdown_report(
 async def main():
     parser = argparse.ArgumentParser(description="Not-NotebookLM Automated Evaluation Benchmark")
     parser.add_argument("--dataset", type=str, default="golden", choices=["golden", "qasper"], help="Dataset to benchmark: 'golden' (multi-paper & domestic) or 'qasper' (official AllenAI QASPER)")
+    parser.add_argument("--split", type=str, default="val", choices=["val", "test", "all"], help="Split for QASPER: 'val' (25 cases), 'test' (25 cases), or 'all' (50 cases)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")
     parser.add_argument("--cross-framework", action="store_true", help="Run comprehensive multi-framework evaluation (Ragas, DeepEval, TruLens, LlamaIndex)")
     parser.add_argument("--include-ragas", action="store_true", help="Run batch Ragas evaluation across results")
     args = parser.parse_args()
 
-    cases, dataset_path = load_benchmark_cases(dataset=args.dataset, limit=args.limit, category=args.category)
+    cases, dataset_path = load_benchmark_cases(dataset=args.dataset, split=args.split, limit=args.limit, category=args.category)
     print(f"\n[Benchmark] Loaded {len(cases)} test cases from {dataset_path.name}")
 
     main_llm = get_main_llm()
