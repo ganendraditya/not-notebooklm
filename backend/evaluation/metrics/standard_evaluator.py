@@ -317,7 +317,7 @@ async def evaluate_rag_turn(
         for d_idx, d_txt in source_map.items():
             if d_txt:
                 per_doc_limit = 40000 if len(source_map) <= 2 else 25000
-                doc_contexts.append(f"--- DOKUMEN [{d_idx}] ---\n" + d_txt[:per_doc_limit])
+                doc_contexts.append(f"--- DOCUMENT [{d_idx}] ---\n" + d_txt[:per_doc_limit])
         context_str = "\n\n".join(doc_contexts) if doc_contexts else (contexts[0][:40000] if contexts else "")
 
         # A. Factual Grounding Evaluation via Rubric Service

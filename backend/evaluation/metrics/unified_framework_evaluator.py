@@ -179,7 +179,8 @@ async def evaluate_with_llamaindex(
     from rag.llm_factory import get_fast_llm
 
     eval_llm = llm or get_fast_llm()
-    clean_contexts = [c[:3000] for c in contexts] if contexts else ["No context."]
+    # Merge contexts into a unified document so LlamaIndex SummaryIndex does not perform N sequential refinement calls
+    clean_contexts = ["\n\n".join(contexts)[:45000]] if contexts else ["No context."]
     results = {}
 
     try:
