@@ -179,7 +179,8 @@ async def evaluate_with_llamaindex(
     from rag.llm_factory import get_fast_llm
 
     eval_llm = llm or get_fast_llm()
-    clean_contexts = [c[:3000] for c in contexts] if contexts else ["No context."]
+    merged_ctx = "\n\n".join(contexts)[:45000] if contexts else "No context."
+    clean_contexts = [merged_ctx]
     results = {}
 
     try:
