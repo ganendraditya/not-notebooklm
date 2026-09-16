@@ -609,7 +609,7 @@ async def main():
     if (args.include_ragas or args.cross_framework or args.fast) and ragas_records and not ragas_scores:
         print("\n[Benchmark] Running batch evaluation with Ragas...")
         try:
-            ragas_scores = evaluate_batch_with_ragas(ragas_records)
+            ragas_scores = await evaluate_batch_with_ragas(ragas_records)
             print(f"Ragas Faithfulness: {ragas_scores.get('ragas_faithfulness')} | Answer Relevancy: {ragas_scores.get('ragas_answer_relevancy')}")
             save_checkpoint_now(final_ragas=ragas_scores)
         except Exception as e:

@@ -11,7 +11,7 @@ import evaluation
 
 try:
     from ragas.metrics import faithfulness, answer_relevancy, context_recall, context_precision
-    from ragas import evaluate
+    from ragas import evaluate, aevaluate
     from langchain_openai import ChatOpenAI
     from langchain_google_genai import GoogleGenerativeAIEmbeddings
     RAGAS_AVAILABLE = True
@@ -20,13 +20,12 @@ except Exception as e:
     RAGAS_AVAILABLE = False
 
 
-def evaluate_batch_with_ragas(
+async def evaluate_batch_with_ragas(
     eval_records: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Evaluates a batch of RAG turns using official Ragas metrics across all dimensions:
+    Evaluates a batch of RAG turns asynchronously using official Ragas metrics across all dimensions:
     - Generation: Faithfulness, Answer Relevancy
-    - Retrieval: Context Recall, Context Precision
     """
     if not RAGAS_AVAILABLE or not eval_records:
         return {
@@ -74,12 +73,12 @@ def evaluate_batch_with_ragas(
 
         from ragas.run_config import RunConfig
         dataset = Dataset.from_dict(dataset_dict)
-        results = evaluate(
+        results = await aevaluate(
             dataset=dataset,
             metrics=active_metrics,
             llm=ragas_llm,
             embeddings=embeddings,
-            run_config=RunConfig(timeout=240, max_retries=1, max_workers=3),
+            run_config=RunConfig(timeout=90, max_retries=1, max_workers=4),
             raise_exceptions=False
         )
 
