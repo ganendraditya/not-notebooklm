@@ -150,7 +150,7 @@ def extract_relevant_contexts(
     query: str,
     response: str,
     source_docs_map: Dict[str, str],
-    max_chunks: int = 8
+    max_chunks: int = 12
 ) -> List[str]:
     """
     Extracts high-relevance context excerpts from full source documents.
@@ -162,7 +162,7 @@ def extract_relevant_contexts(
     # 1. Always include document header (title, authors, abstract) for each document
     for doc_idx, doc_text in source_docs_map.items():
         if doc_text:
-            header_snippet = f"--- DOKUMEN [{doc_idx}] HEADER ---\n" + doc_text[:2500]
+            header_snippet = f"--- DOCUMENT [{doc_idx}] HEADER ---\n" + doc_text[:2500]
             if header_snippet not in seen_texts:
                 seen_texts.add(header_snippet)
                 selected_contexts.append(header_snippet)
@@ -190,18 +190,22 @@ def extract_relevant_contexts(
         except Exception:
             pass
 
-    # 2. Add top paragraphs with highest token overlap with query + response
+    # 3. Add top paragraphs with highest token overlap with query + response, boosting empirical results/tables
     search_tokens = set(re.findall(r'\w+', (query + " " + response).lower()))
     scored_paragraphs = []
 
     for doc_idx, doc_text in source_docs_map.items():
         # Split into substantial paragraphs
-        paragraphs = [p.strip() for p in doc_text.split("\n\n") if len(p.strip()) >= 80]
+        paragraphs = [p.strip() for p in doc_text.split("\n\n") if len(p.strip()) >= 60]
         for p in paragraphs:
             words = set(re.findall(r'\w+', p.lower()))
             overlap = len(search_tokens.intersection(words))
-            if overlap >= 3:
-                scored_paragraphs.append((overlap, p))
+            p_lower = p.lower()
+            bonus = 0
+            if any(k in p_lower for k in ["table", "result", "dataset", "f1", "baseline", "accuracy", "evaluation"]):
+                bonus += 2
+            if overlap >= 2 or (bonus > 0 and overlap >= 1):
+                scored_paragraphs.append((overlap + bonus, p))
 
     scored_paragraphs.sort(key=lambda x: x[0], reverse=True)
     for _, p in scored_paragraphs:

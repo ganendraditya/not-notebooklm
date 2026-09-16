@@ -80,19 +80,19 @@ async def _load_single_doc_snippet_async(idx_fname_chat: tuple, db_records: Dict
     if doc_display_title.isupper() and len(doc_display_title) > 8:
         doc_display_title = doc_display_title.title()
 
-    status_label = "NASKAH LENGKAP TERSEDIA (Full-Text Original PDF Downloaded - Seluruh Bab Lengkap Ada)" if is_full_paper else "RINGKASAN ABSTRAK & METADATA RESMI (Abstract & Metadata Only)"
-    has_doi_label = f"DOI Resmi: {db_record.get('doi')}" if (db_record and db_record.get("doi")) else "DOI Resmi: Tidak Ada / Repositori Kampus"
+    status_label = "FULL-TEXT ORIGINAL AVAILABLE (All Sections Included)" if is_full_paper else "ABSTRACT & OFFICIAL METADATA ONLY"
+    has_doi_label = f"Official DOI: {db_record.get('doi')}" if (db_record and db_record.get("doi")) else "Official DOI: None / Campus Repository"
 
     return (
         is_full_paper,
         (
-            f"--- DOKUMEN [{i+1}] ---\n"
-            f"Nomor Dokumen: [{i+1}]\n"
-            f"Judul Publikasi: {doc_display_title}\n"
-            f"Nama File: {fname}\n"
-            f"Status File Dokumen: {status_label}\n"
+            f"--- DOCUMENT [{i+1}] ---\n"
+            f"Document Number: [{i+1}]\n"
+            f"Publication Title: {doc_display_title}\n"
+            f"File Name: {fname}\n"
+            f"Document Status: {status_label}\n"
             f"{has_doi_label}\n"
-            f"Teks Dokumen Asli:\n{content_snippet}\n"
+            f"Source Document Content:\n{content_snippet}\n"
         )
     )
 
@@ -110,7 +110,7 @@ async def _retrieve_hybrid_workspace_context(
     3. Reranks chunks via FlashRank Cross-Encoder to fit optimal context budget.
     """
     total_docs = len(local_docs)
-    catalog_lines = [f"=== KATALOG DOKUMEN WORKSPACE ({total_docs} DOKUMEN) ==="]
+    catalog_lines = [f"=== WORKSPACE DOCUMENTS CATALOG ({total_docs} DOCUMENTS) ==="]
 
     for i, fname in enumerate(local_docs):
         d = db_records.get(fname, {})
@@ -121,7 +121,7 @@ async def _retrieve_hybrid_workspace_context(
         snippet = (d.get("abstract") or d.get("snippet") or "").strip()
         if len(snippet) > 350:
             snippet = snippet[:350] + "..."
-        catalog_lines.append(f"[{i+1}] {title}{year}{venue}{doi}\nRingkasan: {snippet or '(Tidak ada ringkasan)'}")
+        catalog_lines.append(f"[{i+1}] {title}{year}{venue}{doi}\nSummary: {snippet or '(No summary available)'}")
 
     catalog_text = "\n\n".join(catalog_lines)
 
@@ -162,11 +162,11 @@ async def _retrieve_hybrid_workspace_context(
             for idx, n in enumerate(selected_nodes, start=1):
                 fname = n.node.metadata.get("filename", "Dokumen")
                 sec = n.node.metadata.get("section") or n.node.metadata.get("breadcrumb") or ""
-                sec_lbl = f" - Bagian: {sec}" if sec else ""
+                sec_lbl = f" - Section: {sec}" if sec else ""
                 doc_idx = local_docs.index(fname) + 1 if fname in local_docs else idx
                 chunk_text = n.node.get_content()
                 retrieved_blocks.append(
-                    f"--- KUTIPAN RELEVAN Dokumen [{doc_idx}] (Sumber: {fname}{sec_lbl}) ---\n{chunk_text}"
+                    f"--- RELEVANT EXCERPT Document [{doc_idx}] (Source: {fname}{sec_lbl}) ---\n{chunk_text}"
                 )
 
                 doc_key = str(doc_idx)
@@ -181,7 +181,7 @@ async def _retrieve_hybrid_workspace_context(
     if retrieved_blocks:
         return (
             f"{catalog_text}\n\n"
-            f"=== KUTIPAN MENDALAM DARI DOKUMEN TERKAIT QUERY ({len(retrieved_blocks)} BAGIAN RELEVAN TERTINGGI) ===\n\n"
+            f"=== DEEP EXCERPTS FROM DOCUMENTS RELEVANT TO QUERY ({len(retrieved_blocks)} HIGHEST-RANKED SECTIONS) ===\n\n"
             + "\n\n".join(retrieved_blocks),
             pre_stored_rag_map
         )
@@ -246,6 +246,10 @@ async def handle_workspace_analysis_pipeline(
     system_prompt_text = (
         f"{get_workspace_analysis_system_prompt(total_doc_count)}\n\n"
         "CRITICAL INSTRUCTIONS FOR SYNTHESIS & ANALYSIS:\n"
+        "- STRICT LANGUAGE MIRRORING: You MUST ALWAYS respond in the EXACT same language as the user query. If the user prompt is in English, the response MUST be 100% in English. If the user prompt is in Indonesian, the response MUST be 100% in Indonesian. Zero unsolicited translation or cross-language mixing.\n"
+        "- ZERO CONVERSATIONAL PREAMBLE: Begin your response directly with the factual answer or findings. Strictly avoid conversational filler or introductory throat-clearing (e.g. do NOT start with 'Berdasarkan dokumen...', 'Based on the provided document...', 'In the paper...', etc.). State the findings directly.\n"
+        "- EMPIRICAL METRICS PRECISION: When reporting empirical performance, accuracy, or benchmark scores, ALWAYS provide the exact final absolute metrics (e.g. 'F1 scores of 85.99 on DL-PS, 75.15 on EC-MT, and 71.53 on EC-UQ') alongside any relative improvements. NEVER report only improvement deltas (+1.08) when final absolute metrics are present.\n"
+        "- DIRECT NEGATIVE ABSTENTION (FIRST SENTENCE): If any requested aspect, metric, parameter, mechanism, or platform is not explicitly documented or discussed in the text, you MUST state in the FIRST SENTENCE that the information is not mentioned or provided in the paper (e.g. 'This information is not mentioned or provided in the paper.'). Do NOT speculate, extrapolate, or attempt to explain adjacent mechanisms.\n"
         "- Respond strictly and proportionally to what the user asks. If the user asks a simple question (e.g. counting, listing, or checking status), answer directly and concisely without unsolicited long tables or essays.\n"
         "- When the user explicitly asks to summarize, analyze, compare, or generate chapters/sections, write a structured, highly analytical synthesis. Cover all comparison dimensions asked by the user, maintain dense academic conciseness (avoid overly verbose repetitive preamble), and ensure all points and sentences are fully and cleanly concluded.\n"
         "- DO NOT refuse with excuses about copyright or partial text. Leverage the available document text fully.\n\n"
@@ -263,7 +267,7 @@ async def handle_workspace_analysis_pipeline(
     )
     context_msg = LlamaChatMessage(
         role=MessageRole.SYSTEM,
-        content=f"BERIKUT ADALAH SELURUH DATA & TEKS DOKUMEN REFERENSI YANG DIIMPOR ({total_doc_count} DOKUMEN):\n\n{full_docs_context}"
+        content=f"=== AUTHORITATIVE REFERENCE DOCUMENTS CONTEXT ({total_doc_count} DOCUMENTS) ===\n\n{full_docs_context}"
     )
     chat_msgs = [
         system_msg,
