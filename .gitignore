@@ -47,10 +47,9 @@ antislop.md
 .cursorrules
 .windsurfrules
 
-# Evaluation caches & large datasets
+# Evaluation benchmarks, datasets & reports (local only)
 .promptfoo/
-backend/evaluation/reports/checkpoint_*.json
-backend/evaluation/datasets/alce/
-backend/evaluation/datasets/attributed_qa/
-backend/evaluation/datasets/crag/
-backend/evaluation/datasets/scifact/
+backend/evaluation/
+backend/tests/test_citation_verifier.py
+docs/EVALUATION_METHODOLOGY.md
+docs/releases/v1.4.0-draft.md
