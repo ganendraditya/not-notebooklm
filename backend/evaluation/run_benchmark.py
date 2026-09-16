@@ -166,9 +166,9 @@ async def run_workspace_rag_benchmark_case(
 
     # 2. Extract authentic retrieval context chunks aligned with query & response
     from evaluation.metrics.standard_evaluator import extract_relevant_contexts
-    contexts = extract_relevant_contexts(query, response, source_docs_map, max_chunks=8)
+    contexts = extract_relevant_contexts(query, response, source_docs_map, max_chunks=16)
     if not contexts:
-        contexts = [t[:4000] for t in source_docs_map.values() if t]
+        contexts = [t[:40000] for t in source_docs_map.values() if t]
 
     # 3. Evaluate turn
     result = await evaluate_rag_turn(
@@ -548,9 +548,9 @@ async def main():
                     source_docs_map[str(idx)] = doc_text
                 
                 from evaluation.metrics.standard_evaluator import extract_relevant_contexts
-                retrieved_chunks = extract_relevant_contexts(case["query"], res.raw_response, source_docs_map, max_chunks=8)
+                retrieved_chunks = extract_relevant_contexts(case["query"], res.raw_response, source_docs_map, max_chunks=16)
                 if not retrieved_chunks:
-                    retrieved_chunks = [t[:4000] for t in source_docs_map.values() if t]
+                    retrieved_chunks = [t[:40000] for t in source_docs_map.values() if t]
 
                 cf_report = None
                 if (args.cross_framework or args.fast) and cat != "search_discovery":

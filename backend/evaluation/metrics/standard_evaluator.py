@@ -150,14 +150,44 @@ def extract_relevant_contexts(
     query: str,
     response: str,
     source_docs_map: Dict[str, str],
-    max_chunks: int = 12
+    max_chunks: int = 16
 ) -> List[str]:
     """
-    Extracts high-relevance context excerpts from full source documents.
-    Anchors on CITATION_MAP quotes and keyword overlap with query + response.
+    Extracts high-fidelity context excerpts from full source documents.
+    If total document size is moderate (<= 60,000 characters, covering standard research papers),
+    partitions the full authentic text into contiguous, substantial chunks so that 100% of the
+    information read by the generator is preserved for evaluation judges.
+    For large corpora (> 60,000 characters), prioritizes document headers, CITATION_MAP quotes,
+    and high-overlap paragraphs.
     """
     selected_contexts = []
     seen_texts = set()
+
+    total_chars = sum(len(txt) for txt in source_docs_map.values() if txt)
+
+    # Fast path: For standard papers (<= 60,000 chars total), preserve 100% of the text across contiguous chunks
+    if total_chars <= 60000:
+        for doc_idx, doc_text in source_docs_map.items():
+            if not doc_text:
+                continue
+            # Chunk document by paragraphs, aiming for ~2,500-3,000 chars per chunk
+            paragraphs = [p.strip() for p in doc_text.split("\n\n") if p.strip()]
+            cur_chunk_parts = []
+            cur_len = 0
+            for p in paragraphs:
+                cur_chunk_parts.append(p)
+                cur_len += len(p)
+                if cur_len >= 2500:
+                    chunk_text = f"--- DOCUMENT [{doc_idx}] ---\n" + "\n\n".join(cur_chunk_parts)
+                    selected_contexts.append(chunk_text)
+                    cur_chunk_parts = []
+                    cur_len = 0
+            if cur_chunk_parts:
+                chunk_text = f"--- DOCUMENT [{doc_idx}] ---\n" + "\n\n".join(cur_chunk_parts)
+                selected_contexts.append(chunk_text)
+
+        if selected_contexts:
+            return selected_contexts
 
     # 1. Always include document header (title, authors, abstract) for each document
     for doc_idx, doc_text in source_docs_map.items():

@@ -143,7 +143,7 @@ async def evaluate_with_trulens(
         target_statement = ' '.join(candidate_sentences[:3]) if candidate_sentences else response[:600]
 
         # Run TruLens QA Relevance and Groundedness CoT in parallel
-        clean_context = context_text[:15000] if context_text else "No context."
+        clean_context = context_text[:60000] if context_text else "No context."
         rel_task = asyncio.to_thread(provider.relevance, query, response)
         cot_task = asyncio.to_thread(
             provider.groundedness_measure_with_cot_reasons,
@@ -221,7 +221,7 @@ async def evaluate_with_promptfoo(
     import json
 
     eval_llm = llm or get_fast_llm()
-    ctx_snippet = "\n\n".join(contexts)[:15000]
+    ctx_snippet = "\n\n".join(contexts)[:60000]
 
     gt_clause = f"\nReference Ground Truth:\n{ground_truth}\n" if ground_truth else ""
     correctness_instruction = (
