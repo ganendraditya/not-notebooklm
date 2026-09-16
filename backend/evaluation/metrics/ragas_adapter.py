@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import logging
 from typing import List, Dict, Any, Optional
@@ -6,18 +7,34 @@ from datasets import Dataset
 
 logger = logging.getLogger("uvicorn.error")
 
-# Ensure Ragas compatibility shims
+# Ensure Ragas compatibility shims & telemetry disabled
 import evaluation
+os.environ["RAGAS_DO_NOT_TRACK"] = "true"
 
 try:
     from ragas.metrics import faithfulness, answer_relevancy, context_recall, context_precision
-    from ragas import evaluate, aevaluate
+    from ragas import aevaluate
     from langchain_openai import ChatOpenAI
     from langchain_google_genai import GoogleGenerativeAIEmbeddings
     RAGAS_AVAILABLE = True
 except Exception as e:
     logger.warning(f"[RagasAdapter] Failed to initialize Ragas: {e}")
     RAGAS_AVAILABLE = False
+
+
+class CleanChatOpenAI(ChatOpenAI):
+    """ChatOpenAI wrapper that automatically strips markdown code fences so Ragas parser never fails."""
+    async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        res = await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+        for gen in res.generations:
+            t = gen.text.strip()
+            if t.startswith("```"):
+                t = re.sub(r"^```(?:json)?\s*", "", t)
+                t = re.sub(r"\s*```$", "", t)
+                gen.text = t.strip()
+                if hasattr(gen, "message") and hasattr(gen.message, "content"):
+                    gen.message.content = t.strip()
+        return res
 
 
 async def evaluate_batch_with_ragas(
@@ -45,40 +62,26 @@ async def evaluate_batch_with_ragas(
         dataset_dict["reference"] = [r.get("ground_truth", "") for r in eval_records]
 
     base_url = os.getenv("LLM_BASE_URL", "http://localhost:20128/v1")
-    api_key = os.getenv("LLM_API_KEY", "")
+    api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "dummy-key"
     model = os.getenv("LLM_MODEL", "gpt-4o")
     gemini_key = os.getenv("GEMINI_API_KEY")
 
     try:
-        ragas_llm = ChatOpenAI(
+        ragas_llm = CleanChatOpenAI(
             base_url=base_url,
             api_key=api_key,
             model=model,
             temperature=0.0
         )
 
-        embeddings = None
-        if gemini_key:
-            try:
-                embeddings = GoogleGenerativeAIEmbeddings(
-                    model="models/gemini-embedding-001",
-                    google_api_key=gemini_key
-                )
-            except Exception as e:
-                logger.warning(f"[RagasAdapter] Could not load Google embeddings: {e}")
-
         active_metrics = [faithfulness]
-        if embeddings is not None:
-            active_metrics.append(answer_relevancy)
-
         from ragas.run_config import RunConfig
         dataset = Dataset.from_dict(dataset_dict)
         results = await aevaluate(
             dataset=dataset,
             metrics=active_metrics,
             llm=ragas_llm,
-            embeddings=embeddings,
-            run_config=RunConfig(timeout=90, max_retries=1, max_workers=4),
+            run_config=RunConfig(timeout=90, max_retries=1, max_workers=3),
             raise_exceptions=False
         )
 
