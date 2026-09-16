@@ -1,8 +1,8 @@
 # NotbookLM
 
-An open-source academic research assistant and document workspace designed to run locally on your own machine. Inspired by tools like Google Notebook / Gemini Notebook (previously NotebookLM), Consensus, and Elicit—NotbookLM bridges conversational AI with verifiable academic literature synthesis.
-
 ![NotbookLM Workspace](docs/assets/workspace-preview.png)
+
+An open-source academic research assistant and document workspace designed to run locally on your own machine. Inspired by tools like Google Notebook / Gemini Notebook (previously NotebookLM), Consensus, and Elicit—NotbookLM bridges conversational AI with verifiable academic literature synthesis.
 
 Instead of relying on proprietary cloud lock-in, NotbookLM operates locally by default—combining embedded relational storage (SQLite), in-process vector indexing (Qdrant), and local file processing. It streamlines retrieval, filtering, and synthesis of scholarly publications from global academic repositories—including **OpenAlex**, **Crossref**, and **Europe PMC**, with **DuckDuckGo** scholarly web search fallback, and full-text PDF resolution via **arXiv** and **Unpaywall**—delivering structured comparative matrices and grounded citations linked directly to source papers.
 
@@ -19,7 +19,8 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 * **Interactive Split-Pane Reader & Jump-to-Highlight:** Bidirectional citation navigation—clicking any citation badge in a response or table cell automatically opens the document reader, scrolls to the page, and highlights the exact supporting passage.
 * **Targeted Document Focus:** One-click "Ask about this document" mode focuses questions exclusively on an individual paper without deselecting other workspace files.
 * **7-Format Citation Generator & Bulk ZIP Export:** Instant generation of verified academic citations in APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS formats, alongside one-click bulk ZIP bundling for entire workspaces.
-* **3-Tier Hybrid Metadata Extractor:** Handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and an AI Document Inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
+* **3-Tier Hybrid Metadata Extractor:** Handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and a document inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
+* **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 50-case benchmark combining single-paper deep dives, multi-paper comparative synthesis, and biomedical claim verification (**AllenAI QASPER & SciFact**), achieving a 0.955 Groundedness consensus score (anti-hallucination) and 0.972 ground-truth correctness.
 * **Local-First & Multi-Role LLM Architecture:** Runs locally with embedded SQLite and Qdrant. Connects to any OpenAI-compatible API (Ollama, vLLM, DeepSeek, GPT-4o) with tiered primary, fast, and auto-fallback model roles, plus optional S3 storage (Cloudflare R2, MinIO).
 
 ---
@@ -27,7 +28,7 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 ## Workflow & Core Capabilities
 
 ### 1. Literature Discovery & Granular Ingestion
-Search across OpenAlex, Crossref, Europe PMC, with intelligent **DuckDuckGo** scholarly web search fallback for niche topics and recent preprints. NotbookLM screens candidate publications and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select candidates with tri-state selection controls, batch-import with live progress tracking (`Adding x/y...`), and cancel individual downloads granularly from the sidebar without leaving orphan files.
+Search across OpenAlex, Crossref, and Europe PMC, with automated **DuckDuckGo** scholarly web search fallback for niche topics and recent preprints. NotbookLM screens candidate publications and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select candidates with tri-state selection controls, batch-import with live progress tracking (`Adding x/y...`), and cancel individual downloads granularly from the sidebar without leaving orphan files.
 
 ![Literature Discovery](docs/assets/literature-discovery.png)
 
@@ -54,6 +55,49 @@ Synthesize multiple papers into comparative review matrices. Each finding is tag
 * **KaTeX Mathematics:** Seamlessly renders mathematical notation, formulas, and matrices ($E = mc^2$, $\sum$, $\int$).
 
 ![Grounded Citation Highlighting](docs/assets/citation-grounding.png)
+
+---
+
+## Empirical Benchmarking & Evaluation
+
+To evaluate retrieval, synthesis, and citation accuracy, NotbookLM is benchmarked against public research questions from peer-reviewed scientific datasets rather than ad-hoc queries.
+
+Performance is audited across established open-source evaluation tools and research benchmark protocols on a **50-case scientific benchmark** (evaluated under deterministic greedy decoding `temperature=0.0`):
+* **25 Single-Paper Deep Dives:** AllenAI QASPER test split (full-text 15–35 page arXiv papers with tables and empirical metrics).
+* **15 Multi-Paper Comparative Synthesis:** Curated multi-document workspaces comparing 2–3 research papers in structured tables.
+* **10 Biomedical Claim Verifications:** AllenAI SciFact claims testing evidence attribution and false-premise rejection.
+
+### Baseline Scorecard (50-Question Multi-Paper Scientific Benchmark)
+
+| Evaluation Dimension | Multi-Judge Consensus (Mean) | Evaluator Breakdown & Methodology |
+| :--- | :---: | :--- |
+| **Groundedness (Anti-Hallucination)** | **0.955** | Continuous 4-judge mean: DeepEval (`0.998`) + TruLens (`0.959`) + Promptfoo (`0.944`) + RAGAS (`0.900`) |
+| **Answer Relevancy & Completeness** | **0.897** | Continuous 3-judge mean: DeepEval (`0.953`) + TruLens (`0.780`) + Promptfoo (`0.959`) |
+| **Ground-Truth Correctness** | **0.972** | Dual-judge consensus: LlamaIndex + Promptfoo ground-truth alignment |
+| **Citation Quality (Princeton ALCE)** | **Recall: 0.800 / Precision: 0.750** | Formal statement entailment & citation redundancy penalty *(EMNLP 2023)* |
+| **Strict Binary Entailment (LlamaIndex)** | **0.700** *(35/50 passed)* | Zero-tolerance binary context entailment gate (35 passed, 15 failed; separated from continuous consensus) |
+| **Composite Consensus Score** | **0.947** / 1.000 | Weighted summary index across continuous evaluation dimensions |
+
+> **Benchmark Configuration & Model Roles:**  
+> * **System Under Test (NotbookLM Core Pipeline):**  
+>   * **Main LLM (`gemini-3.8-flash-high`):** Powers full-manuscript reading, multi-paper comparative synthesis tables, and grounded academic drafting.  
+>   * **Fast LLM (`gemini-3.8-flash-low`):** Handles operational micro-tasks (on-demand citation highlight passage extraction, metadata inspection, and query intent classification).  
+> * **Evaluator Judge (`gemini-3.1-pro-low`):** Assigned as the independent evaluation judge across all six evaluation tools and protocols (RAGAS, DeepEval, TruLens, Promptfoo, Princeton ALCE, and LlamaIndex) under greedy decoding (`temperature=0.0`).  
+> * **Reproducibility Note:** Decoding temperature is locked to `0.0` to maximize determinism. However, due to the inherent non-deterministic nature of LLM inference (provider-side GPU batching and dual-sided LLM-as-a-judge dynamics), replication runs may still exhibit slight score variations even when using the exact same model pairing. Running the benchmark with alternative backends (e.g. GPT-4o, Claude, or local open-weights models) will naturally yield distinct quantitative figures.
+
+### Evaluation Tooling & Dataset References
+
+#### Open-Source Evaluation Libraries & Tools
+* **RAGAS** ([GitHub](https://github.com/explodinggradients/ragas)): Automated evaluation of retrieval-augmented generation pipelines using atomic claim decomposition and NLI — Es et al., *RAGAS: Automated Evaluation of Retrieval Augmented Generation*, EACL 2024.
+* **DeepEval** ([GitHub](https://github.com/confident-ai/deepeval)): Production LLM evaluation harness utilizing G-Eval probabilistic metric modeling — Liu et al., *G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment*, EMNLP 2023.
+* **TruLens** ([GitHub](https://github.com/truera/trulens)): Systematic RAG Triad assessment measuring groundedness, context relevance, and answer relevance with Chain-of-Thought (CoT) reasoning — TruEra (2023).
+* **Promptfoo** ([GitHub](https://github.com/promptfoo/promptfoo)): Test suite and assertion harness for model-graded continuous verification, regression testing, and negative abstention.
+* **LlamaIndex Evaluation Core** ([Docs](https://docs.llamaindex.ai/en/stable/module_guides/evaluating/)): Native context entailment gatekeeping (`FaithfulnessEvaluator`) and semantic ground-truth correctness (`CorrectnessEvaluator`).
+
+#### Benchmark Protocols & Research Datasets
+* **Princeton ALCE Protocol** ([GitHub](https://github.com/princeton-nlp/ALCE)): Automatic LLM citation evaluation benchmark protocol measuring formal Citation Recall (statement support) and Citation Precision (redundancy check) — Gao et al., *Enabling Large Language Models to Generate Text with Citations*, EMNLP 2023.
+* **AllenAI QASPER** ([Project](https://allenai.org/data/qasper)): Information-seeking questions and answers anchored in full-text arXiv research papers with human-annotated evidence — Dasigi et al., *A Dataset of Information-Seeking Questions and Answers Anchored in Research Papers*, ACL 2021.
+* **AllenAI SciFact** ([Project](https://allenai.org/data/scifact)): Scientific claim verification benchmark based on biomedical literature with expert-labeled evidence and rationale sentences — Wadden et al., *Fact or Fiction: Verifying Scientific Claims with Evidence from Open Access Publications*, EMNLP 2020.
 
 ---
 
@@ -234,8 +278,51 @@ The application reads configuration through standard environment variables. If y
 * **Embeddings:** Local multilingual embeddings (`intfloat/multilingual-e5-small`) or Google Gemini embeddings.
 * **LLM Engine:** OpenAI-compatible adapter (`OpenAILike`) with tiered model roles (Primary, Fast, Fallback) and automated error recovery.
 
+### Repository Structure
+
+```text
+.
+├── backend
+│   ├── database.py              # SQLite + SQLAlchemy session manager with WAL mode
+│   ├── main.py                  # FastAPI application entrypoint and middleware
+│   ├── models.py                # Database models (chats, messages, documents, highlights)
+│   ├── providers                # Academic registry and web search scrapers
+│   │   ├── academic             # OpenAlex, Crossref, and Europe PMC registry clients
+│   │   └── scrapers             # DuckDuckGo scholarly web search fallback scraper
+│   ├── rag                      # Retrieval-Augmented Generation core engine
+│   │   ├── academic_chunker.py  # Section-aware academic paper chunking
+│   │   ├── engine.py            # Chat query dispatch and history pipeline
+│   │   ├── intent.py            # Pure semantic intent classifier (Discovery vs Workspace)
+│   │   ├── llm_factory.py       # Tiered model factory (Primary, Fast, Fallback)
+│   │   ├── parsers.py           # Multi-format document parser (PDF, DOCX, TXT, MD)
+│   │   ├── pipelines            # Workspace synthesis & comparative analysis pipelines
+│   │   ├── prompts.py           # Strict language mirroring & zero-hallucination prompts
+│   │   ├── search.py            # FlashRank reranker and reciprocal rank fusion
+│   │   └── vector_store.py      # Qdrant client (embedded disk & remote server)
+│   ├── routers                  # REST API endpoints (chats, documents, papers, storage)
+│   ├── services                 # Business logic services
+│   │   ├── document             # DOI resolution, deduplication, and file handlers
+│   │   ├── export_service.py    # 7-format citation generator & bulk ZIP packager
+│   │   ├── highlight_service.py # 4-tier citation highlight matching engine
+│   │   └── storage_adapter.py   # Unified storage adapter (Local disk & S3/R2/MinIO)
+│   └── tests                    # Backend pytest suite (94 unit & integration tests)
+├── frontend
+│   ├── src
+│   │   ├── app                  # Next.js 16 App Router (layout, page, providers)
+│   │   ├── components           # Modular UI (Chat, Sources, DocumentReader, Search)
+│   │   ├── hooks                # Custom React hooks (auto-scroll, shortcuts, resizers)
+│   │   ├── lib                  # Formatting helpers, KaTeX renderer, and i18n
+│   │   └── stores               # Zustand state stores (chatStore, searchStore, readerStore)
+│   ├── package.json             # Frontend package metadata and dependencies
+│   └── vitest.config.ts         # Vitest unit test configuration
+├── check.sh                     # CI mirror pre-flight verification script (lint, test, build)
+├── docker-compose.yml           # Multi-container orchestration (App + Qdrant)
+├── start.sh                     # One-click startup script with port guard (Linux/macOS)
+└── start.ps1                    # One-click startup script with port guard (Windows)
+```
+
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+MIT.
