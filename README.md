@@ -98,6 +98,7 @@ Performance is audited across established open-source evaluation tools and resea
 
 #### Benchmark Protocols & Research Datasets
 * **Princeton ALCE Protocol** ([GitHub](https://github.com/princeton-nlp/ALCE)): Automatic LLM citation evaluation benchmark protocol measuring formal Citation Recall (statement support) and Citation Precision (redundancy check) — Gao et al., *Enabling Large Language Models to Generate Text with Citations*, EMNLP 2023.
+* **Needle In A Haystack (NIAH) Protocol** ([GitHub](https://github.com/gkamradt/LLMTest_NeedleInAHaystack)): Standardized evaluation protocol measuring multi-turn long-context constraint retention and retrieval under constrained token budgets — Kamradt (2023).
 * **AllenAI QASPER** ([Project](https://allenai.org/data/qasper)): Information-seeking questions and answers anchored in full-text arXiv research papers with human-annotated evidence — Dasigi et al., *A Dataset of Information-Seeking Questions and Answers Anchored in Research Papers*, ACL 2021.
 * **AllenAI SciFact** ([Project](https://allenai.org/data/scifact)): Scientific claim verification benchmark based on biomedical literature with expert-labeled evidence and rationale sentences — Wadden et al., *Fact or Fiction: Verifying Scientific Claims with Evidence from Open Access Publications*, EMNLP 2020.
 
