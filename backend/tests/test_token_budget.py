@@ -269,4 +269,83 @@ async def test_query_chat_end_to_end_8k_compaction(monkeypatch):
     assert bridge_found
 
 
+def test_extract_context_window_from_error_patterns():
+    """Verify regex parser extracts exact token capacity from provider error messages."""
+    from rag.token_budget import extract_context_window_from_error
+
+    err1 = "This model's maximum context length is 16384 tokens. However, your messages resulted in 18000 tokens."
+    assert extract_context_window_from_error(err1) == 16384
+
+    err2 = "Error: context length of 8192 tokens exceeded"
+    assert extract_context_window_from_error(err2) == 8192
+
+    err3 = "maximum prompt length is 4096"
+    assert extract_context_window_from_error(err3) == 4096
+
+    err4 = "Runtime error: max_position_embeddings is 32768"
+    assert extract_context_window_from_error(err4) == 32768
+
+    err_unrelated = "Connection refused by peer"
+    assert extract_context_window_from_error(err_unrelated) is None
+
+
+def test_dynamic_context_window_registration():
+    """Verify unknown/custom models use fallback initially and adopt discovered limits upon registration."""
+    from rag.token_budget import get_model_context_window, record_discovered_context_window
+
+    custom_model = "niche-research-biomed-v1"
+    # Before registration: returns safe default
+    initial = get_model_context_window(custom_model)
+    assert initial == 32_768
+
+    # Discover and register limit
+    record_discovered_context_window(custom_model, 16_384)
+
+    # After registration: immediately reflects discovered limit
+    updated = get_model_context_window(custom_model)
+    assert updated == 16_384
+
+
+@pytest.mark.asyncio
+async def test_runtime_error_400_auto_healing(monkeypatch):
+    """Verify query_chat catches context limit error, registers discovered limit, and auto-retries smoothly."""
+    from unittest.mock import AsyncMock, MagicMock
+    from rag.engine import query_chat
+    from rag.token_budget import get_model_context_window
+
+    unknown_model = "custom-military-defense-llm"
+    mock_llm = MagicMock()
+    mock_llm.model = unknown_model
+
+    attempts = 0
+    async def mock_achat_side_effect(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            # First attempt simulates 400 Context Length Exceeded
+            raise RuntimeError("This model's maximum context length is 4096 tokens. However, you requested 6500 tokens.")
+        # Second attempt succeeds
+        resp = MagicMock()
+        resp.message.content = "Auto-healed response successfully completed."
+        return resp
+
+    mock_llm.achat = AsyncMock(side_effect=mock_achat_side_effect)
+    mock_llm.astream_chat = None
+
+    monkeypatch.setattr("rag.engine.get_candidate_llm_chain", lambda: [(mock_llm, "Custom-LLM")])
+    monkeypatch.setattr("rag.engine.acall_fast_with_fallback", AsyncMock(return_value="GENERAL_CHAT"))
+
+    result = await query_chat(
+        chat_id="test_auto_healing_chat",
+        query="Analyze theoretical implications",
+        chat_history=[{"role": "user", "content": "Question " + ("detail " * 40)}],
+    )
+
+    assert "Auto-healed response successfully completed." in result
+    assert attempts == 2
+    # Check that the discovered limit was cached
+    assert get_model_context_window(unknown_model) == 4096
+
+
+
 

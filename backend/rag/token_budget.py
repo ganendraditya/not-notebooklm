@@ -133,10 +133,119 @@ def count_messages_tokens(messages: List[Any], model_name: Optional[str] = None)
     return total + 3  # Conversation wrapper priming tokens
 
 
+# In-memory registry for dynamically discovered model context windows (via API metadata or Error 400 auto-healing)
+DISCOVERED_CONTEXT_WINDOWS: Dict[str, int] = {}
+
+
+def record_discovered_context_window(model_name: str, context_window: int):
+    """Registers a dynamically discovered context window for a model name."""
+    if model_name and context_window > 0:
+        DISCOVERED_CONTEXT_WINDOWS[model_name.strip().lower()] = context_window
+        logger.info(f"[TokenBudget] Dynamically registered context window for '{model_name}': {context_window} tokens.")
+
+
+def extract_context_window_from_error(error_message: str) -> Optional[int]:
+    """
+    Extracts the exact model context window limit from provider error messages.
+    Supports OpenAI, Groq, Anthropic, vLLM, Ollama, and HuggingFace error patterns.
+    """
+    if not error_message:
+        return None
+
+    patterns = [
+        # "This model's maximum context length is 16384 tokens. However, your messages resulted in..."
+        re.compile(r"maximum context length is (\d+) tokens", re.I),
+        # "context length of 8192 tokens exceeded"
+        re.compile(r"context length of (\d+) tokens", re.I),
+        # "maximum prompt length is 4096"
+        re.compile(r"maximum prompt length is (\d+)", re.I),
+        # "max_position_embeddings is 32768"
+        re.compile(r"max_position_embeddings\s*(?:is|=)\s*(\d+)", re.I),
+        # "context window of (\d+) tokens"
+        re.compile(r"context window (?:is|of)?\s*(\d+)", re.I),
+        # "model context limit: 8192"
+        re.compile(r"model(?:'s)?\s*context\s*limit\s*(?:is|:)?\s*(\d+)", re.I),
+        # "cannot exceed (\d+) tokens"
+        re.compile(r"cannot exceed (\d+) tokens", re.I),
+        # "requested X tokens, but maximum is Y"
+        re.compile(r"(?:maximum|limit|max)\s*(?:is|:)?\s*(\d+)\s*tokens?", re.I),
+    ]
+
+    for p in patterns:
+        m = p.search(error_message)
+        if m:
+            try:
+                val = int(m.group(1))
+                if val >= 1024:  # reasonable context window minimum
+                    return val
+            except (ValueError, TypeError):
+                continue
+    return None
+
+
+async def adiscover_model_context_window(
+    model_name: str,
+    base_url: Optional[str] = None,
+    api_key: Optional[str] = None
+) -> Optional[int]:
+    """
+    Proactively discovers model context window from server metadata endpoints.
+    - Ollama: POST /api/show -> model_info.context_length
+    - OpenRouter: GET /api/v1/models -> context_length
+    """
+    if not model_name:
+        return None
+
+    b_url = (base_url or os.getenv("LLM_BASE_URL") or "").strip().rstrip("/")
+    if not b_url:
+        return None
+
+    # Check Ollama endpoint
+    if "11434" in b_url or b_url.endswith("/v1"):
+        try:
+            import httpx
+            ollama_url = b_url.replace("/v1", "") + "/api/show"
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                res = await client.post(ollama_url, json={"name": model_name})
+                if res.status_code == 200:
+                    data = res.json()
+                    info = data.get("model_info", {})
+                    for k, v in info.items():
+                        if "context_length" in k and isinstance(v, int) and v > 0:
+                            record_discovered_context_window(model_name, v)
+                            return v
+        except Exception:
+            pass
+
+    # Check OpenRouter endpoint
+    if "openrouter.ai" in b_url:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=2.5) as client:
+                headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+                res = await client.get("https://openrouter.ai/api/v1/models", headers=headers)
+                if res.status_code == 200:
+                    data = res.json()
+                    for m in data.get("data", []):
+                        if m.get("id") == model_name or m.get("name") == model_name:
+                            ctx = m.get("context_length")
+                            if isinstance(ctx, int) and ctx > 0:
+                                record_discovered_context_window(model_name, ctx)
+                                return ctx
+        except Exception:
+            pass
+
+    return None
+
+
 def get_model_context_window(model_name: Optional[str] = None) -> int:
     """
     Resolves the maximum context window for a given model.
-    Honors LLM_CONTEXT_WINDOW environment variable if explicitly configured.
+    Checks:
+    1. LLM_CONTEXT_WINDOW environment variable override.
+    2. DISCOVERED_CONTEXT_WINDOWS (dynamic API discovery & auto-healing cache).
+    3. KNOWN_MODEL_CONTEXT_WINDOWS (regex pattern matching).
+    4. DEFAULT_CONTEXT_WINDOW (safe fallback).
     """
     env_override = os.getenv("LLM_CONTEXT_WINDOW", "").strip()
     if env_override.isdigit():
@@ -147,6 +256,10 @@ def get_model_context_window(model_name: Optional[str] = None) -> int:
     name_to_check = (model_name or os.getenv("LLM_MODEL") or os.getenv("NINEROUTER_MODEL") or "").strip()
     if not name_to_check:
         return DEFAULT_CONTEXT_WINDOW
+
+    norm_name = name_to_check.lower()
+    if norm_name in DISCOVERED_CONTEXT_WINDOWS:
+        return DISCOVERED_CONTEXT_WINDOWS[norm_name]
 
     for pattern, window in KNOWN_MODEL_CONTEXT_WINDOWS:
         if pattern.search(name_to_check):
