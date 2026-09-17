@@ -75,7 +75,7 @@ Performance is audited across established open-source evaluation tools and resea
 | **Answer Relevancy & Completeness** | **0.923** | Continuous 3-judge mean: DeepEval (`0.956`) + TruLens (`0.853`) + Promptfoo (`0.960`) |
 | **Ground-Truth Correctness** | **0.976** | Dual-judge consensus: LlamaIndex + Promptfoo ground-truth alignment |
 | **Citation Quality (Princeton ALCE)** | **Recall: 0.817 / Precision: 0.760** | Formal statement entailment & citation redundancy penalty *(EMNLP 2023)* |
-| **Conversational NIAH Retention** | **1.000** *(Legacy: 0.400)* | Multi-turn constraint retention under 8k limit *(Stanford MT-Bench / Needle-In-A-Haystack)* |
+| **Conversational NIAH Retention** | **1.000** *(Legacy: 0.400)* | Multi-turn user constraint retention evaluated under a deliberately constrained ~8,192-token context window environment *(Stanford MT-Bench & Needle-In-A-Haystack protocol)* |
 | **Strict Binary Entailment (LlamaIndex)** | **0.720** *(36/50 passed)* | Zero-tolerance binary context entailment gate (36 passed, 14 failed; separated from continuous consensus) |
 | **Composite Consensus Score** | **0.953** / 1.000 | Weighted summary index across continuous evaluation dimensions |
 
