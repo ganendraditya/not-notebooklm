@@ -261,6 +261,20 @@ def get_model_context_window(model_name: Optional[str] = None) -> int:
     if norm_name in DISCOVERED_CONTEXT_WINDOWS:
         return DISCOVERED_CONTEXT_WINDOWS[norm_name]
 
+    # 3. Check explicit name suffix tags (e.g. -128k, _64k, -32k, -1m, _2m)
+    suffix_m = re.search(r"[-_](\d+)[mM]\b", name_to_check)
+    if suffix_m:
+        val = int(suffix_m.group(1)) * 1_000_000
+        if val > 0:
+            return val
+
+    suffix_k = re.search(r"[-_](\d+)[kK]\b", name_to_check)
+    if suffix_k:
+        val = int(suffix_k.group(1)) * 1024
+        if val >= 1024:
+            return val
+
+    # 4. Known pattern matching
     for pattern, window in KNOWN_MODEL_CONTEXT_WINDOWS:
         if pattern.search(name_to_check):
             return window

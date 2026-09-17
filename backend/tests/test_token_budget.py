@@ -25,6 +25,14 @@ def test_get_model_context_window_known_models():
     assert get_model_context_window("mistral-small-latest") == 32_768
 
 
+def test_get_model_context_window_suffix_tags():
+    """Verify name suffix patterns like -128k, _64k, -1m are automatically parsed."""
+    assert get_model_context_window("niche-bio-llm-128k") == 131_072
+    assert get_model_context_window("custom_defense_model_64k") == 65_536
+    assert get_model_context_window("experimental-nlp-32k") == 32_768
+    assert get_model_context_window("frontier-multimodal-1m") == 1_000_000
+
+
 def test_get_model_context_window_env_override(monkeypatch):
     """Verify LLM_CONTEXT_WINDOW environment variable overrides any model name."""
     monkeypatch.setenv("LLM_CONTEXT_WINDOW", "65536")
