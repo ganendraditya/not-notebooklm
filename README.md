@@ -20,7 +20,7 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 * **Targeted Document Focus:** One-click "Ask about this document" mode focuses questions exclusively on an individual paper without deselecting other workspace files.
 * **7-Format Citation Generator & Bulk ZIP Export:** Instant generation of verified academic citations in APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS formats, alongside one-click bulk ZIP bundling for entire workspaces.
 * **3-Tier Hybrid Metadata Extractor:** Handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and a document inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
-* **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 50-case benchmark combining single-paper deep dives, multi-paper comparative synthesis, and biomedical claim verification (**AllenAI QASPER & SciFact**), achieving a 0.955 Groundedness consensus score (anti-hallucination) and 0.972 ground-truth correctness.
+* **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 50-case benchmark combining single-paper deep dives, multi-paper comparative synthesis, and biomedical claim verification (**AllenAI QASPER & SciFact**), achieving a 0.953 Composite Consensus score (0.949 Groundedness, 0.923 Answer Relevancy, 1.000 Conversational NIAH Retention, and 100% PDF Citation Fidelity).
 * **Local-First & Multi-Role LLM Architecture:** Runs locally with embedded SQLite and Qdrant. Connects to any OpenAI-compatible API (Ollama, vLLM, DeepSeek, GPT-4o) with tiered primary, fast, and auto-fallback model roles, plus optional S3 storage (Cloudflare R2, MinIO).
 
 ---
@@ -67,22 +67,25 @@ Performance is audited across established open-source evaluation tools and resea
 * **15 Multi-Paper Comparative Synthesis:** Curated multi-document workspaces comparing 2–3 research papers in structured tables.
 * **10 Biomedical Claim Verifications:** AllenAI SciFact claims testing evidence attribution and false-premise rejection.
 
-### Baseline Scorecard (50-Question Multi-Paper Scientific Benchmark)
+### Production Scorecard (50-Case Multi-Paper Scientific Benchmark)
 
-| Evaluation Dimension | Multi-Judge Consensus (Mean) | Evaluator Breakdown & Methodology |
+| Evaluation Dimension | Benchmark Score | Evaluator Breakdown & Methodology |
 | :--- | :---: | :--- |
-| **Groundedness (Anti-Hallucination)** | **0.955** | Continuous 4-judge mean: DeepEval (`0.998`) + TruLens (`0.959`) + Promptfoo (`0.944`) + RAGAS (`0.900`) |
-| **Answer Relevancy & Completeness** | **0.897** | Continuous 3-judge mean: DeepEval (`0.953`) + TruLens (`0.780`) + Promptfoo (`0.959`) |
-| **Ground-Truth Correctness** | **0.972** | Dual-judge consensus: LlamaIndex + Promptfoo ground-truth alignment |
-| **Citation Quality (Princeton ALCE)** | **Recall: 0.800 / Precision: 0.750** | Formal statement entailment & citation redundancy penalty *(EMNLP 2023)* |
-| **Strict Binary Entailment (LlamaIndex)** | **0.700** *(35/50 passed)* | Zero-tolerance binary context entailment gate (35 passed, 15 failed; separated from continuous consensus) |
-| **Composite Consensus Score** | **0.947** / 1.000 | Weighted summary index across continuous evaluation dimensions |
+| **Groundedness (Anti-Hallucination)** | **0.949** | Continuous 4-judge mean: DeepEval (`0.985`) + TruLens (`0.942`) + Promptfoo (`0.957`) + RAGAS (`0.919`)* |
+| **Answer Relevancy & Completeness** | **0.923** | Continuous 3-judge mean: DeepEval (`0.956`) + TruLens (`0.853`) + Promptfoo (`0.960`) |
+| **Ground-Truth Correctness** | **0.976** | Dual-judge consensus: LlamaIndex + Promptfoo ground-truth alignment |
+| **Citation Quality (Princeton ALCE)** | **Recall: 0.817 / Precision: 0.760** | Formal statement entailment & citation redundancy penalty *(EMNLP 2023)* |
+| **Product Invariant: PDF Citation Fidelity** | **100.0%** *(1.000)* | Deterministic substring & token n-gram match on raw physical source PDF |
+| **Conversational NIAH Retention** | **1.000** *(Legacy: 0.400)* | Multi-turn constraint retention under 8k limit *(Stanford MT-Bench / Needle-In-A-Haystack)* |
+| **Strict Binary Entailment (LlamaIndex)** | **0.720** *(36/50 passed)* | Zero-tolerance binary context entailment gate (36 passed, 14 failed; separated from continuous consensus) |
+| **Composite Consensus Score** | **0.953** / 1.000 | Weighted summary index across continuous evaluation dimensions |
 
 > **Benchmark Configuration & Model Roles:**  
 > * **System Under Test (NotbookLM Core Pipeline):**  
 >   * **Main LLM (`gemini-3.8-flash-high`):** Powers full-manuscript reading, multi-paper comparative synthesis tables, and grounded academic drafting.  
 >   * **Fast LLM (`gemini-3.8-flash-low`):** Handles operational micro-tasks (on-demand citation highlight passage extraction, metadata inspection, and query intent classification).  
 > * **Evaluator Judge (`gemini-3.1-pro-low`):** Assigned as the independent evaluation judge across all six evaluation tools and protocols (RAGAS, DeepEval, TruLens, Promptfoo, Princeton ALCE, and LlamaIndex) under greedy decoding (`temperature=0.0`).  
+> * **Methodological Note on RAGAS ($N=38$):** RAGAS multi-statement atomic claim decomposition evaluates all 38 extractive QASPER cases. It is intentionally omitted on 2 unanswerable cases and 10 SciFact verification claims to prevent false penalties on negative abstention.  
 > * **Reproducibility Note:** Decoding temperature is locked to `0.0` to maximize determinism. However, due to the inherent non-deterministic nature of LLM inference (provider-side GPU batching and dual-sided LLM-as-a-judge dynamics), replication runs may still exhibit slight score variations even when using the exact same model pairing. Running the benchmark with alternative backends (e.g. GPT-4o, Claude, or local open-weights models) will naturally yield distinct quantitative figures.
 
 ### Evaluation Tooling & Dataset References
