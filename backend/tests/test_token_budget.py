@@ -221,3 +221,52 @@ async def test_acompact_chat_history_with_custom_summarizer():
     assert "What is the learning rate?" in compacted[-1].content
 
 
+@pytest.mark.asyncio
+async def test_query_chat_end_to_end_8k_compaction(monkeypatch):
+    """Verify end-to-end query_chat on an 8k model compacts 20-turn history into safe prompt boundaries."""
+    from unittest.mock import AsyncMock, MagicMock
+    from rag.engine import query_chat
+
+    mock_llm = MagicMock()
+    mock_llm.model = "llama-3-8b"
+    mock_response = MagicMock()
+    mock_response.message.content = "Final response under safe 8k budget."
+    mock_llm.achat = AsyncMock(return_value=mock_response)
+    mock_llm.astream_chat = AsyncMock()
+
+    # Mock candidate chain to return our 8k mock LLM
+    monkeypatch.setattr("rag.engine.get_candidate_llm_chain", lambda: [(mock_llm, "Llama-3-8B")])
+    # Mock fast LLM fallback for intent classification
+    monkeypatch.setattr("rag.engine.acall_fast_with_fallback", AsyncMock(return_value="GENERAL_CHAT"))
+
+    # Generate 20 turns of heavy history (~6,000 tokens)
+    heavy_history = []
+    for i in range(20):
+        heavy_history.append({"role": "user", "content": f"User query {i}: " + ("Explain deeper details of ML. " * 25)})
+        heavy_history.append({"role": "assistant", "content": f"Assistant reply {i}: " + ("Comprehensive explanation provided. " * 25)})
+
+    collected_deltas = []
+    def on_delta(d):
+        collected_deltas.append(d)
+
+    result = await query_chat(
+        chat_id="test_8k_chat_session",
+        query="What is the conclusion from our previous discussion?",
+        chat_history=heavy_history,
+        delta_callback=on_delta,
+    )
+
+    assert "Final response" in result
+    # Verify the chat call was made
+    assert mock_llm.achat.called or mock_llm.astream_chat.called
+    call_args = (mock_llm.achat.call_args or mock_llm.astream_chat.call_args)[0][0]
+    
+    # Prompt tokens passed to the 8k LLM must stay strictly below 8k minus output reserve
+    total_tokens = count_messages_tokens(call_args, model_name="llama-3-8b")
+    assert total_tokens < 8_192 - 2_048
+    # The first message in the history portion must be the synthetic context summary bridge
+    bridge_found = any("[Context Summary of Earlier Conversation:" in str(getattr(m, "content", "")) for m in call_args)
+    assert bridge_found
+
+
+
