@@ -20,7 +20,7 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 * **Targeted Document Focus:** One-click "Ask about this document" mode focuses questions exclusively on an individual paper without deselecting other workspace files.
 * **7-Format Citation Generator & Bulk ZIP Export:** Instant generation of verified academic citations in APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS formats, alongside one-click bulk ZIP bundling for entire workspaces.
 * **3-Tier Hybrid Metadata Extractor:** Handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and a document inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
-* **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 50-case benchmark combining single-paper deep dives, multi-paper comparative synthesis, and biomedical claim verification (**AllenAI QASPER & SciFact**), achieving a 0.953 Composite Consensus score (0.949 Groundedness, 0.923 Answer Relevancy, 1.000 Conversational NIAH Retention, and 100% PDF Citation Fidelity).
+* **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 50-case benchmark combining single-paper deep dives, multi-paper comparative synthesis, and biomedical claim verification (**AllenAI QASPER & SciFact**), achieving a 0.953 Composite Consensus score (0.949 Groundedness, 0.923 Answer Relevancy, and 1.000 Conversational NIAH Retention).
 * **Local-First & Multi-Role LLM Architecture:** Runs locally with embedded SQLite and Qdrant. Connects to any OpenAI-compatible API (Ollama, vLLM, DeepSeek, GPT-4o) with tiered primary, fast, and auto-fallback model roles, plus optional S3 storage (Cloudflare R2, MinIO).
 
 ---
@@ -75,7 +75,6 @@ Performance is audited across established open-source evaluation tools and resea
 | **Answer Relevancy & Completeness** | **0.923** | Continuous 3-judge mean: DeepEval (`0.956`) + TruLens (`0.853`) + Promptfoo (`0.960`) |
 | **Ground-Truth Correctness** | **0.976** | Dual-judge consensus: LlamaIndex + Promptfoo ground-truth alignment |
 | **Citation Quality (Princeton ALCE)** | **Recall: 0.817 / Precision: 0.760** | Formal statement entailment & citation redundancy penalty *(EMNLP 2023)* |
-| **Product Invariant: PDF Citation Fidelity** | **100.0%** *(1.000)* | Deterministic substring & token n-gram match on raw physical source PDF |
 | **Conversational NIAH Retention** | **1.000** *(Legacy: 0.400)* | Multi-turn constraint retention under 8k limit *(Stanford MT-Bench / Needle-In-A-Haystack)* |
 | **Strict Binary Entailment (LlamaIndex)** | **0.720** *(36/50 passed)* | Zero-tolerance binary context entailment gate (36 passed, 14 failed; separated from continuous consensus) |
 | **Composite Consensus Score** | **0.953** / 1.000 | Weighted summary index across continuous evaluation dimensions |
