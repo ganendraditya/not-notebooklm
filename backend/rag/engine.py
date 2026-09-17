@@ -39,6 +39,11 @@ from .pipelines import (
     search_pipeline,
     workspace_pipeline,
 )
+from .token_budget import (
+    allocate_token_budget,
+    acompact_chat_history,
+    compact_chat_history,
+)
 
 load_dotenv()
 
@@ -264,6 +269,29 @@ async def query_chat(
 
     if not candidate_llms:
         return "Error: Tidak ada LLM Provider yang terkonfigurasi. Silakan periksa file .env."
+
+    # Priority Waterfall: Compact history safely against target model context limit (NO naive .pop())
+    target_model_name = None
+    if candidate_llms:
+        first_llm = candidate_llms[0][0]
+        raw_m = getattr(first_llm, "model", None)
+        if isinstance(raw_m, str):
+            target_model_name = raw_m
+        else:
+            raw_mn = getattr(first_llm, "model_name", None)
+            if isinstance(raw_mn, str):
+                target_model_name = raw_mn
+
+    budget = allocate_token_budget(
+        model_name=target_model_name,
+        system_prompt="",
+        user_query=query,
+    )
+    formatted_history = await acompact_chat_history(
+        formatted_history,
+        max_history_tokens=budget.max_history_tokens,
+        model_name=target_model_name,
+    )
 
     # Intent classification is performed ultra-fast via Fast Lite LLM (with fallback cascade)
     has_chat_attachments = "[Attachments Provided by User:]" in query
