@@ -40,6 +40,7 @@ QASPER_TEST_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_qasp
 QASPER_MULTI_PATH = BACKEND_DIR / "evaluation" / "datasets" / "qasper_multi_benchmark.json"
 SCIFACT_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_scifact.json"
 FULL50_PATH = BACKEND_DIR / "evaluation" / "datasets" / "full50_benchmark.json"
+FULL50_HETERO_PATH = BACKEND_DIR / "evaluation" / "datasets" / "full50_heterogeneous_benchmark.json"
 REPORTS_DIR = BACKEND_DIR / "evaluation" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -56,8 +57,13 @@ def load_benchmark_cases(
     category: Optional[str] = None
 ) -> Tuple[List[Dict[str, Any]], Path]:
     """Loads and filters benchmark test cases from chosen dataset and split."""
-    if dataset == "full50":
-        # 25 QASPER test + 15 QASPER multi + 10 SciFact = 50 cases
+    if dataset in ("full50", "full50_hetero", "hetero50"):
+        # 50-Case Heterogeneous Benchmark across 5 Diverse Domains (10 CS, 10 Bio, 10 Fin, 10 Law, 10 Physics)
+        target_path = FULL50_HETERO_PATH
+        with open(target_path, "r", encoding="utf-8") as f:
+            cases = json.load(f)
+    elif dataset == "full50_legacy":
+        # Legacy QASPER-dominated 50-case benchmark
         c_qasper = json.load(open(QASPER_TEST_PATH, encoding="utf-8")) if QASPER_TEST_PATH.exists() else []
         c_multi = json.load(open(QASPER_MULTI_PATH, encoding="utf-8")) if QASPER_MULTI_PATH.exists() else []
         c_scifact = json.load(open(SCIFACT_PATH, encoding="utf-8")) if SCIFACT_PATH.exists() else []
@@ -512,7 +518,7 @@ def build_benchmark_eval_llm(model_override: Optional[str] = None):
 async def main():
     benchmark_start_time = time.time()
     parser = argparse.ArgumentParser(description="Not-NotebookLM Automated Evaluation Benchmark")
-    parser.add_argument("--dataset", type=str, default="qasper", choices=["golden", "qasper", "scifact", "qasper_multi", "full50"], help="Dataset to benchmark: 'full50' (50-case multi-paper benchmark), 'qasper', 'scifact', 'qasper_multi', or 'golden'")
+    parser.add_argument("--dataset", type=str, default="qasper", choices=["golden", "qasper", "scifact", "qasper_multi", "full50", "full50_hetero", "full50_legacy"], help="Dataset to benchmark: 'full50' (50-case heterogeneous cross-domain benchmark), 'full50_legacy', 'qasper', 'scifact', 'qasper_multi', or 'golden'")
     parser.add_argument("--split", type=str, default="val", choices=["val", "test", "all"], help="Split for QASPER: 'val' (25 cases), 'test' (25 cases), or 'all' (50 cases)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")

@@ -1,0 +1,12 @@
+# Fidelity National Information Services SEC 10-K (2010)
+
+## Management's Financial Discussion & Analysis
+Business Combinations: During the fiscal year ended December 31, 2010, the company completed strategic acquisitions expanding financial payment processing services.
+
+## Consolidated Balance Sheet and Notes
+| Acquisition Consideration Component | Value (in millions) | Percentage of Purchase Price |
+| :--- | :--- | :--- |
+| Cash Consideration Paid | $ 1,240 | 85.2% |
+| Common Stock Issued | $ 173 | 11.9% |
+| Vested Stock Awards & Replacement Options | $ 42 | 2.9% |
+| Total Purchase Price | $ 1,455 | 100.0% |

@@ -1,0 +1,4 @@
+# Master Software as a Service Agreement - Security Incident Addendum
+
+## Authoritative Contractual Provisions
+Section 8.2 Security Breach and Credential Compromise: In the event that a user's credentials, API keys, or administrative access tokens are compromised, the Company shall promptly notify the affected customer within twenty-four (24) hours and require the compromised credentials to be revoked and reset immediately. The Company shall provide a root-cause forensic report within five (5) business days.

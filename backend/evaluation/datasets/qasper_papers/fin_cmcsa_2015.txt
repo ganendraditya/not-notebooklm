@@ -1,0 +1,12 @@
+# Comcast Corporation SEC 10-K (2015)
+
+## Management's Financial Discussion & Analysis
+Income Taxes and Contingent Liabilities: Unrecognized tax benefits represent potential tax liabilities associated with uncertain tax positions taken on filed returns.
+
+## Consolidated Balance Sheet and Notes
+| Unrecognized Tax Benefits Rollforward | Amount (in millions) |
+| :--- | :--- |
+| Balance as of December 31, 2014 | $ 1,420 |
+| Additions for Prior Period Tax Positions | $ 85 |
+| Reductions for Tax Positions of Prior Years | $ (120) |
+| Net Balance as of December 31, 2015 | $ 1,385 |

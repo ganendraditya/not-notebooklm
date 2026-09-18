@@ -1,0 +1,4 @@
+# Hydrodynamic Instability Growth in Cryogenic Laser-Driven Inertial Confinement Fusion
+
+## Scientific Methodology & Experimental Findings
+During laser-driven direct-drive implosion of deuterium-tritium cryogenic shells, Rayleigh-Taylor (RT) hydrodynamic instability develops at the ablation front where low-density ablating plasma accelerates the high-density cryogenic fuel. Initial surface roughness and laser beam imprint seed perturbation growth, which degrades core compression stagnation pressure if peak implosion velocity exceeds 380 km/s.

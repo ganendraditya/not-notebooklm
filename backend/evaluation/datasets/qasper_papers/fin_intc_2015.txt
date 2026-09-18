@@ -1,0 +1,12 @@
+# Intel Corporation SEC 10-K (2015)
+
+## Management's Financial Discussion & Analysis
+Properties and Facilities Overview: Intel's executive offices and primary research facilities are located in Santa Clara, California.
+Total global footprint spans 56.0 million square feet across manufacturing wafer fabrication facilities, assembly, and test operations.
+
+## Consolidated Balance Sheet and Notes
+| Facilities (sq ft in millions) | United States | Other Countries | Total |
+| :--- | :--- | :--- | :--- |
+| Owned Facilities | 30.7 | 17.2 | 47.9 |
+| Leased Facilities | 2.1 | 6.0 | 8.1 |
+| Total Facilities | 32.8 | 23.2 | 56.0 |

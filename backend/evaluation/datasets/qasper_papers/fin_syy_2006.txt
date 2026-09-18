@@ -1,0 +1,10 @@
+# Sysco Corporation SEC 10-K (2006)
+
+## Management's Financial Discussion & Analysis
+Commitments and Contingencies: Sysco leases distribution warehouse centers and delivery tractor-trailer fleet vehicles under long-term non-cancelable operating leases.
+
+## Consolidated Balance Sheet and Notes
+| Fiscal Year | Rental Expense under Operating Leases | % Growth |
+| :--- | :--- | :--- |
+| 2005 | $ 84,320,000 | — |
+| 2006 | $ 90,222,000 | +7.0% |

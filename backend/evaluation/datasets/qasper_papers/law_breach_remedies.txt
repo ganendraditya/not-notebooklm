@@ -1,0 +1,4 @@
+# Vendor Services Agreement - Default and Termination Remedies
+
+## Authoritative Contractual Provisions
+Section 11.3 Material Breach Remedies: If either party breaches any material provision of this Agreement, the non-breaching party may deliver written notice specifying the default. If the default is not cured within thirty (30) days of receipt of notice, the non-breaching party shall have the right to immediately terminate the Agreement and pursue all available remedies at law and in equity, including direct compensatory damages.

@@ -1,0 +1,10 @@
+# Analog Devices Inc SEC 10-K (2011)
+
+## Management's Financial Discussion & Analysis
+Quantitative Disclosures About Market Risk: The company utilizes forward contracts designated as cash flow hedges to mitigate the foreign exchange volatility of operational expenditures denominated in foreign currencies.
+
+## Consolidated Balance Sheet and Notes
+| Derivative Instrument Category | 2010 Fair Value | 2011 Fair Value | % Change |
+| :--- | :--- | :--- | :--- |
+| Cash Flow Hedges (Foreign Currency) | $ 41.2 million | $ 45.3 million | +9.9% |
+| Undesignated Economic Hedges | $ 3.5 million | $ 2.8 million | -20.0% |

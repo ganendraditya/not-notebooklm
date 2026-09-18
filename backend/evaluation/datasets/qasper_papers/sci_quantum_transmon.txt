@@ -1,0 +1,4 @@
+# Merged-Element Transmon Qubit Architecture (arXiv:2008.07652)
+
+## Scientific Methodology & Experimental Findings
+The merged-element transmon (MET) integrates the shunting capacitor and Josephson junctions into a unified physical footprint. This design substantially reduces stray geometric capacitance, diminishes electric dipole coupling to spurious two-level defects in the dielectric substrate, and achieves relaxation times (T1) exceeding 50 microseconds while occupying less than 15% of the surface area of conventional planar transmons.
