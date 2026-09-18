@@ -332,4 +332,4 @@ The application reads configuration through standard environment variables. If y
 
 ## License
 
-MIT.
+MIT
