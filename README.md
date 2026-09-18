@@ -285,6 +285,10 @@ The application reads configuration through standard environment variables. If y
 .
 ├── backend
 │   ├── database.py              # SQLite + SQLAlchemy session manager with WAL mode
+│   ├── evaluation               # Multi-framework scientific evaluation benchmark suite
+│   │   ├── datasets             # Curated QASPER, SciFact, and multi-paper test suites
+│   │   ├── metrics              # 6-framework metric adapters (ALCE, Ragas, TruLens, DeepEval)
+│   │   └── run_benchmark.py     # Automated headless benchmark harness and consensus ledger
 │   ├── main.py                  # FastAPI application entrypoint and middleware
 │   ├── models.py                # Database models (chats, messages, documents, highlights)
 │   ├── providers                # Academic registry and web search scrapers
@@ -299,6 +303,7 @@ The application reads configuration through standard environment variables. If y
 │   │   ├── pipelines            # Workspace synthesis & comparative analysis pipelines
 │   │   ├── prompts.py           # Strict language mirroring & zero-hallucination prompts
 │   │   ├── search.py            # FlashRank reranker and reciprocal rank fusion
+│   │   ├── token_budget.py      # Dynamic context budgeting and token waterfall
 │   │   └── vector_store.py      # Qdrant client (embedded disk & remote server)
 │   ├── routers                  # REST API endpoints (chats, documents, papers, storage)
 │   ├── services                 # Business logic services
@@ -307,6 +312,7 @@ The application reads configuration through standard environment variables. If y
 │   │   ├── highlight_service.py # 4-tier citation highlight matching engine
 │   │   └── storage_adapter.py   # Unified storage adapter (Local disk & S3/R2/MinIO)
 │   └── tests                    # Backend pytest suite (unit & integration tests)
+├── docs                         # Architectural documentation & evaluation methodology
 ├── frontend
 │   ├── src
 │   │   ├── app                  # Next.js 16 App Router (layout, page, providers)
@@ -326,4 +332,4 @@ The application reads configuration through standard environment variables. If y
 
 ## License
 
-MIT.
+MIT

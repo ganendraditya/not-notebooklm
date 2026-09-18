@@ -1,0 +1,290 @@
+[
+  {
+    "id": "QASPER-MUL-01",
+    "category": "multi_comparative",
+    "title": "Comparative Datasets in Multilingual NMT",
+    "query": "Compare the training and evaluation datasets used in Paper [1] and Paper [2] into a structured comparison table!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1912.01214.txt",
+      "qasper_1811.00383.txt"
+    ],
+    "ground_truth": "Paper [1] experiments on Europarl and MultiUN datasets. Paper [2] experiments on the IITB English-Hindi parallel corpus and the ILCI multilingual parallel corpus.",
+    "key_entities": [
+      "Europarl",
+      "MultiUN",
+      "IITB",
+      "ILCI"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-02",
+    "category": "multi_comparative",
+    "title": "Comparative Baselines in Multilingual Machine Translation",
+    "query": "Compare the baseline translation approaches and configurations evaluated between Paper [1] and Paper [2]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1912.01214.txt",
+      "qasper_1811.00383.txt"
+    ],
+    "ground_truth": "Paper [1] compares with pivot-based baselines ('pivoting' and 'pivoting_m') and standard multilingual NMT. Paper [2] compares non-preordered baselines against generic pre-ordering rules and Hindi-tuned pre-ordering rules (CFILT-preorder).",
+    "key_entities": [
+      "pivoting",
+      "pivoting_m",
+      "generic pre-ordering",
+      "Hindi-tuned"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-03",
+    "category": "multi_comparative",
+    "title": "Comparative Baseline NER Models across Armenian and Spanish Clinical Domains",
+    "query": "Compare the baseline algorithms and models evaluated between Paper [1] and Paper [2] for named entity recognition!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1810.08699.txt",
+      "qasper_2003.03106.txt"
+    ],
+    "ground_truth": "Paper [1] evaluates Stanford NER, spaCy 2.0, and a recurrent neural network with a CRF layer. Paper [2] evaluates regular expressions/dictionary look-up, CRF (sklearn-crfsuite), and spaCy NER model alongside BERT.",
+    "key_entities": [
+      "Stanford NER",
+      "CRF",
+      "spaCy",
+      "BERT",
+      "regular expressions"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-04",
+    "category": "multi_comparative",
+    "title": "Comparative Datasets across Chinese, Armenian, and Multilingual NER",
+    "query": "Compare the language corpora and datasets evaluated across Paper [1], Paper [2], and Paper [3]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1810.08699.txt",
+      "qasper_1801.05147.txt",
+      "qasper_1911.04474.txt"
+    ],
+    "ground_truth": "Paper [1] uses news sentences from ilur.am for Armenian NER (pioNER). Paper [2] evaluates on Chinese Dialog (DL-PS) and E-commerce (EC-MT, EC-UQ) datasets. Paper [3] evaluates on CoNLL03 (English, German, Spanish, Dutch) and Chinese Weibo and Resume datasets.",
+    "key_entities": [
+      "ilur.am",
+      "DL-PS",
+      "EC-MT",
+      "CoNLL03",
+      "Weibo",
+      "Resume"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-05",
+    "category": "multi_comparative",
+    "title": "Comparative KBQA Benchmarks",
+    "query": "Compare the benchmark datasets on which state-of-the-art results are evaluated in Paper [1] and Paper [2]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1704.06194.txt",
+      "qasper_1905.00840.txt"
+    ],
+    "ground_truth": "Paper [1] evaluates and achieves state-of-the-art on SimpleQuestions and WebQSP. Paper [2] evaluates on WebQuestions and SimpleQuestions.",
+    "key_entities": [
+      "SimpleQuestions",
+      "WebQSP",
+      "WebQuestions"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-06",
+    "category": "multi_comparative",
+    "title": "Comparative Social Media Analysis: Dogmatism vs Rumor Detection",
+    "query": "Compare the predictive models, target phenomena, and data platforms between Paper [1] and Paper [2]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1609.00425.txt",
+      "qasper_1611.06322.txt"
+    ],
+    "ground_truth": "Paper [1] builds a logistic regression model to predict dogmatism in Reddit posts across politics, business, science, and AskReddit. Paper [2] detects rumors on Chinese social media (Weibo) using novelty detection and similarity to previously detected rumors.",
+    "key_entities": [
+      "logistic regression",
+      "Reddit",
+      "dogmatism",
+      "rumor",
+      "Weibo",
+      "novelty"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-07",
+    "category": "multi_comparative",
+    "title": "Comparative Word Representations & Semantic Embeddings",
+    "query": "Compare the core experimental objectives and representation techniques between Paper [1] and Paper [2]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1909.00512.txt",
+      "qasper_1909.00091.txt"
+    ],
+    "ground_truth": "Paper [1] tests context-specificity in upper layers of ELMo, BERT, and GPT-2 using self-similarity, intra-sentence similarity, and principal component static embeddings. Paper [2] discovers gender associations and coherent word clusters via K-means clustering and WordNet distance concept labeling.",
+    "key_entities": [
+      "self-similarity",
+      "principal component",
+      "BERT",
+      "GPT-2",
+      "gender associations",
+      "K-means",
+      "WordNet"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-08",
+    "category": "multi_comparative",
+    "title": "Comparative Evaluation Metrics: Rumors vs Non-Collaborative Dialog",
+    "query": "Compare the evaluation metrics and experimental criteria reported between Paper [1] and Paper [2]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1611.06322.txt",
+      "qasper_1911.10742.txt"
+    ],
+    "ground_truth": "Paper [1] evaluates accuracy, Detection Error Trade-off (DET) curves, and throughput per second. Paper [2] evaluates perplexity, BLEU, dialog success rate, turn count, and human ratings (quality and fluency).",
+    "key_entities": [
+      "accuracy",
+      "DET",
+      "throughput",
+      "perplexity",
+      "BLEU",
+      "success rate"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-09",
+    "category": "multi_comparative",
+    "title": "Comparative Baseline Models: Topic Models vs Event Detection",
+    "query": "Compare the baseline architectures compared against between Paper [1] and Paper [2]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1604.02038.txt",
+      "qasper_1810.02229.txt"
+    ],
+    "ground_truth": "Paper [1] compares with LDA, Doc-NADE, HTMM, and GMNTM. Paper [2] compares with a cascade of two SVM classifiers (one for detection and one for classification).",
+    "key_entities": [
+      "LDA",
+      "Doc-NADE",
+      "HTMM",
+      "GMNTM",
+      "SVM"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-10",
+    "category": "multi_comparative",
+    "title": "Comparative Language Scope across Three Papers",
+    "query": "Compare the languages explored and evaluated across Paper [1], Paper [2], and Paper [3]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1912.01214.txt",
+      "qasper_1811.00383.txt",
+      "qasper_2003.03106.txt"
+    ],
+    "ground_truth": "Paper [1] explores German, English, French, Spanish, Romanian, Arabic, and Russian. Paper [2] explores English to Hindi (parent) and Bengali, Gujarati, Marathi, Malayalam, and Tamil (child). Paper [3] evaluates on Spanish clinical reports.",
+    "key_entities": [
+      "German",
+      "English",
+      "French",
+      "Spanish",
+      "Bengali",
+      "Hindi",
+      "Tamil",
+      "Malayalam"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-11",
+    "category": "multi_comparative",
+    "title": "Distractor Test: Word Order Divergence Mitigation",
+    "query": "Which of the two papers addresses word order divergence in translation, and what specific method is proposed?",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1912.01214.txt",
+      "qasper_1811.00383.txt"
+    ],
+    "ground_truth": "Only Paper [2] addresses word order divergence, proposing to pre-order assisting language sentences to match the target language word order using generic and Hindi-tuned rules. Paper [1] focuses on cross-lingual pre-training and zero-shot transfer without addressing word order divergence.",
+    "key_entities": [
+      "Paper [2]",
+      "pre-order",
+      "word order divergence",
+      "Paper [1] does not"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-12",
+    "category": "multi_comparative",
+    "title": "Distractor Test: Crowdsourcing in Named Entity Recognition",
+    "query": "Between Paper [1] and Paper [2], which paper uses a crowdsourcing platform or crowd annotators, and who performs the annotations?",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1810.08699.txt",
+      "qasper_1801.05147.txt"
+    ],
+    "ground_truth": "Paper [1] did not use crowdsourcing (authors manually annotated the news data). In contrast, Paper [2] utilizes crowd annotations, hiring undergraduate students for Dialog and E-commerce data.",
+    "key_entities": [
+      "Paper [1] did not",
+      "Paper [2]",
+      "undergraduate students",
+      "crowd"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-13",
+    "category": "multi_comparative",
+    "title": "Comparative Analysis: Outperforming State-of-the-Art",
+    "query": "Do the models proposed in Paper [1] and Paper [2] outperform current state-of-the-art architectures across all evaluated tasks?",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1911.04474.txt",
+      "qasper_2003.03106.txt"
+    ],
+    "ground_truth": "Neither model achieves unconditional state-of-the-art across all benchmarks. In Paper [1] (TENER), the model does not outperform BERT-based state-of-the-art NER models. In Paper [2], BERT does not reach the best performance across all algorithms compared (e.g. NLNDE scores higher on strict detection).",
+    "key_entities": [
+      "No",
+      "BERT-based SOTA",
+      "NLNDE",
+      "does not reach"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-14",
+    "category": "multi_comparative",
+    "title": "Comparative Dataset Sizes across Dialog and Gender Corpora",
+    "query": "Compare the reported dataset sizes (number of dialogs, turns, or sentences) between Paper [1] and Paper [2]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1911.10742.txt",
+      "qasper_1909.00091.txt"
+    ],
+    "ground_truth": "Paper [1] (ANTISCAM) contains 220 dialogs, with 3,044 sentences in the 100 annotated dialog subset. Paper [2] introduces two corpora with over 300,000 (300K) sentences each.",
+    "key_entities": [
+      "220 dialogs",
+      "3,044 sentences",
+      "100 dialogs",
+      "300,000 sentences"
+    ]
+  },
+  {
+    "id": "QASPER-MUL-15",
+    "category": "multi_comparative",
+    "title": "Comparative Structural and Typographic Annotation Layers",
+    "query": "Compare the text structural and typographical information layers extracted between Paper [1] and Paper [2]!",
+    "chat_id": "fa005a59-540e-405d-8029-b7c2002b4fd4",
+    "target_documents": [
+      "qasper_1909.09067.txt",
+      "qasper_1810.02229.txt"
+    ],
+    "ground_truth": "Paper [1] annotates text structure (paragraph, line, and physical page segmentation) and typography (font type, font style bold/italics, and position). Paper [2] focuses on linguistic and semantic event detection using sequence-to-sequence BIO scheme without typography or page layout layers.",
+    "key_entities": [
+      "paragraph segmentation",
+      "page segmentation",
+      "font style",
+      "bold",
+      "italics",
+      "BIO"
+    ]
+  }
+]
