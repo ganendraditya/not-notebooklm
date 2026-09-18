@@ -177,3 +177,91 @@ def delete_profile_fact(
     except Exception as e:
         logger.error(f"[MemoryService] Error deleting fact {fact_id}: {e}")
         return False
+
+
+async def extract_and_reconcile_research_memory(
+    chat_id: str,
+    user_message: str,
+    db: Session,
+    assistant_response: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Asynchronously analyzes a conversational turn using Fast LLM to:
+    1. Extract newly declared permanent research constraints, objectives, or settings.
+    2. Reconcile and invalidate existing facts that are contradicted or revoked by the user.
+    Executes database mutations deterministically through the Python service layer.
+    """
+    if not chat_id or not user_message or len(user_message.strip()) < 8:
+        return {"inserted": 0, "invalidated": 0}
+
+    # Fetch currently active profile facts to check for contradictions
+    active_facts = get_active_profile_facts(db, chat_id, max_tokens=400)
+    facts_context_lines = []
+    for f in active_facts:
+        facts_context_lines.append(f"- [ID {f.id}] ({f.category}): {f.fact_text}")
+    existing_facts_str = "\n".join(facts_context_lines) if facts_context_lines else "None (No active research profile facts stored yet)."
+
+    prompt = (
+        "You are an expert Research Profile Memory Extractor and Contradiction Reconciler.\n"
+        "Your task is to analyze the user's latest message in an academic research assistant workspace.\n\n"
+        f"Currently Active Research Profile Facts:\n{existing_facts_str}\n\n"
+        f"Latest User Message:\n\"{user_message.strip()}\"\n\n"
+        "Task Guidelines:\n"
+        "1. INSERT NEW FACTS:\n"
+        "   - Detect permanent research constraints, exclusion criteria, hardware setups, target venues, deadlines, or methodologies stated by the user.\n"
+        "   - Must be permanent directives (e.g. 'Never recommend closed-source datasets', 'Our GPU is RTX 3060 12GB', 'Targeting IEEE TMI').\n"
+        "   - DO NOT extract ephemeral questions, greetings, or specific paper questions.\n"
+        "   - Each fact must be atomic, precise, and under 25 words.\n"
+        "   - Valid categories: 'constraint', 'objective', 'methodology', 'hardware', 'venue'.\n\n"
+        "2. RECONCILE / INVALIDATE CONTRADICTIONS:\n"
+        "   - If the user explicitly cancels, updates, or contradicts an existing fact (e.g. earlier fact forbade arXiv, but user now says 'it is okay to use arXiv now'), output the target fact ID in 'invalidate_ids'.\n"
+        "   - If no existing facts are contradicted, keep 'invalidate_ids' empty.\n\n"
+        "Respond ONLY with valid JSON schema:\n"
+        "{\n"
+        "  \"insert_facts\": [\n"
+        "    {\"category\": \"constraint\", \"fact_text\": \"Concise directive text\"}\n"
+        "  ],\n"
+        "  \"invalidate_ids\": [1, 2],\n"
+        "  \"reason\": \"Brief justification\"\n"
+        "}"
+    )
+
+    try:
+        from rag.llm_factory import acall_fast_with_fallback
+        from utils.text_processing import extract_json_from_llm
+        import json
+        import re
+
+        raw_resp = await acall_fast_with_fallback(lambda llm: llm.acomplete(prompt))
+        clean_json_str = extract_json_from_llm(raw_resp.text if hasattr(raw_resp, "text") else str(raw_resp))
+        data = json.loads(clean_json_str)
+
+        invalidated_count = 0
+        for fid in data.get("invalidate_ids", []):
+            try:
+                fid_int = int(fid)
+                if invalidate_profile_fact(db, fid_int, chat_id):
+                    invalidated_count += 1
+            except Exception as inv_err:
+                logger.debug(f"[MemoryService] Error invalidating ID {fid}: {inv_err}")
+
+        inserted_count = 0
+        for item in data.get("insert_facts", []):
+            f_text = item.get("fact_text", "").strip()
+            f_cat = item.get("category", "constraint").strip()
+            if f_text and len(f_text) >= 6:
+                # Check for near-duplicate active facts
+                is_duplicate = any(f_text.lower() in existing.fact_text.lower() for existing in active_facts if existing.is_active)
+                if not is_duplicate:
+                    if add_profile_fact(db, chat_id, f_text, f_cat):
+                        inserted_count += 1
+
+        return {
+            "inserted": inserted_count,
+            "invalidated": invalidated_count,
+            "reason": data.get("reason", "")
+        }
+    except Exception as e:
+        logger.warning(f"[MemoryService] Background reconciliation failed: {e}")
+        return {"inserted": 0, "invalidated": 0, "error": str(e)}
+
