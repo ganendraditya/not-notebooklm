@@ -318,23 +318,7 @@ async def handle_workspace_analysis_pipeline(
             model_name=model_name
         )
     
-    system_prompt_text = (
-        f"{get_workspace_analysis_system_prompt(total_doc_count)}\n\n"
-        "CRITICAL INSTRUCTIONS FOR SYNTHESIS & ANALYSIS:\n"
-        "- STRICT LANGUAGE MIRRORING: You MUST ALWAYS respond in the EXACT same language or dialect as the user query (e.g. English -> English, Indonesian -> Indonesian, Chinese -> Chinese (中文), Korean -> Korean (한국어), Spanish -> Spanish (Español), Japanese -> Japanese (日本語), etc.). Zero unsolicited translation or cross-language mixing.\n"
-        "- ZERO CONVERSATIONAL PREAMBLE: Begin your response directly with the factual answer or findings. Strictly avoid conversational filler or introductory throat-clearing (e.g. do NOT start with 'Berdasarkan dokumen...', 'Based on the provided document...', 'In the paper...', etc.). State the findings directly.\n"
-        "- EMPIRICAL METRICS PRECISION: When reporting empirical performance, accuracy, or benchmark scores, ALWAYS provide the exact final absolute metrics alongside any relative improvements. NEVER report only improvement deltas when final absolute metrics are present.\n"
-        "- DIRECT NEGATIVE ABSTENTION & UNMENTIONED ACTIONS: If any requested aspect, metric, parameter, mechanism, or platform is not explicitly documented or discussed in the text, you MUST state in the FIRST SENTENCE that the information is not mentioned or provided in the paper (e.g. 'This information is not mentioned or provided in the paper.'). If the question asks how or why an action is performed when the authors do not mention performing that action (false premise), state directly: 'The paper does not mention [action].' Do NOT speculate, extrapolate, or attempt to explain adjacent mechanisms or general architecture.\n"
-        "- Respond strictly and proportionally to what the user asks. If the user asks a simple question (e.g. counting, listing, or checking status), answer directly and concisely without unsolicited long tables or essays.\n"
-        "- When the user explicitly asks to summarize, analyze, compare, or generate chapters/sections, write a structured, highly analytical synthesis. Cover all comparison dimensions asked by the user, maintain dense academic conciseness (avoid overly verbose repetitive preamble), and ensure all points and sentences are fully and cleanly concluded.\n"
-        "- DO NOT refuse with excuses about copyright or partial text. Leverage the available document text fully.\n\n"
-        "STRICT IEEE CITATION & CITATION_MAP REQUIREMENTS (MANDATORY BEFORE COMPLETION):\n"
-        "1. IEEE CITATION POSITION: Citation tags [X] MUST ALWAYS appear BEFORE sentence-ending periods or punctuation (e.g. 'mencapai akurasi 93% [13].' or 'metode Swin [1], [2].'). NEVER place citation tags after the period (NEVER write 'akurasi 93%. [1]'). In table cells, place citation tags before the closing period of each bullet (e.g. '• Integrates DA-Blocks [2].').\n"
-        "2. CITATION MAP (MANDATORY): Whenever your response contains citations [X], you MUST append the hidden CITATION_MAP at the VERY END of your response:\n"
-        "<!-- CITATION_MAP: {\"X\": [\"Verbatim sentence proving finding A from Doc X\", \"Verbatim sentence proving finding B from Doc X\"]} -->\n"
-        "Copy authentic verbatim sentences directly from the document text provided in the prompt context (provide 1 to 3 key evidence sentences per cited document). Do not paraphrase or invent quotes. This is required for the document viewer to highlight the source evidence accurately.\n"
-        "3. UNIVERSAL FACTUALITY (ZERO HALLUCINATION BY OMISSION): If any requested aspect, metric, parameter, limitation, or recommendation is not explicitly discussed by the authors in Document X, report honestly in the prompt's language (e.g. 'This information is not mentioned or provided in the paper.' or 'Tidak disebutkan secara eksplisit dalam naskah') without attaching any citation tag [X] and without inventing claims."
-    )
+    system_prompt_text = get_workspace_analysis_system_prompt(total_doc_count)
 
     system_msg = LlamaChatMessage(
         role=MessageRole.SYSTEM,
