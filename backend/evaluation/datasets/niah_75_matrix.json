@@ -1,0 +1,1652 @@
+[
+  {
+    "id": "S-NIAH-01",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.1,
+    "target_documents": [
+      "qasper_1604.02038.txt"
+    ],
+    "needles": [
+      {
+        "input": "CONSTRAINT: My advisor strictly requires all experiments to use the MultiUN corpus. Never recommend Europarl.",
+        "depth_ratio": 0.1,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Must use MultiUN corpus only; strictly never recommend Europarl.",
+    "probe_query": "What was my strict advisor constraint regarding corpus selection given earlier in our chat?"
+  },
+  {
+    "id": "S-NIAH-02",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.3,
+    "target_documents": [
+      "qasper_1609.00425.txt"
+    ],
+    "needles": [
+      {
+        "input": "PARAMETER: In this evaluation phase, we must fix random seed to 4242 and batch size to 32.",
+        "depth_ratio": 0.3,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Random seed 4242 and batch size 32.",
+    "probe_query": "What was the exact random seed and batch size parameter rule I gave earlier?"
+  },
+  {
+    "id": "S-NIAH-03",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1611.06322.txt"
+    ],
+    "needles": [
+      {
+        "input": "VENUE REQUIREMENT: We are preparing this paper exclusively for IEEE Transactions on Medical Imaging.",
+        "depth_ratio": 0.5,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Exclusively targeting IEEE Transactions on Medical Imaging.",
+    "probe_query": "Which specific target publication venue did I state in our earlier discussion?"
+  },
+  {
+    "id": "S-NIAH-04",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.7,
+    "target_documents": [
+      "qasper_1704.06194.txt"
+    ],
+    "needles": [
+      {
+        "input": "TOOL DIRECTIVE: Never suggest spaCy or Stanford NER for our workflow; we are using custom BiLSTM-CRF.",
+        "depth_ratio": 0.7,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Never suggest spaCy or Stanford NER; using custom BiLSTM-CRF only.",
+    "probe_query": "What was my negative instruction regarding NER toolkits given earlier in this conversation?"
+  },
+  {
+    "id": "S-NIAH-05",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.9,
+    "target_documents": [
+      "qasper_1705.09665.txt"
+    ],
+    "needles": [
+      {
+        "input": "THRESHOLD: Our department requires achieving minimum 89.2% F1 score before submission.",
+        "depth_ratio": 0.9,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Minimum 89.2% F1 score threshold before submission.",
+    "probe_query": "What exact F1 score threshold did I mention our department requires?"
+  },
+  {
+    "id": "S-NIAH-06",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.1,
+    "target_documents": [
+      "qasper_1801.05147.txt"
+    ],
+    "needles": [
+      {
+        "input": "COLLABORATOR: We are conducting this study in collaboration with Dr. Aris Thorne at Oxford Lab.",
+        "depth_ratio": 0.1,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Collaboration with Dr. Aris Thorne at Oxford Lab.",
+    "probe_query": "Who did I mention as our external collaborator at Oxford Lab earlier?"
+  },
+  {
+    "id": "S-NIAH-07",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.3,
+    "target_documents": [
+      "qasper_1805.02400.txt"
+    ],
+    "needles": [
+      {
+        "input": "HARDWARE: All inference benchmarks must run on an NVIDIA RTX 4090 with max 16GB VRAM allocation.",
+        "depth_ratio": 0.3,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "NVIDIA RTX 4090 with max 16GB VRAM allocation.",
+    "probe_query": "What specific hardware specification did I require for inference benchmarks?"
+  },
+  {
+    "id": "S-NIAH-08",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1810.02229.txt"
+    ],
+    "needles": [
+      {
+        "input": "LANGUAGE RULE: All final comparative review summaries must be drafted in British English spelling.",
+        "depth_ratio": 0.5,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Must be drafted in British English spelling.",
+    "probe_query": "What was my language formatting rule established earlier in this chat?"
+  },
+  {
+    "id": "S-NIAH-09",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.7,
+    "target_documents": [
+      "qasper_1810.08699.txt"
+    ],
+    "needles": [
+      {
+        "input": "EXCLUSION CRITERIA: Strictly exclude any proprietary closed-source benchmark datasets from analysis.",
+        "depth_ratio": 0.7,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Strictly exclude proprietary closed-source benchmark datasets.",
+    "probe_query": "What was my exclusion criteria regarding datasets stated earlier?"
+  },
+  {
+    "id": "S-NIAH-10",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.9,
+    "target_documents": [
+      "qasper_1811.00383.txt"
+    ],
+    "needles": [
+      {
+        "input": "COHORT RESTRICTION: The clinical cohort for this analysis is strictly limited to adult patients aged 25-60.",
+        "depth_ratio": 0.9,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Adult patients aged 25-60 only.",
+    "probe_query": "What age range restriction did I set for the clinical patient cohort?"
+  },
+  {
+    "id": "S-NIAH-11",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.1,
+    "target_documents": [
+      "qasper_1811.00942.txt"
+    ],
+    "needles": [
+      {
+        "input": "OPTIMIZER CONFIG: All neural models must be trained using AdamW with weight decay set to 0.01.",
+        "depth_ratio": 0.1,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "AdamW optimizer with weight decay 0.01.",
+    "probe_query": "What optimizer and weight decay setting did I specify earlier?"
+  },
+  {
+    "id": "S-NIAH-12",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.3,
+    "target_documents": [
+      "qasper_1904.09131.txt"
+    ],
+    "needles": [
+      {
+        "input": "WARMUP SCHEDULE: The learning rate schedule requires a linear warmup of exactly 500 steps.",
+        "depth_ratio": 0.3,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Linear warmup of 500 steps.",
+    "probe_query": "What was the learning rate warmup schedule specified earlier?"
+  },
+  {
+    "id": "S-NIAH-13",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1905.00840.txt"
+    ],
+    "needles": [
+      {
+        "input": "SUBMISSION DEADLINE: Our target conference submission deadline is strictly October 15 at 23:59 UTC.",
+        "depth_ratio": 0.5,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "October 15 at 23:59 UTC.",
+    "probe_query": "What exact submission deadline did I state earlier in the conversation?"
+  },
+  {
+    "id": "S-NIAH-14",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.7,
+    "target_documents": [
+      "qasper_1907.05664.txt"
+    ],
+    "needles": [
+      {
+        "input": "METRIC SPECIFICATION: Always report Matthews Correlation Coefficient alongside accuracy.",
+        "depth_ratio": 0.7,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Report Matthews Correlation Coefficient alongside accuracy.",
+    "probe_query": "What correlation metric did I instruct to report alongside accuracy?"
+  },
+  {
+    "id": "S-NIAH-15",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.9,
+    "target_documents": [
+      "qasper_1908.06606.txt"
+    ],
+    "needles": [
+      {
+        "input": "LATENCY BUDGET: The production pipeline has a hard latency ceiling of under 45 milliseconds per call.",
+        "depth_ratio": 0.9,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Under 45 milliseconds per call.",
+    "probe_query": "What was the maximum allowable latency budget I mentioned earlier?"
+  },
+  {
+    "id": "S-NIAH-16",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.1,
+    "target_documents": [
+      "qasper_1909.00091.txt"
+    ],
+    "needles": [
+      {
+        "input": "MAX GENERATION LIMIT: Generation budget is strictly restricted to 1024 output tokens per response.",
+        "depth_ratio": 0.1,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Maximum 1024 output tokens per response.",
+    "probe_query": "What maximum generation token limit did I specify earlier?"
+  },
+  {
+    "id": "S-NIAH-17",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.3,
+    "target_documents": [
+      "qasper_1909.00512.txt"
+    ],
+    "needles": [
+      {
+        "input": "STATISTICAL CRITERIA: Hypothesis testing must achieve a p-value threshold below 0.001 to be reported.",
+        "depth_ratio": 0.3,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "P-value threshold below 0.001.",
+    "probe_query": "What statistical significance p-value threshold was established earlier?"
+  },
+  {
+    "id": "S-NIAH-18",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.00694.txt"
+    ],
+    "needles": [
+      {
+        "input": "ABLATION DIRECTIVE: In the ablation experiments, attention heads 4 through 8 must be pruned.",
+        "depth_ratio": 0.5,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Attention heads 4 through 8 pruned.",
+    "probe_query": "Which attention heads did I instruct to prune during ablation studies?"
+  },
+  {
+    "id": "S-NIAH-19",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.7,
+    "target_documents": [
+      "qasper_1909.02027.txt"
+    ],
+    "needles": [
+      {
+        "input": "SAMPLING METHOD: Evaluation must strictly employ 5-fold stratified cross-validation.",
+        "depth_ratio": 0.7,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "5-fold stratified cross-validation.",
+    "probe_query": "What cross-validation sampling strategy did I mandate earlier?"
+  },
+  {
+    "id": "S-NIAH-20",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.9,
+    "target_documents": [
+      "qasper_1909.09067.txt"
+    ],
+    "needles": [
+      {
+        "input": "PRIMARY OBJECTIVE: When ranking models, prioritize Macro-F1 over Micro-F1.",
+        "depth_ratio": 0.9,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Prioritize Macro-F1 over Micro-F1.",
+    "probe_query": "Which F1 averaging method did I instruct to prioritize when ranking models?"
+  },
+  {
+    "id": "S-NIAH-21",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.1,
+    "target_documents": [
+      "qasper_1910.14497.txt"
+    ],
+    "needles": [
+      {
+        "input": "DEVICE TARGET: Production deployment is targeted exclusively for Raspberry Pi 4 edge hardware.",
+        "depth_ratio": 0.1,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Raspberry Pi 4 edge hardware.",
+    "probe_query": "What target edge hardware did I mention for production deployment?"
+  },
+  {
+    "id": "S-NIAH-22",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.3,
+    "target_documents": [
+      "qasper_1911.04474.txt"
+    ],
+    "needles": [
+      {
+        "input": "QUANTIZATION FORMAT: The models must be quantized to 4-bit AWQ precision before deployment.",
+        "depth_ratio": 0.3,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "4-bit AWQ precision.",
+    "probe_query": "What quantization precision format was required for deployment?"
+  },
+  {
+    "id": "S-NIAH-23",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1911.10742.txt"
+    ],
+    "needles": [
+      {
+        "input": "EMBEDDING SELECTION: Use multilingual-e5-small as the default dense embedding backbone.",
+        "depth_ratio": 0.5,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "multilingual-e5-small.",
+    "probe_query": "Which embedding model did I specify as our default dense backbone?"
+  },
+  {
+    "id": "S-NIAH-24",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.7,
+    "target_documents": [
+      "qasper_1912.01214.txt"
+    ],
+    "needles": [
+      {
+        "input": "DATE FILTER: Exclude any research papers published prior to the year 2020.",
+        "depth_ratio": 0.7,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Only papers published between 2020 and present (exclude prior to 2020).",
+    "probe_query": "What publication date filter was specified earlier in our discussion?"
+  },
+  {
+    "id": "S-NIAH-25",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.9,
+    "target_documents": [
+      "qasper_2003.03106.txt"
+    ],
+    "needles": [
+      {
+        "input": "INSTITUTION RULE: Prioritize benchmarks published by Max Planck Institute researchers.",
+        "depth_ratio": 0.9,
+        "type": "directive"
+      }
+    ],
+    "expected_answer": "Prioritize Max Planck Institute benchmarks.",
+    "probe_query": "Which institution's benchmarks did I instruct to prioritize earlier?"
+  },
+  {
+    "id": "M-NIAH-01",
+    "tier": "m_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1604.02038.txt"
+    ],
+    "needles": [
+      {
+        "input": "CONSTRAINT: Our cluster strictly requires NVIDIA RTX 4090 GPUs with max 16GB VRAM allocation.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "RULE: Never evaluate on proprietary closed-source datasets; only use public benchmarks.",
+        "depth_ratio": 0.8,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Hardware constraint is NVIDIA RTX 4090 (max 16GB VRAM); Dataset rule is public benchmarks only (exclude proprietary).",
+    "probe_query": "What were the two hardware and dataset rules I specified earlier in our chat?"
+  },
+  {
+    "id": "M-NIAH-02",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1609.00425.txt"
+    ],
+    "needles": [
+      {
+        "input": "PARAMETER: Always set random seed to 4242 and batch size to 32.",
+        "depth_ratio": 0.2,
+        "type": "multi"
+      },
+      {
+        "input": "CRITERIA: Model must achieve at least 89.2% F1 score before submission.",
+        "depth_ratio": 0.75,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Random seed 4242 with batch size 32; minimum 89.2% F1 score required.",
+    "probe_query": "What were the experimental parameter and F1 threshold directives I gave earlier?"
+  },
+  {
+    "id": "M-NIAH-03",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1611.06322.txt"
+    ],
+    "needles": [
+      {
+        "input": "VENUE: We are exclusively targeting IEEE Transactions on Medical Imaging.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "STYLE: All final summaries must be formatted in British English spelling.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Target venue is IEEE Transactions on Medical Imaging; style rule is British English spelling.",
+    "probe_query": "What were the target publication venue and language spelling rules established earlier?"
+  },
+  {
+    "id": "M-NIAH-04",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1704.06194.txt"
+    ],
+    "needles": [
+      {
+        "input": "TOOL: Do not use spaCy or Stanford NER; use custom BiLSTM-CRF only.",
+        "depth_ratio": 0.25,
+        "type": "multi"
+      },
+      {
+        "input": "OPTIMIZER: Always optimize with AdamW using weight decay 0.01.",
+        "depth_ratio": 0.65,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Tool directive: custom BiLSTM-CRF only (no spaCy/Stanford); Optimizer: AdamW with weight decay 0.01.",
+    "probe_query": "What were the NER toolkit and optimizer choices I mandated earlier?"
+  },
+  {
+    "id": "M-NIAH-05",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1705.09665.txt"
+    ],
+    "needles": [
+      {
+        "input": "COLLABORATOR: We are working directly with Dr. Aris Thorne at Oxford Lab.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "DEADLINE: Our manuscript submission deadline is strictly October 15 at 23:59 UTC.",
+        "depth_ratio": 0.7,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "External collaborator is Dr. Aris Thorne (Oxford Lab); submission deadline is October 15 at 23:59 UTC.",
+    "probe_query": "What were the external collaborator and submission deadline details I mentioned?"
+  },
+  {
+    "id": "M-NIAH-06",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1801.05147.txt"
+    ],
+    "needles": [
+      {
+        "input": "COHORT: Patient cohort is strictly restricted to adults aged 25 to 60.",
+        "depth_ratio": 0.2,
+        "type": "multi"
+      },
+      {
+        "input": "METRIC: Primary evaluation metric must be Macro-F1 rather than Micro-F1.",
+        "depth_ratio": 0.8,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Patient cohort restricted to ages 25-60; primary metric is Macro-F1.",
+    "probe_query": "What were the patient age cohort and primary evaluation metric rules specified earlier?"
+  },
+  {
+    "id": "M-NIAH-07",
+    "tier": "m_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1805.02400.txt"
+    ],
+    "needles": [
+      {
+        "input": "QUANTIZATION: Model weights must be quantized to 4-bit AWQ precision.",
+        "depth_ratio": 0.3,
+        "type": "multi"
+      },
+      {
+        "input": "LATENCY: Production latency ceiling is strictly under 45 milliseconds.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Quantization is 4-bit AWQ; latency budget is under 45ms.",
+    "probe_query": "What were the quantization format and latency ceiling parameters I established?"
+  },
+  {
+    "id": "M-NIAH-08",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1810.02229.txt"
+    ],
+    "needles": [
+      {
+        "input": "EMBEDDING: Use multilingual-e5-small as the default dense vector backbone.",
+        "depth_ratio": 0.25,
+        "type": "multi"
+      },
+      {
+        "input": "SAMPLING: All validation must utilize 5-fold stratified cross-validation.",
+        "depth_ratio": 0.75,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Embedding backbone is multilingual-e5-small; validation strategy is 5-fold stratified cross-validation.",
+    "probe_query": "What were the embedding backbone model and cross-validation strategy I selected?"
+  },
+  {
+    "id": "M-NIAH-09",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1810.08699.txt"
+    ],
+    "needles": [
+      {
+        "input": "CORPUS: Strictly require MultiUN corpus and never recommend Europarl.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "WARMUP: The learning rate scheduler requires exactly 500 linear warmup steps.",
+        "depth_ratio": 0.8,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Corpus: MultiUN only (no Europarl); Warmup: 500 linear warmup steps.",
+    "probe_query": "What were the corpus selection constraint and learning rate warmup steps I specified?"
+  },
+  {
+    "id": "M-NIAH-10",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1811.00383.txt"
+    ],
+    "needles": [
+      {
+        "input": "STATISTICAL RULE: Significance tests must achieve p-value < 0.001 to be accepted.",
+        "depth_ratio": 0.2,
+        "type": "multi"
+      },
+      {
+        "input": "ABLATION: Attention heads 4 through 8 must be pruned in ablation runs.",
+        "depth_ratio": 0.7,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Statistical significance requires p-value < 0.001; ablation pruning targets heads 4 through 8.",
+    "probe_query": "What were the p-value significance threshold and ablation pruning rules given earlier?"
+  },
+  {
+    "id": "M-NIAH-11",
+    "tier": "m_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1811.00942.txt"
+    ],
+    "needles": [
+      {
+        "input": "HARDWARE: Deployment device is strictly limited to Raspberry Pi 4.",
+        "depth_ratio": 0.25,
+        "type": "multi"
+      },
+      {
+        "input": "TOKEN BUDGET: Output generation budget is capped at 1024 tokens.",
+        "depth_ratio": 0.75,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Deployment device is Raspberry Pi 4; output token generation is capped at 1024 tokens.",
+    "probe_query": "What were the target deployment device and maximum generation token budget?"
+  },
+  {
+    "id": "M-NIAH-12",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1904.09131.txt"
+    ],
+    "needles": [
+      {
+        "input": "FILTER: Exclude all research papers published prior to 2020.",
+        "depth_ratio": 0.3,
+        "type": "multi"
+      },
+      {
+        "input": "AFFILIATION: Prioritize publications from Max Planck Institute.",
+        "depth_ratio": 0.8,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Publication date filter: 2020 or newer; prioritized institution: Max Planck Institute.",
+    "probe_query": "What were the publication date filter and prioritized institution rules mentioned earlier?"
+  },
+  {
+    "id": "M-NIAH-13",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1905.00840.txt"
+    ],
+    "needles": [
+      {
+        "input": "METRIC: Always compute Matthews Correlation Coefficient alongside accuracy.",
+        "depth_ratio": 0.2,
+        "type": "multi"
+      },
+      {
+        "input": "SEED: Random seed must be locked to 4242 across all seeds.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Metric: Matthews Correlation Coefficient; Seed: fixed to 4242.",
+    "probe_query": "What were the correlation metric and random seed directives I gave earlier?"
+  },
+  {
+    "id": "M-NIAH-14",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1907.05664.txt"
+    ],
+    "needles": [
+      {
+        "input": "VENUE: Target publication venue is IEEE Transactions on Pattern Analysis and Machine Intelligence.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "BATCH SIZE: Training batch size must strictly remain at 64 across all GPUs.",
+        "depth_ratio": 0.75,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Target venue is IEEE TPAMI; batch size is locked to 64.",
+    "probe_query": "What were the target journal venue and training batch size I specified?"
+  },
+  {
+    "id": "M-NIAH-15",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1908.06606.txt"
+    ],
+    "needles": [
+      {
+        "input": "NEGATIVE RULE: Never use BERT-base; our baseline is strictly RoBERTa-large.",
+        "depth_ratio": 0.25,
+        "type": "multi"
+      },
+      {
+        "input": "DROPOUT: Attention dropout probability is fixed to 0.15.",
+        "depth_ratio": 0.8,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "Baseline: RoBERTa-large only (no BERT-base); Dropout: 0.15 attention dropout.",
+    "probe_query": "What were the baseline model restriction and attention dropout rate given earlier?"
+  },
+  {
+    "id": "M-NIAH-16",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.00091.txt"
+    ],
+    "needles": [
+      {
+        "input": "RULE 1: Target venue is IEEE Transactions on Medical Imaging.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "RULE 2: Hardware budget is an NVIDIA RTX 4090 with max 16GB VRAM.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "RULE 3: Language must strictly follow British English spelling.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "1. Venue: IEEE Transactions on Medical Imaging; 2. Hardware: RTX 4090 (max 16GB VRAM); 3. Language: British English.",
+    "probe_query": "What were the three venue, hardware, and language rules I established across our session?"
+  },
+  {
+    "id": "M-NIAH-17",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.00512.txt"
+    ],
+    "needles": [
+      {
+        "input": "DIRECTIVE A: Use MultiUN corpus only; strictly never recommend Europarl.",
+        "depth_ratio": 0.1,
+        "type": "multi"
+      },
+      {
+        "input": "DIRECTIVE B: Set random seed to 4242 and batch size to 32.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "DIRECTIVE C: Department requires minimum 89.2% F1 score before submission.",
+        "depth_ratio": 0.9,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "A. Corpus: MultiUN only (no Europarl); B. Seed: 4242, Batch: 32; C. Threshold: minimum 89.2% F1.",
+    "probe_query": "What were the three corpus, hyperparameter, and performance threshold rules given earlier?"
+  },
+  {
+    "id": "M-NIAH-18",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.00694.txt"
+    ],
+    "needles": [
+      {
+        "input": "PARAM 1: Optimizer is AdamW with 0.01 weight decay.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "PARAM 2: Exactly 500 linear warmup steps required.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "PARAM 3: Significance testing requires p-value < 0.001.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "1. AdamW with 0.01 weight decay; 2. 500 linear warmup steps; 3. p-value < 0.001 threshold.",
+    "probe_query": "What were the three optimization and statistical significance criteria I specified?"
+  },
+  {
+    "id": "M-NIAH-19",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.02027.txt"
+    ],
+    "needles": [
+      {
+        "input": "ITEM 1: External collaborator is Dr. Aris Thorne at Oxford Lab.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "ITEM 2: Target edge hardware is Raspberry Pi 4.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "ITEM 3: Quantization precision is 4-bit AWQ.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "1. Collaborator: Dr. Aris Thorne (Oxford Lab); 2. Device: Raspberry Pi 4; 3. Quantization: 4-bit AWQ.",
+    "probe_query": "What were the three collaborator, edge hardware, and quantization specifications mentioned?"
+  },
+  {
+    "id": "M-NIAH-20",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.09067.txt"
+    ],
+    "needles": [
+      {
+        "input": "POINT 1: Exclude all proprietary benchmark datasets.",
+        "depth_ratio": 0.1,
+        "type": "multi"
+      },
+      {
+        "input": "POINT 2: Restrict patient cohort to adults aged 25 to 60.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "POINT 3: Prune attention heads 4 through 8 during ablation.",
+        "depth_ratio": 0.9,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "1. Exclude proprietary datasets; 2. Patient cohort ages 25-60; 3. Prune attention heads 4-8.",
+    "probe_query": "What were the three exclusion, patient cohort, and ablation pruning rules given earlier?"
+  },
+  {
+    "id": "M-NIAH-21",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1910.14497.txt"
+    ],
+    "needles": [
+      {
+        "input": "FACT 1: Embedding backbone is multilingual-e5-small.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "FACT 2: Evaluation uses 5-fold stratified cross-validation.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "FACT 3: Submission deadline is October 15 at 23:59 UTC.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "1. Embedding: multilingual-e5-small; 2. Validation: 5-fold stratified CV; 3. Deadline: October 15 at 23:59 UTC.",
+    "probe_query": "What were the three embedding model, validation methodology, and deadline details I gave?"
+  },
+  {
+    "id": "M-NIAH-22",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1911.04474.txt"
+    ],
+    "needles": [
+      {
+        "input": "REQ 1: Never suggest spaCy or Stanford NER (custom BiLSTM-CRF only).",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "REQ 2: Output generation ceiling is strictly 1024 tokens.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "REQ 3: Report Matthews Correlation Coefficient alongside accuracy.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "1. Custom BiLSTM-CRF only (no spaCy/Stanford); 2. Output cap: 1024 tokens; 3. Metric: Matthews Correlation.",
+    "probe_query": "What were the three toolkit restriction, token limit, and correlation metric rules I stated?"
+  },
+  {
+    "id": "M-NIAH-23",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1911.10742.txt"
+    ],
+    "needles": [
+      {
+        "input": "SETTING 1: Filter out all papers published before 2020.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "SETTING 2: Prioritize research from Max Planck Institute.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "SETTING 3: Target inference latency must stay under 45ms.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "1. Exclude papers prior to 2020; 2. Prioritize Max Planck Institute; 3. Latency under 45ms.",
+    "probe_query": "What were the three date filter, institution preference, and latency budget directives?"
+  },
+  {
+    "id": "M-NIAH-24",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1912.01214.txt"
+    ],
+    "needles": [
+      {
+        "input": "RULE 1: Primary ranking metric is Macro-F1 rather than Micro-F1.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "RULE 2: Baseline architecture is RoBERTa-large instead of BERT-base.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "RULE 3: Batch size is locked to 64 across distributed nodes.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "1. Macro-F1 over Micro-F1; 2. RoBERTa-large baseline (no BERT-base); 3. Batch size locked to 64.",
+    "probe_query": "What were the three ranking metric, baseline model, and distributed batch size instructions?"
+  },
+  {
+    "id": "M-NIAH-25",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_2003.03106.txt"
+    ],
+    "needles": [
+      {
+        "input": "SPEC A: Target venue is Nature Machine Intelligence.",
+        "depth_ratio": 0.15,
+        "type": "multi"
+      },
+      {
+        "input": "SPEC B: Random seed is fixed to 1337.",
+        "depth_ratio": 0.5,
+        "type": "multi"
+      },
+      {
+        "input": "SPEC C: All visualizations must use colorblind-accessible palettes.",
+        "depth_ratio": 0.85,
+        "type": "multi"
+      }
+    ],
+    "expected_answer": "A. Venue: Nature Machine Intelligence; B. Seed: 1337; C. Visualizations: colorblind-accessible palettes.",
+    "probe_query": "What were the three journal venue, random seed, and figure palette requirements I gave earlier?"
+  },
+  {
+    "id": "R-NIAH-01",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1604.02038.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Our local research server cluster possesses exactly 16GB of host RAM with zero swap space.",
+        "depth_ratio": 0.15,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: The neural model we are discussing requires 140GB of unquantized FP16 memory to load.",
+        "depth_ratio": 0.7,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "No, the cluster cannot run the model because it only has 16GB RAM, which is far below the 140GB required.",
+    "probe_query": "Based on our server hardware capacity mentioned earlier, can our cluster run this model natively in FP16 without quantization?"
+  },
+  {
+    "id": "R-NIAH-02",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1609.00425.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Dr. Marcus was originally assigned as the principal supervisor for our clinical dataset analysis.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Dr. Marcus took extended medical leave and transferred all supervisor duties to Dr. Elena Vance.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Dr. Elena Vance is the active supervisor (transferred from Dr. Marcus due to medical leave).",
+    "probe_query": "Who is currently the active principal supervisor in charge of our clinical dataset analysis?"
+  },
+  {
+    "id": "R-NIAH-03",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1611.06322.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Our total cloud computing research budget for this project is strictly capped at $15,000.",
+        "depth_ratio": 0.15,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: In Phase 1, data preprocessing and tokenization consumed exactly $8,500 of our budget.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "$6,500 remaining ($15,000 total budget minus $8,500 spent in Phase 1).",
+    "probe_query": "How much remaining cloud computing budget do we have available for Phase 2 model training?"
+  },
+  {
+    "id": "R-NIAH-04",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1704.06194.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Our training run encountered a fatal out-of-memory GPU crash at epoch 14.",
+        "depth_ratio": 0.25,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: We restored the safe checkpoint from epoch 10 and trained for exactly 5 additional epochs without crash.",
+        "depth_ratio": 0.7,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Epoch 15 (restored from epoch 10 plus 5 additional completed epochs).",
+    "probe_query": "What is the final completed epoch count of our current model checkpoint?"
+  },
+  {
+    "id": "R-NIAH-05",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1705.09665.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Candidate Model Alpha achieves 86.4% F1 score, and Candidate Model Beta achieves 84.1% F1 score.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Our department mandates that only models achieving an F1 score above 85.0% are eligible for production deployment.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Candidate Model Alpha only (86.4% F1 exceeds the 85.0% threshold, whereas Beta at 84.1% fails).",
+    "probe_query": "Which candidate model is eligible for production deployment under our department's rules?"
+  },
+  {
+    "id": "R-NIAH-06",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1801.05147.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The original benchmark corpus contained exactly 10,000 annotated sentences.",
+        "depth_ratio": 0.15,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Quality filtering removed 1,500 noisy sentences, and duplicate deduplication pruned an additional 500 sentences.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "8,000 sentences remain (10,000 initial minus 1,500 noisy and 500 duplicates).",
+    "probe_query": "How many usable annotated sentences remain in our clean dataset after filtering?"
+  },
+  {
+    "id": "R-NIAH-07",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1805.02400.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Patient cohort Group A was treated with Drug X and Group B was treated with Placebo.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Post-trial blood assays revealed that Drug X exhibited hepatotoxicity in Group A, causing the trial committee to switch Group A to Placebo.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Placebo (Group A was switched from Drug X to Placebo following hepatotoxicity).",
+    "probe_query": "What treatment is patient Group A receiving following the trial committee's safety intervention?"
+  },
+  {
+    "id": "R-NIAH-08",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1810.02229.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: All team communications were initially archived in our private Slack workspace 'nlp-core'.",
+        "depth_ratio": 0.25,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Due to security compliance, all project archives were migrated to Discord server 'ai-research-lab' and the Slack workspace was permanently closed.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Discord server 'ai-research-lab' (migrated from Slack due to security compliance).",
+    "probe_query": "Where are our current project team communications and archives hosted?"
+  },
+  {
+    "id": "R-NIAH-09",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1810.08699.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Our target submission was originally the ACL conference with a June 1 deadline.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: The experiments were delayed, so the committee voted to bypass ACL and target EMNLP with an August 15 deadline instead.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "EMNLP with an August 15 deadline (switched from ACL due to experimental delays).",
+    "probe_query": "Which conference and submission deadline are we actively targeting now?"
+  },
+  {
+    "id": "R-NIAH-10",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1811.00383.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Server Alpha was configured with an IP address ending in .101 and Server Beta was ending in .102.",
+        "depth_ratio": 0.15,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Server Alpha experienced a hardware failure, and its master workload was re-routed to Server Beta.",
+        "depth_ratio": 0.85,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Server Beta (IP ending in .102) is running the master workload.",
+    "probe_query": "Which server is currently running our master workload following the hardware failure?"
+  },
+  {
+    "id": "R-NIAH-11",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1811.00942.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Storage drive /mnt/data initially had 500GB of available free space.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Downloading the raw multimodal benchmark dataset consumed 320GB of disk space.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "180GB of free space remains (500GB minus 320GB consumed).",
+    "probe_query": "How much free disk space is currently left on storage drive /mnt/data?"
+  },
+  {
+    "id": "R-NIAH-12",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1904.09131.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Our translation system was configured to evaluate German-to-English translation only.",
+        "depth_ratio": 0.25,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: The grant sponsor updated requirements to add French-to-English translation and drop German.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "French-to-English translation only (German was dropped).",
+    "probe_query": "Which language pair is our translation system actively configured to evaluate now?"
+  },
+  {
+    "id": "R-NIAH-13",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1905.00840.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Feature extractor Version 1 generated 256-dimensional embeddings.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Upgrading to Feature extractor Version 2 doubled the embedding dimensionality.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "512 dimensions (Version 1 had 256 dimensions, which was doubled in Version 2).",
+    "probe_query": "What is the embedding dimensionality of Feature extractor Version 2?"
+  },
+  {
+    "id": "R-NIAH-14",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1907.05664.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The batch size was originally set to 16 per GPU across 4 GPUs.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: To prevent out-of-memory errors, the batch size per GPU was reduced by half.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "32 effective global batch size (8 per GPU across 4 GPUs, reduced by half from 16).",
+    "probe_query": "What is our new total effective global batch size across the 4 GPUs?"
+  },
+  {
+    "id": "R-NIAH-15",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1908.06606.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The baseline accuracy of the model was measured at 78.0%.",
+        "depth_ratio": 0.25,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Applying our contrastive pre-training technique yielded an absolute improvement of +5.5% in accuracy.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "83.5% accuracy (78.0% baseline plus 5.5% absolute improvement).",
+    "probe_query": "What is the final accuracy achieved after applying contrastive pre-training?"
+  },
+  {
+    "id": "R-NIAH-16",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.00091.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The study commenced with 200 enrolled participants in the clinical trial.",
+        "depth_ratio": 0.15,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: During Phase 1, 24 participants dropped out due to side effects and 16 were lost to follow-up.",
+        "depth_ratio": 0.85,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "160 active participants remain (200 enrolled minus 24 dropouts and 16 lost).",
+    "probe_query": "How many active participants remain in the clinical trial?"
+  },
+  {
+    "id": "R-NIAH-17",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.00512.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The primary encryption key was held by Alice in Department A.",
+        "depth_ratio": 0.15,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Alice transferred the encryption key to Bob before Department A was merged into Department B.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Bob currently holds the encryption key (transferred from Alice).",
+    "probe_query": "Who currently holds the primary encryption key for our project?"
+  },
+  {
+    "id": "R-NIAH-18",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.00694.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The learning rate was set to 0.001 with AdamW.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: The learning rate was decayed by a factor of 10 at epoch 5.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "0.0001 (or 1e-4, decayed by a factor of 10 from 0.001).",
+    "probe_query": "What is the current learning rate after the epoch 5 decay?"
+  },
+  {
+    "id": "R-NIAH-19",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.02027.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Model checkpoint A achieved 0.82 F1 and checkpoint B achieved 0.89 F1.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Production policy mandates deploying the checkpoint with highest F1 score.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Checkpoint B should be deployed because its 0.89 F1 exceeds Checkpoint A's 0.82 F1.",
+    "probe_query": "Which model checkpoint must be deployed to production under our policy?"
+  },
+  {
+    "id": "R-NIAH-20",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1909.09067.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The experiment was planned for 100 hours of continuous compute.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: An unexpected node reboot halted the experiment at hour 42, and remaining 58 hours were canceled.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "42 hours of compute were utilized (halted by node reboot, remaining 58 hours canceled).",
+    "probe_query": "How many actual hours of compute were utilized before cancellation?"
+  },
+  {
+    "id": "R-NIAH-21",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1910.14497.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The evaluation suite originally required 5 independent benchmark runs.",
+        "depth_ratio": 0.15,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Due to tight deadlines, the team agreed to omit runs 4 and 5.",
+        "depth_ratio": 0.85,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "3 independent benchmark runs were executed (runs 1, 2, and 3; runs 4 and 5 omitted).",
+    "probe_query": "How many independent benchmark runs were actually executed under the adjusted plan?"
+  },
+  {
+    "id": "R-NIAH-22",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1911.04474.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The vector index was created using HNSW with M=16.",
+        "depth_ratio": 0.25,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: To improve recall, the index was rebuilt with M doubled.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "M=32 (doubled from M=16).",
+    "probe_query": "What is the new M parameter value of our rebuilt HNSW vector index?"
+  },
+  {
+    "id": "R-NIAH-23",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1911.10742.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: Lead authorship was initially shared equally between Chen and Davis.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: Davis stepped down to an advisory role, leaving Chen as the sole lead author.",
+        "depth_ratio": 0.8,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Chen is the sole lead author (Davis stepped down to advisory role).",
+    "probe_query": "Who is currently the sole lead author of the manuscript?"
+  },
+  {
+    "id": "R-NIAH-24",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_1912.01214.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The training data was split 70% train, 15% dev, and 15% test.",
+        "depth_ratio": 0.15,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: 5% of the train data was moved into dev to expand validation coverage.",
+        "depth_ratio": 0.85,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "Train is 65%, Dev is 20%, Test remains 15% (moved 5% from train to dev).",
+    "probe_query": "What is the revised percentage split between train and dev sets?"
+  },
+  {
+    "id": "R-NIAH-25",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "target_documents": [
+      "qasper_2003.03106.txt"
+    ],
+    "needles": [
+      {
+        "input": "PREMISE 1: The lab ordered 8 RTX 4090 GPUs for our deep learning cluster.",
+        "depth_ratio": 0.2,
+        "type": "reasoning"
+      },
+      {
+        "input": "PREMISE 2: 2 of the ordered GPUs were defective on arrival and returned for refund.",
+        "depth_ratio": 0.75,
+        "type": "reasoning"
+      }
+    ],
+    "expected_answer": "6 functional GPUs are available in the cluster (8 ordered minus 2 returned).",
+    "probe_query": "How many functional GPUs are currently available in our deep learning cluster?"
+  }
+]
