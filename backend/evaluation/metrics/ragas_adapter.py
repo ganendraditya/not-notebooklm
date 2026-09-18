@@ -58,6 +58,8 @@ async def evaluate_batch_with_ragas(
         "response": [r["answer"] for r in eval_records],
         "retrieved_contexts": [r["contexts"] for r in eval_records],
     }
+    if any(r.get("sample_id") for r in eval_records):
+        dataset_dict["sample_id"] = [r.get("sample_id", "") for r in eval_records]
     if any(r.get("ground_truth") for r in eval_records):
         dataset_dict["reference"] = [r.get("ground_truth", "") for r in eval_records]
 
@@ -88,6 +90,9 @@ async def evaluate_batch_with_ragas(
         scores = {}
         if hasattr(results, "to_pandas"):
             df = results.to_pandas()
+            s_ids = list(df["sample_id"]) if "sample_id" in df.columns else [r.get("sample_id", "") for r in eval_records]
+            q_texts = list(df["user_input"]) if "user_input" in df.columns else [r.get("question", "") for r in eval_records]
+
             for col, key in [
                 ("faithfulness", "ragas_faithfulness"),
                 ("answer_relevancy", "ragas_answer_relevancy"),
@@ -97,7 +102,10 @@ async def evaluate_batch_with_ragas(
                 if col in df.columns:
                     valid_vals = df[col].dropna()
                     scores[key] = round(float(valid_vals.mean()), 3) if not valid_vals.empty else 0.000
-                    scores[f"case_{col}"] = [round(float(v), 3) if not (v != v) else 0.000 for v in df[col]]
+                    c_vals = [round(float(v), 3) if not (v != v) else 0.000 for v in df[col]]
+                    scores[f"case_{col}"] = c_vals
+                    scores[f"case_{col}_by_id"] = {sid: val for sid, val in zip(s_ids, c_vals) if sid}
+                    scores[f"case_{col}_by_query"] = {q: val for q, val in zip(q_texts, c_vals) if q}
         else:
             for k in ["faithfulness", "answer_relevancy", "context_recall", "context_precision"]:
                 scores[f"ragas_{k}"] = round(float(results.get(k, 0.000)), 3)

@@ -551,7 +551,8 @@ async def main():
                 for cr in chk_data.get("cross_reports", []):
                     cached_cross_reports[cr["sample_id"]] = FrameworkScoreReport(**cr)
                 for rr in chk_data.get("ragas_records", []):
-                    cached_ragas_records[rr.get("question", "")] = rr
+                    key = rr.get("sample_id") or rr.get("question", "")
+                    cached_ragas_records[key] = rr
                 cached_ragas_scores = chk_data.get("ragas_scores")
             print(f"[Benchmark] Resuming from checkpoint with {len(cached_turn_results)} previously completed cases.")
         except Exception as e:
@@ -594,7 +595,9 @@ async def main():
                     results.append((i, res))
                     if cid in cached_cross_reports:
                         cross_reports.append((i, cached_cross_reports[cid]))
-                    if case["query"] in cached_ragas_records:
+                    if cid in cached_ragas_records:
+                        ragas_records.append(cached_ragas_records[cid])
+                    elif case["query"] in cached_ragas_records:
                         ragas_records.append(cached_ragas_records[case["query"]])
                 return
 
@@ -653,12 +656,13 @@ async def main():
                             if item[1].sample_id == cid:
                                 cross_reports.remove(item)
                         cross_reports.append((i, cf_report))
-                    if (args.include_ragas or args.cross_framework or args.fast) and cat in ("single_fact", "multi_comparative") and not case.get("unanswerable"):
+                    if (args.include_ragas or args.cross_framework or args.fast) and not case.get("unanswerable") and cat != "negative_unanswerable":
                         clean_ans = re.sub(r'<!--.*?-->', '', res.raw_response, flags=re.DOTALL).strip()
                         for rr in list(ragas_records):
-                            if rr.get("question") == case["query"]:
+                            if rr.get("sample_id") == cid or rr.get("question") == case["query"]:
                                 ragas_records.remove(rr)
                         ragas_records.append({
+                            "sample_id": cid,
                             "question": case["query"],
                             "answer": clean_ans or res.query,
                             "contexts": retrieved_chunks,
@@ -705,13 +709,28 @@ async def main():
 
     # Map per-case Ragas scores into cross_reports to calculate true multi-judge consensus
     if ragas_scores and final_cross_reports:
-        case_f = ragas_scores.get("case_faithfulness", [])
-        case_r = ragas_scores.get("case_relevancy", [])
+        case_f_by_id = ragas_scores.get("case_faithfulness_by_id", {})
+        case_f_by_q = ragas_scores.get("case_faithfulness_by_query", {})
+        case_r_by_id = ragas_scores.get("case_relevancy_by_id", {})
+        case_r_by_q = ragas_scores.get("case_relevancy_by_query", {})
+        legacy_f = ragas_scores.get("case_faithfulness", [])
+        legacy_r = ragas_scores.get("case_relevancy", [])
+
         for idx, rep in enumerate(final_cross_reports):
-            if idx < len(case_f):
-                rep.ragas_faithfulness = case_f[idx]
-            if idx < len(case_r):
-                rep.ragas_relevancy = case_r[idx]
+            # Match precisely by sample_id or query string, avoiding positional off-by-N shifts
+            f_val = case_f_by_id.get(rep.sample_id)
+            if f_val is None:
+                f_val = case_f_by_q.get(rep.query)
+            if f_val is None and not case_f_by_id and not case_f_by_q and idx < len(legacy_f):
+                f_val = legacy_f[idx]
+            rep.ragas_faithfulness = f_val
+
+            r_val = case_r_by_id.get(rep.sample_id)
+            if r_val is None:
+                r_val = case_r_by_q.get(rep.query)
+            if r_val is None and not case_r_by_id and not case_r_by_q and idx < len(legacy_r):
+                r_val = legacy_r[idx]
+            rep.ragas_relevancy = r_val
 
             # Pure Continuous Groundedness: DeepEval, TruLens, Promptfoo, Ragas (Excluding binary gatekeepers)
             faiths = [
