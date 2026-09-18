@@ -65,6 +65,9 @@ def get_doc_file_path(chat_id: str, filename: str) -> str:
         os.path.join(UPLOAD_DIR, f"None_{clean_fname}"),
         os.path.join(UPLOAD_DIR, raw_fname),
         os.path.join(UPLOAD_DIR, clean_fname),
+        # Benchmark evaluation papers path fallback
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "evaluation", "datasets", "qasper_papers", raw_fname)),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "evaluation", "datasets", "qasper_papers", clean_fname)),
     ]
 
     # Return first existing file that is an authentic binary PDF (>=1000 bytes)
