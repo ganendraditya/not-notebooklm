@@ -1,0 +1,4 @@
+# High-Temperature Superconductivity in Lanthanum Superhydrides under Megabar Pressures
+
+## Scientific Methodology & Experimental Findings
+Electrical resistance and magnetic susceptibility measurements in diamond anvil cells demonstrate that lanthanum superhydride (LaH10) enters a superconducting phase at critical temperatures (Tc) between 250 and 260 Kelvin under megabar pressures of 170 to 190 GPa (1.7 to 1.9 Megabars). The superconducting state is confirmed by a sharp drop in resistivity and the suppression of Tc under external magnetic fields.

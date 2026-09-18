@@ -1,0 +1,4 @@
+# Enterprise Data Processing Agreement - California Privacy Schedule
+
+## Authoritative Contractual Provisions
+Section 12.1 Compliance with California Consumer Privacy Act: The Company shall provide California residents with clear and conspicuous notice of their privacy rights under the CCPA, including the right to know, delete, and opt-out of the sale or sharing of personal information. The Service Provider certifies that it shall not retain, use, or disclose personal information for any purpose other than the specific business purpose specified in this Agreement.

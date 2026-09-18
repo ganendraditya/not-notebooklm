@@ -1,0 +1,14 @@
+# Altria Group Inc SEC 10-K (2016)
+
+## Management's Financial Discussion & Analysis
+Shareholder Return Performance Graph: The graph compares cumulative total return among Altria Group, Inc., the S&P 500 Index, and peer group indices assuming $100 invested on December 31, 2011 with reinvestment of all dividends.
+
+## Consolidated Balance Sheet and Notes
+| Year | Altria Cumulative Return | S&P 500 Index Return |
+| :--- | :--- | :--- |
+| 2011 | $ 100 | $ 100 |
+| 2012 | $ 115 | $ 116 |
+| 2013 | $ 138 | $ 153 |
+| 2014 | $ 178 | $ 174 |
+| 2015 | $ 225 | $ 177 |
+| 2016 | $ 268 | $ 198 |

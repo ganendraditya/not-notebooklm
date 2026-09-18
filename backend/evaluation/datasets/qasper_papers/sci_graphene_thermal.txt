@@ -1,0 +1,4 @@
+# Ballistic Acoustic Phonon Transport in Pristine Suspended Graphene
+
+## Scientific Methodology & Experimental Findings
+Micro-Raman optothermal thermometry reveals that suspended single-layer graphene possesses an extraordinary room-temperature thermal conductivity ranging between 3,000 and 5,000 W/m·K. This extreme thermal transport is dominated by long mean-free-path acoustic phonons (specifically the out-of-plane flexural ZA mode), exceeding the thermal conductivity of pyrolytic graphite.

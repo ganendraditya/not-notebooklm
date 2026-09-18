@@ -1,0 +1,13 @@
+# The Goldman Sachs Group Inc SEC 10-K (2015)
+
+## Management's Financial Discussion & Analysis
+Lease Commitments: The firm leases corporate office space, regional branches, and data computing facilities worldwide under operating lease agreements.
+
+## Consolidated Balance Sheet and Notes
+| Contractual Lease Commitments Due Period | Amount (in millions) | Proportion |
+| :--- | :--- | :--- |
+| 2016 (Next Fiscal Year) | $ 345 | 12.0% |
+| 2017 - 2018 | $ 650 | 22.6% |
+| 2019 - 2020 | $ 580 | 20.2% |
+| Thereafter | $ 1,300 | 45.2% |
+| Total Future Minimum Lease Commitments | $ 2,875 | 100.0% |

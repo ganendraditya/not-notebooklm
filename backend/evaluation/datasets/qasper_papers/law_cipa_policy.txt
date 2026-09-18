@@ -1,0 +1,4 @@
+# Educational Technology Service Agreement - Internet Safety Policy
+
+## Authoritative Contractual Provisions
+Section 5.4 CIPA Technological Protection Measures: The Company's internet safety policy, developed in strict compliance with the Children's Internet Protection Act (CIPA), shall implement technological protection measures (Internet filters) on all connected workstations to block or filter visual depictions that are obscene, child pornography, or harmful to minors.
