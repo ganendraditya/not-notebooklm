@@ -1,4 +1,0 @@
-# Molecular Passivation and Phase Stability in Perovskite Photovoltaics
-
-## Scientific Methodology & Experimental Findings
-Metal-halide perovskite solar cells often suffer from moisture-induced phase degradation and deep-level lead vacancy defects. Incorporating phenethylammonium iodide (PEAI) at the grain boundaries forms a hydrophobic quasi-2D capping layer that retards moisture penetration and passivates undercoordinated halide sites, yielding certified power conversion efficiencies (PCE) of 23.4% with 95% retention after 1,000 hours of continuous AM1.5G illumination.

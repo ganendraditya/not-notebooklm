@@ -1,4 +1,0 @@
-# Transient Work Function Gating: A New Photoemission Regime (arXiv:2006.01950)
-
-## Scientific Methodology & Experimental Findings
-Transient work function gating employs sub-picosecond infrared optical excitation to modulate surface dipole potentials in metallic photocathodes. By dynamically depressing the effective surface work function by up to 0.85 eV during photoemission, the quantum yield of ultraviolet electron emission is enhanced by more than an order of magnitude without thermal beam emittance degradation.

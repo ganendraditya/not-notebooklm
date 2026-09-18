@@ -1,4 +1,0 @@
-# Non-Equilibrium Work Relations and Free Energy Differences in Microscopic Systems
-
-## Scientific Methodology & Experimental Findings
-The Jarzynski equality, <exp(-beta * W)> = exp(-beta * Delta F), connects non-equilibrium work measurements (W) performed along arbitrary irreversible thermodynamic paths to equilibrium Helmholtz free energy differences (Delta F). Here beta = 1/(k_B * T), enabling exact thermodynamic free energy extraction from single-molecule pulling trajectories.

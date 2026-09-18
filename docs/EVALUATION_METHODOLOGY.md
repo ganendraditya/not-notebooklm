@@ -10,10 +10,10 @@ In traditional Machine Learning (ML), models are evaluated on numerical labels o
 To avoid subjective qualitative spot-checks ("eyeball engineering") and prevent **LLM Self-Preference Bias**, Not-NotebookLM establishes a formal **Dual-Track, Multi-Framework Scientific Evaluation Methodology**.
 
 ### Core Evaluation Invariants:
-1. **No Cherry-Picking**: Evaluation questions and document contexts are sourced sequentially from peer-reviewed scientific datasets (AllenAI QASPER, SciFact, Princeton ALCE) without manual curation of favorable cases.
+1. **No Cherry-Picking**: Evaluation questions and document contexts are sourced sequentially from peer-reviewed scientific datasets (AllenAI QASPER, AllenAI SciFact, Princeton ALCE) without manual curation of favorable cases.
 2. **Multi-Judge Consensus**: No single AI model or framework has absolute authority. Groundedness and Relevancy are audited concurrently across multiple industry-standard evaluation engines.
 3. **Strict Scale Separation**: Discrete binary (0/1) gatekeepers are segregated from continuous (0.000–1.000) metrics to avoid severe mathematical distortion.
-4. **Comprehensive Multi-Modal Benchmark Corpus**: Evaluates across three peer-reviewed experimental modalities: Single-Paper Deep Comprehension (25 cases, AllenAI QASPER), Multi-Paper Comparative Synthesis (15 cases, cross-document matrix review), and Biomedical Claim Verification (10 cases, AllenAI SciFact).
+4. **Comprehensive Academic Research Corpus**: Evaluates across a 75-case benchmark balancing four distinct academic modalities: Single-Paper Deep Comprehension (25 unique arXiv papers), Biomedical Claim Verification (25 unique PubMed papers), Multi-Paper Comparative Synthesis (15 workspaces with 2, 3, and 4 documents), and Negative Abstention Traps (10 unanswerable queries). All 50 underlying documents are unique with zero paper reuse.
 
 ---
 
@@ -133,18 +133,24 @@ When benchmark scores fall below target thresholds, optimization is executed sys
 
 ## 6. Dataset Topology & Scientific Modalities
 
-The 50-case benchmark (`--dataset full50`) rigorously balances three authentic, peer-reviewed scientific modalities:
+The 75-case benchmark (`--dataset full75` or `--dataset full50`) rigorously balances four authentic, peer-reviewed scientific modalities across 50 unique physical papers:
 
 ```text
-                       50-CASE SCIENTIFIC BENCHMARK
+                       75-CASE SCIENTIFIC BENCHMARK
                                      │
-     ┌───────────────────────────────┼───────────────────────────────┐
-     ▼                               ▼                               ▼
-[SINGLE-PAPER DEEP DIVE]    [MULTI-PAPER SYNTHESIS]      [BIOMEDICAL CLAIM AUDIT]
-• 25 Cases (QASPER Held-out) • 15 Cases (QASPER-MUL)      • 10 Cases (AllenAI SciFact)
-• 15–35 page arXiv papers   • 2–3 papers per workspace   • Real PubMed literature
-• Tables, metrics, limits   • Cross-doc matrix synthesis • True/False claim verification
+     ┌───────────────────┬───────────┴───────┬───────────────────┐
+     ▼                   ▼                   ▼                   ▼
+[SINGLE-PAPER DEEP]  [BIOMEDICAL AUDIT]  [MULTI-PAPER REVIEW]  [ABSTENTION TRAPS]
+• 25 Cases (QASPER)  • 25 Cases (SciFact)• 15 Cases (MUL)     • 10 Cases (Traps)
+• 25 Unique arXiv    • 25 Unique PubMed  • 2, 3, & 4 Papers  • Authentic Unans
+• Tables & methods   • Lab evidence NLI  • Matrix Synthesis  • Zero Hallucination
 ```
+
+### Modality Breakdown:
+1. **Single-Paper Deep Comprehension (25 Cases)**: 25 distinct full-text arXiv papers from AllenAI QASPER covering sequence labeling, NMT, entity linking, and speech.
+2. **Biomedical Scientific Fact-Checking (25 Cases)**: 25 distinct PubMed medical papers from AllenAI SciFact auditing claims against lab evidence (13 `SUPPORT`, 12 `CONTRADICT`).
+3. **Multi-Paper Comparative Synthesis (15 Cases)**: Workspaces varying across document volumes—9 cases with 2 papers, 4 cases with 3 papers, and 2 cases with 4 papers—verifying cross-paper matrix tables and isolated citation tags (`[1]`, `[2]`, `[3]`, `[4]`).
+4. **Negative Abstention & False Premises (10 Cases)**: Authentic unanswerable research inquiries from AllenAI annotators verifying that the system cleanly abstains rather than fabricating numbers.
 
 ### Production Quality Acceptance Criteria:
 1. **Consensus Groundedness**: $\ge 0.850$ (Continuous 4-Judge: DeepEval, TruLens, Promptfoo, Ragas)
@@ -158,7 +164,7 @@ The 50-case benchmark (`--dataset full50`) rigorously balances three authentic, 
 
 ## 7. The 3-Tier Evaluation Pyramid (Fast-Val vs. Supreme Court)
 
-Evaluating 50 academic research questions across 6 full frameworks requires **600+ asynchronous LLM API calls**, taking approximately **25 to 35 minutes** under `concurrency=2`.
+Evaluating 75 academic research questions across 6 full frameworks requires **700+ asynchronous LLM API calls**, taking approximately **30 to 40 minutes** under `concurrency=2`.
 
 Inspired by software engineering's classic Test Pyramid, Not-NotebookLM organizes evaluation into a **3-Tier Pyramid**:
 
@@ -168,12 +174,12 @@ Inspired by software engineering's classic Test Pyramid, Not-NotebookLM organize
                              / \      TIER 3: "Supreme Court" (All 6 Frameworks)
                             /   \     • DeepEval + TruLens + Promptfoo + Ragas + LlamaIndex + ALCE
                            /     \    • Frequency: Release snapshots & major pipeline changes
-                          /───────\   • Duration: ~25 to 35 Minutes
+                          /───────\   • Duration: ~30 to 40 Minutes
                          /         \
                         /           \  TIER 2: "Fast-Val Suite" (Promptfoo + Ragas + LlamaIndex)
                        /             \ • The Fast Consensus Triple (Dual-Judge + NLI + Gate)
                       /───────────────\• Frequency: Daily dev loop & prompt hill climbing
-                     /                 \• Duration: ~10 to 12 Minutes
+                     /                 \• Duration: ~12 to 15 Minutes
                     /                   \
                    /                     \ TIER 1: "Deterministic Smoke Test" (0 Tokens)
                   /                       \• IEEE Tag Syntax + Verbatim PDF Fuzzy Matching
@@ -195,17 +201,18 @@ Analysis of empirical benchmark data reveals the distinct behavioral archetypes 
 All benchmarks are run headlessly from the project root without launching browsers or frontend servers:
 
 ```bash
-# 1. Fast-Val Mode (~10 mins) for daily development & prompt hill climbing:
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split val --fast --concurrency 2
+# 1. 75-Case Comprehensive Scientific Benchmark (All 4 Modalities):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --cross-framework --concurrency 2
 
-# 2. Supreme Court Full 6-Framework Run (~30 mins) for official release snapshots:
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split test --cross-framework --concurrency 2
+# 2. Fast-Val Mode (~12 mins) across the 75-case suite:
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --fast --concurrency 2
 
-# 3. 50-Case Comprehensive Multi-Paper Benchmark:
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full50 --cross-framework --concurrency 2
+# 3. Subsystem Targeted Benchmarks:
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper_multi --cross-framework
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset scifact --cross-framework
 
 # 4. Fast smoke-test (first N cases):
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper --split val --limit 3 --fast
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --limit 3 --fast
 ```
 
 ---

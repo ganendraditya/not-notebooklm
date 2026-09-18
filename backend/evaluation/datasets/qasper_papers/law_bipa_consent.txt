@@ -1,4 +1,0 @@
-# Biometric Data Collection and Privacy Policy Addendum
-
-## Authoritative Contractual Provisions
-Section 4.1 Biometric Information Privacy Act Consent: In accordance with the Illinois Biometric Information Privacy Act (BIPA), the Company shall not collect, capture, or obtain biometric identifiers or biometric information unless it first informs the individual in writing of the specific purpose and duration for which the data is being collected, and receives a written release signed by the individual.

@@ -1,4 +1,0 @@
-# Quantum Optical Response of a Hybrid Optomechanical Device (arXiv:2006.04134)
-
-## Scientific Methodology & Experimental Findings
-We investigate the quantum optical response of a high-Q optical microcavity coupled to a mechanical membrane. Under strong blue-detuned pump fields, radiation pressure coupling creates destructive quantum interference, generating an optomechanically induced transparency (OMIT) window with a transmission dip exhibiting asymmetric Fano resonance linewidths below 12 kHz.

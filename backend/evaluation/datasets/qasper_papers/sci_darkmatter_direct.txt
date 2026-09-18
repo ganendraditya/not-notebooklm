@@ -1,4 +1,0 @@
-# Direct Detection Search for WIMP Dark Matter with Dual-Phase Xenon Detectors
-
-## Scientific Methodology & Experimental Findings
-Dual-phase liquid xenon time projection chambers search for weakly interacting massive particles (WIMPs) via nuclear recoil scintillation (S1) and ionization electroluminescence (S2) signals. Background rejection relies on the charge-to-light ratio (S2/S1), heavily shielding against cosmic ray muons and environmental radiogenic neutrons.

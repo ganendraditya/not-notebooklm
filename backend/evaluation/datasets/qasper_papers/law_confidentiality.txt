@@ -1,4 +1,0 @@
-# Bilateral Non-Disclosure and Proprietary Rights Agreement
-
-## Authoritative Contractual Provisions
-Section 3.1 Standard of Confidentiality: The parties acknowledge that, in the course of performing their obligations under this Agreement, each party may receive Confidential Information. The receiving party agrees to hold all proprietary trade secrets in strict confidence, prevent unauthorized disclosure, and exercise the same degree of care as it uses for its own confidential data of like nature, but in no event less than a reasonable standard of care.
