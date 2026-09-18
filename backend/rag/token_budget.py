@@ -412,16 +412,25 @@ def pack_text_into_token_budget(
 
 
 def extract_concise_history_digest(messages: List[LlamaChatMessage]) -> str:
-    """Extracts a concise extractive digest of messages for deterministic fallback summary."""
-    user_topics = []
+    """Extracts a high-level conceptual topic digest of evicted messages without verbatim directive leakage."""
+    topics = []
     for m in messages:
         if hasattr(m, "role") and m.role == MessageRole.USER:
             txt = str(m.content or "").strip().split("\n")[0]
             if txt and len(txt) > 5 and not txt.startswith("[Context"):
-                user_topics.append(txt[:80])
-    if user_topics:
-        # Keep up to 4 most distinct early topic queries
-        return "Earlier discussion topics covered: " + "; ".join(user_topics[:4]) + "."
+                # Abstract operational constraints and configurations conceptually
+                if re.match(r'^(?:constraint|parameter|rule|instruction|directive|threshold|setting|hardware|venue|collaborator|language|exclusion|cohort):', txt, re.I):
+                    topics.append("operational research constraints and workspace parameters")
+                else:
+                    # Clean analytical question topics
+                    clean_q = re.sub(r'^(?:what|which|how|why|is|are|can|do|does)\s+(?:is|are|the|about)?\s*', '', txt, re.I)
+                    clean_q = re.sub(r'[\?\.\!]', '', clean_q).strip()
+                    words = [w for w in clean_q.split() if len(w) > 3][:4]
+                    if words:
+                        topics.append(" ".join(words))
+    if topics:
+        deduped = list(dict.fromkeys(topics))[:3]
+        return "Earlier discussion covered: " + "; ".join(deduped) + "."
     return "Earlier dialogue covered preliminary research inquiries and introductory context."
 
 

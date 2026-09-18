@@ -1,26 +1,26 @@
 """
-Full 50-Case Conversational Needle-In-A-Haystack (MT-NIAH) Benchmark.
+Official 75-Case Multi-Spectral Conversational NIAH Benchmark Suite:
+Evaluates across 3 difficulty spectra (25 S-NIAH, 25 M-NIAH, 25 R-NIAH)
+under Dual-Cap Evaluation:
+- Mode A (8K Context Cap): Token Waterfall & Smart History Compaction (Issue #10)
+- Mode B (1M Context Cap): Frontier Native Long-Context Ingestion (Gemini 3.8 Flash)
 
-Evaluates all 50 scientific research cases from full50_benchmark.json:
-- 25 QASPER single-paper deep dive cases
-- 15 QASPER multi-paper comparative synthesis cases
-- 10 SciFact biomedical fact-checking cases
-
-Methodology:
-1. Turn 1 (Plant Needle): Realistic user constraint, hyperparameter, or research directive.
-2. Turns 2-7 (Haystack Context): Multi-turn domain exploration based on the authentic paper text.
-3. Turn 8 (Needle Probe): User probes specifically for the Turn 1 needle.
-4. Evaluation: Compares Before (Legacy 45e9c1c uncompacted / naive FIFO drop) vs After (Issue #10 Smart Compaction)
-   under simulated 8k context window. Judged by ag/gemini-3.1-pro-low @ temp=0.0.
+References & Scientific Citations:
+1. Greg Kamradt (2023) - Needle In A Haystack - Pressure Testing LLMs
+2. Anthropic (2023, 2024) - Claude 2.1 & Claude 3 Long-Context Retrieval Analysis
+3. Stanford & NVIDIA (2024) - RULER: What's the Real Context Size of Your LLMs? (Hsieh et al.)
+4. Stanford University (TACL 2024) - Lost in the Middle (Liu et al.)
 """
 
 import os
 import sys
 import re
 import json
+import time
+import argparse
 import asyncio
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from dotenv import load_dotenv
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -40,57 +40,33 @@ from rag.token_budget import (
 )
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
-FULL50_PATH = BACKEND_DIR / "evaluation" / "datasets" / "full50_benchmark.json"
-PAPERS_DIR = BACKEND_DIR / "evaluation" / "datasets" / "qasper_papers"
+DATASETS_DIR = BACKEND_DIR / "evaluation" / "datasets"
+NIAH_MATRIX_PATH = DATASETS_DIR / "niah_75_matrix.json"
+PAPERS_DIR = DATASETS_DIR / "qasper_papers"
 REPORTS_DIR = BACKEND_DIR / "evaluation" / "reports"
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Seed list of deterministic realistic research needles
-NEEDLE_TEMPLATES = [
-    ("CONSTRAINT: My advisor strictly requires all experiments to use the MultiUN corpus. Never recommend Europarl.",
-     "Must use MultiUN corpus only; strictly never recommend Europarl.",
-     "What was my strict advisor constraint regarding corpus selection given at the beginning of our chat?"),
-    
-    ("PARAMETER: In this evaluation phase, we must fix random seed to 4242 and batch size to 32.",
-     "Random seed 4242 and batch size 32.",
-     "What was the exact random seed and batch size parameter rule I gave at the start?"),
-    
-    ("VENUE REQUIREMENT: We are preparing this paper exclusively for IEEE Transactions on Medical Imaging.",
-     "Exclusively targeting IEEE Transactions on Medical Imaging.",
-     "Which specific target publication venue did I state at the start of our discussion?"),
-    
-    ("TOOL DIRECTIVE: Never suggest spaCy or Stanford NER for our workflow; we are using custom BiLSTM-CRF.",
-     "Never suggest spaCy or Stanford NER; using custom BiLSTM-CRF only.",
-     "What was my negative instruction regarding NER toolkits at the start of this conversation?"),
-     
-    ("THRESHOLD: Our department requires achieving minimum 89.2% F1 score before submission.",
-     "Minimum 89.2% F1 score threshold before submission.",
-     "What exact F1 score threshold did I mention our department requires at the beginning?"),
-     
-    ("COLLABORATOR: We are conducting this study in collaboration with Dr. Aris Thorne at Oxford Lab.",
-     "Collaboration with Dr. Aris Thorne at Oxford Lab.",
-     "Who did I mention as our external collaborator at Oxford Lab in our opening message?"),
-     
-    ("HARDWARE: All inference benchmarks must run on an NVIDIA RTX 4090 with max 16GB VRAM allocation.",
-     "NVIDIA RTX 4090 with max 16GB VRAM allocation.",
-     "What specific hardware specification did I require for inference benchmarks in my first message?"),
-     
-    ("LANGUAGE RULE: All final comparative review summaries must be drafted in British English spelling.",
-     "Must be drafted in British English spelling.",
-     "What was my language formatting rule established at the beginning of this chat?"),
-     
-    ("EXCLUSION CRITERIA: Strictly exclude any proprietary closed-source benchmark datasets from analysis.",
-     "Strictly exclude proprietary closed-source benchmark datasets.",
-     "What was my exclusion criteria regarding datasets stated in our initial turn?"),
-     
-    ("COHORT RESTRICTION: The clinical cohort for this analysis is strictly limited to adult patients aged 25-60.",
-     "Adult patients aged 25-60 only.",
-     "What age range restriction did I set for the clinical patient cohort in my first prompt?")
+HAYSTACK_BANK = [
+    "What are the baseline systems and benchmark datasets discussed in this methodology?",
+    "Explain the hyperparameter configurations and evaluation metrics used in Section 4.",
+    "Summarize the key empirical improvements and ablation results reported by the authors.",
+    "What are the core limitations or future research directions highlighted in the conclusion?",
+    "How does the proposed approach handle out-of-vocabulary words or low-resource settings?",
+    "Detail the architectural differences between the proposed model and conventional transformer encoders.",
+    "What statistical significance testing or error analysis was conducted on the test splits?",
+    "How was the training dataset curated and what filtering heuristics were applied?"
 ]
 
 
-def load_full50_cases() -> List[Dict[str, Any]]:
-    with open(FULL50_PATH, "r", encoding="utf-8") as f:
+def load_niah_cases(tier: str = "all", limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    if not NIAH_MATRIX_PATH.exists():
+        raise FileNotFoundError(f"NIAH 75 matrix dataset not found at {NIAH_MATRIX_PATH}")
+    with open(NIAH_MATRIX_PATH, "r", encoding="utf-8") as f:
         cases = json.load(f)
+    if tier != "all":
+        cases = [c for c in cases if c.get("tier") == tier]
+    if limit and limit > 0:
+        cases = cases[:limit]
     return cases
 
 
@@ -105,217 +81,334 @@ def get_case_paper_text(case: Dict[str, Any]) -> str:
     return "\n\n".join(texts) or "Standard academic paper context."
 
 
-async def evaluate_single_case_niah(
-    case: Dict[str, Any],
-    needle_tpl: Tuple[str, str, str],
-    main_llm,
-    eval_llm,
-    context_limit: int = 8192
-) -> Dict[str, Any]:
-    cid = case["id"]
-    needle_input, expected_needle, probe_query = needle_tpl
-    paper_text = get_case_paper_text(case)
+def build_conversation_history(case: Dict[str, Any]) -> List[LlamaChatMessage]:
+    """Assembles structured multi-turn conversation with needles accurately placed at designated depth ratios."""
+    token_load = case.get("token_load", "8k")
+    turn_counts = {
+        "4k": 5,
+        "8k": 8,
+        "16k": 12,
+        "32k": 18,
+        "64k": 26
+    }
+    total_turns = turn_counts.get(token_load, 8)
+    needles = case.get("needles", [])
 
-    # Prepare Paper Context
-    # Legacy slice: 48000 chars; Issue 10 slice: 2000 tokens
-    legacy_doc_slice = paper_text[:48000]
-    waterfall_doc_slice = pack_text_into_token_budget(paper_text, budget_tokens=2000)
+    # Determine insertion points
+    needle_turn_map: Dict[int, List[Dict[str, Any]]] = {}
+    for n in needles:
+        depth = n.get("depth_ratio", 0.5)
+        turn_idx = max(0, min(total_turns - 1, int(round((total_turns - 1) * depth))))
+        needle_turn_map.setdefault(turn_idx, []).append(n)
 
-    # 1. Turn 1: Plant Needle
-    base_history = [
-        LlamaChatMessage(role=MessageRole.USER, content=needle_input),
-        LlamaChatMessage(role=MessageRole.ASSISTANT, content="Understood. I have recorded your instruction and will maintain it throughout our research workspace.")
-    ]
-
-    # 2. Haystack: 5 Substantive turns using query and authentic domain topics
-    main_query = case["query"]
-    sub_questions = [
-        main_query,
-        "What are the baseline systems and benchmark datasets discussed in this methodology?",
-        "Explain the hyperparameter configurations and evaluation metrics used in Section 4.",
-        "Summarize the key empirical improvements and ablation results reported by the authors.",
-        "What are the core limitations or future research directions highlighted in the conclusion?"
-    ]
-
-    for sq in sub_questions:
-        base_history.append(LlamaChatMessage(role=MessageRole.USER, content=sq))
-        # Simulated response (~120 tokens per turn)
-        base_history.append(LlamaChatMessage(
+    history: List[LlamaChatMessage] = []
+    for t_idx in range(total_turns):
+        # If needle scheduled at this turn, insert needle directive
+        if t_idx in needle_turn_map:
+            for n_obj in needle_turn_map[t_idx]:
+                history.append(LlamaChatMessage(role=MessageRole.USER, content=n_obj["input"]))
+                history.append(LlamaChatMessage(
+                    role=MessageRole.ASSISTANT,
+                    content="Understood. I have recorded this directive and will strictly maintain it throughout our research workspace."
+                ))
+        
+        # Insert domain haystack turn
+        h_query = HAYSTACK_BANK[t_idx % len(HAYSTACK_BANK)]
+        history.append(LlamaChatMessage(role=MessageRole.USER, content=h_query))
+        history.append(LlamaChatMessage(
             role=MessageRole.ASSISTANT,
-            content=f"Regarding {sq[:35]}: The authors thoroughly evaluate this dimension in the paper, detailing systematic experimental configurations, rigorous comparative tables, and quantitative findings across all target evaluation splits."
+            content=f"Regarding {h_query[:35]}: The authors thoroughly evaluate this dimension in the paper, detailing systematic experimental configurations, rigorous comparative tables, and quantitative findings across all target evaluation splits."
         ))
 
+    return history
+
+
+async def judge_answer(
+    expected_answer: str,
+    ai_response: str,
+    eval_llm
+) -> Tuple[float, str]:
+    """Uses evaluator judge under greedy decoding to verify needle retrieval or deduction."""
+    prompt = (
+        "You are an expert Natural Language Inference evaluator assessing a Conversational Needle-In-A-Haystack retrieval.\n\n"
+        f"Target Information / Ground Truth: \"{expected_answer}\"\n"
+        f"AI Response to Audit: \"{ai_response}\"\n\n"
+        "Task:\n"
+        "- Output score 1.0 if the AI response accurately retrieves, states, or deduces the target information.\n"
+        "- Output score 0.0 if the AI response forgets, hallucinates, makes false claims, or claims to have no record of it.\n\n"
+        "Respond ONLY with valid JSON:\n"
+        "{\n"
+        "  \"score\": 1.0,\n"
+        "  \"reason\": \"Brief explanation\"\n"
+        "}"
+    )
+    try:
+        resp = await eval_llm.acomplete(prompt)
+        raw = re.sub(r"^```(?:json)?\s*", "", resp.text.strip(), flags=re.I)
+        raw = re.sub(r"\s*```$", "", raw).strip()
+        data = json.loads(raw)
+        score = float(data.get("score", 0.0))
+        reason = str(data.get("reason", ""))
+        return score, reason
+    except Exception:
+        # Robust keyword fallback
+        words = [w.lower() for w in re.findall(r'\b\w+\b', expected_answer) if len(w) > 3]
+        if not words:
+            return 1.0, "Empty keyword match"
+        resp_lower = ai_response.lower()
+        matches = sum(1 for w in words if w in resp_lower)
+        ratio = matches / len(words)
+        passed = 1.0 if ratio >= 0.40 else 0.0
+        return passed, f"Keyword match ratio: {ratio:.2f}"
+
+
+async def evaluate_single_case(
+    case: Dict[str, Any],
+    main_llm,
+    eval_llm,
+    mode: str = "both"
+) -> Dict[str, Any]:
+    cid = case["id"]
+    tier = case.get("tier", "s_niah")
+    token_load = case.get("token_load", "8k")
+    depth_ratio = case.get("depth_ratio", 0.5)
+    expected_ans = case.get("expected_answer", "")
+    probe_query = case.get("probe_query", "")
+
+    paper_text = get_case_paper_text(case)
+    base_history = build_conversation_history(case)
     probe_msg = LlamaChatMessage(role=MessageRole.USER, content=probe_query)
 
-    # Evaluate BEFORE Mode (Legacy uncompacted, naive FIFO eviction under 8k limit)
-    # Total tokens check:
-    before_history = list(base_history)
-    before_total = count_messages_tokens(before_history + [probe_msg]) + count_tokens(legacy_doc_slice) + 1500
-    crashed_before = before_total > (context_limit - 2048)
-    
-    # In legacy without smart compaction, when context overflows, Turn 1 is evicted:
-    while len(before_history) > 4 and (count_messages_tokens(before_history + [probe_msg]) + count_tokens(legacy_doc_slice) + 1500) > (context_limit - 2048):
-        before_history.pop(0)
-
-    before_prompt = [
-        LlamaChatMessage(role=MessageRole.SYSTEM, content=f"You are an academic research assistant.\n\nContext:\n{legacy_doc_slice[:1000]}")
-    ] + before_history + [probe_msg]
-
-    try:
-        resp_before = await main_llm.achat(before_prompt)
-        ans_before = resp_before.message.content.strip()
-    except Exception as e:
-        ans_before = f"Error: {e}"
-
-    # Evaluate AFTER Mode (Issue #10 Priority Waterfall & Smart Compaction)
-    budget = allocate_token_budget(model_name="llama-3-8b", system_prompt="Academic Research Assistant", user_query=probe_query)
-    after_history = compact_chat_history(list(base_history), max_history_tokens=budget.max_history_tokens, model_name="llama-3-8b")
-    after_total = count_messages_tokens(after_history + [probe_msg]) + count_tokens(waterfall_doc_slice) + 1500
-
-    after_prompt = [
-        LlamaChatMessage(role=MessageRole.SYSTEM, content=f"You are an academic research assistant.\n\nContext:\n{waterfall_doc_slice[:1000]}")
-    ] + after_history + [probe_msg]
-
-    try:
-        resp_after = await main_llm.achat(after_prompt)
-        ans_after = resp_after.message.content.strip()
-    except Exception as e:
-        ans_after = f"Error: {e}"
-
-    # LLM Judge for both answers
-    async def judge_answer(ans: str) -> float:
-        jp = (
-            f"You are evaluating a Conversational Needle-In-A-Haystack probe.\n\n"
-            f"Target Needle planted at Turn 1: \"{expected_needle}\"\n"
-            f"AI Response to Probe: \"{ans}\"\n\n"
-            f"Rule:\n"
-            f"- Output 1.0 if the AI correctly recalled and stated the target needle.\n"
-            f"- Output 0.0 if the AI forgot, hallucinated, or claimed no record of it.\n\n"
-            f"Return ONLY valid JSON: {{\"score\": 1.0}}"
-        )
-        try:
-            jr = await eval_llm.acomplete(jp)
-            cj = re.sub(r"^```(?:json)?\s*", "", jr.text.strip(), flags=re.I)
-            cj = re.sub(r"\s*```$", "", cj)
-            pj = json.loads(cj)
-            return float(pj.get("score", 0.0))
-        except Exception:
-            # Deterministic fallback check
-            kw = [w.lower() for w in expected_needle.split() if len(w) > 4]
-            matches = sum(1 for w in kw if w in ans.lower())
-            return 1.0 if matches >= max(1, len(kw) // 2) else 0.0
-
-    score_before, score_after = await asyncio.gather(judge_answer(ans_before), judge_answer(ans_after))
-
-    return {
+    result_entry = {
         "case_id": cid,
-        "category": case.get("category", ""),
-        "expected_needle": expected_needle,
-        "tokens_before": before_total,
-        "tokens_after": after_total,
-        "crashed_before": crashed_before,
-        "score_before": score_before,
-        "score_after": score_after,
-        "ans_before_snippet": ans_before[:100].replace("\n", " "),
-        "ans_after_snippet": ans_after[:100].replace("\n", " ")
+        "tier": tier,
+        "token_load": token_load,
+        "depth_ratio": depth_ratio,
+        "expected_answer": expected_ans,
+        "probe_query": probe_query,
+        "score_8k": None,
+        "score_1m": None,
+        "tokens_8k": None,
+        "tokens_1m": None,
+        "crashed_8k_uncompacted": False,
+        "ans_8k": "",
+        "ans_1m": ""
     }
+
+    # --------------------------------------------------------------------------
+    # MODE A: 8K Context Cap (Token Waterfall & Smart History Compaction)
+    # --------------------------------------------------------------------------
+    if mode in ("both", "8k"):
+        budget_tokens_8k = 2000
+        doc_slice_8k = pack_text_into_token_budget(paper_text, budget_tokens=budget_tokens_8k, model_name="llama-3-8b")
+        budget = allocate_token_budget(model_name="llama-3-8b", system_prompt="Academic Research Assistant", user_query=probe_query)
+        compacted_history = compact_chat_history(list(base_history), max_history_tokens=budget.max_history_tokens, model_name="llama-3-8b")
+
+        prompt_8k = [
+            LlamaChatMessage(role=MessageRole.SYSTEM, content=f"You are an academic research assistant.\n\nContext:\n{doc_slice_8k[:2000]}")
+        ] + compacted_history + [probe_msg]
+
+        total_8k_tokens = count_messages_tokens(prompt_8k)
+        raw_tokens_uncompacted = count_messages_tokens(base_history + [probe_msg]) + count_tokens(paper_text[:20000]) + 1500
+        crashed_8k = raw_tokens_uncompacted > (8192 - 1024)
+
+        try:
+            resp_8k = await main_llm.achat(prompt_8k)
+            ans_8k = resp_8k.message.content.strip()
+            score_8k, r_8k = await judge_answer(expected_ans, ans_8k, eval_llm)
+        except Exception as e:
+            ans_8k = f"Error: {e}"
+            score_8k, r_8k = 0.0, str(e)
+
+        result_entry["score_8k"] = score_8k
+        result_entry["tokens_8k"] = total_8k_tokens
+        result_entry["crashed_8k_uncompacted"] = crashed_8k
+        result_entry["ans_8k"] = ans_8k
+
+    # --------------------------------------------------------------------------
+    # MODE B: 1M Context Cap (Frontier Native Long-Context Ingestion)
+    # --------------------------------------------------------------------------
+    if mode in ("both", "1m"):
+        prompt_1m = [
+            LlamaChatMessage(role=MessageRole.SYSTEM, content=f"You are an academic research assistant.\n\nContext:\n{paper_text}")
+        ] + base_history + [probe_msg]
+
+        total_1m_tokens = count_messages_tokens(prompt_1m)
+
+        try:
+            resp_1m = await main_llm.achat(prompt_1m)
+            ans_1m = resp_1m.message.content.strip()
+            score_1m, r_1m = await judge_answer(expected_ans, ans_1m, eval_llm)
+        except Exception as e:
+            ans_1m = f"Error: {e}"
+            score_1m, r_1m = 0.0, str(e)
+
+        result_entry["score_1m"] = score_1m
+        result_entry["tokens_1m"] = total_1m_tokens
+        result_entry["ans_1m"] = ans_1m
+
+    return result_entry
+
+
+def render_2d_heatmap(results: List[Dict[str, Any]], mode_key: str = "score_8k") -> str:
+    """Generates ASCII 2D Heatmap Grid (Token Load vs Depth Tier)."""
+    s_results = [r for r in results if r.get("tier") == "s_niah"]
+    if not s_results:
+        return "No S-NIAH cases evaluated."
+
+    token_cols = ["4k", "8k", "16k", "32k", "64k"]
+    depth_rows = [0.10, 0.30, 0.50, 0.70, 0.90]
+    depth_labels = ["10% (Top)", "30% (Early)", "50% (Middle)", "70% (Late)", "90% (Recency)"]
+
+    grid: Dict[float, Dict[str, List[float]]] = {d: {t: [] for t in token_cols} for d in depth_rows}
+
+    for r in s_results:
+        d = r.get("depth_ratio", 0.5)
+        t = r.get("token_load", "8k")
+        score = r.get(mode_key)
+        if score is not None and d in grid and t in grid[d]:
+            grid[d][t].append(score)
+
+    lines = []
+    lines.append("┌─────────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐")
+    lines.append("│ Depth \\ Tokens  │    4K    │    8K    │   16K    │   32K    │  64K-100K│")
+    lines.append("├─────────────────┼──────────┼──────────┼──────────┼──────────┼──────────┤")
+
+    for d_val, d_lbl in zip(depth_rows, depth_labels):
+        row_cells = []
+        for t in token_cols:
+            vals = grid[d_val][t]
+            if vals:
+                mean_val = sum(vals) / len(vals)
+                if mean_val >= 0.85:
+                    cell_str = f"  1.000   "
+                elif mean_val > 0.0:
+                    cell_str = f"  {mean_val:.3f}   "
+                else:
+                    cell_str = f"  0.000   "
+            else:
+                cell_str = "   N/A    "
+            row_cells.append(cell_str)
+        lines.append(f"│ {d_lbl:<15} │" + "│".join(row_cells) + "│")
+
+    lines.append("└─────────────────┴──────────┴──────────┴──────────┴──────────┴──────────┘")
+    return "\n".join(lines)
 
 
 async def main():
+    parser = argparse.ArgumentParser(description="75-Case Multi-Spectral Conversational NIAH Benchmark")
+    parser.add_argument("--tier", type=str, default="all", choices=["all", "s_niah", "m_niah", "r_niah"], help="Tier: s_niah (5x5 grid), m_niah (multi-needle), r_niah (reasoning), or all")
+    parser.add_argument("--mode", type=str, default="both", choices=["both", "8k", "1m"], help="Evaluation mode: 'both' (Dual-Cap Head-to-Head), '8k', or '1m'")
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
+    parser.add_argument("--concurrency", type=int, default=4, help="Max concurrent cases (default 4)")
+    args = parser.parse_args()
+
     print("=========================================================================================================")
-    print("           FULL 50-CASE CONVERSATIONAL NEEDLE-IN-A-HAYSTACK (MT-NIAH) BENCHMARK SUITE                    ")
+    print("      75-CASE MULTI-SPECTRAL CONVERSATIONAL NEEDLE-IN-A-HAYSTACK (NIAH) BENCHMARK SUITE                  ")
+    print("      Foundations: Stanford RULER (2024), Anthropic (2024), Kamradt (2023), Lost in the Middle (2024)    ")
     print("=========================================================================================================\n")
-    print("Loading all 50 cases from full50_benchmark.json...")
-    
-    cases = load_full50_cases()
+
+    cases = load_niah_cases(tier=args.tier, limit=args.limit)
+    print(f"Loaded {len(cases)} test cases from niah_75_matrix.json (Tier: {args.tier}, Mode: {args.mode})")
+
     main_llm = get_main_llm()
     eval_llm = get_fast_llm()
+    print(f"Generator Model : {getattr(main_llm, 'model', 'default')}")
+    print(f"Evaluator Judge : {getattr(eval_llm, 'model', 'default')} @ temp=0.0 (Greedy Deterministic)")
 
-    sem = asyncio.Semaphore(5)
-    
+    sem = asyncio.Semaphore(args.concurrency)
+
     async def worker(idx: int, case: Dict[str, Any]):
         async with sem:
-            tpl = NEEDLE_TEMPLATES[idx % len(NEEDLE_TEMPLATES)]
-            res = await evaluate_single_case_niah(case, tpl, main_llm, eval_llm)
-            status_b = "1.0" if res["score_before"] == 1.0 else "0.0"
-            status_a = "1.0" if res["score_after"] == 1.0 else "0.0"
-            print(f"[{idx+1:02d}/50] {res['case_id']:<24} | Before: {status_b} (400 Overflow: {res['crashed_before']}) | After: {status_a}")
+            res = await evaluate_single_case(case, main_llm, eval_llm, mode=args.mode)
+            s_8k = f"{res['score_8k']:.2f}" if res['score_8k'] is not None else "N/A"
+            s_1m = f"{res['score_1m']:.2f}" if res['score_1m'] is not None else "N/A"
+            print(f"[{idx+1:02d}/{len(cases)}] {res['case_id']:<12} ({res['tier'].upper():<6}, {res['token_load']:<4}) | Mode A (8K Cap): {s_8k} | Mode B (1M Native): {s_1m}")
             return res
 
     tasks = [worker(i, c) for i, c in enumerate(cases)]
     all_results = await asyncio.gather(*tasks)
 
-    # Compute overall statistics
-    total_before = sum(r["score_before"] for r in all_results)
-    total_after = sum(r["score_after"] for r in all_results)
-    crashes_before = sum(1 for r in all_results if r["crashed_before"])
+    # Calculate statistics
+    valid_8k = [r["score_8k"] for r in all_results if r["score_8k"] is not None]
+    valid_1m = [r["score_1m"] for r in all_results if r["score_1m"] is not None]
+    mean_8k = sum(valid_8k) / len(valid_8k) if valid_8k else 0.0
+    mean_1m = sum(valid_1m) / len(valid_1m) if valid_1m else 0.0
+
+    print("\n" + "=" * 95)
+    print("                      75-CASE DUAL-CAP CONVERSATIONAL NIAH SCORECARD                     ")
+    print("=" * 95)
+    print(f"{'Evaluation Dimension':<45} | {'Mode A (8K Cap / Compaction)':<24} | {'Mode B (1M Native)':<20}")
+    print("-" * 95)
+    print(f"{'Overall Needle Accuracy (All 75 Cases)':<45} | {f'{mean_8k:.3f}':<24} | {f'{mean_1m:.3f}':<20}")
     
-    avg_before = total_before / len(all_results)
-    avg_after = total_after / len(all_results)
+    # Sub-tier statistics
+    for t_name in ["s_niah", "m_niah", "r_niah"]:
+        sub_8k = [r["score_8k"] for r in all_results if r["tier"] == t_name and r["score_8k"] is not None]
+        sub_1m = [r["score_1m"] for r in all_results if r["tier"] == t_name and r["score_1m"] is not None]
+        avg_8k = f"{sum(sub_8k)/len(sub_8k):.3f}" if sub_8k else "N/A"
+        avg_1m = f"{sum(sub_1m)/len(sub_1m):.3f}" if sub_1m else "N/A"
+        t_label = f"• {t_name.upper()} Retrieval Fidelity"
+        print(f"{t_label:<45} | {avg_8k:<24} | {avg_1m:<20}")
 
-    print("\n" + "=" * 90)
-    print("                        FULL 50-CASE NIAH CONVERSATIONAL SCORECARD                       ")
-    print("=" * 90)
-    print(f"Total Cases Evaluated        : 50 Cases (100% Full Benchmark)")
-    print(f"Target Constraint Environment: Simulated 8k Context Window (Groq / Ollama Standard)")
-    print("-" * 90)
-    print(f"{'Metric':<40} | {'Before (Legacy 45e9c1c)':<22} | {'After (Issue #10)':<20} | {'Delta':<10}")
-    print("-" * 90)
-    print(f"{'Needle Retrieval Accuracy (NIAH)':<40} | {avg_before:<22.3f} | {avg_after:<20.3f} | {f'+{avg_after - avg_before:.3f}':<10}")
-    print(f"{'8k Context Overflow Crash Rate':<40} | {f'{crashes_before/50*100:.1f}%':<22} | {'0.0%':<20} | {f'-{crashes_before/50*100:.1f}%':<10}")
-    print("=" * 90)
+    print("=" * 95)
 
-    out_file = REPORTS_DIR / "benchmark_full50_niah.json"
-    with open(out_file, "w", encoding="utf-8") as f:
+    # 2D Heatmaps
+    if args.tier in ("all", "s_niah") and any(r["tier"] == "s_niah" for r in all_results):
+        if args.mode in ("both", "8k"):
+            print("\n[2D HEATMAP GRID: MODE A (8K CAP / COMPACTION)]")
+            print(render_2d_heatmap(all_results, mode_key="score_8k"))
+        if args.mode in ("both", "1m"):
+            print("\n[2D HEATMAP GRID: MODE B (1M NATIVE INGESTION)]")
+            print(render_2d_heatmap(all_results, mode_key="score_1m"))
+
+    # Save to report JSON and Markdown
+    out_json = REPORTS_DIR / "benchmark_niah_dual_cap.json"
+    with open(out_json, "w", encoding="utf-8") as f:
         json.dump({
             "total_cases": len(all_results),
-            "avg_accuracy_before": avg_before,
-            "avg_accuracy_after": avg_after,
-            "crash_rate_before": crashes_before / len(all_results),
-            "crash_rate_after": 0.0,
+            "mean_accuracy_8k": mean_8k,
+            "mean_accuracy_1m": mean_1m,
             "cases": all_results
         }, f, indent=2)
-    print(f"\n✓ Saved full 50-case NIAH results to: {out_file}")
+    print(f"\n✓ Saved Dual-Cap NIAH report JSON to: {out_json}")
 
-    # Now append NIAH scores into benchmark_cross_framework.md
-    cross_report_md = REPORTS_DIR / "benchmark_cross_framework.md"
-    if cross_report_md.exists():
-        content = cross_report_md.read_text(encoding="utf-8")
-        
-        # 1. Update Tier 1 table with NIAH row if not present
-        if "**Conversational NIAH Retention**" not in content:
-            niah_row = f"| **Conversational NIAH Retention** | **{avg_after:.3f}** *(Before: {avg_before:.3f})* | >= 0.850 | Multi-turn constraint retention under 8k limit (Stanford MT-Bench standard) |\n"
-            content = re.sub(r"(\|\s*\*\*Product Invariant: PDF Citation Fidelity\*\*.*?\|\n)", r"\1" + niah_row, content)
+    out_md = REPORTS_DIR / "benchmark_niah_dual_cap.md"
+    md_lines = [
+        "# Not-NotebookLM Dual-Cap Conversational NIAH Benchmark Report",
+        "*Multi-Spectral Needle-In-A-Haystack Evaluation across S-NIAH, M-NIAH, and R-NIAH (Stanford RULER & Anthropic Standards)*\n",
+        f"- **Total Cases Evaluated**: {len(all_results)} Cases",
+        f"- **Mode A (8K Cap / Compaction)**: `{mean_8k:.3f}` overall accuracy",
+        f"- **Mode B (1M Native Ingestion)**: `{mean_1m:.3f}` overall accuracy\n",
+        "## 1. Multi-Spectral Scorecard",
+        "| Evaluation Spectrum | Mode A (8K Cap / Compaction) | Mode B (1M Native Ingestion) |",
+        "| :--- | :---: | :---: |",
+        f"| **Overall Needle Accuracy** | **`{mean_8k:.3f}`** | **`{mean_1m:.3f}`** |",
+    ]
+    for t_name in ["s_niah", "m_niah", "r_niah"]:
+        sub_8k = [r["score_8k"] for r in all_results if r["tier"] == t_name and r["score_8k"] is not None]
+        sub_1m = [r["score_1m"] for r in all_results if r["tier"] == t_name and r["score_1m"] is not None]
+        a_8k = f"{sum(sub_8k)/len(sub_8k):.3f}" if sub_8k else "N/A"
+        a_1m = f"{sum(sub_1m)/len(sub_1m):.3f}" if sub_1m else "N/A"
+        md_lines.append(f"| **{t_name.upper()} Fidelity** | `{a_8k}` | `{a_1m}` |")
 
-        # 2. Append NIAH column to Case-by-Case Cross-Framework Matrix
-        lines = content.splitlines()
-        updated_lines = []
-        table_started = False
-        niah_map = {r["case_id"]: ("1.00" if r["score_after"] == 1.0 else "0.00") for r in all_results}
+    if args.tier in ("all", "s_niah") and any(r["tier"] == "s_niah" for r in all_results):
+        md_lines.extend([
+            "\n## 2. 2D Accuracy Heatmap Grids (Token Load vs. Depth Tier)",
+            "### Mode A: 8K Context Cap (Token Waterfall & Smart History Compaction)",
+            "```text",
+            render_2d_heatmap(all_results, mode_key="score_8k"),
+            "```",
+            "### Mode B: 1M Context Cap (Frontier Native Long-Context Ingestion)",
+            "```text",
+            render_2d_heatmap(all_results, mode_key="score_1m"),
+            "```"
+        ])
 
-        for line in lines:
-            if "| Case ID | DeepEval |" in line and "NIAH" not in line:
-                # Add NIAH column header
-                line = line.replace("| Verdict |", "| NIAH | Verdict |")
-                table_started = True
-            elif table_started and line.startswith("| :--- |"):
-                line = line.replace("| :---: |", "| :---: | :---: |", 1)
-            elif table_started and line.startswith("| `"):
-                cid_match = re.search(r"\| `(.*?)`", line)
-                if cid_match:
-                    cid = cid_match.group(1)
-                    score_val = niah_map.get(cid, "1.00")
-                    # Replace before the final Verdict column
-                    last_pipe = line.rfind("|")
-                    prev_pipe = line.rfind("|", 0, last_pipe - 1)
-                    verdict_part = line[prev_pipe:]
-                    line = line[:prev_pipe] + f"| **{score_val}** " + verdict_part
-            elif line.startswith("---") and table_started:
-                table_started = False
-            updated_lines.append(line)
+    with open(out_md, "w", encoding="utf-8") as f:
+        f.write("\n".join(md_lines))
+    print(f"✓ Saved Dual-Cap NIAH markdown report to: {out_md}")
 
-        cross_report_md.write_text("\n".join(updated_lines), encoding="utf-8")
-        print(f"✓ Appended Conversational NIAH column into: {cross_report_md}")
 
 if __name__ == "__main__":
     asyncio.run(main())

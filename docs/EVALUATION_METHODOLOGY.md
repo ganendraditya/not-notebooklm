@@ -213,6 +213,9 @@ PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py -
 
 # 4. Fast smoke-test (first N cases):
 PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --limit 3 --fast
+
+# 5. 75-Case Multi-Spectral Dual-Cap NIAH Benchmark (S-, M-, & R-NIAH):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/eval_full50_niah.py --mode both --concurrency 4
 ```
 
 ---
@@ -222,6 +225,7 @@ PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py -
 Every benchmark run produces persistent, timestamped reports:
 - `backend/evaluation/reports/benchmark_cross_framework.md`: Comprehensive two-tier report comparing DeepEval, TruLens, Promptfoo, Ragas, LlamaIndex, and ALCE.
 - `backend/evaluation/reports/benchmark_latest.md`: Standard single-track scorecard.
+- `backend/evaluation/reports/benchmark_niah_dual_cap.md`: Dual-Cap 75-case NIAH scorecard and 2D accuracy heatmap grids.
 
 ---
 
