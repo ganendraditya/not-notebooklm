@@ -61,6 +61,7 @@ class ChatSession(Base):
     
     documents = relationship("Document", back_populates="chat_session")
     messages = relationship("ChatMessage", back_populates="chat_session", order_by="ChatMessage.created_at")
+    research_profiles = relationship("ResearchProfile", back_populates="chat_session", order_by="ResearchProfile.created_at")
 
 class Document(Base):
     __tablename__ = "documents"
@@ -114,6 +115,19 @@ class CitationHighlight(Base):
     claim = Column(Text)
     passages_json = Column(Text) # JSON-serialized list of verbatim string quotes
     created_at = Column(DateTime, default=get_utc_now)
+
+class ResearchProfile(Base):
+    __tablename__ = "research_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(String, ForeignKey("chat_sessions.id"), index=True)
+    category = Column(String(50), default="constraint", index=True) # constraint, objective, methodology, hardware, venue
+    fact_text = Column(Text, nullable=False)
+    is_active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=get_utc_now)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
+
+    chat_session = relationship("ChatSession", back_populates="research_profiles")
 
 Base.metadata.create_all(bind=engine)
 
@@ -184,6 +198,20 @@ def auto_migrate_schema():
                 )
             """))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_citation_highlights_lookup ON citation_highlights (chat_id, doc_id, claim_hash)"))
+
+            # ResearchProfiles table & indexes for declarative long-term memory
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS research_profiles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    chat_id VARCHAR,
+                    category VARCHAR(50) DEFAULT 'constraint',
+                    fact_text TEXT NOT NULL,
+                    is_active BOOLEAN DEFAULT 1,
+                    created_at DATETIME,
+                    updated_at DATETIME
+                )
+            """))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_research_profiles_chat_active ON research_profiles (chat_id, is_active)"))
 
     except Exception as e:
         logger.warning(f"[DB Migration Warning]: {e}")
