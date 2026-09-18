@@ -281,10 +281,26 @@ async def handle_workspace_analysis_pipeline(
             if isinstance(raw_mn, str):
                 model_name = raw_mn
 
-    base_system_prompt = get_workspace_analysis_system_prompt(total_doc_count)
+    # Base system prompt augmented with active declarative research profile facts from SQLite (Issue #11)
+    system_prompt_text = get_workspace_analysis_system_prompt(total_doc_count)
+    try:
+        from services.memory_service import get_active_profile_facts, format_profile_for_prompt
+        profile_db = SessionLocal()
+        try:
+            active_facts = get_active_profile_facts(profile_db, chat_id, max_tokens=250)
+            if active_facts:
+                profile_block = format_profile_for_prompt(active_facts)
+                if profile_block:
+                    system_prompt_text = f"{system_prompt_text}\n\n{profile_block}"
+        finally:
+            profile_db.close()
+    except Exception as mem_err:
+        logger.debug(f"[Workspace Pipeline] Profile memory injection skipped: {mem_err}")
+
+    # Allocate token budget accurately with full augmented system prompt
     token_budget = allocate_token_budget(
         model_name=model_name,
-        system_prompt=base_system_prompt,
+        system_prompt=system_prompt_text,
         user_query=query,
     )
 
@@ -317,8 +333,6 @@ async def handle_workspace_analysis_pipeline(
             max_rag_tokens=token_budget.max_rag_tokens,
             model_name=model_name
         )
-    
-    system_prompt_text = get_workspace_analysis_system_prompt(total_doc_count)
 
     system_msg = LlamaChatMessage(
         role=MessageRole.SYSTEM,
