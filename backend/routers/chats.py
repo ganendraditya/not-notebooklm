@@ -290,10 +290,16 @@ def update_chat_research_fact(chat_id: str, fact_id: int, req: models.UpdateFact
 
     if req.is_active is not None:
         fact.is_active = req.is_active
-    if req.fact_text is not None and len(req.fact_text.strip()) >= 3:
-        fact.fact_text = req.fact_text.strip()[:250]
+    if req.fact_text is not None:
+        clean_text = req.fact_text.strip()
+        if len(clean_text) < 5:
+            raise HTTPException(status_code=400, detail="Fact text must be at least 5 characters")
+        fact.fact_text = clean_text[:250]
     if req.category is not None:
-        fact.category = req.category.strip().lower()[:50]
+        clean_cat = req.category.strip().lower()
+        if not clean_cat:
+            raise HTTPException(status_code=400, detail="Category cannot be empty")
+        fact.category = clean_cat[:50]
 
     fact.updated_at = get_utc_now()
     commit_with_retry(db)

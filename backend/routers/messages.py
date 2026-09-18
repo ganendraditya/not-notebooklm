@@ -211,6 +211,23 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
         )
         save_stream_assistant_response(chat_id, resp_text)
 
+        # Asynchronous background memory extraction & contradiction reconciliation on edited turn (Issue #11)
+        try:
+            async def run_bg_edit_memory():
+                from database import SessionLocal
+                edit_db = SessionLocal()
+                try:
+                    from services.memory_service import extract_and_reconcile_research_memory
+                    await extract_and_reconcile_research_memory(chat_id, req.message, edit_db, resp_text)
+                except Exception as m_err:
+                    logger.debug(f"[Memory Extraction Edit Background Task Error]: {m_err}")
+                finally:
+                    edit_db.close()
+
+            asyncio.create_task(run_bg_edit_memory())
+        except Exception:
+            pass
+
         await emitter.emit_done(
             final_text=resp_text,
             message_payload={
@@ -302,21 +319,20 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
                 except Exception:
                     pass
 
-                # Asynchronous background memory extraction & contradiction reconciliation on edited turn (Issue #11)
+                # Asynchronous background memory extraction & contradiction reconciliation on regenerated turn (Issue #11)
                 try:
-                    async def run_bg_edit_memory():
+                    async def run_bg_regenerate_memory():
                         from database import SessionLocal
-                        edit_db = SessionLocal()
+                        regen_db = SessionLocal()
                         try:
                             from services.memory_service import extract_and_reconcile_research_memory
-                            user_q = req.message or (all_msgs[target_idx].content if target_idx < len(all_msgs) else "")
-                            await extract_and_reconcile_research_memory(chat_id, user_q, edit_db, resp_text)
+                            await extract_and_reconcile_research_memory(chat_id, user_prompt, regen_db, resp_text)
                         except Exception as m_err:
-                            logger.debug(f"[Memory Extraction Edit Background Task Error]: {m_err}")
+                            logger.debug(f"[Memory Extraction Regenerate Background Task Error]: {m_err}")
                         finally:
-                            edit_db.close()
+                            regen_db.close()
 
-                    asyncio.create_task(run_bg_edit_memory())
+                    asyncio.create_task(run_bg_regenerate_memory())
                 except Exception:
                     pass
                 
