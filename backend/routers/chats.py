@@ -223,3 +223,98 @@ async def upload_chat_media(chat_id: str, file: UploadFile = File(...)):
             "chat_only": is_storage_full
         }
     }
+
+
+# ==============================================================================
+# Research Profile Memory Endpoints (Issue #11)
+# ==============================================================================
+
+@router.get("/chats/{chat_id}/profile")
+def get_chat_research_profile(chat_id: str, db: Session = Depends(get_db)):
+    """Retrieves all declarative research profile facts stored for a chat session."""
+    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    from database import ResearchProfile
+    facts = (
+        db.query(ResearchProfile)
+        .filter(ResearchProfile.chat_id == chat_id)
+        .order_by(ResearchProfile.created_at.asc())
+        .all()
+    )
+    return [
+        {
+            "id": f.id,
+            "chat_id": f.chat_id,
+            "category": f.category,
+            "fact_text": f.fact_text,
+            "is_active": f.is_active,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+            "updated_at": f.updated_at.isoformat() if f.updated_at else None,
+        }
+        for f in facts
+    ]
+
+
+@router.post("/chats/{chat_id}/profile")
+def create_chat_research_fact(chat_id: str, req: models.CreateFactRequest, db: Session = Depends(get_db)):
+    """Manually records a declarative research fact or constraint for a workspace."""
+    chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    from services.memory_service import add_profile_fact
+    new_fact = add_profile_fact(db, chat_id, req.fact_text, category=req.category or "constraint")
+    if not new_fact:
+        raise HTTPException(status_code=400, detail="Failed to create research fact")
+
+    return {
+        "id": new_fact.id,
+        "chat_id": new_fact.chat_id,
+        "category": new_fact.category,
+        "fact_text": new_fact.fact_text,
+        "is_active": new_fact.is_active,
+        "created_at": new_fact.created_at.isoformat() if new_fact.created_at else None,
+        "updated_at": new_fact.updated_at.isoformat() if new_fact.updated_at else None,
+    }
+
+
+@router.patch("/chats/{chat_id}/profile/{fact_id}")
+def update_chat_research_fact(chat_id: str, fact_id: int, req: models.UpdateFactRequest, db: Session = Depends(get_db)):
+    """Toggles fact activation (is_active) or edits fact content."""
+    from database import ResearchProfile, commit_with_retry
+    fact = db.query(ResearchProfile).filter(ResearchProfile.id == fact_id, ResearchProfile.chat_id == chat_id).first()
+    if not fact:
+        raise HTTPException(status_code=404, detail="Research fact not found")
+
+    if req.is_active is not None:
+        fact.is_active = req.is_active
+    if req.fact_text is not None and len(req.fact_text.strip()) >= 3:
+        fact.fact_text = req.fact_text.strip()[:250]
+    if req.category is not None:
+        fact.category = req.category.strip().lower()[:50]
+
+    fact.updated_at = get_utc_now()
+    commit_with_retry(db)
+
+    return {
+        "id": fact.id,
+        "chat_id": fact.chat_id,
+        "category": fact.category,
+        "fact_text": fact.fact_text,
+        "is_active": fact.is_active,
+        "created_at": fact.created_at.isoformat() if fact.created_at else None,
+        "updated_at": fact.updated_at.isoformat() if fact.updated_at else None,
+    }
+
+
+@router.delete("/chats/{chat_id}/profile/{fact_id}")
+def delete_chat_research_fact(chat_id: str, fact_id: int, db: Session = Depends(get_db)):
+    """Permanently deletes a research fact record."""
+    from services.memory_service import delete_profile_fact
+    success = delete_profile_fact(db, fact_id, chat_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Research fact not found")
+    return {"status": "success", "deleted_id": fact_id}
+
