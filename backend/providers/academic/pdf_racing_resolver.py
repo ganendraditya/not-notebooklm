@@ -181,6 +181,8 @@ def resolve_and_fetch_authentic_pdf(
     lock = threading.Lock()
 
     def set_winner(data: Optional[bytes]):
+        if stop_event.is_set():
+            return
         if not data or not is_authentic_pdf_bytes(data, min_size=1000):
             return
         if title and not verify_pdf_title_match(data, title):
@@ -192,34 +194,52 @@ def resolve_and_fetch_authentic_pdf(
                 stop_event.set()
 
     def worker_arxiv():
-        if stop_event.is_set(): return
-        data = resolve_arxiv_pdf(clean_doi, title, direct_url, candidate_pdf_url)
-        if data: set_winner(data)
+        try:
+            if stop_event.is_set(): return
+            data = resolve_arxiv_pdf(clean_doi, title, direct_url, candidate_pdf_url)
+            if data and not stop_event.is_set(): set_winner(data)
+        except Exception as e:
+            logger.debug(f"[Worker Arxiv Notice]: {e}")
 
     def worker_unpaywall():
-        if stop_event.is_set() or not clean_doi: return
-        data = resolve_unpaywall_pdf(clean_doi)
-        if data: set_winner(data)
+        try:
+            if stop_event.is_set() or not clean_doi: return
+            data = resolve_unpaywall_pdf(clean_doi)
+            if data and not stop_event.is_set(): set_winner(data)
+        except Exception as e:
+            logger.debug(f"[Worker Unpaywall Notice]: {e}")
 
     def worker_openalex():
-        if stop_event.is_set() or not clean_doi: return
-        data = resolve_openalex_pdf(clean_doi)
-        if data: set_winner(data)
+        try:
+            if stop_event.is_set() or not clean_doi: return
+            data = resolve_openalex_pdf(clean_doi)
+            if data and not stop_event.is_set(): set_winner(data)
+        except Exception as e:
+            logger.debug(f"[Worker OpenAlex Notice]: {e}")
 
     def worker_europe_pmc():
-        if stop_event.is_set() or (not clean_doi and not title): return
-        data = resolve_europe_pmc_pdf(clean_doi, title)
-        if data: set_winner(data)
+        try:
+            if stop_event.is_set() or (not clean_doi and not title): return
+            data = resolve_europe_pmc_pdf(clean_doi, title)
+            if data and not stop_event.is_set(): set_winner(data)
+        except Exception as e:
+            logger.debug(f"[Worker EuropePMC Notice]: {e}")
 
     def worker_semantic_scholar():
-        if stop_event.is_set() or not clean_doi: return
-        data = resolve_semantic_scholar_pdf(clean_doi)
-        if data: set_winner(data)
+        try:
+            if stop_event.is_set() or not clean_doi: return
+            data = resolve_semantic_scholar_pdf(clean_doi)
+            if data and not stop_event.is_set(): set_winner(data)
+        except Exception as e:
+            logger.debug(f"[Worker Semantic Scholar Notice]: {e}")
 
     def worker_landing_page():
-        if stop_event.is_set(): return
-        data = resolve_landing_page_pdf(clean_doi, direct_url)
-        if data: set_winner(data)
+        try:
+            if stop_event.is_set(): return
+            data = resolve_landing_page_pdf(clean_doi, direct_url)
+            if data and not stop_event.is_set(): set_winner(data)
+        except Exception as e:
+            logger.debug(f"[Worker Landing Page Notice]: {e}")
 
     workers = [
         worker_arxiv,

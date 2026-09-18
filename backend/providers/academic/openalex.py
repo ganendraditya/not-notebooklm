@@ -93,7 +93,15 @@ def fetch_openalex(
                         "is_oa": is_oa_work
                     })
                 page += 1
+            elif resp.status_code == 429:
+                import logging
+                logger = logging.getLogger("uvicorn.error")
+                logger.warning(f"[OpenAlex API] Rate limit (429) hit for query '{term[:30]}'")
+                break
             else:
+                import logging
+                logger = logging.getLogger("uvicorn.error")
+                logger.debug(f"[OpenAlex API] Returned status {resp.status_code}")
                 break
         except Exception as e:
             import logging
