@@ -5,9 +5,7 @@ Handles atomic, transactional CRUD operations in SQLite with strict token budget
 
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from database import ResearchProfile, commit_with_retry, get_utc_now
 def _count_text_tokens(text: str) -> int:
@@ -44,11 +42,11 @@ def get_active_profile_facts(
                 ResearchProfile.chat_id == chat_id,
                 ResearchProfile.is_active == True
             )
-            .order_by(ResearchProfile.created_at.asc())
+            .order_by(ResearchProfile.created_at.desc())
             .all()
         )
 
-        # Enforce collective token pool ceiling
+        # Enforce collective token pool ceiling prioritizing recent directives
         retained = []
         cumulative_tokens = 0
         for f in facts:
@@ -58,6 +56,7 @@ def get_active_profile_facts(
             retained.append(f)
             cumulative_tokens += f_tokens
 
+        retained.reverse()
         return retained
     except Exception as e:
         logger.warning(f"[MemoryService] Error fetching active facts for {chat_id}: {e}")
@@ -243,8 +242,16 @@ async def extract_and_reconcile_research_memory(
         if not isinstance(data, dict):
             return {"inserted": 0, "invalidated": 0, "error": "Invalid JSON response structure"}
 
+        raw_inv = data.get("invalidate_ids")
+        if isinstance(raw_inv, (int, str)):
+            invalidate_ids = [raw_inv]
+        elif isinstance(raw_inv, list):
+            invalidate_ids = raw_inv
+        else:
+            invalidate_ids = []
+
         invalidated_count = 0
-        for fid in data.get("invalidate_ids") or []:
+        for fid in invalidate_ids:
             if fid is None:
                 continue
             try:
@@ -254,8 +261,16 @@ async def extract_and_reconcile_research_memory(
             except Exception as inv_err:
                 logger.debug(f"[MemoryService] Error invalidating ID {fid}: {inv_err}")
 
+        raw_ins = data.get("insert_facts")
+        if isinstance(raw_ins, dict):
+            insert_facts = [raw_ins]
+        elif isinstance(raw_ins, list):
+            insert_facts = raw_ins
+        else:
+            insert_facts = []
+
         inserted_count = 0
-        for item in data.get("insert_facts") or []:
+        for item in insert_facts:
             if not isinstance(item, dict):
                 continue
             f_text = (item.get("fact_text") or "").strip()

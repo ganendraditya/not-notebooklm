@@ -194,9 +194,16 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode; [key: string]: 
       // - text/html: Instantly converts to native graphical table grids in Microsoft Word, Google Docs, Apple Pages, and LibreOffice
       // - text/plain: Instantly converts to interactive Markdown tables in Notion, Obsidian, Typora, and text editors
       if (typeof ClipboardItem !== "undefined" && navigator.clipboard && typeof navigator.clipboard.write === "function") {
+        const escapeHtml = (str: string) =>
+          str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+
         const htmlRows = matrix.map((r, rIdx) => {
           const tag = rIdx === 0 ? "th" : "td";
-          return `<tr>${r.map((cell) => `<${tag}>${cell}</${tag}>`).join("")}</tr>`;
+          return `<tr>${r.map((cell) => `<${tag}>${escapeHtml(cell)}</${tag}>`).join("")}</tr>`;
         }).join("");
         const htmlTable = `<table>${htmlRows}</table>`;
 

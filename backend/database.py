@@ -61,7 +61,12 @@ class ChatSession(Base):
     
     documents = relationship("Document", back_populates="chat_session")
     messages = relationship("ChatMessage", back_populates="chat_session", order_by="ChatMessage.created_at")
-    research_profiles = relationship("ResearchProfile", back_populates="chat_session", order_by="ResearchProfile.created_at")
+    research_profiles = relationship(
+        "ResearchProfile",
+        back_populates="chat_session",
+        cascade="all, delete-orphan",
+        order_by="ResearchProfile.created_at"
+    )
 
 class Document(Base):
     __tablename__ = "documents"

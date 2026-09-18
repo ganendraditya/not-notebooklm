@@ -1,4 +1,5 @@
 import os
+import re
 import asyncio
 import inspect
 import logging
@@ -308,7 +309,6 @@ async def astream_llm_response(
     resp = await target_llm.achat(chat_msgs)
     full_content = resp.message.content or ""
     if on_delta and full_content:
-        import re
         visible_content = re.sub(r'<!--\s*(?:CITATION_MAP|SOURCES_DATA)[\s\S]*?(?:-->|$)', '', full_content).strip()
         res = on_delta(visible_content)
         if inspect.isawaitable(res):
