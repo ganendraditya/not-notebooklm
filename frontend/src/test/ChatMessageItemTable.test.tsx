@@ -114,6 +114,51 @@ describe("ChatMessageItem Table & Cleanliness", () => {
     expect(copiedText).toContain("| Book | $20 |");
   });
 
+  it("writes hybrid multi-MIME payload (HTML table + plain text Markdown) when ClipboardItem is available", async () => {
+    const tableMarkdown = `| Col1 | Col2 |
+|:---|:---|
+| Val1 | Val2 |`;
+
+    const msg = {
+      role: "assistant" as const,
+      content: tableMarkdown,
+      created_at: new Date().toISOString(),
+    };
+
+    const writeMock = vi.fn().mockResolvedValue(undefined);
+    class MockClipboardItem {
+      types: string[];
+      items: Record<string, Blob>;
+      constructor(items: Record<string, Blob>) {
+        this.items = items;
+        this.types = Object.keys(items);
+      }
+    }
+    (globalThis as unknown as { ClipboardItem: typeof MockClipboardItem }).ClipboardItem = MockClipboardItem;
+
+    Object.assign(navigator, {
+      clipboard: {
+        write: writeMock,
+        writeText: vi.fn(),
+      },
+    });
+
+    renderWithI18n(
+      <InChatMessageComponent
+        msg={msg}
+        activeChatId="test-chat"
+        backendUrl="http://localhost:8000"
+      />
+    );
+
+    const copyBtn = screen.getByLabelText("Copy table");
+    await act(async () => {
+      fireEvent.click(copyBtn);
+    });
+
+    expect(writeMock).toHaveBeenCalledTimes(1);
+  });
+
   it("strips <blockquote> and <mark> HTML tags from table cells and rendered text", async () => {
     const rawContent = `| Metrik | Bukti Teks |
 |:---|:---|
