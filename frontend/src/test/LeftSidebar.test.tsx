@@ -103,4 +103,19 @@ describe("LeftSidebar Component", () => {
     fireEvent.click(settingsBtn);
     expect(onOpenSettings).toHaveBeenCalled();
   });
+
+  it("renders the current app version in the footer", () => {
+    renderWithI18n(
+      <LeftSidebar
+        sessions={mockSessions}
+        activeChatId="chat-1"
+        onSelectChat={vi.fn()}
+        onCreateChat={vi.fn()}
+        onDeleteChat={vi.fn()}
+        onRenameChat={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("v1.6.0")).toBeInTheDocument();
+  });
 });
