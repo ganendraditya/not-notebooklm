@@ -201,11 +201,16 @@ async def extract_and_reconcile_research_memory(
         facts_context_lines.append(f"- [ID {f.id}] ({f.category}): {f.fact_text}")
     existing_facts_str = "\n".join(facts_context_lines) if facts_context_lines else "None (No active research profile facts stored yet)."
 
+    assistant_context = ""
+    if assistant_response and assistant_response.strip():
+        assistant_context = f"\nLatest Assistant Response Context (for reference):\n\"{assistant_response.strip()[:500]}\"\n"
+
     prompt = (
         "You are an expert Research Profile Memory Extractor and Contradiction Reconciler.\n"
         "Your task is to analyze the user's latest message in an academic research assistant workspace.\n\n"
         f"Currently Active Research Profile Facts:\n{existing_facts_str}\n\n"
-        f"Latest User Message:\n\"{user_message.strip()}\"\n\n"
+        f"Latest User Message:\n\"{user_message.strip()}\"\n"
+        f"{assistant_context}\n"
         "Task Guidelines:\n"
         "1. INSERT NEW FACTS:\n"
         "   - Detect permanent research constraints, exclusion criteria, hardware setups, target venues, deadlines, or methodologies stated by the user.\n"
@@ -230,14 +235,18 @@ async def extract_and_reconcile_research_memory(
         from rag.llm_factory import acall_fast_with_fallback
         from utils.text_processing import extract_json_from_llm
         import json
-        import re
 
         raw_resp = await acall_fast_with_fallback(lambda llm: llm.acomplete(prompt))
         clean_json_str = extract_json_from_llm(raw_resp.text if hasattr(raw_resp, "text") else str(raw_resp))
         data = json.loads(clean_json_str)
 
+        if not isinstance(data, dict):
+            return {"inserted": 0, "invalidated": 0, "error": "Invalid JSON response structure"}
+
         invalidated_count = 0
-        for fid in data.get("invalidate_ids", []):
+        for fid in data.get("invalidate_ids") or []:
+            if fid is None:
+                continue
             try:
                 fid_int = int(fid)
                 if invalidate_profile_fact(db, fid_int, chat_id):
@@ -246,20 +255,28 @@ async def extract_and_reconcile_research_memory(
                 logger.debug(f"[MemoryService] Error invalidating ID {fid}: {inv_err}")
 
         inserted_count = 0
-        for item in data.get("insert_facts", []):
-            f_text = item.get("fact_text", "").strip()
-            f_cat = item.get("category", "constraint").strip()
-            if f_text and len(f_text) >= 6:
-                # Check for near-duplicate active facts
-                is_duplicate = any(f_text.lower() in existing.fact_text.lower() for existing in active_facts if existing.is_active)
+        for item in data.get("insert_facts") or []:
+            if not isinstance(item, dict):
+                continue
+            f_text = (item.get("fact_text") or "").strip()
+            f_cat = (item.get("category") or "constraint").strip().lower() or "constraint"
+            if f_text and len(f_text) >= 5:
+                # Normalized equality and intra-batch deduplication
+                is_duplicate = any(
+                    existing.fact_text and f_text.lower() == existing.fact_text.strip().lower()
+                    for existing in active_facts
+                    if existing.is_active
+                )
                 if not is_duplicate:
-                    if add_profile_fact(db, chat_id, f_text, f_cat):
+                    new_fact = add_profile_fact(db, chat_id, f_text, f_cat)
+                    if new_fact:
                         inserted_count += 1
+                        active_facts.append(new_fact)
 
         return {
             "inserted": inserted_count,
             "invalidated": invalidated_count,
-            "reason": data.get("reason", "")
+            "reason": str(data.get("reason") or "")
         }
     except Exception as e:
         logger.warning(f"[MemoryService] Background reconciliation failed: {e}")
