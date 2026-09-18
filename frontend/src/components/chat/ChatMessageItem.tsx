@@ -190,7 +190,32 @@ const MarkdownTableBlock: React.FC<{ children?: React.ReactNode; [key: string]: 
       const bodyRows = matrix.slice(1).map((r) => `| ${r.join(" | ")} |`).join("\n");
       const mdTable = `${headerRow}\n${separatorRow}\n${bodyRows}`.trim();
 
-      await navigator.clipboard.writeText(mdTable);
+      // Hybrid Multi-MIME Clipboard Payload:
+      // - text/html: Instantly converts to native graphical table grids in Microsoft Word, Google Docs, Apple Pages, and LibreOffice
+      // - text/plain: Instantly converts to interactive Markdown tables in Notion, Obsidian, Typora, and text editors
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard && typeof navigator.clipboard.write === "function") {
+        const htmlRows = matrix.map((r, rIdx) => {
+          const tag = rIdx === 0 ? "th" : "td";
+          return `<tr>${r.map((cell) => `<${tag}>${cell}</${tag}>`).join("")}</tr>`;
+        }).join("");
+        const htmlTable = `<table>${htmlRows}</table>`;
+
+        try {
+          const blobPlain = new Blob([mdTable], { type: "text/plain" });
+          const blobHtml = new Blob([htmlTable], { type: "text/html" });
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "text/plain": blobPlain,
+              "text/html": blobHtml,
+            })
+          ]);
+        } catch {
+          await navigator.clipboard.writeText(mdTable);
+        }
+      } else {
+        await navigator.clipboard.writeText(mdTable);
+      }
+
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
