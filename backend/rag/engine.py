@@ -39,6 +39,13 @@ from .pipelines import (
     search_pipeline,
     workspace_pipeline,
 )
+from .token_budget import (
+    allocate_token_budget,
+    acompact_chat_history,
+    compact_chat_history,
+    extract_context_window_from_error,
+    record_discovered_context_window,
+)
 
 load_dotenv()
 
@@ -265,6 +272,29 @@ async def query_chat(
     if not candidate_llms:
         return "Error: Tidak ada LLM Provider yang terkonfigurasi. Silakan periksa file .env."
 
+    # Priority Waterfall: Compact history safely against target model context limit (NO naive .pop())
+    target_model_name = None
+    if candidate_llms:
+        first_llm = candidate_llms[0][0]
+        raw_m = getattr(first_llm, "model", None)
+        if isinstance(raw_m, str):
+            target_model_name = raw_m
+        else:
+            raw_mn = getattr(first_llm, "model_name", None)
+            if isinstance(raw_mn, str):
+                target_model_name = raw_mn
+
+    budget = allocate_token_budget(
+        model_name=target_model_name,
+        system_prompt="",
+        user_query=query,
+    )
+    formatted_history = await acompact_chat_history(
+        formatted_history,
+        max_history_tokens=budget.max_history_tokens,
+        model_name=target_model_name,
+    )
+
     # Intent classification is performed ultra-fast via Fast Lite LLM (with fallback cascade)
     has_chat_attachments = "[Attachments Provided by User:]" in query
     intent_query = raw_user_query if raw_user_query else ("Silakan baca dan diskusikan dokumen terlampir." if has_chat_attachments else query)
@@ -298,7 +328,54 @@ async def query_chat(
             )
         except Exception as e:
             last_err = e
+            err_msg = str(e)
             logger.warning(f"[RAG Fallback] {curr_name} failed: {e}")
+
+            # Tier 4: Runtime Error 400 Context Limit Exceeded Auto-Healing
+            discovered_limit = extract_context_window_from_error(err_msg)
+            model_key = getattr(curr_llm, "model", None) or getattr(curr_llm, "model_name", None) or target_model_name
+            if discovered_limit and model_key:
+                logger.info(f"[Auto-Healing] Discovered context limit of {discovered_limit} tokens for '{model_key}'. Re-compacting and auto-retrying...")
+                record_discovered_context_window(model_key, discovered_limit)
+
+                # Dynamically re-compact to discovered limit
+                new_budget = allocate_token_budget(
+                    model_name=model_key,
+                    system_prompt="",
+                    user_query=query,
+                )
+                adapted_history = await acompact_chat_history(
+                    formatted_history,
+                    max_history_tokens=new_budget.max_history_tokens,
+                    model_name=model_key,
+                )
+
+                if has_emitted_tokens and reset_callback:
+                    try:
+                        res = reset_callback()
+                        if inspect.isawaitable(res):
+                            await res
+                    except Exception as reset_err:
+                        logger.debug(f"[Reset Callback Error]: {reset_err}")
+                has_emitted_tokens = False
+
+                try:
+                    await report_status(f"Adapting context window to {discovered_limit} tokens...")
+                    return await dispatch_intent_pipeline(
+                        intent=intent,
+                        chat_id=chat_id,
+                        query=query,
+                        local_docs=local_docs,
+                        formatted_history=adapted_history,
+                        target_llm=curr_llm,
+                        report_status=report_status,
+                        timeout_sec=pipeline_timeout,
+                        on_delta=emit_delta
+                    )
+                except Exception as retry_err:
+                    logger.warning(f"[Auto-Healing Retry] Retry with adapted context failed: {retry_err}")
+                    last_err = retry_err
+
             if cand_idx + 1 < len(candidate_llms):
                 next_name = candidate_llms[cand_idx+1][1]
                 logger.info(f"[RAG Fallback] -> Automatically cascading to {next_name}...")

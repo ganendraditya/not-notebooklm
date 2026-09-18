@@ -11,6 +11,11 @@ from rag.formatters import format_clean_response, extract_structured_citations
 from rag.parsers import parse_document_to_markdown
 from utils.file_utils import get_doc_file_path
 from rag.llm_factory import astream_llm_response
+from rag.token_budget import (
+    allocate_token_budget,
+    count_tokens,
+    pack_text_into_token_budget,
+)
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -27,8 +32,14 @@ def extract_key_sentences_from_chunk(text: str, limit: int = 2) -> List[str]:
                     break
     return candidates
 
-async def _load_single_doc_snippet_async(idx_fname_chat: tuple, db_records: Dict[str, Any], total_doc_count: int) -> Tuple[bool, str]:
-    """Helper that reads and formats text from a single document record or file on disk."""
+async def _load_single_doc_snippet_async(
+    idx_fname_chat: tuple,
+    db_records: Dict[str, Any],
+    total_doc_count: int,
+    per_doc_token_budget: Optional[int] = None,
+    model_name: Optional[str] = None
+) -> Tuple[bool, str]:
+    """Helper that reads and formats text from a single document record or file on disk with dynamic token budgeting."""
     i, fname, chat_id = idx_fname_chat
     fpath = get_doc_file_path(chat_id, fname)
     content_snippet = ""
@@ -49,8 +60,13 @@ async def _load_single_doc_snippet_async(idx_fname_chat: tuple, db_records: Dict
                     is_full_paper = False
                 else:
                     is_full_paper = True
-                max_chars = 48000 if total_doc_count > 20 else 80000
-                content_snippet = parsed_text[:max_chars]
+                
+                target_budget = per_doc_token_budget if (per_doc_token_budget and per_doc_token_budget > 0) else 6000
+                content_snippet = pack_text_into_token_budget(
+                    parsed_text,
+                    budget_tokens=target_budget,
+                    model_name=model_name
+                )
         except Exception as parse_err:
             logger.debug(f"[Workspace Pipeline] Doc Parse Error for {fname}: {parse_err}")
 
@@ -101,13 +117,16 @@ async def _retrieve_hybrid_workspace_context(
     query: str,
     local_docs: List[str],
     db_records: Dict[str, Any],
-    report_status: Optional[Callable] = None
-) -> str:
+    report_status: Optional[Callable] = None,
+    max_rag_tokens: int = 6000,
+    model_name: Optional[str] = None
+) -> Tuple[str, Dict[str, List[str]]]:
     """
     Hybrid semantic retrieval for large workspaces (> 4 documents):
     1. Builds a concise catalog overview for all workspace documents.
     2. Retrieves top semantically relevant chunks from Qdrant vector index.
     3. Reranks chunks via FlashRank Cross-Encoder to fit optimal context budget.
+    4. Packs chunks strictly within max_rag_tokens to prevent Stanford 'Lost in the Middle' degradation.
     """
     total_docs = len(local_docs)
     catalog_lines = [f"=== WORKSPACE DOCUMENTS CATALOG ({total_docs} DOCUMENTS) ==="]
@@ -126,6 +145,7 @@ async def _retrieve_hybrid_workspace_context(
     catalog_text = "\n\n".join(catalog_lines)
 
     retrieved_blocks = []
+    pre_stored_rag_map: Dict[str, List[str]] = {}
     try:
         from rag.vector_store import vector_store, embed_model
         from llama_index.core import VectorStoreIndex
@@ -158,16 +178,32 @@ async def _retrieve_hybrid_workspace_context(
                 logger.debug(f"[Workspace Hybrid] FlashRank fallback: {rank_err}")
                 selected_nodes = nodes[:12]
 
-            pre_stored_rag_map: Dict[str, List[str]] = {}
+            total_tokens = count_tokens(catalog_text, model_name=model_name)
             for idx, n in enumerate(selected_nodes, start=1):
                 fname = n.node.metadata.get("filename", "Dokumen")
                 sec = n.node.metadata.get("section") or n.node.metadata.get("breadcrumb") or ""
                 sec_lbl = f" - Section: {sec}" if sec else ""
                 doc_idx = local_docs.index(fname) + 1 if fname in local_docs else idx
                 chunk_text = n.node.get_content()
-                retrieved_blocks.append(
+                block_candidate = (
                     f"--- RELEVANT EXCERPT Document [{doc_idx}] (Source: {fname}{sec_lbl}) ---\n{chunk_text}"
                 )
+                block_tokens = count_tokens(block_candidate, model_name=model_name)
+
+                # Token Waterfall budget check (preventing Lost in the Middle)
+                if total_tokens + block_tokens > max_rag_tokens:
+                    if len(retrieved_blocks) >= 2:
+                        break
+                    remaining_budget = max(0, max_rag_tokens - total_tokens)
+                    if remaining_budget >= 150:
+                        packed_chunk = pack_text_into_token_budget(chunk_text, remaining_budget, model_name=model_name)
+                        retrieved_blocks.append(
+                            f"--- RELEVANT EXCERPT Document [{doc_idx}] (Source: {fname}{sec_lbl}) ---\n{packed_chunk}"
+                        )
+                    break
+
+                retrieved_blocks.append(block_candidate)
+                total_tokens += block_tokens
 
                 doc_key = str(doc_idx)
                 if doc_key not in pre_stored_rag_map:
@@ -186,9 +222,16 @@ async def _retrieve_hybrid_workspace_context(
             pre_stored_rag_map
         )
     else:
-        # Fallback if vector index has no chunks yet: use compact snippets
+        # Fallback if vector index has no chunks yet: use compact snippets with budget protection
+        per_doc_fallback = max(500, max_rag_tokens // max(1, total_docs))
         loaded_results = await asyncio.gather(
-            *(_load_single_doc_snippet_async((i, fname, chat_id), db_records, total_docs) for i, fname in enumerate(local_docs))
+            *(_load_single_doc_snippet_async(
+                (i, fname, chat_id),
+                db_records,
+                total_docs,
+                per_doc_token_budget=per_doc_fallback,
+                model_name=model_name
+            ) for i, fname in enumerate(local_docs))
         )
         fb_map = {str(i): extract_key_sentences_from_chunk(s, limit=2) for i, (_, s) in enumerate(loaded_results, start=1)}
         return "\n\n".join([snippet for _, snippet in loaded_results]), fb_map
@@ -202,7 +245,7 @@ async def handle_workspace_analysis_pipeline(
     report_status,
     on_delta: Optional[Callable[[str], Any]] = None
 ) -> str:
-    """Direct full-context or hybrid semantic comparative synthesis for workspace documents."""
+    """Direct full-context or hybrid semantic comparative synthesis for workspace documents with dynamic token waterfall."""
     db_records: Dict[str, Any] = {}
     db = SessionLocal()
     try:
@@ -226,10 +269,40 @@ async def handle_workspace_analysis_pipeline(
 
     total_doc_count = len(local_docs)
     pre_stored_rag_map: Dict[str, List[str]] = {}
+
+    # 1. Resolve active model name safely (handles real LLMs and test mocks)
+    model_name = None
+    if target_llm is not None:
+        raw_m = getattr(target_llm, "model", None)
+        if isinstance(raw_m, str):
+            model_name = raw_m
+        else:
+            raw_mn = getattr(target_llm, "model_name", None)
+            if isinstance(raw_mn, str):
+                model_name = raw_mn
+
+    base_system_prompt = get_workspace_analysis_system_prompt(total_doc_count)
+    token_budget = allocate_token_budget(
+        model_name=model_name,
+        system_prompt=base_system_prompt,
+        user_query=query,
+    )
+
     if total_doc_count <= 4:
         await report_status("Reading full content of loaded workspace documents...")
+        if token_budget.max_context >= 128_000:
+            per_doc_budget = min(20_000, max(4_000, token_budget.max_rag_tokens * 3 // total_doc_count))
+        else:
+            per_doc_budget = max(600, token_budget.max_rag_tokens // max(1, total_doc_count))
+
         loaded_results = await asyncio.gather(
-            *(_load_single_doc_snippet_async((i, fname, chat_id), db_records, total_doc_count) for i, fname in enumerate(local_docs))
+            *(_load_single_doc_snippet_async(
+                (i, fname, chat_id),
+                db_records,
+                total_doc_count,
+                per_doc_token_budget=per_doc_budget,
+                model_name=model_name
+            ) for i, fname in enumerate(local_docs))
         )
         full_docs_context = "\n\n".join([snippet for _, snippet in loaded_results])
         for i, (_, snippet) in enumerate(loaded_results, start=1):
@@ -240,7 +313,9 @@ async def handle_workspace_analysis_pipeline(
             query=query,
             local_docs=local_docs,
             db_records=db_records,
-            report_status=report_status
+            report_status=report_status,
+            max_rag_tokens=token_budget.max_rag_tokens,
+            model_name=model_name
         )
     
     system_prompt_text = (
