@@ -285,15 +285,19 @@ async def handle_workspace_analysis_pipeline(
     system_prompt_text = get_workspace_analysis_system_prompt(total_doc_count)
     try:
         from services.memory_service import get_active_profile_facts, format_profile_for_prompt
-        profile_db = SessionLocal()
-        try:
-            active_facts = get_active_profile_facts(profile_db, chat_id, max_tokens=250)
-            if active_facts:
-                profile_block = format_profile_for_prompt(active_facts)
-                if profile_block:
-                    system_prompt_text = f"{system_prompt_text}\n\n{profile_block}"
-        finally:
-            profile_db.close()
+        def _fetch_profile_block():
+            profile_db = SessionLocal()
+            try:
+                active_facts = get_active_profile_facts(profile_db, chat_id, max_tokens=250)
+                if active_facts:
+                    return format_profile_for_prompt(active_facts)
+                return ""
+            finally:
+                profile_db.close()
+
+        profile_block = await asyncio.to_thread(_fetch_profile_block)
+        if profile_block:
+            system_prompt_text = f"{system_prompt_text}\n\n{profile_block}"
     except Exception as mem_err:
         logger.debug(f"[Workspace Pipeline] Profile memory injection skipped: {mem_err}")
 

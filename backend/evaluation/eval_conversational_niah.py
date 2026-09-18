@@ -12,6 +12,7 @@ Outputs empirical Before (Legacy uncompacted) vs After (Issue #10 Smart Compacti
 """
 
 import os
+import re
 import sys
 import json
 import asyncio
