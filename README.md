@@ -51,7 +51,7 @@ Synthesize multiple papers into comparative review matrices. Each finding is tag
 * **Cell-Level Evidence:** Citations are anchored to specific table cells for verifiable metric-by-metric comparison.
 * **4-Tier Highlight Matching:** Resolves citations using exact verbatim quotes, n-gram token intersection, character span fallback, and context cursors designed specifically for multi-bullet comparison tables.
 * **Asynchronous Grounding & Persistence:** Fast LLM grounding runs asynchronously in the background and caches results directly in SQLite (`citation_highlights`), ensuring instant jump-to-highlight on return visits.
-* **1-Click Markdown Copy:** Copy sanitized Markdown tables directly into Notion, Obsidian, Typora, or Word.
+* **1-Click Table Copy (Hybrid Clipboard):** Copy sanitized tables directly into Microsoft Word, Google Docs, Notion, Obsidian, or Typora with automated dual-format tabular rendering (HTML grid + Markdown text).
 * **KaTeX Mathematics:** Seamlessly renders mathematical notation, formulas, and matrices ($E = mc^2$, $\sum$, $\int$).
 
 ![Grounded Citation Highlighting](docs/assets/citation-grounding.png)
