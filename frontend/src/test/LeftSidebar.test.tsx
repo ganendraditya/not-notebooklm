@@ -116,6 +116,6 @@ describe("LeftSidebar Component", () => {
       />
     );
 
-    expect(screen.getByText("v1.6.0")).toBeInTheDocument();
+    expect(screen.getByText("v1.6.1")).toBeInTheDocument();
   });
 });
