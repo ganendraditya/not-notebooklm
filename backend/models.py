@@ -99,5 +99,15 @@ class HighlightRequest(BaseModel):
     doc_id: Optional[int] = None
     doc_num: Optional[int] = None
 
+class CreateFactRequest(BaseModel):
+    fact_text: str
+    category: Optional[str] = "constraint"
+
+class UpdateFactRequest(BaseModel):
+    is_active: Optional[bool] = None
+    fact_text: Optional[str] = None
+    category: Optional[str] = None
+
+
 
 
