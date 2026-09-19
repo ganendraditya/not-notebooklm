@@ -297,4 +297,25 @@ describe("CitationParser", () => {
     expect(enhanced).toContain("Akurasi 98%, Presisi 98% [1].");
     expect(enhanced).toContain("mAP 0,893 dan F1-score 0,887 [2].");
   });
+
+  it("passes pre-computed aiQuotes from citationMap to onOpenDocument callback", () => {
+    const docs = [{ id: 1, index: 1, filename: "Paper1.pdf", title: "Paper 1", created_at: "2026-01-01T00:00:00Z" }];
+    const citationMap = { "1": ["Exact sentence quote from paper 1."] };
+    let capturedContext: any = null;
+
+    const onOpen = (_doc: any, ctx: any) => {
+      capturedContext = ctx;
+    };
+
+    const text = "Hasil eksperimen menunjukkan akurasi 98% [1].";
+    const result = parseCitationsInReactNode(text, docs, onOpen, null, undefined, citationMap);
+    const { container } = render(<div>{result}</div>);
+
+    const button = container.querySelector("button");
+    expect(button).toBeTruthy();
+    button?.click();
+
+    expect(capturedContext).toBeTruthy();
+    expect(capturedContext.aiQuotes).toEqual(["Exact sentence quote from paper 1."]);
+  });
 });
