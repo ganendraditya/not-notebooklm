@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback, useRef } from "react";
 import { Document, CitationGroundingHighlight, useDocumentStore } from "@/stores/documentStore";
 
 export interface PaperDetailData {
@@ -122,15 +122,79 @@ export function usePaperDetails({
     setViewingDocState(externalViewingDoc || null);
   }, [externalViewingDoc]);
 
+  const updateDocumentsList = useDocumentStore((s) => s.updateDocumentsList);
+  const prewarmedChatRef = useRef<string | null>(null);
+  const prewarmedDocIds = useRef<Set<number>>(new Set());
+
+  const syncUpgradedDocument = useCallback((targetDoc: Document, data: { filename?: string; has_full_pdf?: boolean; is_oa?: boolean }) => {
+    const isUpgraded =
+      (data.filename && data.filename !== targetDoc.filename) ||
+      (data.has_full_pdf !== undefined && data.has_full_pdf !== targetDoc.has_full_pdf);
+
+    if (isUpgraded) {
+      const updatedFilename = data.filename || targetDoc.filename;
+      const updatedHasPdf = data.has_full_pdf ?? targetDoc.has_full_pdf;
+      const updatedIsOa = data.is_oa ?? targetDoc.is_oa;
+
+      updateDocumentsList((prev) =>
+        prev.map((d) => d.id === targetDoc.id ? { ...d, filename: updatedFilename, has_full_pdf: updatedHasPdf, is_oa: updatedIsOa } : d)
+      );
+
+      const updatedDoc: Document = {
+        ...targetDoc,
+        filename: updatedFilename,
+        has_full_pdf: updatedHasPdf,
+        is_oa: updatedIsOa,
+      };
+
+      setViewingDocState((prev) => (prev && prev.id === targetDoc.id ? updatedDoc : prev));
+      if (onViewingDocChange) {
+        onViewingDocChange(updatedDoc);
+      }
+    }
+  }, [updateDocumentsList, onViewingDocChange]);
+
   // Proactive background pre-warming: pre-fetch full text content for workspace documents
   useEffect(() => {
     if (!activeChatId || !documents || documents.length === 0) return;
+    let isCancelled = false;
+    const currentChatId = activeChatId;
+
+    if (prewarmedChatRef.current !== currentChatId) {
+      prewarmedChatRef.current = currentChatId;
+      prewarmedDocIds.current.clear();
+    }
+
     documents.forEach(doc => {
-      if (doc?.id) {
-        prefetchDocumentContent(backendUrl, activeChatId, doc.id);
+      if (doc?.id && !prewarmedDocIds.current.has(doc.id)) {
+        prewarmedDocIds.current.add(doc.id);
+        prefetchDocumentContent(backendUrl, currentChatId, doc.id)
+          .then(data => {
+            if (isCancelled || prewarmedChatRef.current !== currentChatId) return;
+            if (data && (
+              (data.filename && data.filename !== doc.filename) ||
+              (data.has_full_pdf !== undefined && data.has_full_pdf !== doc.has_full_pdf)
+            )) {
+              updateDocumentsList(prev =>
+                prev.map(d => d.id === doc.id ? {
+                  ...d,
+                  filename: data.filename || d.filename,
+                  has_full_pdf: data.has_full_pdf ?? d.has_full_pdf,
+                  is_oa: data.is_oa ?? d.is_oa
+                } : d)
+              );
+            }
+          })
+          .catch(() => {
+            prewarmedDocIds.current.delete(doc.id);
+          });
       }
     });
-  }, [activeChatId, documents, backendUrl]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeChatId, documents, backendUrl, updateDocumentsList]);
 
   // Whenever active chat changes, always reset viewingDoc and paperDetails to exit reader mode and show default sources list
   useEffect(() => {
@@ -140,8 +204,6 @@ export function usePaperDetails({
       onViewingDocChange(null);
     }
   }, [activeChatId, onViewingDocChange]);
-
-  const updateDocumentsList = useDocumentStore((s) => s.updateDocumentsList);
 
   useEffect(() => {
     if (!viewingDoc || !activeChatId) {
@@ -157,12 +219,7 @@ export function usePaperDetails({
     if (cached && (cached.id === viewingDoc.id || cached.filename === viewingDoc.filename)) {
       setPaperDetails(cached);
       setIsLoadingDetails(false);
-      // Sync store if backend upgraded filename (e.g. .txt -> .pdf via on-demand OA fetch)
-      if (cached.filename && cached.filename !== viewingDoc.filename) {
-        updateDocumentsList((prev) =>
-          prev.map((d) => d.id === viewingDoc.id ? { ...d, filename: cached.filename, has_full_pdf: cached.has_full_pdf, is_oa: cached.is_oa } : d)
-        );
-      }
+      syncUpgradedDocument(viewingDoc, cached);
       return;
     }
 
@@ -175,12 +232,7 @@ export function usePaperDetails({
         if (!isMounted) return;
         if (data) {
           setPaperDetails(data);
-          // Sync store if backend upgraded filename (e.g. .txt -> .pdf via on-demand OA fetch)
-          if (data.filename && data.filename !== viewingDoc.filename) {
-            updateDocumentsList((prev) =>
-              prev.map((d) => d.id === viewingDoc.id ? { ...d, filename: data.filename, has_full_pdf: data.has_full_pdf, is_oa: data.is_oa } : d)
-            );
-          }
+          syncUpgradedDocument(viewingDoc, data);
         } else {
           setPaperDetails(null);
         }
@@ -192,7 +244,7 @@ export function usePaperDetails({
     return () => {
       isMounted = false;
     };
-  }, [viewingDoc, activeChatId, backendUrl, updateDocumentsList]);
+  }, [viewingDoc, activeChatId, backendUrl, syncUpgradedDocument]);
 
   useEffect(() => {
     if (groundingHighlight?.sentence || (groundingHighlight?.aiQuotes && groundingHighlight.aiQuotes.length > 0)) {
