@@ -197,3 +197,25 @@ def test_academic_fetchers_429_resilience():
 
         oa_res = fetch_openalex("machine learning", 5, None, 0, False, False, None, {}, lambda t: True, lambda t, d: False, lambda t, s: True, lambda t, d: None)
         assert oa_res == []
+
+
+def test_get_doc_file_path_resolves_upgraded_pdf():
+    """Verify that get_doc_file_path discovers .pdf on disk even when queried with .txt filename."""
+    from utils.file_utils import get_doc_file_path, UPLOAD_DIR
+
+    test_chat = "test-chat-sync-123"
+    test_base = "My_Upgraded_Study"
+    pdf_path = os.path.join(UPLOAD_DIR, f"{test_chat}_{test_base}.pdf")
+
+    # Create dummy authentic PDF file >= 1000 bytes
+    with open(pdf_path, "wb") as f:
+        f.write(b"%PDF-1.5 " + b"X" * 1200)
+
+    try:
+        resolved = get_doc_file_path(test_chat, f"{test_base}.txt")
+        assert resolved.endswith(".pdf")
+        assert os.path.exists(resolved)
+    finally:
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+

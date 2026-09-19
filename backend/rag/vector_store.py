@@ -1,5 +1,6 @@
 import os
 import logging
+import threading
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -153,19 +154,36 @@ def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
             qmodels.FieldCondition(key="chat_id", match=qmodels.MatchValue(value=chat_id))
         ]
         if doc_filename:
-            # Support both 'filename' (standard across engine.py) and 'file_name', plus legacy prefixed names
-            prefixed_name = f"{chat_id}_{doc_filename}"
+            # Normalize filename: strip existing chat_id prefix to prevent double-prefixing
+            bare_filename = doc_filename
+            if chat_id and bare_filename.startswith(f"{chat_id}_"):
+                bare_filename = bare_filename[len(chat_id) + 1:]
+            prefixed_name = f"{chat_id}_{bare_filename}"
+
+            # Sweep both current and pre-upgrade counterpart extensions (e.g. .pdf <-> .txt, .bib, .ris, .md)
+            candidate_names = {bare_filename, prefixed_name}
+            if bare_filename.lower().endswith(".pdf"):
+                base = bare_filename[:-4]
+                pref_base = prefixed_name[:-4]
+                for ext in (".txt", ".bib", ".bibtex", ".ris", ".md"):
+                    candidate_names.add(f"{base}{ext}")
+                    candidate_names.add(f"{pref_base}{ext}")
+            elif bare_filename.lower().endswith((".txt", ".bib", ".bibtex", ".ris", ".md")):
+                ext_len = len(os.path.splitext(bare_filename)[1])
+                base = bare_filename[:-ext_len] if ext_len > 0 else bare_filename
+                pref_base = prefixed_name[:-ext_len] if ext_len > 0 else prefixed_name
+                candidate_names.add(f"{base}.pdf")
+                candidate_names.add(f"{pref_base}.pdf")
+
+            should_conditions = []
+            for c_name in candidate_names:
+                should_conditions.append(qmodels.FieldCondition(key="filename", match=qmodels.MatchValue(value=c_name)))
+                should_conditions.append(qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=c_name)))
+
             filter_obj = qmodels.Filter(
                 must=[
                     qmodels.FieldCondition(key="chat_id", match=qmodels.MatchValue(value=chat_id)),
-                    qmodels.Filter(
-                        should=[
-                            qmodels.FieldCondition(key="filename", match=qmodels.MatchValue(value=doc_filename)),
-                            qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=doc_filename)),
-                            qmodels.FieldCondition(key="filename", match=qmodels.MatchValue(value=prefixed_name)),
-                            qmodels.FieldCondition(key="file_name", match=qmodels.MatchValue(value=prefixed_name)),
-                        ]
-                    )
+                    qmodels.Filter(should=should_conditions)
                 ]
             )
         else:
@@ -199,17 +217,20 @@ except Exception:
 delete_qdrant_vectors = delete_document_vectors
 
 _flashrank_ranker = None
+_flashrank_lock = threading.Lock()
 
 def get_flashrank_ranker(model_name: str = "ms-marco-TinyBERT-L-2-v2"):
-    """Singleton getter for FlashRank cross-encoder to prevent disk reload per query."""
+    """Singleton getter for FlashRank cross-encoder to prevent disk reload per query (thread-safe)."""
     global _flashrank_ranker
     if _flashrank_ranker is None:
-        try:
-            from flashrank import Ranker
-            _flashrank_ranker = Ranker(model_name=model_name)
-        except Exception as e:
-            logger.warning(f"[FlashRank] Failed to initialize Ranker ({model_name}): {e}")
-            return None
+        with _flashrank_lock:
+            if _flashrank_ranker is None:
+                try:
+                    from flashrank import Ranker
+                    _flashrank_ranker = Ranker(model_name=model_name)
+                except Exception as e:
+                    logger.warning(f"[FlashRank] Failed to initialize Ranker ({model_name}): {e}")
+                    return None
     return _flashrank_ranker
 
 

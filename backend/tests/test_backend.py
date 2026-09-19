@@ -562,6 +562,40 @@ def test_workspace_pipeline_hybrid_retrieval_scaling():
         db.commit()
         db.close()
 
+
+def test_workspace_pipeline_flashrank_empty_fallback():
+    """Verify that if FlashRank returns an empty list, the pipeline safely falls back to top nodes."""
+    import asyncio
+    from rag.pipelines.workspace_pipeline import _retrieve_hybrid_workspace_context
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    mock_ranker = MagicMock()
+    mock_ranker.rerank.return_value = []  # FlashRank returns empty list
+
+    mock_node = MagicMock()
+    mock_node.node.get_content.return_value = "Sample excerpt from paper 1 methodology."
+    mock_node.node.metadata = {"filename": "paper_1.pdf", "section": "Methodology"}
+
+    mock_retriever = AsyncMock()
+    mock_retriever.aretrieve.return_value = [mock_node]
+
+    mock_index = MagicMock()
+    mock_index.as_retriever.return_value = mock_retriever
+
+    async def _test():
+        with patch("rag.vector_store.get_flashrank_ranker", return_value=mock_ranker), \
+             patch("llama_index.core.VectorStoreIndex.from_vector_store", return_value=mock_index):
+            context_str, pre_map = await _retrieve_hybrid_workspace_context(
+                chat_id="test_fallback_chat",
+                query="test query",
+                local_docs=["paper_1.pdf"],
+                db_records={"paper_1.pdf": {"title": "Paper 1", "year": "2023"}},
+            )
+            assert "Sample excerpt from paper 1 methodology." in context_str
+            assert "1" in pre_map
+
+    asyncio.run(_test())
+
 def test_commit_with_retry():
     """Verify commit_with_retry handles success, transient locks with backoff, and fatal errors."""
     from unittest.mock import MagicMock
@@ -934,6 +968,89 @@ def test_auto_ground_worker_and_claim_extractor():
         db.query(DBDocument).filter(DBDocument.chat_id == chat_id).delete()
         db.commit()
         db.close()
+
+
+def test_flashrank_singleton_thread_safety():
+    """Verify FlashRank ranker singleton instantiation is thread-safe."""
+    import concurrent.futures
+    from rag.vector_store import get_flashrank_ranker
+
+    results = []
+    errors = []
+
+    def worker():
+        try:
+            ranker = get_flashrank_ranker()
+            results.append(ranker)
+        except Exception as e:
+            errors.append(e)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futs = [executor.submit(worker) for _ in range(6)]
+        concurrent.futures.wait(futs)
+
+    assert len(errors) == 0
+    assert len(results) == 6
+    # All threads must receive the exact same singleton instance
+    assert all(r is results[0] for r in results)
+
+
+def test_delete_document_vectors_prefix_normalization():
+    """Verify delete_document_vectors strips existing prefix to avoid double-prefixing."""
+    from unittest.mock import patch, MagicMock
+    from rag.vector_store import delete_document_vectors
+
+    mock_qclient = MagicMock()
+    mock_coll = MagicMock()
+    mock_coll.name = "not_notebooklm_test"
+    mock_qclient.get_collections.return_value.collections = [mock_coll]
+
+    with patch("rag.vector_store.qdrant_client", mock_qclient):
+        # Case 1: passing filename with already existing chat_id prefix
+        delete_document_vectors("chat123", "chat123_article.pdf")
+        assert mock_qclient.delete.called
+        call_args = mock_qclient.delete.call_args
+        filter_used = call_args[1]["points_selector"]
+        # The should conditions must contain "article.pdf", "chat123_article.pdf", and counterpart extensions (.txt, .bib, etc.)
+        should_conds = filter_used.must[1].should
+        matched_values = [c.match.value for c in should_conds]
+        assert "article.pdf" in matched_values
+        assert "chat123_article.pdf" in matched_values
+        assert "article.txt" in matched_values
+        assert "chat123_article.txt" in matched_values
+        assert "article.bib" in matched_values
+        assert "chat123_chat123_article.pdf" not in matched_values
+
+
+def test_header_classification_cache_thread_safety():
+    """Verify classify_canonical_section thread safety under concurrent calls."""
+    import concurrent.futures
+    from rag.academic_chunker import classify_canonical_section
+
+    headers = [
+        "1. Introduction and Motivation",
+        "2. Related Work and Prior Art",
+        "3. Research Methodology and System Setup",
+        "4. Experimental Evaluation and Results",
+        "5. Concluding Remarks",
+    ]
+    errors = []
+
+    def worker():
+        try:
+            for _ in range(20):
+                for h in headers:
+                    tag = classify_canonical_section(h)
+                    assert tag in ("introduction", "literature_review", "methodology", "results", "conclusion", "general")
+        except Exception as e:
+            errors.append(e)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futs = [executor.submit(worker) for _ in range(6)]
+        concurrent.futures.wait(futs)
+
+    assert len(errors) == 0
+
 
 
 

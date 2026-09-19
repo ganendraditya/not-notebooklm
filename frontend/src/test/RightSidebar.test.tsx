@@ -24,6 +24,13 @@ describe("RightSidebar Component", () => {
       title: "BERT Pre-training of Deep Bidirectional Transformers",
       doi: "10.48550/arXiv.1810.04805",
       created_at: new Date().toISOString()
+    },
+    {
+      id: 3,
+      filename: "Upgraded_On_Demand.txt",
+      title: "Edge-Computing Video Analytics",
+      has_full_pdf: true,
+      created_at: new Date().toISOString()
     }
   ];
 
@@ -57,6 +64,25 @@ describe("RightSidebar Component", () => {
     expect(screen.getByText("BERT Pre-training of Deep Bidirectional Transformers")).toBeInTheDocument();
     expect(screen.getByText("1.")).toBeInTheDocument();
     expect(screen.getByText("2.")).toBeInTheDocument();
+  });
+
+  it("renders PDF badge for on-demand upgraded documents even if filename was txt", () => {
+    renderWithI18n(
+      <RightSidebar
+        activeChatId="chat-123"
+        documents={mockDocs}
+        onDocumentAdded={vi.fn()}
+        backendUrl="http://localhost:8000"
+        onClose={vi.fn()}
+      />
+    );
+
+    // Document 1 (pdf) and Document 3 (txt with has_full_pdf=true) both display PDF badge
+    const pdfBadges = screen.getAllByText("PDF");
+    expect(pdfBadges.length).toBeGreaterThanOrEqual(2);
+
+    // Document 2 has no full pdf and has txt filename, displaying TXT badge
+    expect(screen.getByText("TXT")).toBeInTheDocument();
   });
 
   it("switches to document reader when a document card is clicked", () => {

@@ -72,7 +72,8 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
   setIsCiteModalOpen,
 }) => {
   const { t } = useTranslation();
-  const badge = getFileBadgeInfo(viewingDoc?.filename || "");
+  const hasFullPdf = paperDetails?.has_full_pdf ?? viewingDoc?.has_full_pdf;
+  const badge = getFileBadgeInfo(paperDetails?.filename || viewingDoc?.filename || "", hasFullPdf);
 
   return (
     <aside className="w-full lg:w-[460px] h-full bg-app-sidebar border-l border-app-border flex flex-col shrink-0 z-10 transition-all relative text-app-text">

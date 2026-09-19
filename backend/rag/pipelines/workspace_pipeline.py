@@ -178,6 +178,10 @@ async def _retrieve_hybrid_workspace_context(
                 logger.debug(f"[Workspace Hybrid] FlashRank fallback: {rank_err}")
                 selected_nodes = nodes[:12]
 
+            # Safety fallback: if reranking produced an empty list, preserve top retrieved nodes
+            if not selected_nodes:
+                selected_nodes = nodes[:12]
+
             total_tokens = count_tokens(catalog_text, model_name=model_name)
             for idx, n in enumerate(selected_nodes, start=1):
                 fname = n.node.metadata.get("filename", "Dokumen")
