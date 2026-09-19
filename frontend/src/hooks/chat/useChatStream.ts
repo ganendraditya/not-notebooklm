@@ -234,10 +234,10 @@ export function useChatStream(
     } finally {
       if (job.controller === controller) {
         job.controller = null;
-      }
-      job.status = null;
-      if (activeChatIdRef.current === targetChatId) {
-        setActiveStatus(null);
+        job.status = null;
+        if (activeChatIdRef.current === targetChatId) {
+          setActiveStatus(null);
+        }
       }
       // If no valid response was completed (e.g. aborted or errored out), clean up loading state immediately
       if (!latestAsstMsg || controller.signal.aborted) {
@@ -495,10 +495,10 @@ export function useChatStream(
     } finally {
       if (job.controller === controller) {
         job.controller = null;
-      }
-      job.status = null;
-      if (activeChatIdRef.current === currentChatId) {
-        setActiveStatus(null);
+        job.status = null;
+        if (activeChatIdRef.current === currentChatId) {
+          setActiveStatus(null);
+        }
       }
       if (!latestAsstMsg || controller.signal.aborted) {
         job.isProcessing = false;
@@ -658,10 +658,10 @@ export function useChatStream(
     } finally {
       if (job.controller === controller) {
         job.controller = null;
-      }
-      job.status = null;
-      if (activeChatIdRef.current === currentChatId) {
-        setActiveStatus(null);
+        job.status = null;
+        if (activeChatIdRef.current === currentChatId) {
+          setActiveStatus(null);
+        }
       }
       if (!latestAsstMsg || controller.signal.aborted) {
         job.isProcessing = false;
