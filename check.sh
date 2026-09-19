@@ -56,10 +56,10 @@ if [ "$RUN_BACKEND" = true ]; then
         source "$ROOT_DIR/venv/bin/activate"
     fi
 
-    python -m compileall .
+    python -m compileall -q -x 'venv|__pycache__' .
 
     echo -e "\n${YELLOW}🧪 [Backend] 2/2: Running Pytest Suite...${NC}"
-    pytest -v
+    pytest -v tests/test_*.py
 
     echo -e "${GREEN}✓ Backend checks passed!${NC}"
 fi
