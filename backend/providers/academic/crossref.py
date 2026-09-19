@@ -86,7 +86,11 @@ def fetch_crossref(
                         "is_oa": is_oa_cr
                     })
                 offset += rows
+            elif resp.status_code == 429:
+                logger.warning(f"[Crossref API] Rate limit (429) hit for query '{term[:30]}'")
+                break
             else:
+                logger.debug(f"[Crossref API] Returned status {resp.status_code}")
                 break
         except Exception as e:
             logger.warning(f"Crossref API err: {e}")

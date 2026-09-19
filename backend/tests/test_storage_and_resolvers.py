@@ -118,17 +118,82 @@ def test_import_sources_stream_with_novel_and_duplicate():
         }
 
         # First import: should succeed
-        res = client.post(f"/chats/{chat_id}/import_sources_stream", json=payload)
-        assert res.status_code == 200
-        lines = [line.decode("utf-8") if isinstance(line, bytes) else line for line in res.iter_lines() if line]
-        assert any("progress" in l for l in lines)
-        assert any("done" in l for l in lines)
+        from unittest.mock import patch
+        fake_pdf = b"%PDF-1.4 " + b"0" * 1200
+        with patch("services.paper_service.resolve_and_fetch_authentic_pdf", return_value=fake_pdf):
+            res = client.post(f"/chats/{chat_id}/import_sources_stream", json=payload)
+            assert res.status_code == 200
+            lines = [line.decode("utf-8") if isinstance(line, bytes) else line for line in res.iter_lines() if line]
+            assert any("progress" in l for l in lines)
+            assert any("done" in l for l in lines)
 
-        # Second import with identical DOI: should recognize existing document and not crash
-        res_dup = client.post(f"/chats/{chat_id}/import_sources_stream", json=payload)
-        assert res_dup.status_code == 200
-        lines_dup = [line.decode("utf-8") if isinstance(line, bytes) else line for line in res_dup.iter_lines() if line]
-        assert any("progress" in l for l in lines_dup)
+            # Second import with identical DOI: should recognize existing document and not crash
+            res_dup = client.post(f"/chats/{chat_id}/import_sources_stream", json=payload)
+            assert res_dup.status_code == 200
+            lines_dup = [line.decode("utf-8") if isinstance(line, bytes) else line for line in res_dup.iter_lines() if line]
+            assert any("progress" in l for l in lines_dup)
     finally:
         # Cleanup test chat
         client.delete(f"/chats/{chat_id}")
+
+
+def test_lru_metadata_cache_thread_safety():
+    """Verify LRUMetadataCache is thread-safe under concurrent writes and evictions."""
+    import concurrent.futures
+    from services.search.metadata_resolver_service import LRUMetadataCache
+
+    cache = LRUMetadataCache(capacity=20)
+    errors = []
+
+    def worker(worker_id: int):
+        try:
+            for i in range(100):
+                key = f"doi:10.1000/{worker_id}_{i % 30}"
+                cache.set(key, {"title": f"Paper {worker_id}-{i}", "id": i})
+                val = cache.get(key)
+                _ = key in cache
+        except Exception as e:
+            errors.append(e)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(worker, w) for w in range(8)]
+        concurrent.futures.wait(futures)
+
+    assert len(errors) == 0
+    assert len(cache.cache) <= 20
+
+
+def test_pdf_racing_resolver_winner_and_bailout():
+    """Verify PDF racing resolver discovers winner and exits cleanly without thread leaks."""
+    from unittest.mock import patch
+    from providers.academic.pdf_racing_resolver import resolve_and_fetch_authentic_pdf
+
+    fake_pdf = b"%PDF-1.4 " + b"0" * 1500
+
+    with patch("providers.academic.pdf_racing_resolver.resolve_arxiv_pdf", return_value=fake_pdf), \
+         patch("providers.academic.pdf_racing_resolver.is_authentic_pdf_bytes", return_value=True), \
+         patch("providers.academic.pdf_racing_resolver.verify_pdf_title_match", return_value=True):
+        res = resolve_and_fetch_authentic_pdf(doi="10.48550/arXiv.2301.12345", title="Test Arxiv Paper")
+        assert res == fake_pdf
+
+
+def test_academic_fetchers_429_resilience():
+    """Verify that academic API fetchers handle HTTP 429 rate limit responses gracefully."""
+    from unittest.mock import patch, MagicMock
+    from providers.academic.crossref import fetch_crossref
+    from providers.academic.europe_pmc import fetch_europe_pmc
+    from providers.academic.openalex import fetch_openalex
+
+    mock_429_resp = MagicMock()
+    mock_429_resp.status_code = 429
+    mock_429_resp.json.return_value = {}
+
+    with patch("requests.get", return_value=mock_429_resp):
+        cr_res = fetch_crossref("machine learning", 5, None, False, {}, lambda t: True, lambda t, d: False, lambda t, s: True, lambda t, d: None)
+        assert cr_res == []
+
+        pmc_res = fetch_europe_pmc("machine learning", 5, None, False, False, lambda t: True, lambda t, d: False, lambda t, s: True, lambda t, d: None)
+        assert pmc_res == []
+
+        oa_res = fetch_openalex("machine learning", 5, None, 0, False, False, None, {}, lambda t: True, lambda t, d: False, lambda t, s: True, lambda t, d: None)
+        assert oa_res == []
