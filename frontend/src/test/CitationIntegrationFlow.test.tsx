@@ -100,7 +100,7 @@ describe("End-to-End Citation & Document Ordering Integration Test", () => {
       created_at: new Date().toISOString(),
     };
 
-    const { container } = renderWithI18n(
+    renderWithI18n(
       <InChatMessageComponent
         msg={msg}
         activeChatId="test-chat"

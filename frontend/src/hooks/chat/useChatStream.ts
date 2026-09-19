@@ -164,6 +164,11 @@ export function useChatStream(
               console.error("Failed to parse sources action:", e);
             }
           }
+
+          // Process next queued prompt if user entered messages while generation was in progress
+          if (job.queue.length > 0) {
+            processNextInQueue(targetChatId);
+          }
         }
       });
 
