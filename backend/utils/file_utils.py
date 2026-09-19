@@ -55,7 +55,30 @@ def get_doc_file_path(chat_id: str, filename: str) -> str:
     clean_fname = sanitize_safe_filename(raw_fname)
 
     # 1. Candidate paths to inspect (prefer authentic binary PDF on disk if available)
-    candidate_paths = [
+    pdf_candidate_paths = []
+
+    # If filename ends with non-PDF extension, prioritize checking its .pdf counterpart
+    if raw_fname.lower().endswith((".txt", ".bib", ".bibtex", ".ris", ".md")):
+        raw_base = os.path.splitext(raw_fname)[0]
+        clean_base = os.path.splitext(clean_fname)[0]
+        pdf_candidate_paths.extend([
+            os.path.join(UPLOAD_DIR, f"{raw_chat_id}_{raw_base}.pdf"),
+            os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_base}.pdf"),
+            os.path.join(UPLOAD_DIR, f"{clean_base}.pdf"),
+            os.path.join(UPLOAD_DIR, f"{raw_base}.pdf"),
+        ])
+
+    regular_candidate_paths = []
+    # If filename already contains chat_id prefix, also test stripped filename
+    if raw_chat_id and raw_fname.startswith(f"{raw_chat_id}_"):
+        stripped = raw_fname[len(raw_chat_id) + 1:]
+        regular_candidate_paths.extend([
+            os.path.join(UPLOAD_DIR, raw_fname),
+            os.path.join(UPLOAD_DIR, stripped),
+            os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{stripped}"),
+        ])
+
+    regular_candidate_paths.extend([
         # Direct raw path with spaces (how paper files are saved)
         os.path.join(UPLOAD_DIR, f"{raw_chat_id}_{raw_fname}"),
         os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{raw_fname}"),
@@ -67,15 +90,15 @@ def get_doc_file_path(chat_id: str, filename: str) -> str:
         os.path.join(UPLOAD_DIR, clean_fname),
         # Benchmark evaluation papers path fallback (sanitized filename only)
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "evaluation", "datasets", "qasper_papers", clean_fname)),
-    ]
+    ])
 
     # Return first existing file that is an authentic binary PDF (>=1000 bytes)
-    for p in candidate_paths:
+    for p in pdf_candidate_paths + regular_candidate_paths:
         if os.path.exists(p) and p.lower().endswith(".pdf") and os.path.getsize(p) >= 1000:
             return p
 
-    # If no binary PDF found, return first existing text/markdown fallback file
-    for p in candidate_paths:
+    # If no binary PDF found, return first existing regular fallback file
+    for p in regular_candidate_paths:
         if os.path.exists(p):
             return p
 

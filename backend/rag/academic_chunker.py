@@ -1,8 +1,6 @@
 import re
-from typing import List, Dict, Any
-
-import re
 import logging
+import threading
 from typing import List, Dict, Any, Optional
 import numpy as np
 
@@ -53,6 +51,7 @@ CANONICAL_SEMANTIC_ANCHORS = {
 
 _CATEGORY_CENTROIDS_CACHE: Optional[Dict[str, np.ndarray]] = None
 _HEADER_CLASSIFICATION_CACHE: Dict[str, str] = {}
+_CHUNKER_LOCK = threading.Lock()
 
 
 def strip_heading_numbering(title: str) -> str:
@@ -86,18 +85,21 @@ def init_semantic_centroids(embed_model: Any) -> Optional[Dict[str, np.ndarray]]
         return _CATEGORY_CENTROIDS_CACHE
     if embed_model is None or not hasattr(embed_model, "get_text_embedding"):
         return None
-    try:
-        centroids = {}
-        for cat, text in CANONICAL_SEMANTIC_ANCHORS.items():
-            vec = np.array(embed_model.get_text_embedding(text), dtype=np.float32)
-            norm = np.linalg.norm(vec)
-            if norm > 0:
-                centroids[cat] = vec / norm
-        _CATEGORY_CENTROIDS_CACHE = centroids
-        return _CATEGORY_CENTROIDS_CACHE
-    except Exception as e:
-        logger.warning(f"[Academic Chunker] Failed to initialize semantic centroids: {e}")
-        return None
+    with _CHUNKER_LOCK:
+        if _CATEGORY_CENTROIDS_CACHE is not None:
+            return _CATEGORY_CENTROIDS_CACHE
+        try:
+            centroids = {}
+            for cat, text in CANONICAL_SEMANTIC_ANCHORS.items():
+                vec = np.array(embed_model.get_text_embedding(text), dtype=np.float32)
+                norm = np.linalg.norm(vec)
+                if norm > 0:
+                    centroids[cat] = vec / norm
+            _CATEGORY_CENTROIDS_CACHE = centroids
+            return _CATEGORY_CENTROIDS_CACHE
+        except Exception as e:
+            logger.warning(f"[Academic Chunker] Failed to initialize semantic centroids: {e}")
+            return None
 
 
 def classify_canonical_section(
@@ -125,8 +127,9 @@ def classify_canonical_section(
                 return cat
 
     # Check cache for previously classified header string
-    if clean_lower in _HEADER_CLASSIFICATION_CACHE:
-        return _HEADER_CLASSIFICATION_CACHE[clean_lower]
+    with _CHUNKER_LOCK:
+        if clean_lower in _HEADER_CLASSIFICATION_CACHE:
+            return _HEADER_CLASSIFICATION_CACHE[clean_lower]
 
     # Tier 2: Semantic Embedding Matcher (Multilingual E5)
     active_embed_model = embed_model if embed_model is not None else get_default_embed_model()
@@ -148,17 +151,16 @@ def classify_canonical_section(
 
                     # Confidence criteria:
                     # If top match is 'general', or confidence is below threshold, or margin is ambiguous:
-                    if top1 != "general" and s1 >= threshold and margin >= min_margin:
-                        _HEADER_CLASSIFICATION_CACHE[clean_lower] = top1
-                        return top1
-                    else:
-                        _HEADER_CLASSIFICATION_CACHE[clean_lower] = "general"
-                        return "general"
+                    decision = top1 if (top1 != "general" and s1 >= threshold and margin >= min_margin) else "general"
+                    with _CHUNKER_LOCK:
+                        _HEADER_CLASSIFICATION_CACHE[clean_lower] = decision
+                    return decision
         except Exception as e:
             logger.debug(f"[Academic Chunker] Semantic classification skipped ({e})")
 
     # Tier 3: Fallback
-    _HEADER_CLASSIFICATION_CACHE[clean_lower] = "general"
+    with _CHUNKER_LOCK:
+        _HEADER_CLASSIFICATION_CACHE[clean_lower] = "general"
     return "general"
 
 

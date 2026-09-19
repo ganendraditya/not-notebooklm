@@ -22,7 +22,7 @@ export interface DocumentListPanelProps {
   setActiveMenuId: (id: number | null) => void;
   setViewingDoc: (doc: Document) => void;
   toggleDocSelection: (docId: number) => void;
-  getFileBadgeInfo: (filename: string) => { label: string; bg: string };
+  getFileBadgeInfo: (filename: string, hasFullPdf?: boolean) => { label: string; bg: string };
   setRenamingDoc: (doc: Document | null) => void;
   setRenameTitleInput: (title: string) => void;
   setRenameError: (err: string | null) => void;
@@ -74,7 +74,7 @@ export const DocumentListPanel: React.FC<DocumentListPanelProps> = ({
             {/* Existing indexed documents */}
             {sortedDocuments.map((doc) => {
               const isChecked = selectedDocs[doc.id] !== undefined ? selectedDocs[doc.id] : true;
-              const badge = getFileBadgeInfo(doc.filename);
+              const badge = getFileBadgeInfo(doc.filename, doc.has_full_pdf);
               const docIndex = (documents.findIndex(d => d.id === doc.id) + 1) || doc.index || 1;
 
               return (

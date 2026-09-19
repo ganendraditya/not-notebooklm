@@ -54,22 +54,32 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Any, file_path: str) -> T
                 base_name = os.path.basename(file_path)
                 target_path = file_path
 
+                # Determine clean base name without chat_id prefix for DBDocument.filename
+                doc_chat_id = doc.get("chat_id") if isinstance(doc, dict) else getattr(doc, "chat_id", None)
+                clean_name = base_name
+                if doc_chat_id and clean_name.startswith(f"{doc_chat_id}_"):
+                    clean_name = clean_name[len(str(doc_chat_id)) + 1:]
+
                 if base_name.lower().endswith((".txt", ".bib", ".bibtex", ".ris")):
                     ext_len = len(os.path.splitext(base_name)[1])
-                    pdf_base_name = base_name[:-ext_len] + ".pdf"
-                    target_path = os.path.join(dir_name, pdf_base_name)
+                    pdf_disk_name = (base_name[:-ext_len] if ext_len > 0 else base_name) + ".pdf"
+                    target_path = os.path.join(dir_name, pdf_disk_name)
+
+                    clean_ext_len = len(os.path.splitext(clean_name)[1])
+                    clean_pdf_name = (clean_name[:-clean_ext_len] if clean_ext_len > 0 else clean_name) + ".pdf"
+
                     try:
                         from database import SessionLocal, Document as DBDocument, commit_with_retry
                         with SessionLocal() as db_session:
                             db_doc = db_session.query(DBDocument).filter(DBDocument.id == doc_id).first()
                             if db_doc:
-                                db_doc.filename = pdf_base_name
+                                db_doc.filename = clean_pdf_name
                                 db_doc.access_status = "Open Access (Full PDF Available)"
                                 db_doc.is_oa = True
                                 if isinstance(doc, dict):
-                                    doc["filename"] = pdf_base_name
+                                    doc["filename"] = clean_pdf_name
                                 else:
-                                    doc.filename = pdf_base_name
+                                    doc.filename = clean_pdf_name
                                 commit_with_retry(db_session)
                     except Exception as db_err:
                         logger.debug(f"[DB filename update warning]: {db_err}")
@@ -207,6 +217,15 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
             res_data["access_status"] = "Open Access (Full PDF Available)"
             res_data["has_full_pdf"] = True
             res_data["is_abstract_only"] = False
+            # Ensure filename and type reflect authentic PDF format upgrade
+            updated_fname = doc.get("filename") if isinstance(doc, dict) else getattr(doc, "filename", None)
+            if updated_fname and updated_fname.lower().endswith(".pdf"):
+                res_data["filename"] = updated_fname
+            else:
+                base_fname = updated_fname or res_data.get("filename") or "document"
+                ext_len = len(os.path.splitext(base_fname)[1])
+                res_data["filename"] = (base_fname[:-ext_len] if ext_len > 0 else base_fname) + ".pdf"
+            res_data["type"] = "pdf"
         elif is_user_upload:
             res_data["is_oa"] = False
             res_data["access_status"] = doc.access_status or "Uploaded Document"
@@ -378,6 +397,14 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         res_data["access_status"] = "Open Access (Full PDF Available)"
         res_data["has_full_pdf"] = True
         res_data["is_abstract_only"] = False
+        updated_fname = doc.get("filename") if isinstance(doc, dict) else getattr(doc, "filename", None)
+        if updated_fname and updated_fname.lower().endswith(".pdf"):
+            res_data["filename"] = updated_fname
+        else:
+            base_fname = updated_fname or res_data.get("filename") or "document"
+            ext_len = len(os.path.splitext(base_fname)[1])
+            res_data["filename"] = (base_fname[:-ext_len] if ext_len > 0 else base_fname) + ".pdf"
+        res_data["type"] = "pdf"
     else:
         res_data["has_full_pdf"] = False
         res_data["is_abstract_only"] = True
