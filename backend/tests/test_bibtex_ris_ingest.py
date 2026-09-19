@@ -42,7 +42,10 @@ def mock_academic_pdf_resolver(monkeypatch):
     """Hermetic isolation: prevent live HTTP requests to Semantic Scholar / Crossref / Unpaywall during tests."""
     monkeypatch.setattr("services.document.upload_service.resolve_and_fetch_authentic_pdf", mock_resolve_and_fetch_authentic_pdf)
     monkeypatch.setattr("services.document.content_service.resolve_and_fetch_authentic_pdf", mock_resolve_and_fetch_authentic_pdf)
+    monkeypatch.setattr("services.paper_service.resolve_and_fetch_authentic_pdf", mock_resolve_and_fetch_authentic_pdf)
     monkeypatch.setattr("providers.academic.pdf_racing_resolver.resolve_and_fetch_authentic_pdf", mock_resolve_and_fetch_authentic_pdf)
+    monkeypatch.setattr("providers.academic.metadata_fetchers.fetch_crossref_metadata_by_doi", lambda *a, **kw: None)
+    monkeypatch.setattr("providers.academic.metadata_fetchers.fetch_openalex_metadata_by_doi", lambda *a, **kw: None)
 
 SAMPLE_BIB_MULTI = """
 @article{vaswani2017attention,

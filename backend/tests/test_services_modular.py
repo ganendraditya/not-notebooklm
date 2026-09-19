@@ -163,7 +163,10 @@ def test_paper_service_prepare_and_document_response():
         url="https://arxiv.org/abs/1706.03762",
         is_oa=True
     )
-    res = prepare_paper_file_sync("test_chat_contract", cand)
+    from unittest.mock import patch
+    fake_pdf = b"%PDF-1.4 " + b"0" * 1200
+    with patch("services.paper_service.resolve_and_fetch_authentic_pdf", return_value=fake_pdf):
+        res = prepare_paper_file_sync("test_chat_contract", cand)
     assert len(res) == 4
     doc_text, filename, c_doi, has_downloaded_pdf = res
     assert "Attention Is All You Need" in doc_text
@@ -296,7 +299,9 @@ def test_clean_chat_duplicates_normalizes_doi_formats():
         db.add_all([d1, d2])
         db.commit()
 
-        result = asyncio.run(clean_chat_duplicates(chat_id, db))
+        from unittest.mock import patch
+        with patch("rag.resolve_paper_metadata_by_doi", return_value=None):
+            result = asyncio.run(clean_chat_duplicates(chat_id, db))
         assert result["status"] == "success"
         assert result["cleaned_count"] == 1
         assert result["remaining_count"] == 1

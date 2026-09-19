@@ -118,17 +118,20 @@ def test_import_sources_stream_with_novel_and_duplicate():
         }
 
         # First import: should succeed
-        res = client.post(f"/chats/{chat_id}/import_sources_stream", json=payload)
-        assert res.status_code == 200
-        lines = [line.decode("utf-8") if isinstance(line, bytes) else line for line in res.iter_lines() if line]
-        assert any("progress" in l for l in lines)
-        assert any("done" in l for l in lines)
+        from unittest.mock import patch
+        fake_pdf = b"%PDF-1.4 " + b"0" * 1200
+        with patch("services.paper_service.resolve_and_fetch_authentic_pdf", return_value=fake_pdf):
+            res = client.post(f"/chats/{chat_id}/import_sources_stream", json=payload)
+            assert res.status_code == 200
+            lines = [line.decode("utf-8") if isinstance(line, bytes) else line for line in res.iter_lines() if line]
+            assert any("progress" in l for l in lines)
+            assert any("done" in l for l in lines)
 
-        # Second import with identical DOI: should recognize existing document and not crash
-        res_dup = client.post(f"/chats/{chat_id}/import_sources_stream", json=payload)
-        assert res_dup.status_code == 200
-        lines_dup = [line.decode("utf-8") if isinstance(line, bytes) else line for line in res_dup.iter_lines() if line]
-        assert any("progress" in l for l in lines_dup)
+            # Second import with identical DOI: should recognize existing document and not crash
+            res_dup = client.post(f"/chats/{chat_id}/import_sources_stream", json=payload)
+            assert res_dup.status_code == 200
+            lines_dup = [line.decode("utf-8") if isinstance(line, bytes) else line for line in res_dup.iter_lines() if line]
+            assert any("progress" in l for l in lines_dup)
     finally:
         # Cleanup test chat
         client.delete(f"/chats/{chat_id}")
