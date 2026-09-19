@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import re
+import threading
 from typing import Dict, List, Optional, Tuple, Any
 from collections import OrderedDict
 
@@ -24,25 +25,28 @@ def compute_claim_hash(claim: str) -> str:
     norm = normalize_claim(claim)
     return hashlib.sha256(norm.encode("utf-8")).hexdigest()
 
-# In-memory LRU cache: (chat_id, doc_id, claim_hash) -> List[str]
+# In-memory thread-safe LRU cache: (chat_id, doc_id, claim_hash) -> List[str]
 _CACHE_MAX_SIZE = 500
 _HIGHLIGHT_CACHE: OrderedDict[Tuple[str, int, str], List[str]] = OrderedDict()
+_HIGHLIGHT_LOCK = threading.Lock()
 
 
 def _get_from_cache(chat_id: str, doc_id: int, claim: str) -> Optional[List[str]]:
     key = (chat_id, doc_id, compute_claim_hash(claim))
-    if key in _HIGHLIGHT_CACHE:
-        _HIGHLIGHT_CACHE.move_to_end(key)
-        return _HIGHLIGHT_CACHE[key]
+    with _HIGHLIGHT_LOCK:
+        if key in _HIGHLIGHT_CACHE:
+            _HIGHLIGHT_CACHE.move_to_end(key)
+            return _HIGHLIGHT_CACHE[key]
     return None
 
 
 def _set_in_cache(chat_id: str, doc_id: int, claim: str, passages: List[str]) -> None:
     key = (chat_id, doc_id, compute_claim_hash(claim))
-    _HIGHLIGHT_CACHE[key] = passages
-    _HIGHLIGHT_CACHE.move_to_end(key)
-    if len(_HIGHLIGHT_CACHE) > _CACHE_MAX_SIZE:
-        _HIGHLIGHT_CACHE.popitem(last=False)
+    with _HIGHLIGHT_LOCK:
+        _HIGHLIGHT_CACHE[key] = passages
+        _HIGHLIGHT_CACHE.move_to_end(key)
+        if len(_HIGHLIGHT_CACHE) > _CACHE_MAX_SIZE:
+            _HIGHLIGHT_CACHE.popitem(last=False)
 
 
 FAST_HIGHLIGHT_SYSTEM_PROMPT = """You are an academic document evidence locator.
@@ -207,19 +211,24 @@ async def get_ai_highlight_passages(
             ]
             # Verify passages actually exist in document text to prevent hallucinations
             verified_passages = []
+            full_text_normalized = " ".join(full_text.split()).lower()
+            clean_doc = " ".join(re.sub(r'[^\w\s]', ' ', full_text_normalized).split())
+
             for vp in valid_passages:
-                # Relaxed whitespace comparison
-                vp_normalized = " ".join(vp.split())
-                full_text_normalized = " ".join(full_text.split())
-                if vp_normalized.lower() in full_text_normalized.lower():
+                # 1. Relaxed whitespace comparison
+                vp_normalized = " ".join(vp.split()).lower()
+                if vp_normalized in full_text_normalized:
                     verified_passages.append(vp)
                 else:
-                    # If slight mismatch due to punctuation, try substring
-                    vp_shorter = vp_normalized[:50]
-                    if len(vp_shorter) >= 20 and vp_shorter.lower() in full_text_normalized.lower():
+                    # 2. Relaxed punctuation comparison (contiguous sequence matching)
+                    clean_vp = " ".join(re.sub(r'[^\w\s]', ' ', vp_normalized).split())
+                    if clean_vp and clean_vp in clean_doc:
                         verified_passages.append(vp)
                     else:
-                        verified_passages.append(vp)
+                        # 3. Substring check on significant initial phrase (>= 25 chars)
+                        vp_shorter = clean_vp[:50].strip()
+                        if len(vp_shorter) >= 25 and vp_shorter in clean_doc:
+                            verified_passages.append(vp)
 
             _set_in_cache(chat_id, doc_id, claim_clean, verified_passages)
 

@@ -59,19 +59,18 @@ async def check_and_fetch_authentic_pdf_on_demand(doc: Any, file_path: str) -> T
                     pdf_base_name = base_name[:-ext_len] + ".pdf"
                     target_path = os.path.join(dir_name, pdf_base_name)
                     try:
-                        from database import SessionLocal, Document as DBDocument
-                        db = SessionLocal()
-                        db_doc = db.query(DBDocument).filter(DBDocument.id == doc_id).first()
-                        if db_doc:
-                            db_doc.filename = pdf_base_name
-                            db_doc.access_status = "Open Access (Full PDF Available)"
-                            db_doc.is_oa = True
-                            if isinstance(doc, dict):
-                                doc["filename"] = pdf_base_name
-                            else:
-                                doc.filename = pdf_base_name
-                            db.commit()
-                        db.close()
+                        from database import SessionLocal, Document as DBDocument, commit_with_retry
+                        with SessionLocal() as db_session:
+                            db_doc = db_session.query(DBDocument).filter(DBDocument.id == doc_id).first()
+                            if db_doc:
+                                db_doc.filename = pdf_base_name
+                                db_doc.access_status = "Open Access (Full PDF Available)"
+                                db_doc.is_oa = True
+                                if isinstance(doc, dict):
+                                    doc["filename"] = pdf_base_name
+                                else:
+                                    doc.filename = pdf_base_name
+                                commit_with_retry(db_session)
                     except Exception as db_err:
                         logger.debug(f"[DB filename update warning]: {db_err}")
 
