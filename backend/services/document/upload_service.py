@@ -143,112 +143,115 @@ async def handle_bib_or_ris_split_upload(
     base_root, _ = os.path.splitext(clean_fname)
 
     for idx, entry in enumerate(entries):
-        entry_key = sanitize_safe_filename(entry.get("key") or entry.get("title") or f"{base_root}_{idx + 1}")
-        entry_key = entry_key[:45].strip("._-") or f"ref_{idx + 1}"
+        try:
+            entry_key = sanitize_safe_filename(entry.get("key") or entry.get("title") or f"{base_root}_{idx + 1}")
+            entry_key = entry_key[:45].strip("._-") or f"ref_{idx + 1}"
 
-        authors_list = entry.get("authors", [])
-        authors_json = json.dumps(authors_list, ensure_ascii=False) if authors_list else None
-        doi = entry.get("doi", "").strip()
-        url = entry.get("url", "").strip()
-        if not url and doi:
-            url = f"https://doi.org/{doi}"
+            authors_list = entry.get("authors", [])
+            authors_json = json.dumps(authors_list, ensure_ascii=False) if authors_list else None
+            doi = entry.get("doi", "").strip()
+            url = entry.get("url", "").strip()
+            if not url and doi:
+                url = f"https://doi.org/{doi}"
 
-        title = entry.get("title") or entry_key
+            title = entry.get("title") or entry_key
 
-        # Proactively attempt authentic open-access PDF resolution via DOI / URL
-        has_downloaded_pdf = False
-        pdf_bytes = None
-        if doi or url:
-            try:
-                pdf_bytes = await asyncio.to_thread(
-                    resolve_and_fetch_authentic_pdf,
-                    doi=doi,
-                    title=title,
-                    direct_url=url or "",
-                    candidate_pdf_url=""
-                )
-                if pdf_bytes and is_authentic_pdf_bytes(pdf_bytes, min_size=1000):
-                    has_downloaded_pdf = True
-            except Exception as e:
-                logger.debug(f"[Bib/RIS PDF Fetch Warning]: {e}")
+            # Proactively attempt authentic open-access PDF resolution via DOI / URL
+            has_downloaded_pdf = False
+            pdf_bytes = None
+            if doi or url:
+                try:
+                    pdf_bytes = await asyncio.to_thread(
+                        resolve_and_fetch_authentic_pdf,
+                        doi=doi,
+                        title=title,
+                        direct_url=url or "",
+                        candidate_pdf_url=""
+                    )
+                    if pdf_bytes and is_authentic_pdf_bytes(pdf_bytes, min_size=1000):
+                        has_downloaded_pdf = True
+                except Exception as e:
+                    logger.debug(f"[Bib/RIS PDF Fetch Warning]: {e}")
 
-        if has_downloaded_pdf and pdf_bytes:
-            entry_fname = f"{entry_key}_{idx + 1}.pdf" if len(entries) > 1 else f"{entry_key}.pdf"
-            storage_fname = f"{clean_chat_id}_{entry_fname}"
-            entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
-            with open(entry_file_path, "wb") as pf:
-                pf.write(pdf_bytes)
-            is_oa = True
-            access_status = "Open Access (Full PDF Available)"
-            metric_name = "Peer-Reviewed"
-        else:
-            entry_fname = f"{entry_key}_{idx + 1}.txt" if len(entries) > 1 else f"{entry_key}.txt"
-            storage_fname = f"{clean_chat_id}_{entry_fname}"
-            entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
-
-            # Write clean human-readable text file with title, authors, year, DOI, and abstract
-            content_lines = [f"Title: {title}"]
-            if authors_list:
-                content_lines.append(f"Authors: {', '.join(authors_list)}")
-            if entry.get("year"):
-                content_lines.append(f"Year: {entry.get('year')}")
-            if entry.get("journal"):
-                content_lines.append(f"Journal/Venue: {entry.get('journal')}")
-            if doi:
-                content_lines.append(f"DOI: {doi}")
-            if url:
-                content_lines.append(f"URL: {url}")
-            content_lines.append("")
-            if entry.get("abstract"):
-                content_lines.append("Abstract:")
-                content_lines.append(entry.get("abstract"))
+            if has_downloaded_pdf and pdf_bytes:
+                entry_fname = f"{entry_key}_{idx + 1}.pdf" if len(entries) > 1 else f"{entry_key}.pdf"
+                storage_fname = f"{clean_chat_id}_{entry_fname}"
+                entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
+                with open(entry_file_path, "wb") as pf:
+                    pf.write(pdf_bytes)
+                is_oa = True
+                access_status = "Open Access (Full PDF Available)"
+                metric_name = "Peer-Reviewed"
             else:
-                content_lines.append("Abstract:")
-                content_lines.append("No abstract available in citation metadata.")
+                entry_fname = f"{entry_key}_{idx + 1}.txt" if len(entries) > 1 else f"{entry_key}.txt"
+                storage_fname = f"{clean_chat_id}_{entry_fname}"
+                entry_file_path = os.path.join(UPLOAD_DIR, storage_fname)
 
-            with open(entry_file_path, "w", encoding="utf-8") as ef:
-                ef.write("\n".join(content_lines))
+                # Write clean human-readable text file with title, authors, year, DOI, and abstract
+                content_lines = [f"Title: {title}"]
+                if authors_list:
+                    content_lines.append(f"Authors: {', '.join(authors_list)}")
+                if entry.get("year"):
+                    content_lines.append(f"Year: {entry.get('year')}")
+                if entry.get("journal"):
+                    content_lines.append(f"Journal/Venue: {entry.get('journal')}")
+                if doi:
+                    content_lines.append(f"DOI: {doi}")
+                if url:
+                    content_lines.append(f"URL: {url}")
+                content_lines.append("")
+                if entry.get("abstract"):
+                    content_lines.append("Abstract:")
+                    content_lines.append(entry.get("abstract"))
+                else:
+                    content_lines.append("Abstract:")
+                    content_lines.append("No abstract available in citation metadata.")
 
-            is_oa = False
-            access_status = "Publication Brief & Abstract (Uploaded)"
-            metric_name = "Uploaded Reference"
+                with open(entry_file_path, "w", encoding="utf-8") as ef:
+                    ef.write("\n".join(content_lines))
 
-        from services import storage_adapter
-        storage_adapter.upload_file(entry_file_path, s3_key=storage_fname)
+                is_oa = False
+                access_status = "Publication Brief & Abstract (Uploaded)"
+                metric_name = "Uploaded Reference"
 
-        db_doc = Document(
-            chat_id=chat_id,
-            filename=entry_fname,
-            title=title,
-            authors=authors_json,
-            year=entry.get("year", ""),
-            journal=entry.get("journal", ""),
-            journal_metric=metric_name,
-            doi=doi,
-            url=url,
-            abstract=entry.get("abstract", ""),
-            abstract_type="official" if entry.get("abstract") else "ai_summary",
-            is_oa=is_oa,
-            access_status=access_status,
-            quality_tier=4
-        )
-        db.add(db_doc)
-        commit_with_retry(db)
-        db.refresh(db_doc)
+            from services import storage_adapter
+            storage_adapter.upload_file(entry_file_path, s3_key=storage_fname)
 
-        enriched = {
-            "title": title,
-            "authors": authors_list,
-            "year": entry.get("year", ""),
-            "journal": entry.get("journal", ""),
-            "journal_metric": metric_name,
-            "doi": doi,
-            "url": url,
-            "abstract": entry.get("abstract", ""),
-            "is_valid_pdf": has_downloaded_pdf,
-            "is_verified_academic": has_downloaded_pdf,
-            "access_status": access_status
-        }
-        results.append((db_doc, entry_file_path, enriched))
+            db_doc = Document(
+                chat_id=chat_id,
+                filename=entry_fname,
+                title=title,
+                authors=authors_json,
+                year=entry.get("year", ""),
+                journal=entry.get("journal", ""),
+                journal_metric=metric_name,
+                doi=doi,
+                url=url,
+                abstract=entry.get("abstract", ""),
+                abstract_type="official" if entry.get("abstract") else "ai_summary",
+                is_oa=is_oa,
+                access_status=access_status,
+                quality_tier=4
+            )
+            db.add(db_doc)
+            commit_with_retry(db)
+            db.refresh(db_doc)
+
+            enriched = {
+                "title": title,
+                "authors": authors_list,
+                "year": entry.get("year", ""),
+                "journal": entry.get("journal", ""),
+                "journal_metric": metric_name,
+                "doi": doi,
+                "url": url,
+                "abstract": entry.get("abstract", ""),
+                "is_valid_pdf": has_downloaded_pdf,
+                "is_verified_academic": has_downloaded_pdf,
+                "access_status": access_status
+            }
+            results.append((db_doc, entry_file_path, enriched))
+        except Exception as entry_err:
+            logger.warning(f"[Bib/RIS Entry Ingest Error] Failed processing entry {idx + 1}: {entry_err}")
 
     return results

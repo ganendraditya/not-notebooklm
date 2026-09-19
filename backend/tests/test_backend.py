@@ -709,7 +709,43 @@ def test_on_demand_highlight_service():
             )
             assert res_cached == res
 
+            # Test that completely fabricated/hallucinated passages are rejected
+            hallucinated_resp = AsyncMock()
+            hallucinated_resp.message.content = '["This sentence does not exist anywhere in the traffic dataset document at all."]'
+            with patch("services.highlight_service.acall_fast_with_fallback", new=AsyncMock(return_value=hallucinated_resp)):
+                res_hallucinated = await get_ai_highlight_passages(
+                    chat_id="test_chat",
+                    doc_id=998,
+                    doc_filename="doc2.pdf",
+                    claim="Non-existent claim",
+                    doc_fallback_text=sample_doc,
+                )
+                assert res_hallucinated == []
+
     asyncio.run(_test())
+
+
+def test_highlight_cache_thread_safety():
+    """Verify in-memory highlight LRU cache is thread-safe under concurrent access."""
+    import concurrent.futures
+    from services.highlight_service import _get_from_cache, _set_in_cache
+
+    errors = []
+
+    def worker(wid: int):
+        try:
+            for i in range(50):
+                claim_text = f"Claim statement {wid} number {i % 15}"
+                _set_in_cache("chat_threads", wid, claim_text, [f"Passage {i}"])
+                _ = _get_from_cache("chat_threads", wid, claim_text)
+        except Exception as e:
+            errors.append(e)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        futs = [ex.submit(worker, w) for w in range(8)]
+        concurrent.futures.wait(futs)
+
+    assert len(errors) == 0
 
 
 def test_highlight_endpoint():
