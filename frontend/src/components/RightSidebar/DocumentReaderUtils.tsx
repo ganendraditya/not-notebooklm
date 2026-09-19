@@ -420,14 +420,15 @@ export interface FileBadge {
   bg: string;
 }
 
-export const getFileBadgeInfo = (filename: string): FileBadge => {
+export const getFileBadgeInfo = (filename: string, hasFullPdf?: boolean): FileBadge => {
+  if (hasFullPdf || filename.toLowerCase().endsWith(".pdf")) {
+    return { label: "PDF", bg: "bg-red-600/15 border-red-500/40 text-red-500" };
+  }
   if (filename.startsWith("10.") || filename.startsWith("DOI:") || filename.includes("doi.org")) {
     return { label: "DOI", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
   }
   const ext = filename.split(".").pop()?.toLowerCase() || "doc";
-  if (ext === "pdf") {
-    return { label: "PDF", bg: "bg-red-600/15 border-red-500/40 text-red-500" };
-  } else if (ext === "docx" || ext === "doc") {
+  if (ext === "docx" || ext === "doc") {
     return { label: "DOC", bg: "bg-blue-600/15 border-blue-500/40 text-blue-500" };
   } else if (ext === "bib" || ext === "bibtex") {
     return { label: "BIB", bg: "bg-amber-600/15 border-amber-500/40 text-amber-500" };
