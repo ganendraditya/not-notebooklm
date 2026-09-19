@@ -70,7 +70,7 @@ function findQuoteSpan(fullText: string, quote: string): [number, number] | null
     const rx = new RegExp(escaped, "i");
     const m = rx.exec(fullText);
     if (m) return [m.index, m.index + m[0].length];
-  } catch (e) {}
+  } catch {}
 
   // Tier 3: Markdown-aware regex allowing optional markdown tags (_, *, <u>, </u>) between words
   const cleanQ = rawQ.replace(/<[^>]+>/g, " ").replace(/[*_~`]/g, "").trim();
@@ -83,7 +83,7 @@ function findQuoteSpan(fullText: string, quote: string): [number, number] | null
     const rxFull = new RegExp(rxFullPattern, "i");
     const m = rxFull.exec(fullText);
     if (m) return [m.index, m.index + m[0].length];
-  } catch (e) {}
+  } catch {}
 
   // Tier 4: Anchor fallback using head (first 4 words) and tail (last 4 words)
   if (words.length >= 6) {
@@ -101,7 +101,7 @@ function findQuoteSpan(fullText: string, quote: string): [number, number] | null
           return [mHead.index, endPos];
         }
       }
-    } catch (e) {}
+    } catch {}
   }
   return null;
 }

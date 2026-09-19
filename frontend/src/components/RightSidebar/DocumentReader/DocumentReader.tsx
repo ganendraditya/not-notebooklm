@@ -11,6 +11,7 @@ import {
   ChevronUp,
   ChevronDown,
   FileText,
+  Loader2,
 } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { Document as DocType } from "@/stores/documentStore";
@@ -135,6 +136,12 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5">
+              {isHighlightLoading && (
+                <div className="flex items-center gap-1 text-[11px] text-app-text-dim animate-pulse mr-1">
+                  <Loader2 size={11} className="animate-spin text-blue-500" />
+                  <span>Locating...</span>
+                </div>
+              )}
               {totalMatches > 1 && (
                 <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2 py-0.5 mr-1">
                   <span className="text-[10px] font-mono font-semibold text-amber-500">
