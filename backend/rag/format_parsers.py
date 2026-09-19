@@ -188,12 +188,69 @@ def extract_bibtex_entries(text: str) -> list:
 def extract_ris_entries(text: str) -> list:
     """
     Extracts structured bibliographic entries from RIS citation library content.
-    Handles multiline tags, multiple authors, and clean metadata extraction.
+    Handles multiline tags, multiple authors, unclosed/truncated files, and clean metadata extraction.
     """
     entries = []
     current_fields = {}
     authors = []
     raw_lines = []
+
+    def _flush_current():
+        nonlocal current_fields, authors, raw_lines
+        if not (current_fields or authors):
+            return
+        raw_title = current_fields.get("TI", current_fields.get("T1", current_fields.get("CT", "Untitled Reference")))
+        clean_title = re.sub(r'\s+', ' ', raw_title).strip()
+
+        raw_year = current_fields.get("PY", current_fields.get("Y1", ""))
+        year_m = re.search(r'\b(19\d\d|20\d\d)\b', raw_year)
+        year = year_m.group(1) if year_m else raw_year.strip()
+
+        journal = current_fields.get("JO", current_fields.get("JF", current_fields.get("T2", current_fields.get("JA", ""))))
+        raw_doi = current_fields.get("DO", "")
+        doi = re.sub(r'^https?://(?:dx\.)?doi\.org/', '', raw_doi).strip()
+        url = current_fields.get("UR", "")
+        abstract = current_fields.get("AB", current_fields.get("N2", ""))
+
+        # Clean formatted author names
+        cleaned_authors = []
+        for a in authors:
+            c_a = a.strip()
+            if ',' in c_a:
+                parts = [p.strip() for p in c_a.split(',', 1)]
+                c_a = f"{parts[1]} {parts[0]}".strip()
+            if c_a:
+                cleaned_authors.append(c_a)
+
+        md_lines = [f"### {clean_title}"]
+        if cleaned_authors:
+            md_lines.append(f"- **Authors**: {', '.join(cleaned_authors)}")
+        if year:
+            md_lines.append(f"- **Year**: {year}")
+        if journal:
+            md_lines.append(f"- **Journal/Venue**: {journal}")
+        if doi:
+            md_lines.append(f"- **DOI**: [{doi}](https://doi.org/{doi})")
+        elif url:
+            md_lines.append(f"- **URL**: [{url}]({url})")
+        if abstract:
+            md_lines.append(f"- **Abstract**: {abstract}")
+
+        entries.append({
+            'type': current_fields.get("TY", "JOUR"),
+            'title': clean_title,
+            'authors': cleaned_authors,
+            'year': year,
+            'journal': journal,
+            'doi': doi,
+            'abstract': abstract,
+            'url': url,
+            'raw': "\n".join(raw_lines).strip(),
+            'markdown': "\n".join(md_lines)
+        })
+        current_fields = {}
+        authors = []
+        raw_lines = []
 
     for line in text.splitlines():
         raw_lines.append(line)
@@ -202,59 +259,7 @@ def extract_ris_entries(text: str) -> list:
             continue
 
         if trimmed.startswith("ER  -") or trimmed == "ER -" or trimmed == "ER-":
-            if current_fields or authors:
-                raw_title = current_fields.get("TI", current_fields.get("T1", current_fields.get("CT", "Untitled Reference")))
-                clean_title = re.sub(r'\s+', ' ', raw_title).strip()
-
-                raw_year = current_fields.get("PY", current_fields.get("Y1", ""))
-                year_m = re.search(r'\b(19\d\d|20\d\d)\b', raw_year)
-                year = year_m.group(1) if year_m else raw_year.strip()
-
-                journal = current_fields.get("JO", current_fields.get("JF", current_fields.get("T2", current_fields.get("JA", ""))))
-                raw_doi = current_fields.get("DO", "")
-                doi = re.sub(r'^https?://(?:dx\.)?doi\.org/', '', raw_doi).strip()
-                url = current_fields.get("UR", "")
-                abstract = current_fields.get("AB", current_fields.get("N2", ""))
-
-                # Clean formatted author names
-                cleaned_authors = []
-                for a in authors:
-                    c_a = a.strip()
-                    if ',' in c_a:
-                        parts = [p.strip() for p in c_a.split(',', 1)]
-                        c_a = f"{parts[1]} {parts[0]}".strip()
-                    if c_a:
-                        cleaned_authors.append(c_a)
-
-                md_lines = [f"### {clean_title}"]
-                if cleaned_authors:
-                    md_lines.append(f"- **Authors**: {', '.join(cleaned_authors)}")
-                if year:
-                    md_lines.append(f"- **Year**: {year}")
-                if journal:
-                    md_lines.append(f"- **Journal/Venue**: {journal}")
-                if doi:
-                    md_lines.append(f"- **DOI**: [{doi}](https://doi.org/{doi})")
-                elif url:
-                    md_lines.append(f"- **URL**: [{url}]({url})")
-                if abstract:
-                    md_lines.append(f"- **Abstract**: {abstract}")
-
-                entries.append({
-                    'type': current_fields.get("TY", "JOUR"),
-                    'title': clean_title,
-                    'authors': cleaned_authors,
-                    'year': year,
-                    'journal': journal,
-                    'doi': doi,
-                    'abstract': abstract,
-                    'url': url,
-                    'raw': "\n".join(raw_lines).strip(),
-                    'markdown': "\n".join(md_lines)
-                })
-            current_fields = {}
-            authors = []
-            raw_lines = []
+            _flush_current()
         elif len(trimmed) >= 4 and (trimmed[2:6] == "  - " or trimmed[2:4] == "- "):
             tag = trimmed[:2].strip()
             dash_idx = trimmed.find("-")
@@ -283,6 +288,9 @@ def extract_ris_entries(text: str) -> list:
                 current_fields["TI"] += " " + trimmed
             elif "T1" in current_fields:
                 current_fields["T1"] += " " + trimmed
+
+    # Flush trailing entry if file lacked explicit ending ER -
+    _flush_current()
 
     return entries
 
