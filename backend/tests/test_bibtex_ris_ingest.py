@@ -139,6 +139,21 @@ def test_extract_ris_entries_unit():
     assert r2["year"] == "2019"
     assert r2["doi"] == "10.18653/v1/N19-1423"
 
+    # Test trailing record without explicit ER - tag (truncated file resilience)
+    truncated_ris = """
+TY  - JOUR
+TI  - Resilient Trailing Entry Without ER
+AU  - Alice Smith
+PY  - 2025
+DO  - 10.1000/trailing
+AB  - This record lacks a terminal ER delimiter.
+"""
+    t_entries = extract_ris_entries(truncated_ris)
+    assert len(t_entries) == 1
+    assert t_entries[0]["title"] == "Resilient Trailing Entry Without ER"
+    assert t_entries[0]["year"] == "2025"
+    assert t_entries[0]["doi"] == "10.1000/trailing"
+
 def test_parse_bibtex_and_ris_markdown():
     """Verify format parsers generate clean Markdown summaries."""
     md_bib = parse_bibtex_text(SAMPLE_BIB_MULTI)
