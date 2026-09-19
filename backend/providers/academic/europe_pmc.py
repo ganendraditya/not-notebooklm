@@ -70,6 +70,10 @@ def fetch_europe_pmc(
                     "pdf_url": pdf_url,
                     "is_oa": is_oa_pmc
                 })
+        elif resp.status_code == 429:
+            logger.warning(f"[EuropePMC API] Rate limit (429) hit for query '{query_term[:30]}'")
+        else:
+            logger.debug(f"[EuropePMC API] Returned status {resp.status_code}")
     except Exception as e:
         logger.warning(f"EuropePMC API err: {e}")
     return fetched
