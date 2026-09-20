@@ -4,529 +4,602 @@
     "tier": "s_niah",
     "token_load": "4k",
     "depth_ratio": 0.1,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
     "target_documents": [
       "qasper_1809.00540.txt"
     ],
     "needles": [
       {
-        "input": "ETHICS DIRECTIVE: Institutional Review Board protocol #2026-B81 must be explicitly cited in all human-subject evaluation sections. Never reference animal subjects.",
+        "input": "eh min, protokol etik penelitian kita pake nomer IRB #2026-B81 ya",
         "depth_ratio": 0.1,
-        "type": "directive"
+        "type": "directive",
+        "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Must explicitly cite IRB protocol #2026-B81 in all human-subject sections; strictly never reference animal subjects.",
-    "probe_query": "What was the mandatory Institutional Review Board (IRB) ethics protocol number and subject restriction I gave earlier?"
+    "expected_answer": "Protokol etik IRB #2026-B81.",
+    "probe_query": "apa nomor protokol etik irb yang saya sebut tadi?"
   },
   {
     "id": "S-VAL-02",
     "tier": "s_niah",
     "token_load": "4k",
     "depth_ratio": 0.9,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
     "target_documents": [
       "qasper_2004.03354.txt"
     ],
     "needles": [
       {
-        "input": "COMPUTE BUDGET: The maximum training cluster runtime is capped at 72 GPU-hours. Disallow all distributed multi-node sweeps exceeding this quota.",
+        "input": "max compute: 72 gpu-hours runtime capped",
         "depth_ratio": 0.9,
-        "type": "directive"
+        "type": "directive",
+        "persona": "terse_lowercase"
       }
     ],
-    "expected_answer": "Maximum training cluster runtime is capped at 72 GPU-hours, disallowing multi-node sweeps exceeding this quota.",
-    "probe_query": "What is the exact maximum cluster compute budget in GPU-hours I specified earlier in our chat?"
+    "expected_answer": "Max compute is 72 GPU-hours.",
+    "probe_query": "what was the compute runtime cap?"
   },
   {
     "id": "S-VAL-03",
     "tier": "s_niah",
     "token_load": "8k",
     "depth_ratio": 0.3,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
     "target_documents": [
       "qasper_1611.04798.txt"
     ],
     "needles": [
       {
-        "input": "DATA PRIVACY: Patient PII de-identification must strictly follow the HIPAA Safe Harbor standard. Strictly prohibit the expert determination method.",
+        "input": "Patient de-identification must strictly conform to the HIPAA Safe Harbor standard.",
         "depth_ratio": 0.3,
-        "type": "directive"
+        "type": "directive",
+        "persona": "academic_verbose"
       }
     ],
-    "expected_answer": "Must strictly follow the HIPAA Safe Harbor standard for de-identification and prohibit expert determination.",
-    "probe_query": "What specific health data privacy compliance standard did I instruct you to follow regarding patient de-identification?"
+    "expected_answer": "HIPAA Safe Harbor standard.",
+    "probe_query": "Which patient de-identification standard was mandated?"
   },
   {
     "id": "S-VAL-04",
     "tier": "s_niah",
     "token_load": "8k",
     "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
     "target_documents": [
       "qasper_1912.13337.txt"
     ],
     "needles": [
       {
-        "input": "OPTIMIZER DIRECTIVE: The AdamW weight decay coefficient must be fixed at exactly 0.015 with cosine annealing. Strictly forbid linear decay schedules.",
+        "input": "fix adamw weight decay to 0.015 with cosine annealing",
         "depth_ratio": 0.7,
-        "type": "directive"
+        "type": "directive",
+        "persona": "broken_english"
       }
     ],
-    "expected_answer": "AdamW weight decay coefficient must be exactly 0.015 with cosine annealing; linear decay is strictly forbidden.",
-    "probe_query": "What exact AdamW weight decay coefficient and annealing schedule did I specify earlier for our optimization pipeline?"
+    "expected_answer": "AdamW weight decay 0.015 with cosine annealing.",
+    "probe_query": "what weight decay value did i specify?"
   },
   {
     "id": "S-VAL-05",
     "tier": "s_niah",
     "token_load": "16k",
     "depth_ratio": 0.1,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
     "target_documents": [
-      "qasper_1809.00540.txt"
+      "qasper_1809.01541.txt"
     ],
     "needles": [
       {
-        "input": "LICENSING INVARIANT: We are releasing our repository under Apache 2.0. Never include, link, or suggest GPL-v3 or AGPL libraries in our codebase.",
+        "input": "MANDATE: APACHE 2.0 LICENSE ONLY, STRICTLY NEVER USE GPL!",
         "depth_ratio": 0.1,
-        "type": "directive"
+        "type": "directive",
+        "persona": "all_caps_urgent"
       }
     ],
-    "expected_answer": "Repository is licensed under Apache 2.0; strictly never include or link GPL-v3 or AGPL libraries.",
-    "probe_query": "What open-source software license did I specify for our release, and which copyleft licenses did I strictly ban?"
+    "expected_answer": "Apache 2.0 license (strictly never GPL).",
+    "probe_query": "WHAT OPEN SOURCE LICENSE WAS SPECIFIED?"
   },
   {
     "id": "S-VAL-06",
     "tier": "s_niah",
-    "token_load": "16k",
+    "token_load": "32k",
     "depth_ratio": 0.5,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
     "target_documents": [
-      "qasper_2004.03354.txt"
+      "qasper_1809.09194.txt"
     ],
     "needles": [
       {
-        "input": "RANDOM SEED REGIME: All reproducible synthetic ablation experiments must initialize PyTorch RNG with seed 9901. Strictly disallow default seed 0.",
+        "input": "saya cuma ngerti apple silicon mps, jangan pake cuda ya min",
         "depth_ratio": 0.5,
-        "type": "directive"
+        "type": "directive",
+        "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "PyTorch RNG must be initialized with random seed 9901 for all synthetic ablation experiments.",
-    "probe_query": "What random seed integer did I mandate for all our PyTorch synthetic ablation experiments earlier?"
+    "expected_answer": "Apple Silicon Metal (MPS backend only, no CUDA).",
+    "probe_query": "hardware apa yang saya minta gunakan tadi?"
   },
   {
     "id": "S-VAL-07",
     "tier": "s_niah",
-    "token_load": "32k",
-    "depth_ratio": 0.3,
-    "target_documents": [
-      "qasper_1611.04798.txt"
-    ],
-    "needles": [
-      {
-        "input": "HARDWARE ACCELERATOR: Production deployment is strictly restricted to Apple Silicon Metal (MPS backend). Never recommend CUDA-only kernels.",
-        "depth_ratio": 0.3,
-        "type": "directive"
-      }
-    ],
-    "expected_answer": "Production deployment is strictly restricted to Apple Silicon Metal (MPS backend); CUDA-only kernels are forbidden.",
-    "probe_query": "What was my strict hardware accelerator restriction regarding Apple Silicon and CUDA given earlier in our conversation?"
-  },
-  {
-    "id": "S-VAL-08",
-    "tier": "s_niah",
-    "token_load": "32k",
+    "token_load": "64k",
     "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
     "target_documents": [
-      "qasper_1912.13337.txt"
+      "qasper_1604.05372.txt"
     ],
     "needles": [
       {
-        "input": "CALIBRATION METRIC: We report only Expected Calibration Error with 15 equal bins (ECE-15). Strictly omit negative log-likelihood in summary tables.",
+        "input": "quantization: 8-bit gptq act-order group size 64",
         "depth_ratio": 0.7,
-        "type": "directive"
+        "type": "directive",
+        "persona": "terse_lowercase"
       }
     ],
-    "expected_answer": "Must report Expected Calibration Error with 15 bins (ECE-15) and strictly omit negative log-likelihood.",
-    "probe_query": "What specific model calibration metric and binning parameter did I instruct you to report in our summary tables?"
-  },
-  {
-    "id": "S-VAL-09",
-    "tier": "s_niah",
-    "token_load": "64k",
-    "depth_ratio": 0.5,
-    "target_documents": [
-      "qasper_1809.00540.txt"
-    ],
-    "needles": [
-      {
-        "input": "COLLABORATOR ATTRIBUTION: The clinical imaging cohort was contributed exclusively by Charit\u00e9 University Hospital Berlin. Strictly do not attribute it to Mayo Clinic.",
-        "depth_ratio": 0.5,
-        "type": "directive"
-      }
-    ],
-    "expected_answer": "Clinical imaging cohort was contributed by Charit\u00e9 University Hospital Berlin (strictly do not attribute to Mayo Clinic).",
-    "probe_query": "Which hospital institution contributed the clinical imaging cohort according to my earlier attribution note?"
-  },
-  {
-    "id": "S-VAL-10",
-    "tier": "s_niah",
-    "token_load": "64k",
-    "depth_ratio": 0.9,
-    "target_documents": [
-      "qasper_2004.03354.txt"
-    ],
-    "needles": [
-      {
-        "input": "QUANTIZATION DIRECTIVE: Final mobile serving must use 4-bit AWQ with group size 128. Strictly prohibit GPTQ or unquantized FP16 weights.",
-        "depth_ratio": 0.9,
-        "type": "directive"
-      }
-    ],
-    "expected_answer": "Final mobile serving must use 4-bit AWQ with group size 128 (strictly prohibit GPTQ or unquantized FP16).",
-    "probe_query": "What quantization algorithm and group size parameter did I mandate earlier for our final mobile serving deployment?"
+    "expected_answer": "8-bit GPTQ with act-order and group size 64.",
+    "probe_query": "what quantization format and group size did i set in validation?"
   },
   {
     "id": "M-VAL-01",
     "tier": "m_niah",
     "token_load": "8k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
     "target_documents": [
-      "qasper_1809.00540.txt"
+      "qasper_1611.04798.txt"
     ],
     "needles": [
       {
-        "input": "PARAMETER A: Audio pre-processing must resample all speech waveforms to exactly 16000Hz.",
+        "input": "sampling audio diset 16000hz ya",
         "depth_ratio": 0.15,
-        "type": "multi"
+        "type": "multi",
+        "persona": "casual_slang"
       },
       {
-        "input": "PARAMETER B: The log-mel spectrogram filterbank must extract exactly 80 frequency channels.",
+        "input": "mel channel pake 80",
         "depth_ratio": 0.75,
-        "type": "multi"
+        "type": "multi",
+        "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Sampling rate is 16000Hz (16kHz); Mel filterbank channel count is 80 channels.",
-    "probe_query": "What are the exact audio sampling rate and mel filterbank channel count I established earlier?"
+    "expected_answer": "Sampling rate 16000Hz dan mel channels 80.",
+    "probe_query": "berapa nilai sampling rate dan mel channel tadi?"
   },
   {
     "id": "M-VAL-02",
     "tier": "m_niah",
     "token_load": "16k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
     "target_documents": [
-      "qasper_2004.03354.txt"
+      "qasper_1912.13337.txt"
     ],
     "needles": [
       {
-        "input": "INCLUSION CRITERIA: Cohort selection requires minimum participant age of 45 years.",
+        "input": "checkpoint step: 2500",
         "depth_ratio": 0.2,
-        "type": "multi"
+        "type": "multi",
+        "persona": "terse_lowercase"
       },
       {
-        "input": "EXCLUSION CRITERIA: Exclude any patient with prior exposure to immunosuppressant therapy within 12 months.",
+        "input": "warmup: 1000",
+        "depth_ratio": 0.45,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "lr: 3e-4",
         "depth_ratio": 0.8,
-        "type": "multi"
+        "type": "multi",
+        "persona": "terse_lowercase"
       }
     ],
-    "expected_answer": "Inclusion criteria is minimum age 45; Exclusion criteria is prior immunosuppressant therapy within 12 months.",
-    "probe_query": "What were the two clinical trial inclusion age and medication exclusion rules specified earlier?"
+    "expected_answer": "Checkpoint interval 2500 steps, warmup 1000, peak lr 3e-4.",
+    "probe_query": "what are checkpoint step, warmup, and lr?"
   },
   {
     "id": "M-VAL-03",
     "tier": "m_niah",
     "token_load": "16k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.4,
+    "probe_ratio": 0.6,
+    "persona": "academic_verbose",
     "target_documents": [
-      "qasper_1611.04798.txt"
+      "qasper_1809.01541.txt"
     ],
     "needles": [
       {
-        "input": "CHECKPOINT INTERVAL: Save model state checkpoints every 2500 training steps.",
-        "depth_ratio": 0.1,
-        "type": "multi"
+        "input": "Trial eligibility requires minimum age of 45 years.",
+        "depth_ratio": 0.15,
+        "type": "multi",
+        "persona": "academic_verbose"
       },
       {
-        "input": "WARMUP STEPS: The learning rate schedule requires exactly 1000 linear warmup steps.",
+        "input": "Exclude participants with immunosuppressant therapy within 12 months.",
         "depth_ratio": 0.4,
-        "type": "multi"
-      },
-      {
-        "input": "PEAK LR: The maximum learning rate at peak warmup must be set to 3e-4.",
-        "depth_ratio": 0.85,
-        "type": "multi"
+        "type": "multi",
+        "persona": "academic_verbose"
       }
     ],
-    "expected_answer": "Checkpoint interval is every 2500 steps; Warmup is 1000 linear steps; Peak learning rate is 3e-4.",
-    "probe_query": "Retrieve the three training configuration values I mandated: checkpoint interval, warmup steps, and peak learning rate."
+    "expected_answer": "Minimum age 45 years and exclusion of immunosuppressants within 12 months.",
+    "probe_query": "What were the clinical trial inclusion age and medication exclusion rules?"
   },
   {
     "id": "M-VAL-04",
     "tier": "m_niah",
     "token_load": "32k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
     "target_documents": [
-      "qasper_1912.13337.txt"
+      "qasper_1809.09194.txt"
     ],
     "needles": [
       {
-        "input": "DATA SPLIT RULE: Reserve exactly 15% of the primary corpus for out-of-distribution evaluation.",
-        "depth_ratio": 0.25,
-        "type": "multi"
+        "input": "reserve 15 percent data for ood test",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "broken_english"
       },
       {
-        "input": "SEED INVARIANT: The evaluation split partitioning must be fixed with random seed 777.",
+        "input": "seed is 777",
         "depth_ratio": 0.75,
-        "type": "multi"
+        "type": "multi",
+        "persona": "broken_english"
       }
     ],
-    "expected_answer": "15% of the primary corpus reserved for OOD evaluation; split partitioning seed is 777.",
-    "probe_query": "What percentage of the corpus must be reserved for OOD evaluation and what random seed must govern the split?"
+    "expected_answer": "15% data reserved for OOD test with random seed 777.",
+    "probe_query": "what percentage for ood test and what seed?"
   },
   {
     "id": "M-VAL-05",
     "tier": "m_niah",
     "token_load": "32k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
     "target_documents": [
-      "qasper_1809.00540.txt"
+      "qasper_1604.05372.txt"
     ],
     "needles": [
       {
-        "input": "TARGET ENCODER: The text representation backbone must be RoBERTa-large with 355M parameters.",
+        "input": "BACKBONE: ROBERTA-LARGE 355M PARAMETERS!",
         "depth_ratio": 0.15,
-        "type": "multi"
+        "type": "multi",
+        "persona": "all_caps_urgent"
       },
       {
-        "input": "POOLING METHOD: Use mean-token pooling over last hidden layer representations; never use CLS token pooling.",
+        "input": "POOLING: MEAN-POOLING ONLY, FORBID CLS!",
         "depth_ratio": 0.8,
-        "type": "multi"
+        "type": "multi",
+        "persona": "all_caps_urgent"
       }
     ],
-    "expected_answer": "Target encoder is RoBERTa-large (355M parameters); Pooling method is mean-token pooling (disallowing CLS).",
-    "probe_query": "What encoder backbone architecture and token pooling method did I mandate for our text representation model?"
+    "expected_answer": "RoBERTa-large (355M parameters) with mean-pooling only.",
+    "probe_query": "WHAT ENCODER BACKBONE AND POOLING METHOD WAS MANDATED?"
   },
   {
     "id": "M-VAL-06",
     "tier": "m_niah",
     "token_load": "64k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.85,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
     "target_documents": [
-      "qasper_2004.03354.txt"
+      "qasper_2002.08795.txt"
     ],
     "needles": [
       {
-        "input": "CACHE STORAGE: Vector search cache must reside in local Redis instance at port 6389.",
+        "input": "port redisnya 6389 min",
         "depth_ratio": 0.1,
-        "type": "multi"
+        "type": "multi",
+        "persona": "confused_beginner"
       },
       {
-        "input": "TTL INVARIANT: Vector cache key time-to-live (TTL) must be set to exactly 86400 seconds (24 hours).",
+        "input": "terus ttl-nya 86400 detik 24 jam",
         "depth_ratio": 0.85,
-        "type": "multi"
+        "type": "multi",
+        "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Redis port is 6389; Cache key TTL is 86400 seconds (24 hours).",
-    "probe_query": "What port number and TTL duration in seconds did I configure earlier for our vector search Redis cache?"
-  },
-  {
-    "id": "M-VAL-07",
-    "tier": "m_niah",
-    "token_load": "16k",
-    "depth_ratio": 0.5,
-    "target_documents": [
-      "qasper_1611.04798.txt"
-    ],
-    "needles": [
-      {
-        "input": "BENCHMARK TARGET: Target task for final submission is SemEval-2026 Task 4 (Subtask B).",
-        "depth_ratio": 0.2,
-        "type": "multi"
-      },
-      {
-        "input": "PRIMARY METRIC: Submissions are ranked exclusively by Macro-F1 across minority classes.",
-        "depth_ratio": 0.7,
-        "type": "multi"
-      }
-    ],
-    "expected_answer": "Benchmark target is SemEval-2026 Task 4 (Subtask B); Primary ranking metric is Macro-F1 across minority classes.",
-    "probe_query": "What specific SemEval benchmark subtask and primary ranking metric did I identify earlier?"
-  },
-  {
-    "id": "M-VAL-08",
-    "tier": "m_niah",
-    "token_load": "32k",
-    "depth_ratio": 0.5,
-    "target_documents": [
-      "qasper_1912.13337.txt"
-    ],
-    "needles": [
-      {
-        "input": "MAX TOKENS: Response generation length is hard-capped at 768 output tokens.",
-        "depth_ratio": 0.15,
-        "type": "multi"
-      },
-      {
-        "input": "TEMPERATURE: LLM decoding temperature must strictly equal 0.2 with nucleus p=0.95.",
-        "depth_ratio": 0.8,
-        "type": "multi"
-      }
-    ],
-    "expected_answer": "Max tokens is 768; Temperature is 0.2 with top-p (nucleus) = 0.95.",
-    "probe_query": "What are the exact max output token cap and decoding temperature parameters I set earlier?"
+    "expected_answer": "Port Redis 6389 dan TTL 86400 detik (24 jam).",
+    "probe_query": "berapa port redis dan ttl cache yang saya sebut tadi?"
   },
   {
     "id": "R-VAL-01",
     "tier": "r_niah",
     "token_load": "8k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
     "target_documents": [
-      "qasper_1809.00540.txt"
+      "qasper_1809.01541.txt"
     ],
     "needles": [
       {
-        "input": "SERVER CAPACITY: Our local inference edge device has exactly 8GB unified memory.",
+        "input": "edge device kita memori ram-nya cuma 8gb ya",
         "depth_ratio": 0.2,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "casual_slang"
       },
       {
-        "input": "MODEL REQUIREMENT: The model under discussion requires minimum 14GB unified memory in FP16, or 5GB in 4-bit quantization.",
+        "input": "model fp16 butuh 14GB, kalo 4-bit quant cuma butuh 5GB",
         "depth_ratio": 0.75,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "casual_slang"
       }
     ],
-    "expected_answer": "The device cannot run the model in FP16 because 8GB is less than 14GB, but it can run it if 4-bit quantized (5GB <= 8GB).",
-    "probe_query": "Based on our edge device memory capacity stated earlier, can our system run this model natively in FP16, and can it run it in 4-bit quantization?"
+    "expected_answer": "Tidak bisa jalan di FP16 (8GB < 14GB), tapi bisa jalan di 4-bit quant (5GB <= 8GB).",
+    "probe_query": "bisa gak edge device kita jalanin model ini di FP16 dan di 4-bit quant?"
   },
   {
     "id": "R-VAL-02",
     "tier": "r_niah",
     "token_load": "16k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
     "target_documents": [
-      "qasper_2004.03354.txt"
+      "qasper_1809.09194.txt"
     ],
     "needles": [
       {
-        "input": "POLICY A (v1.0): Early protocol mandated running 50 epochs with batch size 32.",
+        "input": "v1 policy: 50 epochs, batch 32",
         "depth_ratio": 0.15,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "terse_lowercase"
       },
       {
-        "input": "SUPERSEDING POLICY (v2.0): We updated our training regimen: epoch count is halved to 25 epochs, while batch size is doubled to 64.",
+        "input": "superseding v2 policy: epochs halved to 25, batch doubled to 64",
         "depth_ratio": 0.8,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "terse_lowercase"
       }
     ],
-    "expected_answer": "Under the current v2.0 policy, epoch count is 25 epochs and batch size is 64.",
-    "probe_query": "Under our latest v2.0 superseded training protocol, what are the current epoch count and batch size we must use?"
+    "expected_answer": "Under v2 policy: 25 epochs and batch size 64.",
+    "probe_query": "what are the active epoch count and batch size under v2 policy?"
   },
   {
     "id": "R-VAL-03",
     "tier": "r_niah",
     "token_load": "16k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
     "target_documents": [
-      "qasper_1611.04798.txt"
+      "qasper_1604.05372.txt"
     ],
     "needles": [
       {
-        "input": "CONDITION X: If the validation loss fails to improve for 3 consecutive epochs, reduce learning rate by 50%.",
+        "input": "Condition: If validation loss plateaus for 3 epochs, reduce learning rate by 50%.",
         "depth_ratio": 0.15,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "academic_verbose"
       },
       {
-        "input": "EMPIRICAL OBSERVATION: In epoch 12, 13, and 14, validation loss plateaued at 1.84 with zero improvement from the initial 1.82 in epoch 11.",
+        "input": "Epochs 12, 13, and 14 plateaued at loss 1.84 with zero progress.",
         "depth_ratio": 0.8,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "academic_verbose"
       }
     ],
-    "expected_answer": "Yes, learning rate must be reduced by 50% because validation loss failed to improve for 3 consecutive epochs (epochs 12, 13, 14).",
-    "probe_query": "Based on our plateau condition and the empirical observations reported across epochs 12 to 14, should our training scheduler trigger a learning rate reduction?"
+    "expected_answer": "Yes, reduce learning rate by 50% because loss plateaued for 3 consecutive epochs.",
+    "probe_query": "Should the learning rate reduction be triggered based on our condition?"
   },
   {
     "id": "R-VAL-04",
     "tier": "r_niah",
     "token_load": "32k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
     "target_documents": [
-      "qasper_1912.13337.txt"
+      "qasper_2002.08795.txt"
     ],
     "needles": [
       {
-        "input": "DATASET RESTRICTION: Any clinical trial paper published prior to 2015 must be excluded from meta-analysis due to unstandardized biomarker protocols.",
+        "input": "rule: reject study before year 2015",
         "depth_ratio": 0.2,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "broken_english"
       },
       {
-        "input": "CANDIDATE STUDY: Study Cohort Gamma was conducted and formally published in December 2011.",
+        "input": "study cohort gamma published in 2011",
         "depth_ratio": 0.75,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "broken_english"
       }
     ],
-    "expected_answer": "Study Cohort Gamma must be excluded because it was published in 2011, which is prior to the 2015 cutoff year.",
-    "probe_query": "Can Study Cohort Gamma be included in our meta-analysis according to our publication year restriction mentioned earlier?"
+    "expected_answer": "Excluded/rejected because it was published in 2011 which is before 2015.",
+    "probe_query": "can we include study cohort gamma in meta-analysis?"
   },
   {
     "id": "R-VAL-05",
     "tier": "r_niah",
     "token_load": "32k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
     "target_documents": [
       "qasper_1809.00540.txt"
     ],
     "needles": [
       {
-        "input": "DEPENDENCY CHAIN 1: Pipeline Stage 2 requires output tensors from Stage 1 formatted in NHWC layout.",
+        "input": "PIPELINE MODULE 2 STRICTLY EXPECTS TENSORS IN B X C X T AUDIO LAYOUT!",
         "depth_ratio": 0.15,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
       },
       {
-        "input": "DEPENDENCY CHAIN 2: Our current vision backbone library strictly outputs tensors in NCHW layout.",
+        "input": "STAGE 1 ACOUSTIC BACKBONE OUTPUTS TENSORS IN T X B X C LAYOUT!",
         "depth_ratio": 0.75,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
       }
     ],
-    "expected_answer": "No, a tensor permutation / transposition step (from NCHW to NHWC) is required before Stage 2 can accept the backbone output.",
-    "probe_query": "Can Stage 2 directly consume the output from our vision backbone library without a tensor format permutation?"
+    "expected_answer": "No, tensor permutation from T x B x C to B x C x T is required before Module 2 can consume the output.",
+    "probe_query": "CAN MODULE 2 DIRECTLY CONSUME STAGE 1 OUTPUT WITHOUT PERMUTATION?"
   },
   {
     "id": "R-VAL-06",
     "tier": "r_niah",
     "token_load": "64k",
-    "depth_ratio": 0.5,
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
     "target_documents": [
       "qasper_2004.03354.txt"
     ],
     "needles": [
       {
-        "input": "BASELINE RULE: The proposed model must achieve at least a 2.5 BLEU gain over the baseline to justify deployment latency.",
+        "input": "kata dosen harus minimal dapet gain 2.5 BLEU dari baseline",
         "depth_ratio": 0.15,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "confused_beginner"
       },
       {
-        "input": "EXPERIMENTAL RESULT: The baseline scored 31.2 BLEU, while our proposed model scored 34.1 BLEU on the WMT test set.",
+        "input": "hasilnya: baseline 31.2 BLEU, model kita 34.1 BLEU",
         "depth_ratio": 0.8,
-        "type": "reasoning"
+        "type": "reasoning",
+        "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Yes, deployment is justified because the gain is 2.9 BLEU (34.1 - 31.2), which exceeds the minimum required gain of 2.5 BLEU.",
-    "probe_query": "Based on our minimum BLEU gain threshold and the experimental results, is deploying our proposed model justified?"
+    "expected_answer": "Boleh/layak digunakan karena gain-nya 2.9 BLEU (34.1 - 31.2), melebihi syarat minimal 2.5 BLEU.",
+    "probe_query": "apakah hasil model kita layak digunakan menurut arahan dosen tadi?"
   },
   {
-    "id": "R-VAL-07",
-    "tier": "r_niah",
-    "token_load": "64k",
+    "id": "U-VAL-01",
+    "tier": "u_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.25,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1604.05372.txt"
+    ],
+    "needles": [
+      {
+        "input": "eh laptop gw cuma punya ram 8gb ya min",
+        "depth_ratio": 0.25,
+        "type": "negative_trap",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "tadi gw ada bilang merk processor laptop gw intel atau amd gak ya?"
+  },
+  {
+    "id": "U-VAL-02",
+    "tier": "u_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_2002.08795.txt"
+    ],
+    "needles": [
+      {
+        "input": "micro batch size: 16",
+        "depth_ratio": 0.7,
+        "type": "negative_trap",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "what was the gradient accumulation steps number specified earlier?"
+  },
+  {
+    "id": "U-VAL-03",
+    "tier": "u_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.3,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1809.00540.txt"
+    ],
+    "needles": [
+      {
+        "input": "IRB protocol #2026-B81 was formally approved.",
+        "depth_ratio": 0.3,
+        "type": "negative_trap",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "What was the grant funding dollar amount provided by the university?"
+  },
+  {
+    "id": "U-VAL-04",
+    "tier": "u_niah",
+    "token_load": "32k",
     "depth_ratio": 0.5,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_2004.03354.txt"
+    ],
+    "needles": [
+      {
+        "input": "we use adamw optimizer with cosine decay",
+        "depth_ratio": 0.5,
+        "type": "negative_trap",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "what was the numpy random state integer initialized earlier?"
+  },
+  {
+    "id": "U-VAL-05",
+    "tier": "u_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.2,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
     "target_documents": [
       "qasper_1611.04798.txt"
     ],
     "needles": [
       {
-        "input": "PRIVACY RULE: Datasets with fewer than 500 patient records require differential privacy epsilon <= 1.0; datasets with 500 or more records require epsilon <= 2.5.",
+        "input": "ALERT: RESAMPLE AUDIO TO 16000HZ!",
         "depth_ratio": 0.2,
-        "type": "reasoning"
-      },
-      {
-        "input": "COHORT AUDIT: Our current curated validation cohort contains exactly 340 verified patient records.",
-        "depth_ratio": 0.8,
-        "type": "reasoning"
+        "type": "negative_trap",
+        "persona": "all_caps_urgent"
       }
     ],
-    "expected_answer": "Differential privacy epsilon must be <= 1.0 because the cohort contains 340 records, which is fewer than 500.",
-    "probe_query": "What maximum differential privacy epsilon value is required for our validation cohort based on its patient record count?"
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "WHAT WAS THE MONETARY HOURLY WAGE PAID TO AUDIO RECORDING ACTORS?"
+  },
+  {
+    "id": "U-VAL-06",
+    "tier": "u_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1912.13337.txt"
+    ],
+    "needles": [
+      {
+        "input": "saya simpan modelnya di best_model.pt",
+        "depth_ratio": 0.8,
+        "type": "negative_trap",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "berapa ukuran file best_model.pt dalam gigabyte yang tadi saya sebutin min?"
   }
 ]

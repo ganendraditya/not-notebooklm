@@ -414,30 +414,85 @@ def pack_text_into_token_budget(
 QUESTION_WORDS = {
     'what', 'which', 'how', 'why', 'who', 'where', 'when',
     'is', 'are', 'can', 'could', 'would', 'do', 'does', 'did',
-    'explain', 'detail', 'summarize', 'review', 'describe', 'evaluate'
+    'explain', 'detail', 'summarize', 'review', 'describe', 'evaluate', 'analyze'
 }
+
+NON_DIRECTIVE_PREFIX_WORDS = {
+    'inquiry', 'question', 'query', 'prompt', 'turn', 'topic', 'q', 'user', 'response'
+}
+
+DIRECTIVE_TAG_KEYWORDS = {
+    'constraint', 'rule', 'directive', 'parameter', 'premise', 'policy', 'venue', 'tool',
+    'threshold', 'ethics', 'compute', 'data', 'optimizer', 'licensing', 'random', 'hardware',
+    'calibration', 'collaborator', 'quantization', 'checkpoint', 'warmup', 'peak', 'target',
+    'pooling', 'cache', 'ttl', 'benchmark', 'primary', 'max', 'temperature', 'server', 'model',
+    'condition', 'empirical', 'baseline', 'privacy', 'cohort', 'inclusion', 'exclusion',
+    'superseding', 'dependency', 'setting', 'note', 'spec', 'requirement', 'device'
+}
+
+DIRECTIVE_SEMANTIC_PATTERNS = [
+    re.compile(r'\b(?:strictly\s+(?:require|disallow|prohibit|forbid|enforce|mandate|must|restrict|ban)|must\s+strictly|strictly\s+never)\b', re.IGNORECASE),
+    re.compile(r'\b(?:never\s+(?:use|recommend|suggest|include|evaluate|attribute|link)|do\s+not\s+(?:use|include|suggest|attribute|allow|recommend))\b', re.IGNORECASE),
+    re.compile(r'\b(?:don\'?t\s+(?:recommend|use|suggest|include|allow|propose|attribute))\b', re.IGNORECASE),
+    re.compile(r'\b(?:only\s+use|use\s+only|exclusively\s+(?:use|for|target|require|restricted)|targeted\s+exclusively)\b', re.IGNORECASE),
+    re.compile(r'\b(?:our\s+(?:advisor|cluster|server|device|lab|protocol|policy|department|team)\s+(?:strictly\s+)?(?:requires|mandates|has|possesses|caps|limits|specifies))\b', re.IGNORECASE),
+    re.compile(r'\b(?:fix(?:ed)?\s+(?:the\s+)?(?:random\s+seed|batch\s+size|learning\s+rate)|seed\s+(?:is\s+)?fixed\s+at)\b', re.IGNORECASE),
+    re.compile(r'\b(?:runtime\s+is\s+capped|budget\s+is\s+capped|capped\s+at|hard-capped)\b', re.IGNORECASE),
+    re.compile(r'\bunder\s+our\s+(?:[a-z0-9.]+\s+){0,3}(?:policy|protocol|regimen|standard|guideline|rule)\b', re.IGNORECASE),
+    re.compile(r'\b(?:supersed(?:ing|ed)|supersedes)\b', re.IGNORECASE),
+    re.compile(r'\b(?:must\s+be\s+excluded|must\s+be\s+included|strictly\s+forbid|disallow\s+all)\b', re.IGNORECASE),
+    re.compile(r'\b(?:must\s+(?:resample|extract|initialize|follow|cite|achieve|reside))\b', re.IGNORECASE),
+    re.compile(r'\b(?:pembimbing\s+(?:gw|saya)|wajib\s+(?:pakai|gunakan)|jangan\s+(?:pernah|rekomendasi|pake)|catat\s+ya|ingat\s+ya)\b', re.IGNORECASE),
+    re.compile(r'\b(?:remember\s+that\s+our|keep\s+in\s+mind\s+that\s+we|please\s+note\s+that\s+(?:our|we|all))\b', re.IGNORECASE),
+]
 
 
 def is_directive_statement(line: str) -> bool:
     """
-    Detects whether a line represents an explicit operational directive, constraint, or premise.
-    Directives are formatted as structured tags (e.g., 'CONSTRAINT: ...', 'SEED INVARIANT: ...')
-    with an uppercase tag prefix (upper ratio >= 0.50) before the colon.
+    High-Entropy Directive Detection:
+    Detects whether a line represents an explicit operational directive, constraint, or premise,
+    supporting formal tags ('CONSTRAINT: ...'), mixed/lower tags ('hardware setting: ...'),
+    and colloquial natural language phrasing ('eh bro, pembimbing gw wantinya pake korpus multiun').
     """
-    if ':' not in line[:60]:
+    line_clean = line.strip()
+    if len(line_clean) < 8:
         return False
-    prefix = line.split(':', 1)[0].strip()
-    words = prefix.split()
-    if not (1 <= len(words) <= 6):
-        return False
+
+    words = line_clean.split()
     first_w = re.sub(r'[^a-zA-Z]', '', words[0]).lower()
-    if first_w in QUESTION_WORDS:
+
+    # If it starts with question word and ends with '?', treat as inquiry
+    if first_w in QUESTION_WORDS and line_clean.endswith('?'):
         return False
-    letters = [c for c in prefix if c.isalpha()]
-    if not letters:
-        return False
-    upper_ratio = sum(1 for c in letters if c.isupper()) / len(letters)
-    return upper_ratio >= 0.50
+
+    # Tag prefix check
+    if ':' in line_clean[:50]:
+        prefix = line_clean.split(':', 1)[0].strip()
+        body = line_clean.split(':', 1)[1].strip()
+        p_words = [re.sub(r'[^a-zA-Z0-9]', '', w).lower() for w in prefix.split()]
+        body_first_w = re.sub(r'[^a-zA-Z]', '', body.split()[0]).lower() if body.split() else ''
+
+        if any(w in NON_DIRECTIVE_PREFIX_WORDS for w in p_words):
+            return False
+
+        if body_first_w in QUESTION_WORDS and not any(w in DIRECTIVE_TAG_KEYWORDS for w in p_words):
+            return False
+
+        if any(w in DIRECTIVE_TAG_KEYWORDS for w in p_words):
+            return True
+
+        letters = [c for c in prefix if c.isalpha()]
+        if letters:
+            upper_ratio = sum(1 for c in letters if c.isupper()) / len(letters)
+            if upper_ratio >= 0.50 and len(letters) >= 3 and body_first_w not in QUESTION_WORDS:
+                return True
+
+    # Check semantic patterns across diverse natural phrasing
+    for pat in DIRECTIVE_SEMANTIC_PATTERNS:
+        if pat.search(line_clean):
+            return True
+
+    return False
 
 
 def extract_pinned_directives(

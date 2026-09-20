@@ -40,6 +40,7 @@ QASPER_MULTI_PATH = BACKEND_DIR / "evaluation" / "datasets" / "qasper_multi_benc
 SCIFACT_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_scifact.json"
 FULL50_PATH = BACKEND_DIR / "evaluation" / "datasets" / "full50_benchmark.json"
 FULL75_PATH = BACKEND_DIR / "evaluation" / "datasets" / "full75_benchmark.json"
+FULL100_PATH = BACKEND_DIR / "evaluation" / "datasets" / "full100_benchmark.json"
 VAL25_PATH = BACKEND_DIR / "evaluation" / "datasets" / "val25_benchmark.json"
 REPORTS_DIR = BACKEND_DIR / "evaluation" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -51,7 +52,7 @@ async def dummy_status_reporter(msg: str):
 
 
 def load_benchmark_cases(
-    dataset: str = "full75",
+    dataset: str = "full100",
     split: str = "test",
     limit: Optional[int] = None,
     category: Optional[str] = None
@@ -59,6 +60,13 @@ def load_benchmark_cases(
     """Loads and filters benchmark test cases from chosen dataset and split."""
     if dataset in ("val25", "val"):
         target_path = VAL25_PATH
+        with open(target_path, "r", encoding="utf-8") as f:
+            cases = json.load(f)
+    elif dataset in ("full100", "100", "scientific100"):
+        if split == "val":
+            target_path = VAL25_PATH
+        else:
+            target_path = FULL100_PATH
         with open(target_path, "r", encoding="utf-8") as f:
             cases = json.load(f)
     elif dataset in ("full75", "full50", "75", "scientific75"):
@@ -522,8 +530,8 @@ def build_benchmark_eval_llm(model_override: Optional[str] = None):
 async def main():
     benchmark_start_time = time.time()
     parser = argparse.ArgumentParser(description="Not-NotebookLM Automated Evaluation Benchmark")
-    parser.add_argument("--dataset", type=str, default="full75", choices=["full75", "val25", "full50", "qasper", "scifact", "qasper_multi", "golden"], help="Dataset to benchmark: 'full75' (75-case comprehensive test suite), 'val25' (25-case held-out validation suite), 'full50', 'qasper', 'scifact', 'qasper_multi', or 'golden'")
-    parser.add_argument("--split", type=str, default="test", choices=["val", "test", "all"], help="Split: 'test' (75-case comprehensive test suite) or 'val' (25-case held-out validation suite)")
+    parser.add_argument("--dataset", type=str, default="full100", choices=["full100", "full75", "val25", "full50", "qasper", "scifact", "qasper_multi", "golden"], help="Dataset to benchmark: 'full100' (100-case test suite across 4 balanced quadrants), 'val25' (25-case held-out validation suite), 'full75', 'full50', 'qasper', 'scifact', 'qasper_multi', or 'golden'")
+    parser.add_argument("--split", type=str, default="test", choices=["val", "test", "all"], help="Split: 'test' (100-case comprehensive test suite) or 'val' (25-case held-out validation suite)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")
     parser.add_argument("--eval-model", type=str, default="ag/gemini-3.1-pro-low", help="Evaluator judge model (default: 'ag/gemini-3.1-pro-low')")
