@@ -306,12 +306,15 @@ def allocate_token_budget(
     user_query: str = "",
     reserved_output: Optional[int] = None,
     safety_padding: int = SAFETY_PADDING_TOKENS,
+    has_rag: bool = True,
+    active_rag_tokens: Optional[int] = None,
 ) -> TokenBudget:
     """
     Executes the Priority-Based Token Waterfall:
     1. Tier 1 (Non-Negotiable): Output buffer, system instructions, user query, padding.
     2. Tier 2 (High-Density RAG): Sized specifically to prevent Stanford 'Lost in the Middle'.
     3. Tier 3 (History): Remaining headroom assigned for conversation turns.
+    When has_rag=False (pure chat or conversational NIAH), unused RAG tokens are elastically reclaimed.
     """
     max_context = get_model_context_window(model_name)
 
@@ -333,26 +336,32 @@ def allocate_token_budget(
     available_pool = max(0, max_context - tier1_reserved)
 
     # 4. RAG Allocation (Tier 2) based on Stanford "Lost in the Middle" bounds
-    if max_context <= CONSERVATIVE_MIN_WINDOW:
-        # 8k model: keep RAG compact
-        rag_target = min(TARGET_RAG_TOKENS_SMALL, int(available_pool * 0.55))
-    elif max_context <= 32_768:
-        # 32k model: optimal dense retrieval
-        rag_target = min(TARGET_RAG_TOKENS_MEDIUM, int(available_pool * 0.40))
+    if not has_rag or active_rag_tokens == 0:
+        actual_rag_tokens = 0
     else:
-        # 64k - 1M+ model: cap RAG at high-density bounds (4k - 6k) to maintain sharp attention
-        rag_target = TARGET_RAG_TOKENS_LARGE
+        if max_context <= CONSERVATIVE_MIN_WINDOW:
+            # 8k model: keep RAG compact
+            rag_target = min(TARGET_RAG_TOKENS_SMALL, int(available_pool * 0.55))
+        elif max_context <= 32_768:
+            # 32k model: optimal dense retrieval
+            rag_target = min(TARGET_RAG_TOKENS_MEDIUM, int(available_pool * 0.40))
+        else:
+            # 64k - 1M+ model: cap RAG at high-density bounds (4k - 6k) to maintain sharp attention
+            rag_target = TARGET_RAG_TOKENS_LARGE
 
-    actual_rag_tokens = min(rag_target, available_pool)
+        if active_rag_tokens is not None and active_rag_tokens > 0:
+            actual_rag_tokens = min(rag_target, active_rag_tokens, available_pool)
+        else:
+            actual_rag_tokens = min(rag_target, available_pool)
 
     # 5. History Allocation (Tier 3)
     remaining_for_history = max(0, available_pool - actual_rag_tokens)
     
     # Cap history so prompt isn't needlessly filled if history isn't needed
     if max_context <= CONSERVATIVE_MIN_WINDOW:
-        actual_history_tokens = min(2_500, remaining_for_history)
+        actual_history_tokens = min(5_500 if not has_rag else 3_500, remaining_for_history)
     elif max_context <= 32_768:
-        actual_history_tokens = min(12_000, remaining_for_history)
+        actual_history_tokens = min(22_000 if not has_rag else 12_000, remaining_for_history)
     else:
         actual_history_tokens = min(40_000, remaining_for_history)
 
@@ -417,6 +426,19 @@ QUESTION_WORDS = {
     'explain', 'detail', 'summarize', 'review', 'describe', 'evaluate', 'analyze'
 }
 
+INQUIRY_STARTERS = (
+    "what", "which", "how", "why", "who", "where", "when",
+    "explain", "detail", "summarize", "review", "describe", "evaluate", "analyze", "discuss",
+    "can you", "could you", "would you", "tell me", "show me", "list the", "give me",
+    "is there", "are there", "do the", "does the", "did the", "has the", "have the"
+)
+
+CONVERSATIONAL_PLEASANTRIES = {
+    "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+    "thank you", "thanks", "thanks a lot", "ok", "okay", "sure", "understood",
+    "got it", "sounds good", "great", "perfect", "cool", "alright", "bye", "yes", "no"
+}
+
 NON_DIRECTIVE_PREFIX_WORDS = {
     'inquiry', 'question', 'query', 'prompt', 'turn', 'topic', 'q', 'user', 'response'
 }
@@ -427,46 +449,59 @@ DIRECTIVE_TAG_KEYWORDS = {
     'calibration', 'collaborator', 'quantization', 'checkpoint', 'warmup', 'peak', 'target',
     'pooling', 'cache', 'ttl', 'benchmark', 'primary', 'max', 'temperature', 'server', 'model',
     'condition', 'empirical', 'baseline', 'privacy', 'cohort', 'inclusion', 'exclusion',
-    'superseding', 'dependency', 'setting', 'note', 'spec', 'requirement', 'device'
+    'superseding', 'dependency', 'setting', 'note', 'spec', 'requirement', 'device',
+    'batch', 'seed', 'metric', 'audio', 'rate', 'vram', 'ram', 'gpu', 'epoch', 'loss'
 }
 
 DIRECTIVE_SEMANTIC_PATTERNS = [
     re.compile(r'\b(?:strictly\s+(?:requires?|disallows?|prohibits?|forbids?|enforces?|mandates?|wants?|must|restrict|ban)|must\s+strictly|strictly\s+never)\b', re.IGNORECASE),
     re.compile(r'\b(?:never\s+(?:use|recommend|suggest|include|evaluate|attribute|link)|do\s+not\s+(?:use|include|suggest|attribute|allow|recommend))\b', re.IGNORECASE),
     re.compile(r'\b(?:don\'?t\s+(?:recommend|use|suggest|include|allow|propose|attribute|even\s+think))\b', re.IGNORECASE),
-    re.compile(r'\b(?:only\s+use|use\s+only|exclusively\s+(?:use|for|target|require|restricted)|targeted\s+exclusively)\b', re.IGNORECASE),
-    re.compile(r'\b(?:(?:my|our)\s+(?:[a-z0-9_\-]+\s+){0,3}(?:advisor|professor|boss|lab|team|cluster|server|device|protocol|policy|department)\s+(?:strictly\s+)?(?:requires?|mandates?|wants?|insists?|has|possesses|caps?|limits?|specifies|uses?|employs?|follows?))\b', re.IGNORECASE),
+    re.compile(r'\b(?:only\s+use|use\s+only|exclusively\s+(?:use|for|target|require|restricted|by)|targeted\s+exclusively)\b', re.IGNORECASE),
+    re.compile(r'\b(?:(?:my|our)\s+(?:[a-z0-9_\-]+\s+){0,3}(?:advisor|professor|boss|lab|team|cluster|server|device|protocol|policy|department|app)\s+(?:strictly\s+)?(?:requires?|mandates?|wants?|insists?|has|possesses|caps?|limits?|specifies|uses?|employs?|follows?|is|only))\b', re.IGNORECASE),
     re.compile(r'\b(?:IRB\s*(?:protocol|#|[0-9])|ethics\s+protocol)\b', re.IGNORECASE),
-    re.compile(r'\b(?:fix(?:ed)?\s+(?:the\s+)?(?:random\s+seed|batch\s+size|learning\s+rate)|seed\s+(?:is\s+)?fixed\s+at)\b', re.IGNORECASE),
+    re.compile(r'\b(?:fix(?:ed)?\s+(?:the\s+)?(?:random\s+seed|batch\s+size|learning\s+rate|adamw)|seed\s+(?:is\s+)?fixed\s+at)\b', re.IGNORECASE),
     re.compile(r'\b(?:runtime\s+is\s+capped|budget\s+is\s+capped|capped\s+at|hard-capped)\b', re.IGNORECASE),
     re.compile(r'\bunder\s+our\s+(?:[a-z0-9.]+\s+){0,3}(?:policy|protocol|regimen|standard|guideline|rule)\b', re.IGNORECASE),
     re.compile(r'\b(?:supersed(?:ing|ed)|supersedes)\b', re.IGNORECASE),
     re.compile(r'\b(?:must\s+be\s+excluded|must\s+be\s+included|strictly\s+forbid|disallow\s+all)\b', re.IGNORECASE),
-    re.compile(r'\b(?:must\s+(?:resample|extract|initialize|follow|cite|achieve|reside|use))\b', re.IGNORECASE),
+    re.compile(r'\b(?:must\s+(?:resample|extract|initialize|follow|cite|achieve|reside|use|remain|be))\b', re.IGNORECASE),
     re.compile(r'\b(?:pembimbing\s+(?:gw|saya)|wajib\s+(?:pakai|gunakan)|jangan\s+(?:pernah|rekomendasi|pake)|catat\s+ya|ingat\s+ya)\b', re.IGNORECASE),
-    re.compile(r'\b(?:remember\s+that\s+our|keep\s+in\s+mind\s+that\s+we|please\s+note\s+that\s+(?:our|we|all|my))\b', re.IGNORECASE),
+    re.compile(r'\b(?:remember\s+that\s+our|keep\s+in\s+mind\s+that\s+we|please\s+note\s+(?:that\s+)?(?:our|we|all|my|the))\b', re.IGNORECASE),
 ]
+
+
+def is_inquiry(text: str) -> bool:
+    """Identifies whether a conversational line is a research/analytical inquiry or question."""
+    t = text.strip().lower()
+    if not t:
+        return False
+    if t.endswith("?"):
+        return True
+    t_clean = re.sub(r"^(?:please|kindly|hey\s+assistant|assistant|bot)\s*,?\s*", "", t)
+    for starter in INQUIRY_STARTERS:
+        if t_clean.startswith(starter + " ") or t_clean == starter:
+            return True
+    return False
 
 
 def is_directive_statement(line: str) -> bool:
     """
     High-Entropy Directive Detection:
-    Detects whether a line represents an explicit operational directive, constraint, or premise,
-    supporting formal tags ('CONSTRAINT: ...'), mixed/lower tags ('hardware setting: ...'),
-    and colloquial natural language phrasing ('eh bro, pembimbing gw wantinya pake korpus multiun').
+    Detects whether a line represents an explicit operational directive, constraint, premise,
+    hardware setting, or declarative statement. Employs an inverted high-recall filter:
+    any informative user statement that is not a pure inquiry or conversational pleasantry
+    is preserved in Tier 1 Pinned Memory.
     """
     line_clean = line.strip()
-    if len(line_clean) < 8:
+    if len(line_clean) < 6:
         return False
 
-    words = line_clean.split()
-    first_w = re.sub(r'[^a-zA-Z]', '', words[0]).lower()
-
-    # If it starts with question word and ends with '?', treat as inquiry
-    if first_w in QUESTION_WORDS and line_clean.endswith('?'):
+    norm = line_clean.lower().strip(".! ")
+    if norm in CONVERSATIONAL_PLEASANTRIES:
         return False
 
-    # Tag prefix check
+    # Tag prefix check (e.g. 'CONSTRAINT: ...', 'batch: 64', 'rule: ...')
     if ':' in line_clean[:50]:
         prefix = line_clean.split(':', 1)[0].strip()
         body = line_clean.split(':', 1)[1].strip()
@@ -493,22 +528,32 @@ def is_directive_statement(line: str) -> bool:
         if pat.search(line_clean):
             return True
 
-    return False
+    # If it is clearly an inquiry or analytical question, it is NOT a directive
+    if is_inquiry(line_clean):
+        return False
+
+    # Declarative assertion: statements containing specifications, settings, or user assertions
+    return True
 
 
 def extract_pinned_directives(
     messages: List[LlamaChatMessage],
-    max_directives: int = 20
+    max_directives: int = 25
 ) -> List[str]:
     """
     Tier 1 Pinned Working Memory:
-    Extracts explicit operational directives, constraints, and research invariants
-    from conversation turns so they are never lost during history compaction.
+    Extracts explicit operational directives, constraints, parameters, and research invariants
+    from user conversation turns so they are never lost during history compaction.
     """
     directives: List[str] = []
     seen: set = set()
 
     for m in messages:
+        # Directives strictly originate from user messages
+        role_str = str(getattr(m, "role", "")).lower()
+        if "user" not in role_str:
+            continue
+
         content = str(getattr(m, "content", "") or "").strip()
         if not content or content.startswith("[Context Summary") or content.startswith("[Active Workspace"):
             continue
@@ -531,25 +576,27 @@ def extract_pinned_directives(
 def extract_concise_history_digest(messages: List[LlamaChatMessage]) -> str:
     """
     Tier 2 Structured Topic Digest:
-    Extracts conceptual research topics from evicted turns while leaving
-    explicit operational constraints to Tier 1 Pinned Directives.
+    Extracts conceptual research topics from evicted turns without amputating
+    context into arbitrary 5-word snippets.
     """
     topics = []
     for m in messages:
-        if hasattr(m, "role") and m.role == MessageRole.USER:
-            txt = str(m.content or "").strip().split("\n")[0]
+        role_str = str(getattr(m, "role", "")).lower()
+        if "user" in role_str:
+            txt = str(getattr(m, "content", "") or "").strip().split("\n")[0]
             if txt and len(txt) > 5 and not txt.startswith("[Context") and not txt.startswith("[Active Workspace"):
                 # Skip lines that are explicit directives (handled by Tier 1)
                 if is_directive_statement(txt):
                     continue
                 # Clean analytical question topics
-                clean_q = re.sub(r'^(?:what|which|how|why|is|are|can|do|does)\s+(?:is|are|the|about)?\s*', '', txt, re.I)
+                clean_q = re.sub(r'^(?:what|which|how|why|is|are|can|do|does)\s+(?:is|are|the|about)?\s*', '', txt, flags=re.I)
                 clean_q = re.sub(r'[\?\.\!]', '', clean_q).strip()
-                words = [w for w in clean_q.split() if len(w) > 3][:5]
-                if words:
-                    topics.append(" ".join(words))
+                if len(clean_q) > 90:
+                    clean_q = clean_q[:87].strip() + "..."
+                if clean_q:
+                    topics.append(clean_q)
     if topics:
-        deduped = list(dict.fromkeys(topics))[:4]
+        deduped = list(dict.fromkeys(topics))[:5]
         return "Earlier discussion covered: " + "; ".join(deduped) + "."
     return "Earlier dialogue covered preliminary research inquiries and introductory context."
 
@@ -642,7 +689,8 @@ async def acompact_chat_history(
     summarizer_func: Optional[Callable[[str], Any]] = None
 ) -> List[LlamaChatMessage]:
     """
-    Asynchronous Smart History Compaction Protocol with optional LLM summary generation.
+    Asynchronous Smart History Compaction Protocol with optional LLM summary generation
+    and automatic graceful fallback to deterministic compaction.
     """
     if not messages or max_history_tokens <= 0:
         return []
@@ -680,6 +728,21 @@ async def acompact_chat_history(
                 summary_text = res.strip()
         except Exception as e:
             logger.debug(f"[Compaction Summary Warning]: {e}")
+    elif evicted_messages:
+        # Layer 3: Fast LLM Async Compaction Bridge with graceful degradation
+        try:
+            from rag.llm_factory import acall_fast_with_fallback
+            evicted_text = "\n".join([f"{getattr(m, 'role', 'user')}: {getattr(m, 'content', '')}" for m in evicted_messages[-6:]])
+            prompt = (
+                "Summarize the core topics and questions discussed in these earlier conversation turns "
+                "in 1-2 concise factual sentences (under 40 words):\n\n"
+                f"{evicted_text}"
+            )
+            res = await acall_fast_with_fallback(lambda llm: llm.acomplete(prompt))
+            if res and hasattr(res, "text") and len(res.text.strip()) > 10:
+                summary_text = res.text.strip().replace("\n", " ")
+        except Exception as e:
+            logger.debug(f"[Compaction Fast LLM Summary fallback to deterministic]: {e}")
 
     return compact_chat_history(
         messages=messages,

@@ -176,7 +176,7 @@ async def run_single_niah_case(
                 active_history.pop(0)  # Naive FIFO eviction (amnesia!)
     else:
         # Issue #10 Smart Compaction
-        budget = allocate_token_budget(model_name="llama-3-8b", system_prompt="Research Assistant", user_query=case["probe_turn"])
+        budget = allocate_token_budget(model_name="llama-3-8b", system_prompt="Research Assistant", user_query=case["probe_turn"], has_rag=False)
         active_history = compact_chat_history(active_history, max_history_tokens=budget.max_history_tokens, model_name="llama-3-8b")
         total_tokens = count_messages_tokens(active_history + [probe_msg]) + count_tokens(doc_slice) + 1500
         crashed_400 = False
