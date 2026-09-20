@@ -152,6 +152,24 @@ The 75-case benchmark (`--dataset full75` or `--dataset full50`) rigorously bala
 3. **Multi-Paper Comparative Synthesis (15 Cases)**: Workspaces varying across document volumes—9 cases with 2 papers, 4 cases with 3 papers, and 2 cases with 4 papers—verifying cross-paper matrix tables and isolated citation tags (`[1]`, `[2]`, `[3]`, `[4]`).
 4. **Negative Abstention & False Premises (10 Cases)**: Authentic unanswerable research inquiries from AllenAI annotators verifying that the system cleanly abstains rather than fabricating numbers.
 
+### 6.1. The 25-Case Held-Out Validation Suite (`val25_benchmark.json`)
+To enable rapid daily development without risking test-set overfitting ("eval hacking") or burning extensive API quota on every iteration, Not-NotebookLM provides a dedicated **25-case proportional held-out validation benchmark**:
+
+| Modality | Full 75 (Held-Out Test Set) | Val 25 (Daily Development Set) | Anti-Leakage Guarantee |
+| :--- | :---: | :---: | :--- |
+| **Single-Paper Deep (QASPER)** | 25 Cases | **8 Cases** | 8 novel arXiv papers (zero paper reuse with Test 75) |
+| **Biomedical Fact-Checking (SciFact)** | 25 Cases | **8 Cases** | 8 novel PubMed papers (4 `SUPPORT`, 4 `CONTRADICT`) |
+| **Multi-Paper Comparative (MUL)** | 15 Cases | **5 Cases** | Workspaces with 2, 3, and 4 novel papers |
+| **Negative Abstention Traps (UNANS)** | 10 Cases | **4 Cases** | Authentic unanswerable traps on novel documents |
+| **Total Cases** | **75 Cases** (~35 mins) | **25 Cases** (~7–8 mins) | **0 overlapping documents, 0 overlapping queries** |
+
+### 6.2. The 25-Case Conversational NIAH Validation Matrix (`niah_val25_matrix.json`)
+Similarly, Conversational NIAH evaluation provides a proportional 25-case held-out validation matrix:
+- **10 S-NIAH Cases**: Representative diagonal sampling across token loads (4K, 8K, 16K, 32K, 64K) and depth ratios (10%, 30%, 50%, 70%, 90%).
+- **8 M-NIAH Cases**: Multi-needle tracking across independent variables (audio rates, clinical trial criteria, optimizer schedules, cache TTLs, etc.).
+- **7 R-NIAH Cases**: Multi-hop reasoning, conditional deduction, and superseded policy updates.
+- **Anti-Leakage**: 100% novel needle contents and probe queries with zero overlap with `niah_75_matrix.json`.
+
 ### Production Quality Acceptance Criteria:
 1. **Consensus Groundedness**: $\ge 0.850$ (Continuous 4-Judge: DeepEval, TruLens, Promptfoo, Ragas)
 2. **Consensus Relevancy**: $\ge 0.850$ (Continuous 4-Judge)
@@ -201,21 +219,20 @@ Analysis of empirical benchmark data reveals the distinct behavioral archetypes 
 All benchmarks are run headlessly from the project root without launching browsers or frontend servers:
 
 ```bash
-# 1. 75-Case Comprehensive Scientific Benchmark (All 4 Modalities):
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --cross-framework --concurrency 2
+# 1. 25-Case Held-Out Validation Benchmark (Daily dev loop, ~6-8 mins):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset val25 --cross-framework --concurrency 2
 
-# 2. Fast-Val Mode (~12 mins) across the 75-case suite:
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --fast --concurrency 2
+# 2. 75-Case Comprehensive Scientific Benchmark (Held-Out Test Set / Release Certification, ~30 mins):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --split test --cross-framework --concurrency 2
 
-# 3. Subsystem Targeted Benchmarks:
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset qasper_multi --cross-framework
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset scifact --cross-framework
+# 3. Fast-Val Mode across the 25-case suite (~3 mins):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset val25 --fast --concurrency 2
 
-# 4. Fast smoke-test (first N cases):
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --limit 3 --fast
+# 4. 25-Case Conversational NIAH Validation Matrix (Daily dev loop, ~3 mins):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/eval_full50_niah.py --split val --mode both --concurrency 2
 
-# 5. 75-Case Multi-Spectral Dual-Cap NIAH Benchmark (S-, M-, & R-NIAH):
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/eval_full50_niah.py --mode both --concurrency 4
+# 5. 75-Case Multi-Spectral Dual-Cap NIAH Benchmark (Full Release Test Matrix):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/eval_full50_niah.py --split test --mode both --concurrency 2
 ```
 
 ---
@@ -243,3 +260,53 @@ To prevent false penalties and artificial benchmark inflation, Not-NotebookLM's 
    - Unanswerable cases (where Ragas context recall is mathematically undefined) are excluded cleanly without causing off-by-N shifts in subsequent test cases.
 4. **Zero Few-Shot Prompt Leakage**:
    - System prompts are sanitized of dataset-specific empirical numbers, enforcing general stylistic precision rather than biased target values.
+
+---
+
+## 11. Model Combinatorics, Multi-Perspective Rigor & Evaluator Decoupling
+
+To ensure evaluation rigor is mathematically and empirically sound, Not-NotebookLM strictly decouples the three architectural LLM roles:
+
+### A. The Three Distinct LLM Roles:
+1. **Main LLM (Generator / System Under Test)**:
+   - *Role:* Powers full-manuscript reading, multi-paper comparative synthesis tables, and grounded academic drafting. This is the primary subject being benchmarked.
+   - *Default:* `ag/gemini-3.8-flash-high` (`LLM_MODEL`).
+2. **Fast LLM (Operational Micro-Tasking)**:
+   - *Role:* Handles lightweight operational subtasks (query rewriting, user intent classification, document triage, short title/summary generation).
+   - *Default:* `ag/gemini-3.7-flash-low` (`LLM_FAST_MODEL`). *(Note: `gemini-3.5-flash` was deprecated upstream by Antigravity in favor of Gemini 3.7 Flash).*
+   - *Design Rationale:* Prevents unnecessary token spend on micro-tasks while preserving full reasoning power in the Main LLM. If omitted or set to `LLM_MODEL`, the system operates in monolithic generator mode.
+3. **Evaluator Judge (Independent Referee)**:
+   - *Role:* Audits generated responses across the 6 evaluation frameworks (DeepEval, TruLens, Promptfoo, Ragas, Princeton ALCE, LlamaIndex) under greedy decoding (`temperature=0.0`).
+   - *Default:* `ag/gemini-3.1-pro-low` (`LLM_EVAL_MODEL` or `--eval-model`). Independent frontier judges such as `cx/gpt-5.6-luna-review` or `ag/claude-sonnet-4-6` can be passed via `--eval-model` for adversarial, cross-provider auditing.
+
+### B. Combinatorial Rigor Matrix (Generator × Evaluator Combinations):
+To prevent **LLM Self-Preference Bias** (where models score their own outputs higher) and verify pipeline portability across model families, the benchmark harness supports four structured ablation configurations:
+
+| Ablation Configuration | Main LLM (Generator) | Fast LLM | Evaluator Judge | Research & Engineering Objective |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Standard Production Baseline (Default)** | `ag/gemini-3.8-flash-high` | `ag/gemini-3.7-flash-low` | `ag/gemini-3.1-pro-low` | Standard production certification balancing high synthesis quality, cost-efficient micro-tasks, and consistent evaluation. |
+| **2. Monolithic Generator (`Fast = Main`)** | `ag/gemini-3.8-flash-high` | `ag/gemini-3.8-flash-high` | `ag/gemini-3.1-pro-low` | Ablation testing whether offloading auxiliary micro-tasks to `3.7-flash-low` causes any retrieval routing or query planning penalty. |
+| **3. Cross-Family Independent Audit (Adversarial Judge)** | `ag/gemini-3.8-flash-high` | `ag/gemini-3.7-flash-low` | `cx/gpt-5.6-luna-review` *(or `ag/claude-sonnet-4-6`)* | Stress-tests Gemini synthesis against a strict, external OpenAI / Anthropic model family judge to expose subtle stylistic or factual leniency blind spots. |
+| **4. Cross-Generator Architecture Comparison** | `ag/claude-sonnet-4-6` | `ag/claude-sonnet-4-6` | `ag/gemini-3.1-pro-low` *(or `cx/gpt-5.6-luna-review`)* | Measures how much benchmark performance is driven by the RAG retrieval pipeline vs. underlying generator model capabilities. |
+
+### C. CLI Execution Recipes for Model Combinations:
+
+```bash
+# 1. Standard Production Run (Default):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py \
+  --dataset full75 --cross-framework --concurrency 2
+
+# 2. Monolithic Generator Ablation (Fast = Main):
+LLM_FAST_MODEL=ag/gemini-3.8-flash-high \
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py \
+  --dataset full75 --cross-framework --concurrency 2
+
+# 3. Cross-Family Independent Audit (Claude Sonnet Judge):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py \
+  --dataset full75 --cross-framework --eval-model ag/claude-sonnet-4-6 --concurrency 1
+
+# 4. Cross-Generator Comparison (Claude Sonnet Generator):
+LLM_MODEL=ag/claude-sonnet-4-6 LLM_FAST_MODEL=ag/claude-sonnet-4-6 \
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py \
+  --dataset full75 --cross-framework --eval-model ag/gemini-3.1-pro-low --concurrency 1
+```

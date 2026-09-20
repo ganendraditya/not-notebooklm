@@ -81,7 +81,7 @@ Performance is audited across established open-source evaluation tools and resea
 > **Benchmark Configuration & Model Roles:**  
 > * **System Under Test (NotbookLM Core Pipeline):**  
 >   * **Main LLM (`gemini-3.8-flash-high`):** Powers full-manuscript reading, multi-paper comparative synthesis tables, and grounded academic drafting.  
->   * **Fast LLM (`gemini-3.8-flash-low`):** Handles operational micro-tasks (on-demand citation highlight passage extraction, metadata inspection, and query intent classification).  
+>   * **Fast LLM (`gemini-3.7-flash-low`):** Handles operational micro-tasks (on-demand citation highlight passage extraction, metadata inspection, and query intent classification).  
 > * **Evaluator Judge (`gemini-3.1-pro-low`):** Assigned as the independent evaluation judge across all six evaluation tools and protocols (RAGAS, DeepEval, TruLens, Promptfoo, Princeton ALCE, and LlamaIndex) under greedy decoding (`temperature=0.0`).  
 > * **Methodological Note on RAGAS ($N=38$):** RAGAS multi-statement atomic claim decomposition evaluates all 38 extractive QASPER cases. It is intentionally omitted on 2 unanswerable cases and 10 SciFact verification claims to prevent false penalties on negative abstention.  
 > * **Reproducibility Note:** Decoding temperature is locked to `0.0` to maximize determinism. However, due to the inherent non-deterministic nature of LLM inference (provider-side GPU batching and dual-sided LLM-as-a-judge dynamics), replication runs may still exhibit slight score variations even when using the exact same model pairing. Running the benchmark with alternative backends (e.g. GPT-4o, Claude, or local open-weights models) will naturally yield distinct quantitative figures.
