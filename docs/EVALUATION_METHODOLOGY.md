@@ -243,3 +243,53 @@ To prevent false penalties and artificial benchmark inflation, Not-NotebookLM's 
    - Unanswerable cases (where Ragas context recall is mathematically undefined) are excluded cleanly without causing off-by-N shifts in subsequent test cases.
 4. **Zero Few-Shot Prompt Leakage**:
    - System prompts are sanitized of dataset-specific empirical numbers, enforcing general stylistic precision rather than biased target values.
+
+---
+
+## 11. Model Combinatorics, Multi-Perspective Rigor & Evaluator Decoupling
+
+To ensure evaluation rigor is mathematically and empirically sound, Not-NotebookLM strictly decouples the three architectural LLM roles:
+
+### A. The Three Distinct LLM Roles:
+1. **Main LLM (Generator / System Under Test)**:
+   - *Role:* Powers full-manuscript reading, multi-paper comparative synthesis tables, and grounded academic drafting. This is the primary subject being benchmarked.
+   - *Default:* `ag/gemini-3.8-flash-high` (`LLM_MODEL`).
+2. **Fast LLM (Operational Micro-Tasking)**:
+   - *Role:* Handles lightweight operational subtasks (query rewriting, user intent classification, document triage, short title/summary generation).
+   - *Default:* `ag/gemini-3.7-flash-low` (`LLM_FAST_MODEL`). *(Note: `gemini-3.5-flash` was deprecated upstream by Antigravity in favor of Gemini 3.7 Flash).*
+   - *Design Rationale:* Prevents unnecessary token spend on micro-tasks while preserving full reasoning power in the Main LLM. If omitted or set to `LLM_MODEL`, the system operates in monolithic generator mode.
+3. **Evaluator Judge (Independent Referee)**:
+   - *Role:* Audits generated responses across the 6 evaluation frameworks (DeepEval, TruLens, Promptfoo, Ragas, Princeton ALCE, LlamaIndex) under greedy decoding (`temperature=0.0`).
+   - *Default:* `ag/gemini-3.1-pro-low` (`LLM_EVAL_MODEL` or `--eval-model`). Independent frontier judges such as `cx/gpt-5.6-luna-review` or `ag/claude-sonnet-4-6` can be passed via `--eval-model` for adversarial, cross-provider auditing.
+
+### B. Combinatorial Rigor Matrix (Generator × Evaluator Combinations):
+To prevent **LLM Self-Preference Bias** (where models score their own outputs higher) and verify pipeline portability across model families, the benchmark harness supports four structured ablation configurations:
+
+| Ablation Configuration | Main LLM (Generator) | Fast LLM | Evaluator Judge | Research & Engineering Objective |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Standard Production Baseline (Default)** | `ag/gemini-3.8-flash-high` | `ag/gemini-3.7-flash-low` | `ag/gemini-3.1-pro-low` | Standard production certification balancing high synthesis quality, cost-efficient micro-tasks, and consistent evaluation. |
+| **2. Monolithic Generator (`Fast = Main`)** | `ag/gemini-3.8-flash-high` | `ag/gemini-3.8-flash-high` | `ag/gemini-3.1-pro-low` | Ablation testing whether offloading auxiliary micro-tasks to `3.7-flash-low` causes any retrieval routing or query planning penalty. |
+| **3. Cross-Family Independent Audit (Adversarial Judge)** | `ag/gemini-3.8-flash-high` | `ag/gemini-3.7-flash-low` | `cx/gpt-5.6-luna-review` *(or `ag/claude-sonnet-4-6`)* | Stress-tests Gemini synthesis against a strict, external OpenAI / Anthropic model family judge to expose subtle stylistic or factual leniency blind spots. |
+| **4. Cross-Generator Architecture Comparison** | `ag/claude-sonnet-4-6` | `ag/claude-sonnet-4-6` | `ag/gemini-3.1-pro-low` *(or `cx/gpt-5.6-luna-review`)* | Measures how much benchmark performance is driven by the RAG retrieval pipeline vs. underlying generator model capabilities. |
+
+### C. CLI Execution Recipes for Model Combinations:
+
+```bash
+# 1. Standard Production Run (Default):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py \
+  --dataset full75 --cross-framework --concurrency 2
+
+# 2. Monolithic Generator Ablation (Fast = Main):
+LLM_FAST_MODEL=ag/gemini-3.8-flash-high \
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py \
+  --dataset full75 --cross-framework --concurrency 2
+
+# 3. Cross-Family Independent Audit (Claude Sonnet Judge):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py \
+  --dataset full75 --cross-framework --eval-model ag/claude-sonnet-4-6 --concurrency 1
+
+# 4. Cross-Generator Comparison (Claude Sonnet Generator):
+LLM_MODEL=ag/claude-sonnet-4-6 LLM_FAST_MODEL=ag/claude-sonnet-4-6 \
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py \
+  --dataset full75 --cross-framework --eval-model ag/gemini-3.1-pro-low --concurrency 1
+```

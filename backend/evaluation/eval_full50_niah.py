@@ -418,6 +418,7 @@ async def main():
     parser.add_argument("--mode", type=str, default="both", choices=["both", "8k", "1m"], help="Evaluation mode: 'both' (Dual-Cap Head-to-Head), '8k', or '1m'")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--concurrency", type=int, default=4, help="Max concurrent cases (default 4)")
+    parser.add_argument("--eval-model", type=str, default=None, help="Evaluator judge model (default: LLM_EVAL_MODEL from env)")
     args = parser.parse_args()
 
     print("=========================================================================================================")
@@ -429,7 +430,23 @@ async def main():
     print(f"Loaded {len(cases)} test cases from niah_75_matrix.json (Tier: {args.tier}, Mode: {args.mode})")
 
     main_llm = get_main_llm()
-    eval_llm = get_fast_llm()
+    eval_model_name = (args.eval_model or os.getenv("LLM_EVAL_MODEL", "") or "").strip()
+    if eval_model_name:
+        from llama_index.llms.openai_like import OpenAILike
+        base_url = os.getenv("LLM_BASE_URL", "http://localhost:20128/v1")
+        api_key = os.getenv("LLM_API_KEY", "")
+        eval_llm = OpenAILike(
+            api_base=base_url,
+            api_key=api_key,
+            model=eval_model_name,
+            is_chat_model=True,
+            is_function_calling_model=True,
+            max_tokens=4096,
+            temperature=0.0,
+            timeout=120.0
+        )
+    else:
+        eval_llm = get_fast_llm()
     print(f"Generator Model : {getattr(main_llm, 'model', 'default')}")
     print(f"Evaluator Judge : {getattr(eval_llm, 'model', 'default')} @ temp=0.0 (Greedy Deterministic)")
 
