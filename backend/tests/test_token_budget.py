@@ -405,6 +405,30 @@ def test_compact_chat_history_preserves_pinned_directives():
     assert total_tokens <= 250 + 40
 
 
+def test_extract_colloquial_and_unformatted_directives():
+    """Verify high-entropy extraction captures informal, colloquial, and lowercase user constraints."""
+    from rag.token_budget import extract_pinned_directives
+
+    messages = [
+        ChatMessage(role=MessageRole.USER, content="eh bro, pembimbing gw wantinya pake korpus multiun aja ya, jgn coba2 rekomendasiin europarl"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Siap, dicatat."),
+        ChatMessage(role=MessageRole.USER, content="please note that our server has only 16gb ram with zero swap space, cannot run big models"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Understood."),
+        ChatMessage(role=MessageRole.USER, content="under our latest v2 policy, epoch count is halved to 25 and batch size doubled to 64"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Updated."),
+        ChatMessage(role=MessageRole.USER, content="What are the baseline architectures compared between Paper 1 and Paper 2?"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="The baselines are..."),
+    ]
+
+    directives = extract_pinned_directives(messages)
+    assert len(directives) == 3
+    assert any("multiun" in d.lower() for d in directives)
+    assert any("16gb ram" in d.lower() for d in directives)
+    assert any("epoch count is halved" in d.lower() for d in directives)
+    assert not any("What are the baseline" in d for d in directives)
+
+
+
 
 
 

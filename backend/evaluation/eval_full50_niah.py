@@ -41,7 +41,7 @@ from rag.token_budget import (
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
 DATASETS_DIR = BACKEND_DIR / "evaluation" / "datasets"
-NIAH_MATRIX_PATH = DATASETS_DIR / "niah_75_matrix.json"
+NIAH_MATRIX_PATH = DATASETS_DIR / "niah_100_matrix.json"
 NIAH_VAL_MATRIX_PATH = DATASETS_DIR / "niah_val25_matrix.json"
 PAPERS_DIR = DATASETS_DIR / "qasper_papers"
 REPORTS_DIR = BACKEND_DIR / "evaluation" / "reports"
@@ -228,14 +228,14 @@ async def judge_answer(
     ai_response: str,
     eval_llm
 ) -> Tuple[float, str]:
-    """Uses evaluator judge under greedy decoding to verify needle retrieval or deduction."""
+    """Uses evaluator judge under greedy decoding to verify needle retrieval, deduction, or honest abstention."""
     prompt = (
         "You are an expert Natural Language Inference evaluator assessing a Conversational Needle-In-A-Haystack retrieval.\n\n"
         f"Target Information / Ground Truth: \"{expected_answer}\"\n"
         f"AI Response to Audit: \"{ai_response}\"\n\n"
         "Task:\n"
-        "- Output score 1.0 if the AI response accurately retrieves, states, or deduces the target information.\n"
-        "- Output score 0.0 if the AI response forgets, hallucinates, makes false claims, or claims to have no record of it.\n\n"
+        "- Output score 1.0 if the AI response accurately retrieves, states, or deduces the target information, OR correctly and honestly abstains if the target information was absent/unmentioned.\n"
+        "- Output score 0.0 if the AI response forgets, hallucinates, makes false claims, invents numbers/rules, or claims to have no record when it was clearly provided.\n\n"
         "Respond ONLY with valid JSON:\n"
         "{\n"
         "  \"score\": 1.0,\n"
@@ -272,10 +272,21 @@ async def evaluate_single_case(
     tier = case.get("tier", "s_niah")
     token_load = case.get("token_load", "8k")
     depth_ratio = case.get("depth_ratio", 0.5)
+    probe_ratio = float(case.get("probe_ratio", 1.0))
     expected_ans = case.get("expected_answer", "")
     probe_query = case.get("probe_query", "")
 
-    base_history = build_conversation_history(case)
+    full_history = build_conversation_history(case)
+
+    # Dynamic Probe Positioning: slice history if probe occurs mid-conversation
+    if probe_ratio < 1.0 and len(full_history) > 4:
+        cutoff_turns = max(2, int(len(full_history) * probe_ratio))
+        if cutoff_turns % 2 != 0:
+            cutoff_turns += 1
+        base_history = full_history[:cutoff_turns]
+    else:
+        base_history = full_history
+
     probe_msg = LlamaChatMessage(role=MessageRole.USER, content=probe_query)
 
     # Measure actual token count of built history
@@ -415,17 +426,17 @@ def render_2d_heatmap(results: List[Dict[str, Any]], mode_key: str = "score_8k")
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="75-Case Multi-Spectral Conversational NIAH Benchmark")
-    parser.add_argument("--tier", type=str, default="all", choices=["all", "s_niah", "m_niah", "r_niah"], help="Tier: s_niah (5x5 grid), m_niah (multi-needle), r_niah (reasoning), or all")
+    parser = argparse.ArgumentParser(description="Multi-Spectral High-Entropy Conversational NIAH Benchmark")
+    parser.add_argument("--tier", type=str, default="all", choices=["all", "s_niah", "m_niah", "r_niah", "u_niah"], help="Tier: s_niah (5x5 grid), m_niah (multi-needle), r_niah (reasoning), u_niah (unanswerable traps), or all")
     parser.add_argument("--mode", type=str, default="both", choices=["both", "8k", "1m"], help="Evaluation mode: 'both' (Dual-Cap Head-to-Head), '8k', or '1m'")
-    parser.add_argument("--split", type=str, default="test", choices=["val", "test"], help="Evaluation split: 'test' (75-case comprehensive matrix) or 'val' (25-case held-out validation suite)")
+    parser.add_argument("--split", type=str, default="test", choices=["val", "test"], help="Evaluation split: 'test' (100-case comprehensive matrix) or 'val' (25-case held-out validation suite)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--concurrency", type=int, default=4, help="Max concurrent cases (default 4)")
     parser.add_argument("--eval-model", type=str, default=None, help="Evaluator judge model (default: LLM_EVAL_MODEL from env)")
     args = parser.parse_args()
 
     print("=========================================================================================================")
-    print("      MULTI-SPECTRAL CONVERSATIONAL NEEDLE-IN-A-HAYSTACK (NIAH) BENCHMARK SUITE                          ")
+    print("      MULTI-SPECTRAL HIGH-ENTROPY CONVERSATIONAL NEEDLE-IN-A-HAYSTACK (NIAH) BENCHMARK SUITE             ")
     print("      Foundations: Stanford RULER (2024), Anthropic (2024), Kamradt (2023), Lost in the Middle (2024)    ")
     print("=========================================================================================================\n")
 
@@ -474,7 +485,7 @@ async def main():
     mean_1m = sum(valid_1m) / len(valid_1m) if valid_1m else 0.0
 
     print("\n" + "=" * 95)
-    split_title = "25-CASE HELD-OUT VALIDATION" if args.split == "val" else "75-CASE COMPREHENSIVE TEST"
+    split_title = "25-CASE HELD-OUT VALIDATION" if args.split == "val" else "100-CASE COMPREHENSIVE TEST"
     print(f"               {split_title} DUAL-CAP CONVERSATIONAL NIAH SCORECARD              ")
     print("=" * 95)
     print(f"{'Evaluation Dimension':<45} | {'Mode A (8K Cap / Compaction)':<24} | {'Mode B (1M Native)':<20}")
@@ -482,12 +493,12 @@ async def main():
     print(f"{f'Overall Needle Accuracy ({len(all_results)} Cases)':<45} | {f'{mean_8k:.3f}':<24} | {f'{mean_1m:.3f}':<20}")
     
     # Sub-tier statistics
-    for t_name in ["s_niah", "m_niah", "r_niah"]:
+    for t_name in ["s_niah", "m_niah", "r_niah", "u_niah"]:
         sub_8k = [r["score_8k"] for r in all_results if r["tier"] == t_name and r["score_8k"] is not None]
         sub_1m = [r["score_1m"] for r in all_results if r["tier"] == t_name and r["score_1m"] is not None]
         avg_8k = f"{sum(sub_8k)/len(sub_8k):.3f}" if sub_8k else "N/A"
         avg_1m = f"{sum(sub_1m)/len(sub_1m):.3f}" if sub_1m else "N/A"
-        t_label = f"• {t_name.upper()} Retrieval Fidelity"
+        t_label = f"• {t_name.upper()} Retrieval Fidelity" if t_name != "u_niah" else "• U_NIAH Abstention Fidelity"
         print(f"{t_label:<45} | {avg_8k:<24} | {avg_1m:<20}")
 
     print("=" * 95)
@@ -527,12 +538,13 @@ async def main():
         "| :--- | :---: | :---: |",
         f"| **Overall Needle Accuracy** | **`{mean_8k:.3f}`** | **`{mean_1m:.3f}`** |",
     ]
-    for t_name in ["s_niah", "m_niah", "r_niah"]:
+    for t_name in ["s_niah", "m_niah", "r_niah", "u_niah"]:
         sub_8k = [r["score_8k"] for r in all_results if r["tier"] == t_name and r["score_8k"] is not None]
         sub_1m = [r["score_1m"] for r in all_results if r["tier"] == t_name and r["score_1m"] is not None]
         a_8k = f"{sum(sub_8k)/len(sub_8k):.3f}" if sub_8k else "N/A"
         a_1m = f"{sum(sub_1m)/len(sub_1m):.3f}" if sub_1m else "N/A"
-        md_lines.append(f"| **{t_name.upper()} Fidelity** | `{a_8k}` | `{a_1m}` |")
+        tier_label = f"**{t_name.upper()} Fidelity**" if t_name != "u_niah" else "**U_NIAH Abstention Fidelity**"
+        md_lines.append(f"| {tier_label} | `{a_8k}` | `{a_1m}` |")
 
     if args.tier in ("all", "s_niah") and any(r["tier"] == "s_niah" for r in all_results):
         md_lines.extend([

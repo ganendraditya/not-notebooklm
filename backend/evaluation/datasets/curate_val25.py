@@ -257,31 +257,36 @@ def build_val25_suite():
         {
             "id": "MUL-VAL-01",
             "docs": [p1, p2],
-            "query": f"Compare the experimental objectives, benchmark datasets, and model architectures evaluated in Paper [1] ({novel_qasper[0]['title'][:45]}) and Paper [2] ({novel_qasper[1]['title'][:45]}).",
+            "persona": "casual_slang",
+            "query": f"bro coba compare dong Paper [1] ({novel_qasper[0]['title'][:35]}) sama Paper [2] ({novel_qasper[1]['title'][:35]}): dataset yg dipake apa aja dan arsitekturnya beda di mana?",
             "gt": f"Paper [1] investigates {novel_qasper[0]['title']}, while Paper [2] focuses on {novel_qasper[1]['title']}. Both propose distinct neural architectures and evaluation splits."
         },
         {
             "id": "MUL-VAL-02",
             "docs": [p2, p3],
-            "query": f"Compare the baseline systems, hyperparameter choices, and quantitative metric gains reported between Paper [1] and Paper [2].",
+            "persona": "terse_lowercase",
+            "query": f"compare baselines and metric numbers between paper 1 and paper 2. concise bullet points only",
             "gt": f"Paper [1] ({novel_qasper[1]['title'][:30]}) and Paper [2] ({novel_qasper[2]['title'][:30]}) evaluate different baselines with dedicated metric improvements."
         },
         {
             "id": "MUL-VAL-03",
             "docs": [p1, p2, p3],
-            "query": f"Synthesize a Master Comparison Table across all three research papers comparing (a) Problem Domain, (b) Representation Method, and (c) Reported Empirical Results.",
+            "persona": "academic_professor",
+            "query": f"Synthesize an exhaustive Master Comparison Table across all three research papers comparing (a) Problem Domain, (b) Representation Method, and (c) Reported Empirical Results.",
             "gt": f"Master table synthesizing across all three manuscripts: [1] {novel_qasper[0]['title'][:30]}, [2] {novel_qasper[1]['title'][:30]}, and [3] {novel_qasper[2]['title'][:30]}."
         },
         {
             "id": "MUL-VAL-04",
             "docs": [novel_scifact[0]["filename"], novel_scifact[1]["filename"], novel_scifact[2]["filename"]],
+            "persona": "medical_researcher",
             "query": f"Compare the biomedical mechanisms, target biological pathways, and laboratory evidence reported across Paper [1], Paper [2], and Paper [3].",
             "gt": f"Paper [1] ({novel_scifact[0]['title'][:30]}), Paper [2] ({novel_scifact[1]['title'][:30]}), and Paper [3] ({novel_scifact[2]['title'][:30]}) analyze distinct biological pathways with respective experimental findings."
         },
         {
             "id": "MUL-VAL-05",
             "docs": [p1, p2, p3, p4],
-            "query": f"Construct a comprehensive 4-paper synthesis matrix comparing the neural sequence modeling techniques, optimization strategies, and future limitations across Paper [1], Paper [2], Paper [3], and Paper [4].",
+            "persona": "all_caps_urgent",
+            "query": f"CONSTRUCT A COMPREHENSIVE 4-PAPER SYNTHESIS MATRIX COMPARING THE SEQUENCE MODELING TECHNIQUES, OPTIMIZATIONS, AND REPORTED LIMITATIONS ACROSS PAPERS [1], [2], [3], AND [4]!",
             "gt": f"Four-paper comparative matrix reviewing methodological approaches, loss functions, and dataset configurations across all four distinct research publications."
         }
     ]
@@ -292,6 +297,7 @@ def build_val25_suite():
             "sample_id": m["id"],
             "dataset": "qasper_multi",
             "category": "multi_comparative",
+            "persona": m.get("persona", "general"),
             "query": m["query"],
             "target_documents": m["docs"],
             "documents": m["docs"],
@@ -304,25 +310,29 @@ def build_val25_suite():
         {
             "id": "UNANS-VAL-01",
             "doc": novel_qasper[0]["filename"],
-            "query": "What crowdsourcing compensation rate per hour was paid to Amazon Mechanical Turk workers for annotating this dataset?",
+            "persona": "casual_slang",
+            "query": "min mau nanya, ada gak info berapa upah per jam yang dibayar ke pekerja mechanical turk buat bikin dataset ini?",
             "gt": "Unanswerable. The paper does not mention any crowdsourcing hourly compensation rate or MTurk payment figures."
         },
         {
             "id": "UNANS-VAL-02",
             "doc": novel_qasper[1]["filename"],
-            "query": "What specific cluster hardware specs, number of GPU nodes, and interconnect bandwidth were used during model pre-training?",
+            "persona": "all_caps_urgent",
+            "query": "WHAT SPECIFIC CLUSTER HARDWARE SPECS, NUMBER OF GPU NODES, AND INTERCONNECT BANDWIDTH WERE USED DURING PRE-TRAINING?",
             "gt": "Unanswerable. The text does not disclose cluster hardware specifications, interconnect bandwidth, or the number of GPU nodes used."
         },
         {
             "id": "UNANS-VAL-03",
             "doc": novel_scifact[0]["filename"],
-            "query": "What clinical exclusion criteria regarding patient body mass index (BMI) were applied in the Phase III trial cohort?",
+            "persona": "confused_beginner",
+            "query": "saya kurang paham medis, di paper ini ada disebutin syarat berat badan atau BMI pasien yang gak boleh ikut uji klinis gak ya?",
             "gt": "Unanswerable. The provided abstract does not report any patient BMI exclusion criteria or Phase III trial parameters."
         },
         {
             "id": "UNANS-VAL-04",
             "doc": novel_scifact[1]["filename"],
-            "query": "How many days of post-operative follow-up were recorded before assessing patient survival rates in Section 4?",
+            "persona": "terse_lowercase",
+            "query": "number of post-op follow up days before assessing survival rate in section 4? need the exact number",
             "gt": "Unanswerable. The study does not mention post-operative follow-up duration or Section 4 survival data in the provided document."
         }
     ]
@@ -333,6 +343,7 @@ def build_val25_suite():
             "sample_id": u["id"],
             "dataset": "unanswerable",
             "category": "negative_unanswerable",
+            "persona": u.get("persona", "general"),
             "query": u["query"],
             "target_documents": [u["doc"]],
             "documents": [u["doc"]],
