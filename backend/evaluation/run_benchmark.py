@@ -35,12 +35,12 @@ logger = logging.getLogger("eval_runner")
 
 GOLDEN_DATASET_PATH = BACKEND_DIR / "evaluation" / "datasets" / "golden_benchmark.json"
 QASPER_DATASET_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_qasper.json"
-QASPER_VAL_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_qasper_val.json"
 QASPER_TEST_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_qasper_test.json"
 QASPER_MULTI_PATH = BACKEND_DIR / "evaluation" / "datasets" / "qasper_multi_benchmark.json"
 SCIFACT_PATH = BACKEND_DIR / "evaluation" / "datasets" / "international_scifact.json"
 FULL50_PATH = BACKEND_DIR / "evaluation" / "datasets" / "full50_benchmark.json"
 FULL75_PATH = BACKEND_DIR / "evaluation" / "datasets" / "full75_benchmark.json"
+VAL25_PATH = BACKEND_DIR / "evaluation" / "datasets" / "val25_benchmark.json"
 REPORTS_DIR = BACKEND_DIR / "evaluation" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -52,15 +52,21 @@ async def dummy_status_reporter(msg: str):
 
 def load_benchmark_cases(
     dataset: str = "full75",
-    split: str = "val",
+    split: str = "test",
     limit: Optional[int] = None,
     category: Optional[str] = None
 ) -> Tuple[List[Dict[str, Any]], Path]:
     """Loads and filters benchmark test cases from chosen dataset and split."""
-    if dataset in ("full75", "full50", "75", "scientific75"):
-        # 75-Case Comprehensive Scientific Benchmark:
-        # 25 QASPER Single + 25 SciFact Biomedical + 15 Multi-Paper (2/3/4 docs) + 10 Unanswerable Traps
-        target_path = FULL75_PATH
+    if dataset in ("val25", "val"):
+        target_path = VAL25_PATH
+        with open(target_path, "r", encoding="utf-8") as f:
+            cases = json.load(f)
+    elif dataset in ("full75", "full50", "75", "scientific75"):
+        # 75-Case Comprehensive Scientific Benchmark (Test) or 25-Case Held-Out (Val)
+        if split == "val":
+            target_path = VAL25_PATH
+        else:
+            target_path = FULL75_PATH
         with open(target_path, "r", encoding="utf-8") as f:
             cases = json.load(f)
     elif dataset == "scifact":
@@ -77,10 +83,8 @@ def load_benchmark_cases(
     elif dataset == "qasper":
         if split == "test":
             target_path = QASPER_TEST_PATH
-        elif split == "all":
-            target_path = QASPER_DATASET_PATH
         else:
-            target_path = QASPER_VAL_PATH
+            target_path = QASPER_DATASET_PATH
         with open(target_path, "r", encoding="utf-8") as f:
             cases = json.load(f)
     else:
@@ -518,8 +522,8 @@ def build_benchmark_eval_llm(model_override: Optional[str] = None):
 async def main():
     benchmark_start_time = time.time()
     parser = argparse.ArgumentParser(description="Not-NotebookLM Automated Evaluation Benchmark")
-    parser.add_argument("--dataset", type=str, default="full75", choices=["full75", "full50", "qasper", "scifact", "qasper_multi", "golden"], help="Dataset to benchmark: 'full75' (75-case comprehensive scientific benchmark), 'full50', 'qasper', 'scifact', 'qasper_multi', or 'golden'")
-    parser.add_argument("--split", type=str, default="val", choices=["val", "test", "all"], help="Split for QASPER: 'val' (25 cases), 'test' (25 cases), or 'all' (50 cases)")
+    parser.add_argument("--dataset", type=str, default="full75", choices=["full75", "val25", "full50", "qasper", "scifact", "qasper_multi", "golden"], help="Dataset to benchmark: 'full75' (75-case comprehensive test suite), 'val25' (25-case held-out validation suite), 'full50', 'qasper', 'scifact', 'qasper_multi', or 'golden'")
+    parser.add_argument("--split", type=str, default="test", choices=["val", "test", "all"], help="Split: 'test' (75-case comprehensive test suite) or 'val' (25-case held-out validation suite)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--category", type=str, default=None, help="Filter by category (single_fact, multi_comparative, negative_unanswerable, search_discovery)")
     parser.add_argument("--eval-model", type=str, default="ag/gemini-3.1-pro-low", help="Evaluator judge model (default: 'ag/gemini-3.1-pro-low')")
@@ -586,7 +590,7 @@ async def main():
             logger.warning(f"Failed saving checkpoint: {e}")
 
     async def execute_case_worker(i: int, case: Dict[str, Any]):
-        cid = case["id"]
+        cid = case.get("id") or case.get("sample_id", f"CASE-{i:02d}")
         cat = case.get("category", "")
 
         # Only resume from cache if explicitly requested via --resume

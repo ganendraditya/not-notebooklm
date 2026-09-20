@@ -42,6 +42,7 @@ from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
 DATASETS_DIR = BACKEND_DIR / "evaluation" / "datasets"
 NIAH_MATRIX_PATH = DATASETS_DIR / "niah_75_matrix.json"
+NIAH_VAL_MATRIX_PATH = DATASETS_DIR / "niah_val25_matrix.json"
 PAPERS_DIR = DATASETS_DIR / "qasper_papers"
 REPORTS_DIR = BACKEND_DIR / "evaluation" / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -54,20 +55,39 @@ HAYSTACK_BANK = [
     "How does the proposed approach handle out-of-vocabulary words or low-resource settings?",
     "Detail the architectural differences between the proposed model and conventional transformer encoders.",
     "What statistical significance testing or error analysis was conducted on the test splits?",
-    "How was the training dataset curated and what filtering heuristics were applied?"
+    "How was the training dataset curated and what filtering heuristics were applied?",
+    "What tokenization strategy and vocabulary size are used in this model architecture?",
+    "Describe the attention mechanism and positional encoding scheme employed by the authors.",
+    "What are the main contributions of this paper relative to prior work in the field?",
+    "How do the authors handle domain adaptation or transfer learning in their experiments?",
+    "What loss functions and optimization schedules were used during model training?",
+    "Summarize the error analysis and qualitative examples provided in the supplementary material.",
+    "What preprocessing steps were applied to the raw input data before model training?",
+    "How does the model perform on low-resource languages or limited-data scenarios?",
 ]
 
+# Target token counts per token_load label (approximate, leaving headroom for system prompt + probe)
+TOKEN_LOAD_TARGETS: Dict[str, int] = {
+    "4k": 3500,
+    "8k": 7000,
+    "16k": 14000,
+    "32k": 28000,
+    "64k-100k": 56000,
+    "64k": 56000,
+}
 
-def load_niah_cases(tier: str = "all", limit: Optional[int] = None) -> List[Dict[str, Any]]:
-    if not NIAH_MATRIX_PATH.exists():
-        raise FileNotFoundError(f"NIAH 75 matrix dataset not found at {NIAH_MATRIX_PATH}")
-    with open(NIAH_MATRIX_PATH, "r", encoding="utf-8") as f:
+
+def load_niah_cases(tier: str = "all", limit: Optional[int] = None, split: str = "test") -> Tuple[List[Dict[str, Any]], Path]:
+    matrix_path = NIAH_VAL_MATRIX_PATH if split == "val" else NIAH_MATRIX_PATH
+    if not matrix_path.exists():
+        raise FileNotFoundError(f"NIAH matrix dataset not found at {matrix_path}")
+    with open(matrix_path, "r", encoding="utf-8") as f:
         cases = json.load(f)
     if tier != "all":
         cases = [c for c in cases if c.get("tier") == tier]
     if limit and limit > 0:
         cases = cases[:limit]
-    return cases
+    return cases, matrix_path
 
 
 def get_case_paper_text(case: Dict[str, Any]) -> str:
@@ -81,44 +101,124 @@ def get_case_paper_text(case: Dict[str, Any]) -> str:
     return "\n\n".join(texts) or "Standard academic paper context."
 
 
+def _load_all_paper_texts() -> List[str]:
+    """Load all available paper texts from the papers directory."""
+    if not PAPERS_DIR.exists():
+        return []
+    texts = []
+    for p in sorted(PAPERS_DIR.glob("*.txt")):
+        try:
+            texts.append(p.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return texts
+
+
+_ALL_PAPER_TEXTS: List[str] = []  # Lazy-loaded once
+
+
+def _get_paper_pool() -> List[str]:
+    global _ALL_PAPER_TEXTS
+    if not _ALL_PAPER_TEXTS:
+        _ALL_PAPER_TEXTS = _load_all_paper_texts()
+    return _ALL_PAPER_TEXTS
+
+
 def build_conversation_history(case: Dict[str, Any]) -> List[LlamaChatMessage]:
-    """Assembles structured multi-turn conversation with needles accurately placed at designated depth ratios."""
+    """
+    Assembles structured multi-turn conversation with needles placed at designated
+    depth ratios, and fills haystack turns with real paper excerpts until the
+    accumulated token count reaches the target_tokens for the given token_load label.
+    """
     token_load = case.get("token_load", "8k")
-    turn_counts = {
-        "4k": 5,
-        "8k": 8,
-        "16k": 12,
-        "32k": 18,
-        "64k": 26
-    }
-    total_turns = turn_counts.get(token_load, 8)
+    target_tokens = TOKEN_LOAD_TARGETS.get(token_load, 7000)
     needles = case.get("needles", [])
+    paper_pool = _get_paper_pool()
 
-    # Determine insertion points
-    needle_turn_map: Dict[int, List[Dict[str, Any]]] = {}
-    for n in needles:
-        depth = n.get("depth_ratio", 0.5)
-        turn_idx = max(0, min(total_turns - 1, int(round((total_turns - 1) * depth))))
-        needle_turn_map.setdefault(turn_idx, []).append(n)
+    # Build a pool of real haystack content chunks (~500 tokens each)
+    chunk_target = 500
+    haystack_chunks: List[str] = []
+    for paper_text in paper_pool:
+        words = paper_text.split()
+        # Approximate 500 tokens ≈ 385 words (GPT-style tokenizer ~1.3 words/token)
+        step = max(1, int(chunk_target / 1.3))
+        for start in range(0, len(words), step):
+            chunk = " ".join(words[start:start + step])
+            if chunk.strip():
+                haystack_chunks.append(chunk)
+    # Cycle chunks indefinitely
+    import itertools
+    chunk_cycle = itertools.cycle(haystack_chunks) if haystack_chunks else None
 
+    # --- Build needle turn map (based on token fraction, not turn index) ---
+    # We will place needles at the right depth after we know total turns needed,
+    # so first build a list of (depth_ratio, needle_obj).
+    needle_schedule = sorted(
+        [(n.get("depth_ratio", 0.5), n) for n in needles],
+        key=lambda x: x[0]
+    )
+
+    # --- Incrementally build turns until we hit target_tokens ---
     history: List[LlamaChatMessage] = []
-    for t_idx in range(total_turns):
-        # If needle scheduled at this turn, insert needle directive
-        if t_idx in needle_turn_map:
-            for n_obj in needle_turn_map[t_idx]:
-                history.append(LlamaChatMessage(role=MessageRole.USER, content=n_obj["input"]))
-                history.append(LlamaChatMessage(
+    accumulated_tokens = 0
+    turn_idx = 0
+
+    # Keep track of which needle depths we've passed so we can insert at the right time
+    needle_ptr = 0  # index into needle_schedule
+
+    while accumulated_tokens < target_tokens:
+        current_depth = turn_idx / max(1, turn_idx + 1)  # rough progress fraction
+
+        # Insert any needles whose depth has been reached
+        while needle_ptr < len(needle_schedule):
+            ndepth, n_obj = needle_schedule[needle_ptr]
+            if current_depth >= ndepth:
+                user_msg = LlamaChatMessage(role=MessageRole.USER, content=n_obj["input"])
+                asst_msg = LlamaChatMessage(
                     role=MessageRole.ASSISTANT,
                     content="Understood. I have recorded this directive and will strictly maintain it throughout our research workspace."
-                ))
-        
-        # Insert domain haystack turn
-        h_query = HAYSTACK_BANK[t_idx % len(HAYSTACK_BANK)]
-        history.append(LlamaChatMessage(role=MessageRole.USER, content=h_query))
-        history.append(LlamaChatMessage(
+                )
+                history.extend([user_msg, asst_msg])
+                accumulated_tokens += count_tokens(n_obj["input"]) + count_tokens(asst_msg.content)
+                needle_ptr += 1
+            else:
+                break
+
+        # Build a real-content haystack turn using paper excerpt
+        if chunk_cycle is not None:
+            excerpt = next(chunk_cycle)
+            h_query = HAYSTACK_BANK[turn_idx % len(HAYSTACK_BANK)]
+            asst_content = (
+                f"Based on the research material: {excerpt[:1200]}"
+            )
+        else:
+            h_query = HAYSTACK_BANK[turn_idx % len(HAYSTACK_BANK)]
+            asst_content = (
+                f"Regarding {h_query[:40]}: The authors thoroughly evaluate this dimension in the paper, "
+                "detailing systematic experimental configurations, rigorous comparative tables, and "
+                "quantitative findings across all target evaluation splits."
+            )
+
+        user_msg = LlamaChatMessage(role=MessageRole.USER, content=h_query)
+        asst_msg = LlamaChatMessage(role=MessageRole.ASSISTANT, content=asst_content)
+        history.extend([user_msg, asst_msg])
+        accumulated_tokens += count_tokens(h_query) + count_tokens(asst_content)
+        turn_idx += 1
+
+        # Safety cap: never exceed 80K turns (prevents infinite loop on edge cases)
+        if turn_idx > 800:
+            break
+
+    # Insert any remaining needles that haven't been placed yet (at end of history)
+    while needle_ptr < len(needle_schedule):
+        _, n_obj = needle_schedule[needle_ptr]
+        user_msg = LlamaChatMessage(role=MessageRole.USER, content=n_obj["input"])
+        asst_msg = LlamaChatMessage(
             role=MessageRole.ASSISTANT,
-            content=f"Regarding {h_query[:35]}: The authors thoroughly evaluate this dimension in the paper, detailing systematic experimental configurations, rigorous comparative tables, and quantitative findings across all target evaluation splits."
-        ))
+            content="Understood. I have recorded this directive and will strictly maintain it throughout our research workspace."
+        )
+        history.extend([user_msg, asst_msg])
+        needle_ptr += 1
 
     return history
 
@@ -175,9 +275,11 @@ async def evaluate_single_case(
     expected_ans = case.get("expected_answer", "")
     probe_query = case.get("probe_query", "")
 
-    paper_text = get_case_paper_text(case)
     base_history = build_conversation_history(case)
     probe_msg = LlamaChatMessage(role=MessageRole.USER, content=probe_query)
+
+    # Measure actual token count of built history
+    actual_history_tokens = count_messages_tokens(base_history)
 
     result_entry = {
         "case_id": cid,
@@ -192,25 +294,37 @@ async def evaluate_single_case(
         "tokens_1m": None,
         "crashed_8k_uncompacted": False,
         "ans_8k": "",
-        "ans_1m": ""
+        "ans_1m": "",
+        "actual_history_tokens": actual_history_tokens,
     }
 
     # --------------------------------------------------------------------------
     # MODE A: 8K Context Cap (Token Waterfall & Smart History Compaction)
+    # The history may be much larger than 8K; compaction is the mechanism under test.
     # --------------------------------------------------------------------------
     if mode in ("both", "8k"):
-        budget_tokens_8k = 2000
-        doc_slice_8k = pack_text_into_token_budget(paper_text, budget_tokens=budget_tokens_8k, model_name="llama-3-8b")
-        budget = allocate_token_budget(model_name="llama-3-8b", system_prompt="Academic Research Assistant", user_query=probe_query)
-        compacted_history = compact_chat_history(list(base_history), max_history_tokens=budget.max_history_tokens, model_name="llama-3-8b")
+        budget = allocate_token_budget(
+            model_name="llama-3-8b",
+            system_prompt="You are an academic research assistant evaluating long conversation history.",
+            user_query=probe_query,
+        )
+        compacted_history = compact_chat_history(
+            list(base_history),
+            max_history_tokens=budget.max_history_tokens,
+            model_name="llama-3-8b",
+        )
 
         prompt_8k = [
-            LlamaChatMessage(role=MessageRole.SYSTEM, content=f"You are an academic research assistant.\n\nContext:\n{doc_slice_8k[:2000]}")
+            LlamaChatMessage(
+                role=MessageRole.SYSTEM,
+                content="You are an academic research assistant. Answer based on the conversation history.",
+            )
         ] + compacted_history + [probe_msg]
 
         total_8k_tokens = count_messages_tokens(prompt_8k)
-        raw_tokens_uncompacted = count_messages_tokens(base_history + [probe_msg]) + count_tokens(paper_text[:20000]) + 1500
-        crashed_8k = raw_tokens_uncompacted > (8192 - 1024)
+        # Record whether the uncompacted history would overflow 8K
+        raw_uncompacted_tokens = actual_history_tokens + count_tokens(probe_query) + 500
+        crashed_8k = raw_uncompacted_tokens > (8192 - 1024)
 
         try:
             resp_8k = await main_llm.achat(prompt_8k)
@@ -227,10 +341,15 @@ async def evaluate_single_case(
 
     # --------------------------------------------------------------------------
     # MODE B: 1M Context Cap (Frontier Native Long-Context Ingestion)
+    # Send the full uncompacted history — the model must retrieve the needle
+    # from the real accumulated context without any truncation or compaction.
     # --------------------------------------------------------------------------
     if mode in ("both", "1m"):
         prompt_1m = [
-            LlamaChatMessage(role=MessageRole.SYSTEM, content=f"You are an academic research assistant.\n\nContext:\n{paper_text}")
+            LlamaChatMessage(
+                role=MessageRole.SYSTEM,
+                content="You are an academic research assistant. Answer based on the full conversation history.",
+            )
         ] + base_history + [probe_msg]
 
         total_1m_tokens = count_messages_tokens(prompt_1m)
@@ -299,20 +418,38 @@ async def main():
     parser = argparse.ArgumentParser(description="75-Case Multi-Spectral Conversational NIAH Benchmark")
     parser.add_argument("--tier", type=str, default="all", choices=["all", "s_niah", "m_niah", "r_niah"], help="Tier: s_niah (5x5 grid), m_niah (multi-needle), r_niah (reasoning), or all")
     parser.add_argument("--mode", type=str, default="both", choices=["both", "8k", "1m"], help="Evaluation mode: 'both' (Dual-Cap Head-to-Head), '8k', or '1m'")
+    parser.add_argument("--split", type=str, default="test", choices=["val", "test"], help="Evaluation split: 'test' (75-case comprehensive matrix) or 'val' (25-case held-out validation suite)")
     parser.add_argument("--limit", type=int, default=None, help="Limit number of test cases to run")
     parser.add_argument("--concurrency", type=int, default=4, help="Max concurrent cases (default 4)")
+    parser.add_argument("--eval-model", type=str, default=None, help="Evaluator judge model (default: LLM_EVAL_MODEL from env)")
     args = parser.parse_args()
 
     print("=========================================================================================================")
-    print("      75-CASE MULTI-SPECTRAL CONVERSATIONAL NEEDLE-IN-A-HAYSTACK (NIAH) BENCHMARK SUITE                  ")
+    print("      MULTI-SPECTRAL CONVERSATIONAL NEEDLE-IN-A-HAYSTACK (NIAH) BENCHMARK SUITE                          ")
     print("      Foundations: Stanford RULER (2024), Anthropic (2024), Kamradt (2023), Lost in the Middle (2024)    ")
     print("=========================================================================================================\n")
 
-    cases = load_niah_cases(tier=args.tier, limit=args.limit)
-    print(f"Loaded {len(cases)} test cases from niah_75_matrix.json (Tier: {args.tier}, Mode: {args.mode})")
+    cases, matrix_path = load_niah_cases(tier=args.tier, limit=args.limit, split=args.split)
+    print(f"Loaded {len(cases)} test cases from {matrix_path.name} (Split: {args.split}, Tier: {args.tier}, Mode: {args.mode})")
 
     main_llm = get_main_llm()
-    eval_llm = get_fast_llm()
+    eval_model_name = (args.eval_model or os.getenv("LLM_EVAL_MODEL", "") or "").strip()
+    if eval_model_name:
+        from llama_index.llms.openai_like import OpenAILike
+        base_url = os.getenv("LLM_BASE_URL", "http://localhost:20128/v1")
+        api_key = os.getenv("LLM_API_KEY", "")
+        eval_llm = OpenAILike(
+            api_base=base_url,
+            api_key=api_key,
+            model=eval_model_name,
+            is_chat_model=True,
+            is_function_calling_model=True,
+            max_tokens=4096,
+            temperature=0.0,
+            timeout=120.0
+        )
+    else:
+        eval_llm = get_fast_llm()
     print(f"Generator Model : {getattr(main_llm, 'model', 'default')}")
     print(f"Evaluator Judge : {getattr(eval_llm, 'model', 'default')} @ temp=0.0 (Greedy Deterministic)")
 
@@ -323,7 +460,8 @@ async def main():
             res = await evaluate_single_case(case, main_llm, eval_llm, mode=args.mode)
             s_8k = f"{res['score_8k']:.2f}" if res['score_8k'] is not None else "N/A"
             s_1m = f"{res['score_1m']:.2f}" if res['score_1m'] is not None else "N/A"
-            print(f"[{idx+1:02d}/{len(cases)}] {res['case_id']:<12} ({res['tier'].upper():<6}, {res['token_load']:<4}) | Mode A (8K Cap): {s_8k} | Mode B (1M Native): {s_1m}")
+            actual_tok = res.get("actual_history_tokens", "?")
+            print(f"[{idx+1:02d}/{len(cases)}] {res['case_id']:<12} ({res['tier'].upper():<6}, {res['token_load']:<8}, actual={actual_tok}tok) | Mode A (8K Cap): {s_8k} | Mode B (1M Native): {s_1m}")
             return res
 
     tasks = [worker(i, c) for i, c in enumerate(cases)]
@@ -336,11 +474,12 @@ async def main():
     mean_1m = sum(valid_1m) / len(valid_1m) if valid_1m else 0.0
 
     print("\n" + "=" * 95)
-    print("                      75-CASE DUAL-CAP CONVERSATIONAL NIAH SCORECARD                     ")
+    split_title = "25-CASE HELD-OUT VALIDATION" if args.split == "val" else "75-CASE COMPREHENSIVE TEST"
+    print(f"               {split_title} DUAL-CAP CONVERSATIONAL NIAH SCORECARD              ")
     print("=" * 95)
     print(f"{'Evaluation Dimension':<45} | {'Mode A (8K Cap / Compaction)':<24} | {'Mode B (1M Native)':<20}")
     print("-" * 95)
-    print(f"{'Overall Needle Accuracy (All 75 Cases)':<45} | {f'{mean_8k:.3f}':<24} | {f'{mean_1m:.3f}':<20}")
+    print(f"{f'Overall Needle Accuracy ({len(all_results)} Cases)':<45} | {f'{mean_8k:.3f}':<24} | {f'{mean_1m:.3f}':<20}")
     
     # Sub-tier statistics
     for t_name in ["s_niah", "m_niah", "r_niah"]:
@@ -363,9 +502,11 @@ async def main():
             print(render_2d_heatmap(all_results, mode_key="score_1m"))
 
     # Save to report JSON and Markdown
-    out_json = REPORTS_DIR / "benchmark_niah_dual_cap.json"
+    suffix = f"_{args.split}" if args.split == "val" else ""
+    out_json = REPORTS_DIR / f"benchmark_niah_dual_cap{suffix}.json"
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump({
+            "split": args.split,
             "total_cases": len(all_results),
             "mean_accuracy_8k": mean_8k,
             "mean_accuracy_1m": mean_1m,
@@ -373,10 +514,11 @@ async def main():
         }, f, indent=2)
     print(f"\n✓ Saved Dual-Cap NIAH report JSON to: {out_json}")
 
-    out_md = REPORTS_DIR / "benchmark_niah_dual_cap.md"
+    out_md = REPORTS_DIR / f"benchmark_niah_dual_cap{suffix}.md"
     md_lines = [
-        "# Not-NotebookLM Dual-Cap Conversational NIAH Benchmark Report",
+        f"# Not-NotebookLM Dual-Cap Conversational NIAH Benchmark Report ({split_title})",
         "*Multi-Spectral Needle-In-A-Haystack Evaluation across S-NIAH, M-NIAH, and R-NIAH (Stanford RULER & Anthropic Standards)*\n",
+        f"- **Split**: `{args.split}`",
         f"- **Total Cases Evaluated**: {len(all_results)} Cases",
         f"- **Mode A (8K Cap / Compaction)**: `{mean_8k:.3f}` overall accuracy",
         f"- **Mode B (1M Native Ingestion)**: `{mean_1m:.3f}` overall accuracy\n",

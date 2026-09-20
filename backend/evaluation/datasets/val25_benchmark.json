@@ -1,0 +1,482 @@
+[
+  {
+    "id": "QASPER-VAL-01",
+    "sample_id": "QASPER-VAL-01",
+    "dataset": "qasper",
+    "category": "single_fact",
+    "paper_id": "1809.00540",
+    "paper_title": "Multilingual Clustering of Streaming News",
+    "query": "What are the sources of the datasets?",
+    "target_documents": [
+      "qasper_1809.00540.txt"
+    ],
+    "documents": [
+      "qasper_1809.00540.txt"
+    ],
+    "ground_truth": "rupnik2016news",
+    "evidence_spans": [
+      "rupnik2016news"
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "QASPER-VAL-02",
+    "sample_id": "QASPER-VAL-02",
+    "dataset": "qasper",
+    "category": "single_fact",
+    "paper_id": "2004.03354",
+    "paper_title": "Inexpensive Domain Adaptation of Pretrained Language Models: A Case Study on Biomedical Named Entity Recognition",
+    "query": "What in-domain text did they use?",
+    "target_documents": [
+      "qasper_2004.03354.txt"
+    ],
+    "documents": [
+      "qasper_2004.03354.txt"
+    ],
+    "ground_truth": "PubMed+PMC",
+    "evidence_spans": [
+      "PubMed+PMC"
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "QASPER-VAL-03",
+    "sample_id": "QASPER-VAL-03",
+    "dataset": "qasper",
+    "category": "single_fact",
+    "paper_id": "1611.04798",
+    "paper_title": "Toward Multilingual Neural Machine Translation with Universal Encoder and Decoder",
+    "query": "Which languages do they test on for the under-resourced scenario?",
+    "target_documents": [
+      "qasper_1611.04798.txt"
+    ],
+    "documents": [
+      "qasper_1611.04798.txt"
+    ],
+    "ground_truth": "English German",
+    "evidence_spans": [
+      "English",
+      "German"
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "QASPER-VAL-04",
+    "sample_id": "QASPER-VAL-04",
+    "dataset": "qasper",
+    "category": "single_fact",
+    "paper_id": "1912.13337",
+    "paper_title": "What Does My QA Model Know? Devising Controlled Probes using Expert Knowledge",
+    "query": "After how many hops does accuracy decrease?",
+    "target_documents": [
+      "qasper_1912.13337.txt"
+    ],
+    "documents": [
+      "qasper_1912.13337.txt"
+    ],
+    "ground_truth": "1-hop links to 2-hops",
+    "evidence_spans": [
+      "1-hop links to 2-hops"
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "QASPER-VAL-05",
+    "sample_id": "QASPER-VAL-05",
+    "dataset": "qasper",
+    "category": "single_fact",
+    "paper_id": "1809.01541",
+    "paper_title": "Copenhagen at CoNLL--SIGMORPHON 2018: Multilingual Inflection in Context with Explicit Morphosyntactic Decoding",
+    "query": "How do they perform multilingual training?",
+    "target_documents": [
+      "qasper_1809.01541.txt"
+    ],
+    "documents": [
+      "qasper_1809.01541.txt"
+    ],
+    "ground_truth": "Multilingual training is performed by randomly alternating between languages for every new minibatch",
+    "evidence_spans": [
+      "Multilingual training is performed by randomly alternating between languages for every new minibatch"
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "QASPER-VAL-06",
+    "sample_id": "QASPER-VAL-06",
+    "dataset": "qasper",
+    "category": "single_fact",
+    "paper_id": "1809.09194",
+    "paper_title": "Stochastic Answer Networks for SQuAD 2.0",
+    "query": "What is the architecture of the span detector?",
+    "target_documents": [
+      "qasper_1809.09194.txt"
+    ],
+    "documents": [
+      "qasper_1809.09194.txt"
+    ],
+    "ground_truth": "adopt a multi-turn answer module for the span detector BIBREF1",
+    "evidence_spans": [
+      "adopt a multi-turn answer module for the span detector BIBREF1"
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "QASPER-VAL-07",
+    "sample_id": "QASPER-VAL-07",
+    "dataset": "qasper",
+    "category": "single_fact",
+    "paper_id": "1604.05372",
+    "paper_title": "Clustering Comparable Corpora of Russian and Ukrainian Academic Texts: Word Embeddings and Semantic Fingerprints",
+    "query": "What evaluation metric do they use?",
+    "target_documents": [
+      "qasper_1604.05372.txt"
+    ],
+    "documents": [
+      "qasper_1604.05372.txt"
+    ],
+    "ground_truth": "Accuracy",
+    "evidence_spans": [],
+    "unanswerable": false
+  },
+  {
+    "id": "QASPER-VAL-08",
+    "sample_id": "QASPER-VAL-08",
+    "dataset": "qasper",
+    "category": "single_fact",
+    "paper_id": "2002.08795",
+    "paper_title": "How To Avoid Being Eaten By a Grue: Exploration Strategies for Text-Adventure Agents",
+    "query": "What are the baselines?",
+    "target_documents": [
+      "qasper_2002.08795.txt"
+    ],
+    "documents": [
+      "qasper_2002.08795.txt"
+    ],
+    "ground_truth": "a score of 40",
+    "evidence_spans": [
+      "a score of 40"
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "SCIFACT-VAL-01",
+    "sample_id": "SCIFACT-VAL-01",
+    "dataset": "scifact",
+    "category": "scientific_fact_checking",
+    "paper_id": "1084345",
+    "paper_title": "Restoration of chaperone-mediated autophagy in aging liver improves cellular maintenance and hepatic function",
+    "query": "Evaluate the following scientific claim based on the literature: \"Autophagy declines in aged organisms.\"",
+    "target_documents": [
+      "scifact_1084345.txt"
+    ],
+    "documents": [
+      "scifact_1084345.txt"
+    ],
+    "ground_truth": "Verdict: SUPPORT. Evidence: We have previously found that CMA activity declines in aged organisms and have proposed that this failure in cellular clearance could contribute to the accumulation of altered proteins, the abnormal cellular homeostasis and, eventually, the functional loss characteristic of aged organisms.",
+    "claim": "Autophagy declines in aged organisms.",
+    "evidence_spans": [
+      "We have previously found that CMA activity declines in aged organisms and have proposed that this failure in cellular clearance could contribute to the accumulation of altered proteins, the abnormal cellular homeostasis and, eventually, the functional loss characteristic of aged organisms."
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "SCIFACT-VAL-02",
+    "sample_id": "SCIFACT-VAL-02",
+    "dataset": "scifact",
+    "category": "scientific_fact_checking",
+    "paper_id": "18872233",
+    "paper_title": "Mental Health Conditions Among Patients Seeking and Undergoing Bariatric Surgery: A Meta-analysis.",
+    "query": "Evaluate the following scientific claim based on the literature: \"Bariatric surgery has a positive impact on mental health.\"",
+    "target_documents": [
+      "scifact_18872233.txt"
+    ],
+    "documents": [
+      "scifact_18872233.txt"
+    ],
+    "ground_truth": "Verdict: SUPPORT. Evidence: Bariatric surgery was, however, consistently associated with postoperative decreases in the prevalence of depression (7 studies; 8%-74% decrease) and the severity of depressive symptoms (6 studies; 40%-70% decrease).   \n",
+    "claim": "Bariatric surgery has a positive impact on mental health.",
+    "evidence_spans": [
+      "Bariatric surgery was, however, consistently associated with postoperative decreases in the prevalence of depression (7 studies; 8%-74% decrease) and the severity of depressive symptoms (6 studies; 40%-70% decrease).   \n"
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "SCIFACT-VAL-03",
+    "sample_id": "SCIFACT-VAL-03",
+    "dataset": "scifact",
+    "category": "scientific_fact_checking",
+    "paper_id": "16322674",
+    "paper_title": "Birth Size and Breast Cancer Risk: Re-analysis of Individual Participant Data from 32 Studies",
+    "query": "Evaluate the following scientific claim based on the literature: \"Birth-weight is positively associated with breast cancer.\"",
+    "target_documents": [
+      "scifact_16322674.txt"
+    ],
+    "documents": [
+      "scifact_16322674.txt"
+    ],
+    "ground_truth": "Verdict: SUPPORT. Evidence: Birth weight was positively associated with breast cancer risk in studies based on birth records (pooled relative risk [RR] per one standard deviation [SD] [= 0.5 kg] increment in birth weight: 1.06; 95% confidence interval [CI] 1.02-1.09) and parental recall when the participants were children (1.02; 95% CI 0.99-1.05), but not in those based on adult self-reports, or maternal recall during the woman's adulthood (0.98; 95% CI 0.95-1.01) (p for heterogeneity between data sources = 0.003).",
+    "claim": "Birth-weight is positively associated with breast cancer.",
+    "evidence_spans": [
+      "Birth weight was positively associated with breast cancer risk in studies based on birth records (pooled relative risk [RR] per one standard deviation [SD] [= 0.5 kg] increment in birth weight: 1.06; 95% confidence interval [CI] 1.02-1.09) and parental recall when the participants were children (1.02; 95% CI 0.99-1.05), but not in those based on adult self-reports, or maternal recall during the woman's adulthood (0.98; 95% CI 0.95-1.01) (p for heterogeneity between data sources = 0.003)."
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "SCIFACT-VAL-04",
+    "sample_id": "SCIFACT-VAL-04",
+    "dataset": "scifact",
+    "category": "scientific_fact_checking",
+    "paper_id": "13519661",
+    "paper_title": "Linkage Disequilibrium Mapping of       CHEK2: Common Variation and Breast Cancer Risk     ",
+    "query": "Evaluate the following scientific claim based on the literature: \"CHEK2 is not associated with breast cancer.\"",
+    "target_documents": [
+      "scifact_13519661.txt"
+    ],
+    "documents": [
+      "scifact_13519661.txt"
+    ],
+    "ground_truth": "Verdict: SUPPORT. Evidence: We genotyped these six tagSNPs in 1,577 postmenopausal breast cancer cases and 1,513 population controls, but found no convincing association between any common CHEK2 haplotype and breast cancer risk.",
+    "claim": "CHEK2 is not associated with breast cancer.",
+    "evidence_spans": [
+      "We genotyped these six tagSNPs in 1,577 postmenopausal breast cancer cases and 1,513 population controls, but found no convincing association between any common CHEK2 haplotype and breast cancer risk."
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "SCIFACT-VAL-05",
+    "sample_id": "SCIFACT-VAL-05",
+    "dataset": "scifact",
+    "category": "scientific_fact_checking",
+    "paper_id": "4388470",
+    "paper_title": "Somatic sex identity is cell-autonomous in the chicken",
+    "query": "Evaluate the following scientific claim based on the literature: \"Cell autonomous sex determination in somatic cells does not occur in Galliformes.\"",
+    "target_documents": [
+      "scifact_4388470.txt"
+    ],
+    "documents": [
+      "scifact_4388470.txt"
+    ],
+    "ground_truth": "Verdict: CONTRADICT. Evidence: These studies demonstrated that gynandromorph birds are genuine male:female chimaeras, and indicated that male and female avian somatic cells may have an inherent sex identity.",
+    "claim": "Cell autonomous sex determination in somatic cells does not occur in Galliformes.",
+    "evidence_spans": [
+      "These studies demonstrated that gynandromorph birds are genuine male:female chimaeras, and indicated that male and female avian somatic cells may have an inherent sex identity."
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "SCIFACT-VAL-06",
+    "sample_id": "SCIFACT-VAL-06",
+    "dataset": "scifact",
+    "category": "scientific_fact_checking",
+    "paper_id": "1568684",
+    "paper_title": "The Bile Acid Chenodeoxycholic Acid Increases Human Brown Adipose Tissue Activity.",
+    "query": "Evaluate the following scientific claim based on the literature: \"Chenodeosycholic acid treatment reduces whole-body energy expenditure.\"",
+    "target_documents": [
+      "scifact_1568684.txt"
+    ],
+    "documents": [
+      "scifact_1568684.txt"
+    ],
+    "ground_truth": "Verdict: CONTRADICT. Evidence: In rodents, BAT can be activated by bile acids, which activate type 2 iodothyronine deiodinase (D2) in BAT via the G-coupled protein receptor TGR5, resulting in increased oxygen consumption and energy expenditure. Treatment of 12 healthy female subjects with CDCA for 2 days resulted in increased BAT activity.",
+    "claim": "Chenodeosycholic acid treatment reduces whole-body energy expenditure.",
+    "evidence_spans": [
+      "In rodents, BAT can be activated by bile acids, which activate type 2 iodothyronine deiodinase (D2) in BAT via the G-coupled protein receptor TGR5, resulting in increased oxygen consumption and energy expenditure. Treatment of 12 healthy female subjects with CDCA for 2 days resulted in increased BAT activity."
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "SCIFACT-VAL-07",
+    "sample_id": "SCIFACT-VAL-07",
+    "dataset": "scifact",
+    "category": "scientific_fact_checking",
+    "paper_id": "11614737",
+    "paper_title": "Combination varenicline and bupropion SR for tobacco-dependence treatment in cigarette smokers: a randomized trial.",
+    "query": "Evaluate the following scientific claim based on the literature: \"Combination nicotine replacement therapies with varenicline or bupropion lead to significantly higher long-term abstinence rates at 52 weeks than varenicline monotherapy.\"",
+    "target_documents": [
+      "scifact_11614737.txt"
+    ],
+    "documents": [
+      "scifact_11614737.txt"
+    ],
+    "ground_truth": "Verdict: CONTRADICT. Evidence: At 52 weeks, 30.9% of the combination therapy group achieved prolonged and 36.6% achieved 7-day point-prevalence smoking abstinence compared with 24.5% and 29.2% in varenicline monotherapy (OR, 1.39; 95% CI, 0.93-2.07; P = .11 and OR, 1.40; 95% CI, 0.96-2.05; P = .08, respectively).",
+    "claim": "Combination nicotine replacement therapies with varenicline or bupropion lead to significantly higher long-term abstinence rates at 52 weeks than varenicline monotherapy.",
+    "evidence_spans": [
+      "At 52 weeks, 30.9% of the combination therapy group achieved prolonged and 36.6% achieved 7-day point-prevalence smoking abstinence compared with 24.5% and 29.2% in varenicline monotherapy (OR, 1.39; 95% CI, 0.93-2.07; P = .11 and OR, 1.40; 95% CI, 0.96-2.05; P = .08, respectively)."
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "SCIFACT-VAL-08",
+    "sample_id": "SCIFACT-VAL-08",
+    "dataset": "scifact",
+    "category": "scientific_fact_checking",
+    "paper_id": "23349986",
+    "paper_title": "Dexamethasone and risk of nausea and vomiting and postoperative bleeding after tonsillectomy in children: a randomized trial.",
+    "query": "Evaluate the following scientific claim based on the literature: \"Dexamethasone decreases risk of postoperative bleeding.\"",
+    "target_documents": [
+      "scifact_23349986.txt"
+    ],
+    "documents": [
+      "scifact_23349986.txt"
+    ],
+    "ground_truth": "Verdict: CONTRADICT. Evidence: Two of 53 (4%; 95% CI, 0.5%-13%) children who received placebo had bleeding compared with 6 of 53 (11%; 95% CI, 4%-23%), 2 of 51 (4%; 95% CI, 0.5%-13%), and 12 of 50 (24%; 95% CI, 13%-38%) who received dexamethasone at 0.05, 0.15, and 0.5 mg/kg, respectively (P = .003).",
+    "claim": "Dexamethasone decreases risk of postoperative bleeding.",
+    "evidence_spans": [
+      "Two of 53 (4%; 95% CI, 0.5%-13%) children who received placebo had bleeding compared with 6 of 53 (11%; 95% CI, 4%-23%), 2 of 51 (4%; 95% CI, 0.5%-13%), and 12 of 50 (24%; 95% CI, 13%-38%) who received dexamethasone at 0.05, 0.15, and 0.5 mg/kg, respectively (P = .003)."
+    ],
+    "unanswerable": false
+  },
+  {
+    "id": "MUL-VAL-01",
+    "sample_id": "MUL-VAL-01",
+    "dataset": "qasper_multi",
+    "category": "multi_comparative",
+    "query": "Compare the experimental objectives, benchmark datasets, and model architectures evaluated in Paper [1] (Multilingual Clustering of Streaming News) and Paper [2] (Inexpensive Domain Adaptation of Pretrained L).",
+    "target_documents": [
+      "qasper_1809.00540.txt",
+      "qasper_2004.03354.txt"
+    ],
+    "documents": [
+      "qasper_1809.00540.txt",
+      "qasper_2004.03354.txt"
+    ],
+    "ground_truth": "Paper [1] investigates Multilingual Clustering of Streaming News, while Paper [2] focuses on Inexpensive Domain Adaptation of Pretrained Language Models: A Case Study on Biomedical Named Entity Recognition. Both propose distinct neural architectures and evaluation splits.",
+    "unanswerable": false
+  },
+  {
+    "id": "MUL-VAL-02",
+    "sample_id": "MUL-VAL-02",
+    "dataset": "qasper_multi",
+    "category": "multi_comparative",
+    "query": "Compare the baseline systems, hyperparameter choices, and quantitative metric gains reported between Paper [1] and Paper [2].",
+    "target_documents": [
+      "qasper_2004.03354.txt",
+      "qasper_1611.04798.txt"
+    ],
+    "documents": [
+      "qasper_2004.03354.txt",
+      "qasper_1611.04798.txt"
+    ],
+    "ground_truth": "Paper [1] (Inexpensive Domain Adaptation ) and Paper [2] (Toward Multilingual Neural Mac) evaluate different baselines with dedicated metric improvements.",
+    "unanswerable": false
+  },
+  {
+    "id": "MUL-VAL-03",
+    "sample_id": "MUL-VAL-03",
+    "dataset": "qasper_multi",
+    "category": "multi_comparative",
+    "query": "Synthesize a Master Comparison Table across all three research papers comparing (a) Problem Domain, (b) Representation Method, and (c) Reported Empirical Results.",
+    "target_documents": [
+      "qasper_1809.00540.txt",
+      "qasper_2004.03354.txt",
+      "qasper_1611.04798.txt"
+    ],
+    "documents": [
+      "qasper_1809.00540.txt",
+      "qasper_2004.03354.txt",
+      "qasper_1611.04798.txt"
+    ],
+    "ground_truth": "Master table synthesizing across all three manuscripts: [1] Multilingual Clustering of Str, [2] Inexpensive Domain Adaptation , and [3] Toward Multilingual Neural Mac.",
+    "unanswerable": false
+  },
+  {
+    "id": "MUL-VAL-04",
+    "sample_id": "MUL-VAL-04",
+    "dataset": "qasper_multi",
+    "category": "multi_comparative",
+    "query": "Compare the biomedical mechanisms, target biological pathways, and laboratory evidence reported across Paper [1], Paper [2], and Paper [3].",
+    "target_documents": [
+      "scifact_1084345.txt",
+      "scifact_18872233.txt",
+      "scifact_16322674.txt"
+    ],
+    "documents": [
+      "scifact_1084345.txt",
+      "scifact_18872233.txt",
+      "scifact_16322674.txt"
+    ],
+    "ground_truth": "Paper [1] (Restoration of chaperone-media), Paper [2] (Mental Health Conditions Among), and Paper [3] (Birth Size and Breast Cancer R) analyze distinct biological pathways with respective experimental findings.",
+    "unanswerable": false
+  },
+  {
+    "id": "MUL-VAL-05",
+    "sample_id": "MUL-VAL-05",
+    "dataset": "qasper_multi",
+    "category": "multi_comparative",
+    "query": "Construct a comprehensive 4-paper synthesis matrix comparing the neural sequence modeling techniques, optimization strategies, and future limitations across Paper [1], Paper [2], Paper [3], and Paper [4].",
+    "target_documents": [
+      "qasper_1809.00540.txt",
+      "qasper_2004.03354.txt",
+      "qasper_1611.04798.txt",
+      "qasper_1912.13337.txt"
+    ],
+    "documents": [
+      "qasper_1809.00540.txt",
+      "qasper_2004.03354.txt",
+      "qasper_1611.04798.txt",
+      "qasper_1912.13337.txt"
+    ],
+    "ground_truth": "Four-paper comparative matrix reviewing methodological approaches, loss functions, and dataset configurations across all four distinct research publications.",
+    "unanswerable": false
+  },
+  {
+    "id": "UNANS-VAL-01",
+    "sample_id": "UNANS-VAL-01",
+    "dataset": "unanswerable",
+    "category": "negative_unanswerable",
+    "query": "What crowdsourcing compensation rate per hour was paid to Amazon Mechanical Turk workers for annotating this dataset?",
+    "target_documents": [
+      "qasper_1809.00540.txt"
+    ],
+    "documents": [
+      "qasper_1809.00540.txt"
+    ],
+    "ground_truth": "Unanswerable. The paper does not mention any crowdsourcing hourly compensation rate or MTurk payment figures.",
+    "unanswerable": true
+  },
+  {
+    "id": "UNANS-VAL-02",
+    "sample_id": "UNANS-VAL-02",
+    "dataset": "unanswerable",
+    "category": "negative_unanswerable",
+    "query": "What specific cluster hardware specs, number of GPU nodes, and interconnect bandwidth were used during model pre-training?",
+    "target_documents": [
+      "qasper_2004.03354.txt"
+    ],
+    "documents": [
+      "qasper_2004.03354.txt"
+    ],
+    "ground_truth": "Unanswerable. The text does not disclose cluster hardware specifications, interconnect bandwidth, or the number of GPU nodes used.",
+    "unanswerable": true
+  },
+  {
+    "id": "UNANS-VAL-03",
+    "sample_id": "UNANS-VAL-03",
+    "dataset": "unanswerable",
+    "category": "negative_unanswerable",
+    "query": "What clinical exclusion criteria regarding patient body mass index (BMI) were applied in the Phase III trial cohort?",
+    "target_documents": [
+      "scifact_1084345.txt"
+    ],
+    "documents": [
+      "scifact_1084345.txt"
+    ],
+    "ground_truth": "Unanswerable. The provided abstract does not report any patient BMI exclusion criteria or Phase III trial parameters.",
+    "unanswerable": true
+  },
+  {
+    "id": "UNANS-VAL-04",
+    "sample_id": "UNANS-VAL-04",
+    "dataset": "unanswerable",
+    "category": "negative_unanswerable",
+    "query": "How many days of post-operative follow-up were recorded before assessing patient survival rates in Section 4?",
+    "target_documents": [
+      "scifact_18872233.txt"
+    ],
+    "documents": [
+      "scifact_18872233.txt"
+    ],
+    "ground_truth": "Unanswerable. The study does not mention post-operative follow-up duration or Section 4 survival data in the provided document.",
+    "unanswerable": true
+  }
+]
