@@ -258,7 +258,7 @@ def build_val25_suite():
             "id": "MUL-VAL-01",
             "docs": [p1, p2],
             "persona": "casual_slang",
-            "query": f"bro coba compare dong Paper [1] ({novel_qasper[0]['title'][:35]}) sama Paper [2] ({novel_qasper[1]['title'][:35]}): dataset yg dipake apa aja dan arsitekturnya beda di mana?",
+            "query": f"hey bro, can you compare Paper [1] ({novel_qasper[0]['title'][:35]}) and Paper [2] ({novel_qasper[1]['title'][:35]}): what datasets did they use and how do the architectures differ?",
             "gt": f"Paper [1] investigates {novel_qasper[0]['title']}, while Paper [2] focuses on {novel_qasper[1]['title']}. Both propose distinct neural architectures and evaluation splits."
         },
         {
@@ -311,7 +311,7 @@ def build_val25_suite():
             "id": "UNANS-VAL-01",
             "doc": novel_qasper[0]["filename"],
             "persona": "casual_slang",
-            "query": "min mau nanya, ada gak info berapa upah per jam yang dibayar ke pekerja mechanical turk buat bikin dataset ini?",
+            "query": "hey, quick question, is there any mention of the hourly wage paid to mechanical turk crowd workers to build this dataset?",
             "gt": "Unanswerable. The paper does not mention any crowdsourcing hourly compensation rate or MTurk payment figures."
         },
         {
@@ -325,7 +325,7 @@ def build_val25_suite():
             "id": "UNANS-VAL-03",
             "doc": novel_scifact[0]["filename"],
             "persona": "confused_beginner",
-            "query": "saya kurang paham medis, di paper ini ada disebutin syarat berat badan atau BMI pasien yang gak boleh ikut uji klinis gak ya?",
+            "query": "i'm not from a medical background, does this paper mention any patient body weight or BMI exclusion criteria for the clinical trial?",
             "gt": "Unanswerable. The provided abstract does not report any patient BMI exclusion criteria or Phase III trial parameters."
         },
         {
