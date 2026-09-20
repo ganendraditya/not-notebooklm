@@ -1,0 +1,2432 @@
+[
+  {
+    "id": "S-NIAH-01",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.1,
+    "persona": "casual_slang",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1604.02038.txt"
+    ],
+    "needles": [
+      {
+        "input": "eh bro pembimbing gw wantinya pake korpus multiun aja ya, jgn coba2 pake europarl",
+        "depth_ratio": 0.1,
+        "type": "directive",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "MultiUN corpus only (never Europarl).",
+    "probe_query": "Apa korpus yang diwajibkan pembimbing saya tadi?"
+  },
+  {
+    "id": "S-NIAH-02",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.3,
+    "persona": "terse_lowercase",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1609.00425.txt"
+    ],
+    "needles": [
+      {
+        "input": "batch: 64, seed: 9901, no gpl libraries allowed",
+        "depth_ratio": 0.3,
+        "type": "directive",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Batch size 64, random seed 9901, strictly no GPL libraries.",
+    "probe_query": "what batch size and random seed did i specify?"
+  },
+  {
+    "id": "S-NIAH-03",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.5,
+    "persona": "broken_english",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1611.06322.txt"
+    ],
+    "needles": [
+      {
+        "input": "please note our server is only 16gb ram zero swap, cannot load big model",
+        "depth_ratio": 0.5,
+        "type": "directive",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Server has only 16GB RAM with zero swap space.",
+    "probe_query": "How much RAM does our server possess according to earlier note?"
+  },
+  {
+    "id": "S-NIAH-04",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.7,
+    "persona": "academic_verbose",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1704.06194.txt"
+    ],
+    "needles": [
+      {
+        "input": "Pursuant to Institutional Ethics Protocol #2026-B81, human subjects must be explicitly de-identified.",
+        "depth_ratio": 0.7,
+        "type": "directive",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Institutional Ethics Protocol #2026-B81 requires explicit de-identification.",
+    "probe_query": "What was the ethics protocol number I stated earlier?"
+  },
+  {
+    "id": "S-NIAH-05",
+    "tier": "s_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.9,
+    "persona": "all_caps_urgent",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1705.09665.txt"
+    ],
+    "needles": [
+      {
+        "input": "NOTICE: MUST RESAMPLE ALL SPEECH WAVEFORMS TO EXACTLY 16000HZ!",
+        "depth_ratio": 0.9,
+        "type": "directive",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Speech waveforms must be resampled to 16000Hz (16kHz).",
+    "probe_query": "What audio sampling rate did I mandate in my urgent notice?"
+  },
+  {
+    "id": "S-NIAH-06",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.1,
+    "persona": "confused_beginner",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1801.05147.txt"
+    ],
+    "needles": [
+      {
+        "input": "laptop saya cuma punya GPU RTX 3060 6GB VRAM, jangan rekomendasi model yg butuh VRAM lebih dari itu ya min",
+        "depth_ratio": 0.1,
+        "type": "directive",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Maximum 6GB VRAM (NVIDIA RTX 3060 constraint).",
+    "probe_query": "Berapa batas maksimum VRAM GPU yang saya miliki?"
+  },
+  {
+    "id": "S-NIAH-07",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.3,
+    "persona": "casual_slang",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1805.02400.txt"
+    ],
+    "needles": [
+      {
+        "input": "inget ya boss kita cuma targetin deployment di apple silicon mps, jangan pake cuda",
+        "depth_ratio": 0.3,
+        "type": "directive",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Target deployment is Apple Silicon Metal (MPS backend); no CUDA.",
+    "probe_query": "Target hardware apa yang saya sebutkan untuk deployment?"
+  },
+  {
+    "id": "S-NIAH-08",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.5,
+    "persona": "terse_lowercase",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1810.02229.txt"
+    ],
+    "needles": [
+      {
+        "input": "quantization: 4-bit awq group size 128 only",
+        "depth_ratio": 0.5,
+        "type": "directive",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "4-bit AWQ with group size 128.",
+    "probe_query": "what quantization format and group size did i set?"
+  },
+  {
+    "id": "S-NIAH-09",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.7,
+    "persona": "academic_verbose",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1810.08699.txt"
+    ],
+    "needles": [
+      {
+        "input": "The clinical diagnostic cohort was contributed exclusively by Charit\u00e9 University Hospital Berlin.",
+        "depth_ratio": 0.7,
+        "type": "directive",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Contributed exclusively by Charit\u00e9 University Hospital Berlin.",
+    "probe_query": "Which medical institution contributed the diagnostic cohort?"
+  },
+  {
+    "id": "S-NIAH-10",
+    "tier": "s_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.9,
+    "persona": "broken_english",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1811.00383.txt"
+    ],
+    "needles": [
+      {
+        "input": "we must fix adamw weight decay to 0.015 with cosine annealing schedule",
+        "depth_ratio": 0.9,
+        "type": "directive",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "AdamW weight decay fixed at 0.015 with cosine annealing.",
+    "probe_query": "What weight decay value and annealing schedule did I specify?"
+  },
+  {
+    "id": "S-NIAH-11",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.1,
+    "persona": "all_caps_urgent",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1811.00942.txt"
+    ],
+    "needles": [
+      {
+        "input": "SECURITY DIRECTIVE: NEVER STORE UNENCRYPTED ACCESS TOKENS IN THE REDIS CACHE!",
+        "depth_ratio": 0.1,
+        "type": "directive",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Never store unencrypted access tokens in Redis cache.",
+    "probe_query": "What was my urgent security rule regarding the Redis cache?"
+  },
+  {
+    "id": "S-NIAH-12",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.3,
+    "persona": "confused_beginner",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1904.09131.txt"
+    ],
+    "needles": [
+      {
+        "input": "saya dapet pesan error katanya learning rate harus diset 3e-4, tolong inget ya peak lr kita 3e-4",
+        "depth_ratio": 0.3,
+        "type": "directive",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Peak learning rate must be set to 3e-4.",
+    "probe_query": "Berapa nilai peak learning rate yang saya minta catat tadi?"
+  },
+  {
+    "id": "S-NIAH-13",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "persona": "casual_slang",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1905.00840.txt"
+    ],
+    "needles": [
+      {
+        "input": "catat ya, kita cuma submit paper ini khusus buat venue ACL 2026, bukan EMNLP",
+        "depth_ratio": 0.5,
+        "type": "directive",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Submission is exclusively targeted for ACL 2026 (not EMNLP).",
+    "probe_query": "Target venue konferensi apa yang saya sebutkan tadi?"
+  },
+  {
+    "id": "S-NIAH-14",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.7,
+    "persona": "terse_lowercase",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1907.05664.txt"
+    ],
+    "needles": [
+      {
+        "input": "metric: report only expected calibration error 15 bins ece-15",
+        "depth_ratio": 0.7,
+        "type": "directive",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Report only Expected Calibration Error with 15 bins (ECE-15).",
+    "probe_query": "which calibration metric did i ask to report?"
+  },
+  {
+    "id": "S-NIAH-15",
+    "tier": "s_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.9,
+    "persona": "academic_verbose",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1908.06606.txt"
+    ],
+    "needles": [
+      {
+        "input": "Cohort eligibility criteria strictly mandate a minimum participant age threshold of 45 years.",
+        "depth_ratio": 0.9,
+        "type": "directive",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Minimum participant age threshold of 45 years.",
+    "probe_query": "What was the minimum cohort age threshold established earlier?"
+  },
+  {
+    "id": "S-NIAH-16",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.1,
+    "persona": "broken_english",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1909.00091.txt"
+    ],
+    "needles": [
+      {
+        "input": "our mobile app only support on-device inference with coreml format",
+        "depth_ratio": 0.1,
+        "type": "directive",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Mobile app strictly supports on-device inference using CoreML format.",
+    "probe_query": "Which mobile inference framework did I state our app supports?"
+  },
+  {
+    "id": "S-NIAH-17",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.3,
+    "persona": "all_caps_urgent",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1909.00512.txt"
+    ],
+    "needles": [
+      {
+        "input": "STOP: MAXIMUM CONTEXT WINDOW FOR LOCAL RERANKER IS CAPPED AT 2048 TOKENS!",
+        "depth_ratio": 0.3,
+        "type": "directive",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Local reranker maximum context length is hard-capped at 2048 tokens.",
+    "probe_query": "What is the maximum token cap for our local reranker?"
+  },
+  {
+    "id": "S-NIAH-18",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.5,
+    "persona": "confused_beginner",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1909.00694.txt"
+    ],
+    "needles": [
+      {
+        "input": "kata dosen saya loss function harus pake Dice Loss bukan Cross Entropy biasa",
+        "depth_ratio": 0.5,
+        "type": "directive",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Loss function must use Dice Loss instead of Cross Entropy.",
+    "probe_query": "Apa fungsi loss yang disuruh dosen saya gunakan tadi?"
+  },
+  {
+    "id": "S-NIAH-19",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.7,
+    "persona": "casual_slang",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1909.09067.txt"
+    ],
+    "needles": [
+      {
+        "input": "eh iya, token pooling-nya wajib mean-pooling ya, jangan sekali-kali pake CLS token",
+        "depth_ratio": 0.7,
+        "type": "directive",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Must use mean-token pooling; strictly never use CLS token pooling.",
+    "probe_query": "Metode token pooling apa yang saya wajibkan tadi?"
+  },
+  {
+    "id": "S-NIAH-20",
+    "tier": "s_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.9,
+    "persona": "terse_lowercase",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1910.14497.txt"
+    ],
+    "needles": [
+      {
+        "input": "vector cache ttl: fixed at 86400 seconds 24 hours in redis port 6389",
+        "depth_ratio": 0.9,
+        "type": "directive",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Vector cache key TTL fixed at 86400 seconds on Redis port 6389.",
+    "probe_query": "what is the vector cache ttl in seconds?"
+  },
+  {
+    "id": "S-NIAH-21",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.1,
+    "persona": "academic_verbose",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1911.04474.txt"
+    ],
+    "needles": [
+      {
+        "input": "It is an unalterable operational requirement that the text embedding backbone remain RoBERTa-large with 355M parameters.",
+        "depth_ratio": 0.1,
+        "type": "directive",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Text embedding backbone must be RoBERTa-large (355M parameters).",
+    "probe_query": "What exact text embedding backbone architecture was mandated?"
+  },
+  {
+    "id": "S-NIAH-22",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.3,
+    "persona": "broken_english",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1911.10742.txt"
+    ],
+    "needles": [
+      {
+        "input": "we cannot use spacy or stanford ner library, we write crf from scratch",
+        "depth_ratio": 0.3,
+        "type": "directive",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Cannot use spaCy or Stanford NER; must implement custom CRF.",
+    "probe_query": "Which two NER libraries did I forbid earlier?"
+  },
+  {
+    "id": "S-NIAH-23",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "persona": "all_caps_urgent",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_1912.01214.txt"
+    ],
+    "needles": [
+      {
+        "input": "CRITICAL THRESHOLD: MINIMUM TEST ACCURACY BEFORE MERGING IS 92.5 PERCENT!",
+        "depth_ratio": 0.5,
+        "type": "directive",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Minimum test accuracy threshold before merging is 92.5%.",
+    "probe_query": "What was the critical test accuracy percentage threshold I set?"
+  },
+  {
+    "id": "S-NIAH-24",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.7,
+    "persona": "confused_beginner",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_2003.03106.txt"
+    ],
+    "needles": [
+      {
+        "input": "saya simpan file modelnya di folder /opt/checkpoints/best_model.pt, jangan lupa path-nya ya min",
+        "depth_ratio": 0.7,
+        "type": "directive",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Model checkpoint path is /opt/checkpoints/best_model.pt.",
+    "probe_query": "Di folder path mana saya menyimpan file model tadi?"
+  },
+  {
+    "id": "S-NIAH-25",
+    "tier": "s_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.9,
+    "persona": "casual_slang",
+    "probe_ratio": 1.0,
+    "target_documents": [
+      "qasper_2003.07723.txt"
+    ],
+    "needles": [
+      {
+        "input": "inget ya kita rilis pake lisensi apache 2.0, haram hukumnya masukin kode agpl",
+        "depth_ratio": 0.9,
+        "type": "directive",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Repository released under Apache 2.0; AGPL code strictly prohibited.",
+    "probe_query": "Apa lisensi open source kita dan lisensi apa yang dilarang keras?"
+  },
+  {
+    "id": "M-NIAH-01",
+    "tier": "m_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.35,
+    "probe_ratio": 0.5,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1801.05147.txt"
+    ],
+    "needles": [
+      {
+        "input": "eh bro ram server kita cuma 16gb ya",
+        "depth_ratio": 0.15,
+        "type": "multi",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "trs gpu kita pake rtx 4090 vram 24gb",
+        "depth_ratio": 0.35,
+        "type": "multi",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "RAM server 16GB dan GPU RTX 4090 dengan 24GB VRAM.",
+    "probe_query": "tadi gw sempet sebut spek RAM sama GPU server kita berapa ya?"
+  },
+  {
+    "id": "M-NIAH-02",
+    "tier": "m_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1805.02400.txt"
+    ],
+    "needles": [
+      {
+        "input": "audio rate: 16000hz",
+        "depth_ratio": 0.1,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "mel channels: 80",
+        "depth_ratio": 0.75,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Sampling rate is 16000Hz and mel channels is 80.",
+    "probe_query": "what are the audio rate and mel channels i set earlier?"
+  },
+  {
+    "id": "M-NIAH-03",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1810.02229.txt"
+    ],
+    "needles": [
+      {
+        "input": "Protocol requires minimum subject age of 45 years.",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "academic_verbose"
+      },
+      {
+        "input": "Exclude any patient receiving corticosteroid therapy.",
+        "depth_ratio": 0.8,
+        "type": "multi",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Minimum age 45 years and exclusion of patients receiving corticosteroid therapy.",
+    "probe_query": "What were the minimum subject age and medication exclusion criteria specified?"
+  },
+  {
+    "id": "M-NIAH-04",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.65,
+    "probe_ratio": 0.75,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1810.08699.txt"
+    ],
+    "needles": [
+      {
+        "input": "save checkpoint every 2000 step",
+        "depth_ratio": 0.1,
+        "type": "multi",
+        "persona": "broken_english"
+      },
+      {
+        "input": "warmup step is 500",
+        "depth_ratio": 0.3,
+        "type": "multi",
+        "persona": "broken_english"
+      },
+      {
+        "input": "max learning rate is 3e-4",
+        "depth_ratio": 0.65,
+        "type": "multi",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Checkpoint interval 2000 steps, warmup 500 steps, peak learning rate 3e-4.",
+    "probe_query": "what three training values i gave: checkpoint interval, warmup step, and max lr?"
+  },
+  {
+    "id": "M-NIAH-05",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1811.00383.txt"
+    ],
+    "needles": [
+      {
+        "input": "RULE 1: RESERVE EXACTLY 15 PERCENT DATA FOR OOD EVALUATION!",
+        "depth_ratio": 0.15,
+        "type": "multi",
+        "persona": "all_caps_urgent"
+      },
+      {
+        "input": "RULE 2: SEED MUST BE FIXED AT 777!",
+        "depth_ratio": 0.7,
+        "type": "multi",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "15% data for OOD evaluation and random seed 777.",
+    "probe_query": "WHAT WERE THE TWO DATA SPLIT RULES REGARDING OOD PERCENTAGE AND SEED?"
+  },
+  {
+    "id": "M-NIAH-06",
+    "tier": "m_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1811.00942.txt"
+    ],
+    "needles": [
+      {
+        "input": "saya cuma boleh pake dataset publik kata dosen",
+        "depth_ratio": 0.25,
+        "type": "multi",
+        "persona": "confused_beginner"
+      },
+      {
+        "input": "terus minimal data test harus 500 baris katanya",
+        "depth_ratio": 0.75,
+        "type": "multi",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Hanya dataset publik dan minimal 500 baris data test.",
+    "probe_query": "dua aturan dataset apa yang disuruh dosen saya tadi?"
+  },
+  {
+    "id": "M-NIAH-07",
+    "tier": "m_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.85,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1904.09131.txt"
+    ],
+    "needles": [
+      {
+        "input": "jgn pake spacy ya",
+        "depth_ratio": 0.1,
+        "type": "multi",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "jgn pake stanford ner juga",
+        "depth_ratio": 0.45,
+        "type": "multi",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "pake custom crf aja",
+        "depth_ratio": 0.85,
+        "type": "multi",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Dilarang pakai spaCy dan Stanford NER; harus pakai custom CRF.",
+    "probe_query": "library apa aja yg dilarang dan model apa yg disuruh pake?"
+  },
+  {
+    "id": "M-NIAH-08",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.4,
+    "probe_ratio": 0.6,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1905.00840.txt"
+    ],
+    "needles": [
+      {
+        "input": "embedding dim: 512",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "hidden layers: 12",
+        "depth_ratio": 0.4,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Embedding dimension is 512 and hidden layers is 12.",
+    "probe_query": "what embedding dim and layer count did i specify earlier?"
+  },
+  {
+    "id": "M-NIAH-09",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1907.05664.txt"
+    ],
+    "needles": [
+      {
+        "input": "The primary clinical endpoint is 30-day progression-free survival.",
+        "depth_ratio": 0.15,
+        "type": "multi",
+        "persona": "academic_verbose"
+      },
+      {
+        "input": "Statistical significance threshold is pre-specified at alpha=0.01.",
+        "depth_ratio": 0.75,
+        "type": "multi",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Primary endpoint is 30-day progression-free survival with significance threshold alpha=0.01.",
+    "probe_query": "What primary clinical endpoint and alpha threshold were established earlier?"
+  },
+  {
+    "id": "M-NIAH-10",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1908.06606.txt"
+    ],
+    "needles": [
+      {
+        "input": "we use bpe tokenizer vocab 32000",
+        "depth_ratio": 0.1,
+        "type": "multi",
+        "persona": "broken_english"
+      },
+      {
+        "input": "dropout rate is 0.1",
+        "depth_ratio": 0.8,
+        "type": "multi",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "BPE tokenizer with vocabulary size 32000 and dropout rate 0.1.",
+    "probe_query": "what tokenizer vocab size and dropout rate did i tell you?"
+  },
+  {
+    "id": "M-NIAH-11",
+    "tier": "m_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1909.00091.txt"
+    ],
+    "needles": [
+      {
+        "input": "MANDATE: USE ADAMW WITH WEIGHT DECAY 0.01!",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "all_caps_urgent"
+      },
+      {
+        "input": "MANDATE: COSINE LR SCHEDULER ONLY!",
+        "depth_ratio": 0.8,
+        "type": "multi",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "AdamW optimizer with weight decay 0.01 and cosine scheduler.",
+    "probe_query": "WHAT OPTIMIZER AND SCHEDULER COMBINATION DID I INSTRUCT EARLIER?"
+  },
+  {
+    "id": "M-NIAH-12",
+    "tier": "m_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.4,
+    "probe_ratio": 0.55,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1909.00512.txt"
+    ],
+    "needles": [
+      {
+        "input": "min saya lupa tadi nyebut port redis 6389",
+        "depth_ratio": 0.15,
+        "type": "multi",
+        "persona": "confused_beginner"
+      },
+      {
+        "input": "sama passwordnya secrettoken123",
+        "depth_ratio": 0.4,
+        "type": "multi",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Port Redis 6389 dan password secrettoken123.",
+    "probe_query": "berapa port redis dan password yang tadi saya sebutin?"
+  },
+  {
+    "id": "M-NIAH-13",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1909.00694.txt"
+    ],
+    "needles": [
+      {
+        "input": "gpu cluster kita ada 8 node",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "masing2 node punya 4 a100",
+        "depth_ratio": 0.8,
+        "type": "multi",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "8 cluster nodes with 4 NVIDIA A100 GPUs per node (32 A100s total).",
+    "probe_query": "berapa jumlah node dan gpu per node di cluster kita tadi?"
+  },
+  {
+    "id": "M-NIAH-14",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1909.09067.txt"
+    ],
+    "needles": [
+      {
+        "input": "max input tokens: 4096",
+        "depth_ratio": 0.1,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "max output tokens: 512",
+        "depth_ratio": 0.7,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Max input tokens is 4096 and max output tokens is 512.",
+    "probe_query": "what are the max input and output token limits?"
+  },
+  {
+    "id": "M-NIAH-15",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.85,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1910.14497.txt"
+    ],
+    "needles": [
+      {
+        "input": "Institutional Review Board oversight is governed by Protocol #4402-A.",
+        "depth_ratio": 0.25,
+        "type": "multi",
+        "persona": "academic_verbose"
+      },
+      {
+        "input": "Cross-validation must strictly employ 10 stratified folds.",
+        "depth_ratio": 0.85,
+        "type": "multi",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "IRB Protocol #4402-A and 10 stratified cross-validation folds.",
+    "probe_query": "What IRB protocol number and cross-validation fold count were specified?"
+  },
+  {
+    "id": "M-NIAH-16",
+    "tier": "m_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1911.04474.txt"
+    ],
+    "needles": [
+      {
+        "input": "our corpus has english and german language only",
+        "depth_ratio": 0.15,
+        "type": "multi",
+        "persona": "broken_english"
+      },
+      {
+        "input": "no french data",
+        "depth_ratio": 0.75,
+        "type": "multi",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Corpus contains English and German only (no French data).",
+    "probe_query": "which two languages are in our corpus and which language is excluded?"
+  },
+  {
+    "id": "M-NIAH-17",
+    "tier": "m_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1911.10742.txt"
+    ],
+    "needles": [
+      {
+        "input": "ALERT: DEPLOYMENT DEVICE IS RASPBERRY PI 4!",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "all_caps_urgent"
+      },
+      {
+        "input": "ALERT: OPERATING SYSTEM IS UBUNTU 22.04 LTS!",
+        "depth_ratio": 0.8,
+        "type": "multi",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Raspberry Pi 4 running Ubuntu 22.04 LTS.",
+    "probe_query": "WHAT HARDWARE DEVICE AND OS WAS MANDATED FOR DEPLOYMENT?"
+  },
+  {
+    "id": "M-NIAH-18",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.45,
+    "probe_ratio": 0.6,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1912.01214.txt"
+    ],
+    "needles": [
+      {
+        "input": "file datanya format parquet",
+        "depth_ratio": 0.1,
+        "type": "multi",
+        "persona": "confused_beginner"
+      },
+      {
+        "input": "ukurannya kira2 250 megabyte",
+        "depth_ratio": 0.45,
+        "type": "multi",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Format Parquet dengan ukuran sekitar 250MB.",
+    "probe_query": "apa format file data dan ukurannya yang saya bilang tadi?"
+  },
+  {
+    "id": "M-NIAH-19",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_2003.03106.txt"
+    ],
+    "needles": [
+      {
+        "input": "loss-nya pake focal loss gamma 2.0 ya",
+        "depth_ratio": 0.15,
+        "type": "multi",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "label smoothing diset 0.05 aja",
+        "depth_ratio": 0.8,
+        "type": "multi",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Focal Loss dengan gamma 2.0 dan label smoothing 0.05.",
+    "probe_query": "apa setting loss function dan label smoothing kita tadi?"
+  },
+  {
+    "id": "M-NIAH-20",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.85,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_2003.07723.txt"
+    ],
+    "needles": [
+      {
+        "input": "batch size: 32",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "epochs: 50",
+        "depth_ratio": 0.5,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "patience: 5",
+        "depth_ratio": 0.85,
+        "type": "multi",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Batch size 32, epochs 50, early stopping patience 5.",
+    "probe_query": "retrieve batch size, epochs, and early stopping patience."
+  },
+  {
+    "id": "M-NIAH-21",
+    "tier": "m_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1604.02038.txt"
+    ],
+    "needles": [
+      {
+        "input": "Experimental evaluation is strictly confined to the WMT16 English-Romanian benchmark.",
+        "depth_ratio": 0.1,
+        "type": "multi",
+        "persona": "academic_verbose"
+      },
+      {
+        "input": "Evaluation metric is detokenized SacreBLEU.",
+        "depth_ratio": 0.75,
+        "type": "multi",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "WMT16 English-Romanian benchmark evaluated using detokenized SacreBLEU.",
+    "probe_query": "What benchmark dataset and evaluation BLEU variant were designated?"
+  },
+  {
+    "id": "M-NIAH-22",
+    "tier": "m_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1609.00425.txt"
+    ],
+    "needles": [
+      {
+        "input": "our model name is BiTrans-Tiny",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "broken_english"
+      },
+      {
+        "input": "it has 15 million parameter",
+        "depth_ratio": 0.8,
+        "type": "multi",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Model name is BiTrans-Tiny with 15 million parameters.",
+    "probe_query": "what is the model name and parameter count?"
+  },
+  {
+    "id": "M-NIAH-23",
+    "tier": "m_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1611.06322.txt"
+    ],
+    "needles": [
+      {
+        "input": "RESTRICTION: MAX CONCURRENCY IS 4 WORKERS!",
+        "depth_ratio": 0.15,
+        "type": "multi",
+        "persona": "all_caps_urgent"
+      },
+      {
+        "input": "TIMEOUT IS 120 SECONDS!",
+        "depth_ratio": 0.7,
+        "type": "multi",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Max concurrency of 4 workers and 120-second timeout.",
+    "probe_query": "WHAT ARE THE CONCURRENCY AND TIMEOUT SETTINGS?"
+  },
+  {
+    "id": "M-NIAH-24",
+    "tier": "m_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.4,
+    "probe_ratio": 0.5,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1704.06194.txt"
+    ],
+    "needles": [
+      {
+        "input": "min tolong catat seed 1337",
+        "depth_ratio": 0.1,
+        "type": "multi",
+        "persona": "confused_beginner"
+      },
+      {
+        "input": "sama learning rate 1e-4 ya",
+        "depth_ratio": 0.4,
+        "type": "multi",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Random seed 1337 dan learning rate 1e-4.",
+    "probe_query": "berapa seed dan learning rate yang saya titip catat tadi?"
+  },
+  {
+    "id": "M-NIAH-25",
+    "tier": "m_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1705.09665.txt"
+    ],
+    "needles": [
+      {
+        "input": "kita pake embedding bge-m3 ya bro",
+        "depth_ratio": 0.2,
+        "type": "multi",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "reranker-nya pake bge-reranker-large",
+        "depth_ratio": 0.8,
+        "type": "multi",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Embedding model bge-m3 dan reranker bge-reranker-large.",
+    "probe_query": "model embedding sama reranker apa yg kita sepakati tadi?"
+  },
+  {
+    "id": "R-NIAH-01",
+    "tier": "r_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1811.00942.txt"
+    ],
+    "needles": [
+      {
+        "input": "eh rtx 3090 kita vram-nya 24gb doang ya",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "model 70b fp16 butuh vram 140gb buat loading",
+        "depth_ratio": 0.7,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Tidak bisa, karena VRAM GPU cuma 24GB sedangkan model butuh 140GB (kurang 116GB, akan OOM).",
+    "probe_query": "bisa gak gpu kita load model 70b fp16 secara native tanpa quantisasi?"
+  },
+  {
+    "id": "R-NIAH-02",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1904.09131.txt"
+    ],
+    "needles": [
+      {
+        "input": "policy v1: batch size is 32",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "superseding update policy v2: batch size is doubled to 64",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Under policy v2, the current batch size is 64 (superseding 32).",
+    "probe_query": "what is our current active batch size under policy v2?"
+  },
+  {
+    "id": "R-NIAH-03",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1905.00840.txt"
+    ],
+    "needles": [
+      {
+        "input": "Condition: If validation loss plateaus for 3 consecutive epochs, reduce learning rate by 50%.",
+        "depth_ratio": 0.2,
+        "type": "reasoning",
+        "persona": "academic_verbose"
+      },
+      {
+        "input": "Empirical observation: Validation loss remained 1.84 across epochs 12, 13, and 14 without improvement.",
+        "depth_ratio": 0.8,
+        "type": "reasoning",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Yes, the learning rate must be reduced by 50% because validation loss plateaued for 3 consecutive epochs (epochs 12-14).",
+    "probe_query": "Based on the plateau condition and empirical observations across epochs 12-14, should the learning rate be reduced?"
+  },
+  {
+    "id": "R-NIAH-04",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1907.05664.txt"
+    ],
+    "needles": [
+      {
+        "input": "rule: paper before year 2015 must be rejected",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "broken_english"
+      },
+      {
+        "input": "candidate study published in year 2012",
+        "depth_ratio": 0.7,
+        "type": "reasoning",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Rejected/excluded, because it was published in 2012 which is before 2015.",
+    "probe_query": "can we accept the candidate study according to our publication year rule?"
+  },
+  {
+    "id": "R-NIAH-05",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1908.06606.txt"
+    ],
+    "needles": [
+      {
+        "input": "STAGE 2 INPUT REQUIRES NHWC TENSOR LAYOUT!",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
+      },
+      {
+        "input": "STAGE 1 VISION BACKBONE STRICTLY OUTPUTS NCHW TENSOR LAYOUT!",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "No, a tensor transposition/permutation step (NCHW to NHWC) is required before Stage 2 can accept the output.",
+    "probe_query": "CAN STAGE 2 DIRECTLY CONSUME STAGE 1 OUTPUT WITHOUT A TENSOR PERMUTATION?"
+  },
+  {
+    "id": "R-NIAH-06",
+    "tier": "r_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1909.00091.txt"
+    ],
+    "needles": [
+      {
+        "input": "tadi kata dosen minimal gain harus 2.5 BLEU dari baseline biar boleh dipake",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "confused_beginner"
+      },
+      {
+        "input": "hasil test: baseline 31.2 BLEU, model kita 34.1 BLEU",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Boleh/layak digunakan, karena gain-nya 2.9 BLEU (34.1 - 31.2), melebihi syarat minimal 2.5 BLEU.",
+    "probe_query": "berdasarkan syarat minimal gain dan hasil test, apakah model kita layak digunakan?"
+  },
+  {
+    "id": "R-NIAH-07",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.4,
+    "probe_ratio": 0.55,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1909.00512.txt"
+    ],
+    "needles": [
+      {
+        "input": "aturan awal: kita pake 4 node",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "eh update bro, dapet hibah server jd node kita sekarang 10",
+        "depth_ratio": 0.4,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "10 node (aturan awal 4 node sudah diupdate setelah dapat hibah).",
+    "probe_query": "total node cluster kita sekarang ada berapa ya?"
+  },
+  {
+    "id": "R-NIAH-08",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1909.00694.txt"
+    ],
+    "needles": [
+      {
+        "input": "rule: if records < 500 use epsilon <= 1.0; if >= 500 use epsilon <= 2.5",
+        "depth_ratio": 0.2,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "cohort audit: total verified records is 340",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Epsilon must be <= 1.0 because 340 records is less than 500.",
+    "probe_query": "what is the required differential privacy epsilon for our cohort?"
+  },
+  {
+    "id": "R-NIAH-09",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1909.09067.txt"
+    ],
+    "needles": [
+      {
+        "input": "Hypothesis A asserts that elevation of A\u03b2 and tau phosphorylation occur through independent downstream cascades.",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "academic_verbose"
+      },
+      {
+        "input": "Laboratory observation confirms that inhibition of A\u03b2 synthesis left tau hyperphosphorylation completely unaffected.",
+        "depth_ratio": 0.8,
+        "type": "reasoning",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Yes, the laboratory observation supports Hypothesis A, demonstrating that tau phosphorylation operates independently of A\u03b2 elevation.",
+    "probe_query": "Does the laboratory observation substantiate or refute Hypothesis A regarding independent pathways?"
+  },
+  {
+    "id": "R-NIAH-10",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1910.14497.txt"
+    ],
+    "needles": [
+      {
+        "input": "gpu price is 2000 dollar each",
+        "depth_ratio": 0.2,
+        "type": "reasoning",
+        "persona": "broken_english"
+      },
+      {
+        "input": "our total grant budget is 7000 dollar",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Maximum 3 GPUs (3 x $2000 = $6000, 4 would be $8000 which exceeds budget).",
+    "probe_query": "how many gpus can we buy within our total grant budget?"
+  },
+  {
+    "id": "R-NIAH-11",
+    "tier": "r_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1911.04474.txt"
+    ],
+    "needles": [
+      {
+        "input": "OLD SPEC: LEARNING RATE WAS 1E-3!",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
+      },
+      {
+        "input": "REVISION: OVERFITTING DETECTED, REDUCE LEARNING RATE TO 2E-4!",
+        "depth_ratio": 0.7,
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Current learning rate is 2e-4 (revised from 1e-3).",
+    "probe_query": "WHAT IS THE CURRENT LEARNING RATE FOLLOWING THE REVISION?"
+  },
+  {
+    "id": "R-NIAH-12",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1911.10742.txt"
+    ],
+    "needles": [
+      {
+        "input": "kuota token harian kita 100.000 token",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "confused_beginner"
+      },
+      {
+        "input": "setiap request chat makan 5.000 token",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Maksimal 20 request chat per hari (100.000 / 5.000 = 20).",
+    "probe_query": "berapa maksimal request chat yang bisa kita lakukan dalam sehari?"
+  },
+  {
+    "id": "R-NIAH-13",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.45,
+    "probe_ratio": 0.6,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1912.01214.txt"
+    ],
+    "needles": [
+      {
+        "input": "kalo akurasi < 90% kita ga boleh submit paper",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "hasil akhir cuma tembus 87.5%",
+        "depth_ratio": 0.45,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Tidak boleh submit, karena akurasi 87.5% masih di bawah syarat minimal 90%.",
+    "probe_query": "apakah kita boleh submit paper dengan hasil akurasi kita saat ini?"
+  },
+  {
+    "id": "R-NIAH-14",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_2003.03106.txt"
+    ],
+    "needles": [
+      {
+        "input": "server a: 32gb ram",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "server b: 64gb ram",
+        "depth_ratio": 0.45,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "job needs 48gb ram",
+        "depth_ratio": 0.8,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Server B can run the job (64GB >= 48GB), but Server A cannot (32GB < 48GB).",
+    "probe_query": "which server can accommodate the job memory requirement?"
+  },
+  {
+    "id": "R-NIAH-15",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_2003.07723.txt"
+    ],
+    "needles": [
+      {
+        "input": "Initial protocol mandated evaluation across all 15 low-resource language pairs.",
+        "depth_ratio": 0.2,
+        "type": "reasoning",
+        "persona": "academic_verbose"
+      },
+      {
+        "input": "Due to compute constraints, evaluation was formally pruned to only the top 5 highest-resource pairs.",
+        "depth_ratio": 0.8,
+        "type": "reasoning",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Only 5 language pairs were evaluated (pruned from the initial 15 due to compute constraints).",
+    "probe_query": "How many language pairs were ultimately evaluated according to the revised protocol?"
+  },
+  {
+    "id": "R-NIAH-16",
+    "tier": "r_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1604.02038.txt"
+    ],
+    "needles": [
+      {
+        "input": "we train model on 200 epochs",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "broken_english"
+      },
+      {
+        "input": "loss stop improve after epoch 50 and early stop",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "50 epochs, because early stopping triggered when loss stopped improving.",
+    "probe_query": "how many epochs was the model actually trained for before stopping?"
+  },
+  {
+    "id": "R-NIAH-17",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1609.00425.txt"
+    ],
+    "needles": [
+      {
+        "input": "REQUIREMENT: DATASET SPLIT IS 70% TRAIN, 15% VAL, 15% TEST!",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
+      },
+      {
+        "input": "TOTAL RAW SAMPLES COLLECTED IS 10,000!",
+        "depth_ratio": 0.7,
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Train: 7,000 samples (70%), Val: 1,500 samples (15%), Test: 1,500 samples (15%).",
+    "probe_query": "HOW MANY EXACT SAMPLES ARE ALLOCATED TO TRAIN, VAL, AND TEST RESPECTIVELY?"
+  },
+  {
+    "id": "R-NIAH-18",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1611.06322.txt"
+    ],
+    "needles": [
+      {
+        "input": "awalnya kita mau pake model BERT",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "confused_beginner"
+      },
+      {
+        "input": "tapi dosen bilang ganti RoBERTa biar lebih modern",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "RoBERTa (menggantikan rencana awal BERT sesuai arahan dosen).",
+    "probe_query": "model apa yang akhirnya kita pilih untuk eksperimen?"
+  },
+  {
+    "id": "R-NIAH-19",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1704.06194.txt"
+    ],
+    "needles": [
+      {
+        "input": "aturan 1: diskon token 50% kalo query malem",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "query dilakukan jam 11 malem",
+        "depth_ratio": 0.8,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Dapat diskon 50%, karena query dilakukan pada jam 11 malam.",
+    "probe_query": "apakah query saya berhak dapet diskon token?"
+  },
+  {
+    "id": "R-NIAH-20",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1705.09665.txt"
+    ],
+    "needles": [
+      {
+        "input": "v1: top-k = 10",
+        "depth_ratio": 0.1,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "v2: top-k increased to 25",
+        "depth_ratio": 0.4,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      },
+      {
+        "input": "v3: final top-k set to 15",
+        "depth_ratio": 0.8,
+        "type": "reasoning",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Final active top-k is 15 (superseded from 10 and 25).",
+    "probe_query": "what is the final active top-k parameter after all updates?"
+  },
+  {
+    "id": "R-NIAH-21",
+    "tier": "r_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1801.05147.txt"
+    ],
+    "needles": [
+      {
+        "input": "Phase 1 requires unweighted cross-entropy loss.",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "academic_verbose"
+      },
+      {
+        "input": "Phase 2 fine-tuning introduces a focal penalty with gamma=2.0 and alpha=0.25.",
+        "depth_ratio": 0.75,
+        "type": "reasoning",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Phase 1 uses standard cross-entropy; Phase 2 introduces focal penalty (gamma=2.0, alpha=0.25).",
+    "probe_query": "How does the loss function formulation differ between Phase 1 and Phase 2?"
+  },
+  {
+    "id": "R-NIAH-22",
+    "tier": "r_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1805.02400.txt"
+    ],
+    "needles": [
+      {
+        "input": "we have 1000 dollar, cloud cost 10 dollar per hour",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "broken_english"
+      },
+      {
+        "input": "training run 120 hour",
+        "depth_ratio": 0.7,
+        "type": "reasoning",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "No, budget will be exceeded: 120 hours x $10 = $1200, which exceeds the $1000 budget by $200.",
+    "probe_query": "is our 1000 dollar budget enough to finish the 120 hour training?"
+  },
+  {
+    "id": "R-NIAH-23",
+    "tier": "r_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1810.02229.txt"
+    ],
+    "needles": [
+      {
+        "input": "CRITICAL: IF SENSITIVITY < 0.95, REJECT MODEL!",
+        "depth_ratio": 0.2,
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
+      },
+      {
+        "input": "RESULT: SENSITIVITY IS 0.962, SPECIFICITY IS 0.910!",
+        "depth_ratio": 0.8,
+        "type": "reasoning",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Accept/Do not reject, because sensitivity is 0.962 which meets the >= 0.95 requirement.",
+    "probe_query": "SHOULD WE ACCEPT OR REJECT THE MODEL BASED ON THE SENSITIVITY THRESHOLD?"
+  },
+  {
+    "id": "R-NIAH-24",
+    "tier": "r_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1810.08699.txt"
+    ],
+    "needles": [
+      {
+        "input": "file train.json ada 800 baris",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "confused_beginner"
+      },
+      {
+        "input": "file test.json ada 200 baris",
+        "depth_ratio": 0.7,
+        "type": "reasoning",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "1.000 baris total (800 train + 200 test).",
+    "probe_query": "berapa total seluruh baris data jika train dan test digabung?"
+  },
+  {
+    "id": "R-NIAH-25",
+    "tier": "r_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1811.00383.txt"
+    ],
+    "needles": [
+      {
+        "input": "aturan lab: ga boleh ninggal server nyala lebih dr 48 jam",
+        "depth_ratio": 0.15,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      },
+      {
+        "input": "training udah jalan 52 jam",
+        "depth_ratio": 0.8,
+        "type": "reasoning",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Sudah melanggar aturan, karena training berjalan 52 jam (melebihi batas maksimal 48 jam).",
+    "probe_query": "apakah status server saat ini melanggar aturan lab?"
+  },
+  {
+    "id": "U-NIAH-01",
+    "tier": "u_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.3,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1909.00091.txt"
+    ],
+    "needles": [
+      {
+        "input": "eh bro ram laptop gw cuma 8gb ya",
+        "depth_ratio": 0.3,
+        "type": "negative_trap",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "tadi gw ada sebut merk laptop gw gak ya? merk apa?"
+  },
+  {
+    "id": "U-NIAH-02",
+    "tier": "u_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1909.00512.txt"
+    ],
+    "needles": [
+      {
+        "input": "batch size: 64",
+        "depth_ratio": 0.7,
+        "type": "negative_trap",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "what was the learning rate schedule specified earlier?"
+  },
+  {
+    "id": "U-NIAH-03",
+    "tier": "u_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.2,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1909.00694.txt"
+    ],
+    "needles": [
+      {
+        "input": "IRB ethics protocol #2026-B81 was approved.",
+        "depth_ratio": 0.2,
+        "type": "negative_trap",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "What was the grant funding dollar amount provided by the National Science Foundation?"
+  },
+  {
+    "id": "U-NIAH-04",
+    "tier": "u_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.6,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1909.09067.txt"
+    ],
+    "needles": [
+      {
+        "input": "we use adamw optimizer for train model",
+        "depth_ratio": 0.6,
+        "type": "negative_trap",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "what is the random seed number we use?"
+  },
+  {
+    "id": "U-NIAH-05",
+    "tier": "u_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.85,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1910.14497.txt"
+    ],
+    "needles": [
+      {
+        "input": "ALERT: RESAMPLE ALL AUDIO TO 16000HZ!",
+        "depth_ratio": 0.85,
+        "type": "negative_trap",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "WHAT WAS THE MONETARY HOURLY WAGE PAID TO THE AUDIO TRANSCRIBERS?"
+  },
+  {
+    "id": "U-NIAH-06",
+    "tier": "u_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.25,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1911.04474.txt"
+    ],
+    "needles": [
+      {
+        "input": "saya simpan modelnya di file best_weights.pt",
+        "depth_ratio": 0.25,
+        "type": "negative_trap",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "berapa ukuran file best_weights.pt dalam gigabyte yang saya sebutkan tadi?"
+  },
+  {
+    "id": "U-NIAH-07",
+    "tier": "u_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.5,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1911.10742.txt"
+    ],
+    "needles": [
+      {
+        "input": "pembimbing gw nyuruh pake korpus multiun",
+        "depth_ratio": 0.5,
+        "type": "negative_trap",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "tadi pembimbing gw ada nyebut batas deadline pengumpulan tesis gak? kapan?"
+  },
+  {
+    "id": "U-NIAH-08",
+    "tier": "u_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1912.01214.txt"
+    ],
+    "needles": [
+      {
+        "input": "dropout: 0.1",
+        "depth_ratio": 0.8,
+        "type": "negative_trap",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "what was the activation function specified?"
+  },
+  {
+    "id": "U-NIAH-09",
+    "tier": "u_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.15,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_2003.03106.txt"
+    ],
+    "needles": [
+      {
+        "input": "The diagnostic cohort was recruited from Charit\u00e9 Berlin.",
+        "depth_ratio": 0.15,
+        "type": "negative_trap",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "What was the mean body mass index (BMI) of the clinical cohort?"
+  },
+  {
+    "id": "U-NIAH-10",
+    "tier": "u_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.4,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_2003.07723.txt"
+    ],
+    "needles": [
+      {
+        "input": "our server has 16gb ram zero swap",
+        "depth_ratio": 0.4,
+        "type": "negative_trap",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "what is the ip address of our server?"
+  },
+  {
+    "id": "U-NIAH-11",
+    "tier": "u_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.75,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1604.02038.txt"
+    ],
+    "needles": [
+      {
+        "input": "CRITICAL: MAXIMUM CLUSTER RUNTIME IS CAPPED AT 72 GPU-HOURS!",
+        "depth_ratio": 0.75,
+        "type": "negative_trap",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "WHAT IS THE CLUSTER ELECTRICITY COST IN DOLLARS PER KILOWATT-HOUR?"
+  },
+  {
+    "id": "U-NIAH-12",
+    "tier": "u_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.9,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1609.00425.txt"
+    ],
+    "needles": [
+      {
+        "input": "loss function kita disuruh pake Dice Loss",
+        "depth_ratio": 0.9,
+        "type": "negative_trap",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "siapa nama dosen pembimbing yang nyuruh pake Dice Loss tadi min?"
+  },
+  {
+    "id": "U-NIAH-13",
+    "tier": "u_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.1,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1611.06322.txt"
+    ],
+    "needles": [
+      {
+        "input": "gpu kita pake rtx 4090 vram 24gb ya bro",
+        "depth_ratio": 0.1,
+        "type": "negative_trap",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "tadi kita beli gpu rtx 4090 di toko komputer mana ya?"
+  },
+  {
+    "id": "U-NIAH-14",
+    "tier": "u_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.35,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1704.06194.txt"
+    ],
+    "needles": [
+      {
+        "input": "quantization: 4-bit awq group size 128",
+        "depth_ratio": 0.35,
+        "type": "negative_trap",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "what was the temperature parameter for text generation?"
+  },
+  {
+    "id": "U-NIAH-15",
+    "tier": "u_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.6,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1705.09665.txt"
+    ],
+    "needles": [
+      {
+        "input": "Tissue biopsies were stained using standard hematoxylin and eosin protocols.",
+        "depth_ratio": 0.6,
+        "type": "negative_trap",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "What was the manufacturer catalog serial number of the microscope used?"
+  },
+  {
+    "id": "U-NIAH-16",
+    "tier": "u_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.85,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1801.05147.txt"
+    ],
+    "needles": [
+      {
+        "input": "we must use 10 fold cross validation",
+        "depth_ratio": 0.85,
+        "type": "negative_trap",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "how many hours each fold take to complete?"
+  },
+  {
+    "id": "U-NIAH-17",
+    "tier": "u_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.3,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1805.02400.txt"
+    ],
+    "needles": [
+      {
+        "input": "MANDATE: SUBMIT EXCLUSIVELY TO ACL 2026 CONFERENCE!",
+        "depth_ratio": 0.3,
+        "type": "negative_trap",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "WHAT IS THE EXACT PAGE LIMIT REQUIREMENT FOR SHORT PAPERS AT ACL 2026?"
+  },
+  {
+    "id": "U-NIAH-18",
+    "tier": "u_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.2,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1810.02229.txt"
+    ],
+    "needles": [
+      {
+        "input": "saya cuma punya koneksi internet 10 Mbps di kostan",
+        "depth_ratio": 0.2,
+        "type": "negative_trap",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "berapa biaya langganan wifi kostan saya per bulan yang saya sebutin tadi?"
+  },
+  {
+    "id": "U-NIAH-19",
+    "tier": "u_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.4,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1810.08699.txt"
+    ],
+    "needles": [
+      {
+        "input": "token pooling wajib mean-pooling ya",
+        "depth_ratio": 0.4,
+        "type": "negative_trap",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "kenapa dosen kita gasuka sama CLS token? ada gw sebutin alasannya gak?"
+  },
+  {
+    "id": "U-NIAH-20",
+    "tier": "u_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.5,
+    "probe_ratio": 1.0,
+    "persona": "terse_lowercase",
+    "target_documents": [
+      "qasper_1811.00383.txt"
+    ],
+    "needles": [
+      {
+        "input": "metric: macro-f1 across minority classes",
+        "depth_ratio": 0.5,
+        "type": "negative_trap",
+        "persona": "terse_lowercase"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "what was the accuracy percentage score on the majority class?"
+  },
+  {
+    "id": "U-NIAH-21",
+    "tier": "u_niah",
+    "token_load": "32k",
+    "depth_ratio": 0.3,
+    "probe_ratio": 1.0,
+    "persona": "academic_verbose",
+    "target_documents": [
+      "qasper_1811.00942.txt"
+    ],
+    "needles": [
+      {
+        "input": "The text backbone is RoBERTa-large with 355M parameters.",
+        "depth_ratio": 0.3,
+        "type": "negative_trap",
+        "persona": "academic_verbose"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "What was the pre-training carbon footprint in metric tons of CO2 equivalent?"
+  },
+  {
+    "id": "U-NIAH-22",
+    "tier": "u_niah",
+    "token_load": "16k",
+    "depth_ratio": 0.6,
+    "probe_ratio": 1.0,
+    "persona": "broken_english",
+    "target_documents": [
+      "qasper_1904.09131.txt"
+    ],
+    "needles": [
+      {
+        "input": "we use bpe tokenizer vocabulary 32000",
+        "depth_ratio": 0.6,
+        "type": "negative_trap",
+        "persona": "broken_english"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "how many days tokenizer take to train on raw corpus?"
+  },
+  {
+    "id": "U-NIAH-23",
+    "tier": "u_niah",
+    "token_load": "64k",
+    "depth_ratio": 0.2,
+    "probe_ratio": 1.0,
+    "persona": "all_caps_urgent",
+    "target_documents": [
+      "qasper_1905.00840.txt"
+    ],
+    "needles": [
+      {
+        "input": "INVARIANT: NEVER STORE PLAINTEXT PASSWORDS IN REDIS!",
+        "depth_ratio": 0.2,
+        "type": "negative_trap",
+        "persona": "all_caps_urgent"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "WHAT ENCRYPTION ALGORITHM (AES-256 OR RSA) WAS MANDATED FOR PASSWORDS?"
+  },
+  {
+    "id": "U-NIAH-24",
+    "tier": "u_niah",
+    "token_load": "8k",
+    "depth_ratio": 0.7,
+    "probe_ratio": 1.0,
+    "persona": "confused_beginner",
+    "target_documents": [
+      "qasper_1907.05664.txt"
+    ],
+    "needles": [
+      {
+        "input": "min saya pake laptop windows 11 home edition",
+        "depth_ratio": 0.7,
+        "type": "negative_trap",
+        "persona": "confused_beginner"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "tadi saya sebut processor laptop saya intel core i5 atau i7 ya?"
+  },
+  {
+    "id": "U-NIAH-25",
+    "tier": "u_niah",
+    "token_load": "4k",
+    "depth_ratio": 0.8,
+    "probe_ratio": 1.0,
+    "persona": "casual_slang",
+    "target_documents": [
+      "qasper_1908.06606.txt"
+    ],
+    "needles": [
+      {
+        "input": "lisensi repo kita apache 2.0 ya",
+        "depth_ratio": 0.8,
+        "type": "negative_trap",
+        "persona": "casual_slang"
+      }
+    ],
+    "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
+    "probe_query": "siapa nama pengacara hak cipta yang nyaranin lisensi apache tadi?"
+  }
+]

@@ -331,7 +331,8 @@
     "sample_id": "MUL-VAL-01",
     "dataset": "qasper_multi",
     "category": "multi_comparative",
-    "query": "Compare the experimental objectives, benchmark datasets, and model architectures evaluated in Paper [1] (Multilingual Clustering of Streaming News) and Paper [2] (Inexpensive Domain Adaptation of Pretrained L).",
+    "persona": "casual_slang",
+    "query": "bro coba compare dong Paper [1] (Multilingual Clustering of Streamin) sama Paper [2] (Inexpensive Domain Adaptation of Pr): dataset yg dipake apa aja dan arsitekturnya beda di mana?",
     "target_documents": [
       "qasper_1809.00540.txt",
       "qasper_2004.03354.txt"
@@ -348,7 +349,8 @@
     "sample_id": "MUL-VAL-02",
     "dataset": "qasper_multi",
     "category": "multi_comparative",
-    "query": "Compare the baseline systems, hyperparameter choices, and quantitative metric gains reported between Paper [1] and Paper [2].",
+    "persona": "terse_lowercase",
+    "query": "compare baselines and metric numbers between paper 1 and paper 2. concise bullet points only",
     "target_documents": [
       "qasper_2004.03354.txt",
       "qasper_1611.04798.txt"
@@ -365,7 +367,8 @@
     "sample_id": "MUL-VAL-03",
     "dataset": "qasper_multi",
     "category": "multi_comparative",
-    "query": "Synthesize a Master Comparison Table across all three research papers comparing (a) Problem Domain, (b) Representation Method, and (c) Reported Empirical Results.",
+    "persona": "academic_professor",
+    "query": "Synthesize an exhaustive Master Comparison Table across all three research papers comparing (a) Problem Domain, (b) Representation Method, and (c) Reported Empirical Results.",
     "target_documents": [
       "qasper_1809.00540.txt",
       "qasper_2004.03354.txt",
@@ -384,6 +387,7 @@
     "sample_id": "MUL-VAL-04",
     "dataset": "qasper_multi",
     "category": "multi_comparative",
+    "persona": "medical_researcher",
     "query": "Compare the biomedical mechanisms, target biological pathways, and laboratory evidence reported across Paper [1], Paper [2], and Paper [3].",
     "target_documents": [
       "scifact_1084345.txt",
@@ -403,7 +407,8 @@
     "sample_id": "MUL-VAL-05",
     "dataset": "qasper_multi",
     "category": "multi_comparative",
-    "query": "Construct a comprehensive 4-paper synthesis matrix comparing the neural sequence modeling techniques, optimization strategies, and future limitations across Paper [1], Paper [2], Paper [3], and Paper [4].",
+    "persona": "all_caps_urgent",
+    "query": "CONSTRUCT A COMPREHENSIVE 4-PAPER SYNTHESIS MATRIX COMPARING THE SEQUENCE MODELING TECHNIQUES, OPTIMIZATIONS, AND REPORTED LIMITATIONS ACROSS PAPERS [1], [2], [3], AND [4]!",
     "target_documents": [
       "qasper_1809.00540.txt",
       "qasper_2004.03354.txt",
@@ -424,7 +429,8 @@
     "sample_id": "UNANS-VAL-01",
     "dataset": "unanswerable",
     "category": "negative_unanswerable",
-    "query": "What crowdsourcing compensation rate per hour was paid to Amazon Mechanical Turk workers for annotating this dataset?",
+    "persona": "casual_slang",
+    "query": "min mau nanya, ada gak info berapa upah per jam yang dibayar ke pekerja mechanical turk buat bikin dataset ini?",
     "target_documents": [
       "qasper_1809.00540.txt"
     ],
@@ -439,7 +445,8 @@
     "sample_id": "UNANS-VAL-02",
     "dataset": "unanswerable",
     "category": "negative_unanswerable",
-    "query": "What specific cluster hardware specs, number of GPU nodes, and interconnect bandwidth were used during model pre-training?",
+    "persona": "all_caps_urgent",
+    "query": "WHAT SPECIFIC CLUSTER HARDWARE SPECS, NUMBER OF GPU NODES, AND INTERCONNECT BANDWIDTH WERE USED DURING PRE-TRAINING?",
     "target_documents": [
       "qasper_2004.03354.txt"
     ],
@@ -454,7 +461,8 @@
     "sample_id": "UNANS-VAL-03",
     "dataset": "unanswerable",
     "category": "negative_unanswerable",
-    "query": "What clinical exclusion criteria regarding patient body mass index (BMI) were applied in the Phase III trial cohort?",
+    "persona": "confused_beginner",
+    "query": "saya kurang paham medis, di paper ini ada disebutin syarat berat badan atau BMI pasien yang gak boleh ikut uji klinis gak ya?",
     "target_documents": [
       "scifact_1084345.txt"
     ],
@@ -469,7 +477,8 @@
     "sample_id": "UNANS-VAL-04",
     "dataset": "unanswerable",
     "category": "negative_unanswerable",
-    "query": "How many days of post-operative follow-up were recorded before assessing patient survival rates in Section 4?",
+    "persona": "terse_lowercase",
+    "query": "number of post-op follow up days before assessing survival rate in section 4? need the exact number",
     "target_documents": [
       "scifact_18872233.txt"
     ],

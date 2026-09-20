@@ -133,42 +133,46 @@ When benchmark scores fall below target thresholds, optimization is executed sys
 
 ## 6. Dataset Topology & Scientific Modalities
 
-The 75-case benchmark (`--dataset full75 --split test`) rigorously balances four authentic, peer-reviewed scientific modalities across 50 unique physical papers:
+Not-NotebookLM enforces a symmetric **Dual 100-Test / 25-Val Standard** across both Protocol A (Scientific RAG) and Protocol B (Conversational NIAH). The 100-case test suites provide exact 1% metric resolution without rounding distortion, while the 25-case held-out validation suites offer 6–8 minute dev loops with strict anti-leakage guarantees.
 
 ```text
-                       75-CASE SCIENTIFIC BENCHMARK
-                                     │
-     ┌───────────────────┬───────────┴───────┬───────────────────┐
-     ▼                   ▼                   ▼                   ▼
-[SINGLE-PAPER DEEP]  [BIOMEDICAL AUDIT]  [MULTI-PAPER REVIEW]  [ABSTENTION TRAPS]
-• 25 Cases (QASPER)  • 25 Cases (SciFact)• 15 Cases (MUL)     • 10 Cases (Traps)
-• 25 Unique arXiv    • 25 Unique PubMed  • 2, 3, & 4 Papers  • Authentic Unans
-• Tables & methods   • Lab evidence NLI  • Matrix Synthesis  • Zero Hallucination
+                        100-CASE SCIENTIFIC BENCHMARK (PROTOCOL A)
+                                           │
+      ┌────────────────────┬───────────────┴───────────────┬────────────────────┐
+      ▼                    ▼                               ▼                    ▼
+ [SINGLE-PAPER DEEP]  [BIOMEDICAL AUDIT]          [MULTI-PAPER REVIEW]   [ABSTENTION TRAPS]
+ • 25 Cases (QASPER)  • 25 Cases (SciFact)        • 25 Cases (MUL)       • 25 Cases (UNANS)
+ • 25 Unique arXiv    • 25 Unique PubMed          • 2, 3, & 4 Papers     • Authentic Unans
+ • Tables & methods   • Lab evidence NLI          • Matrix Synthesis     • Zero Hallucination
 ```
 
-### Modality Breakdown:
+### Modality Breakdown (Protocol A: 100-Case Test Suite):
 1. **Single-Paper Deep Comprehension (25 Cases)**: 25 distinct full-text arXiv papers from AllenAI QASPER covering sequence labeling, NMT, entity linking, and speech.
 2. **Biomedical Scientific Fact-Checking (25 Cases)**: 25 distinct PubMed medical papers from AllenAI SciFact auditing claims against lab evidence (13 `SUPPORT`, 12 `CONTRADICT`).
-3. **Multi-Paper Comparative Synthesis (15 Cases)**: Workspaces varying across document volumes—9 cases with 2 papers, 4 cases with 3 papers, and 2 cases with 4 papers—verifying cross-paper matrix tables and isolated citation tags (`[1]`, `[2]`, `[3]`, `[4]`).
-4. **Negative Abstention & False Premises (10 Cases)**: Authentic unanswerable research inquiries from AllenAI annotators verifying that the system cleanly abstains rather than fabricating numbers.
+3. **Multi-Paper Comparative Synthesis (25 Cases)**: Workspaces varying across document volumes—2, 3, and 4 papers—verifying cross-paper matrix tables and isolated citation tags (`[1]`, `[2]`, `[3]`, `[4]`).
+4. **Negative Abstention & False Premises (25 Cases)**: Authentic unanswerable research inquiries spanning diverse human personas (casual slang, academic, confused beginner, all-caps urgent, terse lowercase) verifying clean abstention without hallucinated metrics.
 
 ### 6.1. The 25-Case Held-Out Validation Suite (`val25_benchmark.json`)
 To enable rapid daily development without risking test-set overfitting ("eval hacking") or burning extensive API quota on every iteration, Not-NotebookLM provides a dedicated **25-case proportional held-out validation benchmark**:
 
-| Modality | Full 75 (Held-Out Test Set) | Val 25 (Daily Development Set) | Anti-Leakage Guarantee |
+| Modality | Full 100 (Held-Out Test Set) | Val 25 (Daily Development Set) | Anti-Leakage Guarantee |
 | :--- | :---: | :---: | :--- |
-| **Single-Paper Deep (QASPER)** | 25 Cases | **8 Cases** | 8 novel arXiv papers (zero paper reuse with Test 75) |
+| **Single-Paper Deep (QASPER)** | 25 Cases | **8 Cases** | 8 novel arXiv papers (zero paper reuse with Test 100) |
 | **Biomedical Fact-Checking (SciFact)** | 25 Cases | **8 Cases** | 8 novel PubMed papers (4 `SUPPORT`, 4 `CONTRADICT`) |
-| **Multi-Paper Comparative (MUL)** | 15 Cases | **5 Cases** | Workspaces with 2, 3, and 4 novel papers |
-| **Negative Abstention Traps (UNANS)** | 10 Cases | **4 Cases** | Authentic unanswerable traps on novel documents |
-| **Total Cases** | **75 Cases** (~35 mins) | **25 Cases** (~7–8 mins) | **0 overlapping documents, 0 overlapping queries** |
+| **Multi-Paper Comparative (MUL)** | 25 Cases | **5 Cases** | Workspaces with 2, 3, and 4 novel papers |
+| **Negative Abstention Traps (UNANS)** | 25 Cases | **4 Cases** | Authentic unanswerable traps on novel documents |
+| **Total Cases** | **100 Cases** (~35 mins) | **25 Cases** (~7–8 mins) | **0 overlapping documents, 0 overlapping queries** |
 
-### 6.2. The 25-Case Conversational NIAH Validation Matrix (`niah_val25_matrix.json`)
-Similarly, Conversational NIAH evaluation provides a proportional 25-case held-out validation matrix:
-- **10 S-NIAH Cases**: Representative diagonal sampling across token loads (4K, 8K, 16K, 32K, 64K) and depth ratios (10%, 30%, 50%, 70%, 90%).
-- **8 M-NIAH Cases**: Multi-needle tracking across independent variables (audio rates, clinical trial criteria, optimizer schedules, cache TTLs, etc.).
-- **7 R-NIAH Cases**: Multi-hop reasoning, conditional deduction, and superseded policy updates.
-- **Anti-Leakage**: 100% novel needle contents and probe queries with zero overlap with `niah_75_matrix.json`.
+### 6.2. Protocol B: High-Entropy Conversational NIAH (`niah_100_matrix.json` & `niah_val25_matrix.json`)
+Conversational NIAH evaluation is organized into **4 balanced quadrants @ 25 cases each (100 total)** in Test, mirrored by 25 cases in Val:
+
+| Quadrant | Test 100 | Val 25 | High-Entropy Features & Linguistic Topology |
+| :--- | :---: | :---: | :--- |
+| **S-NIAH (Single-Needle Grid)** | 25 Cases | **7 Cases** | 5x5 grid (4K–64K token loads × 10%–90% depths) across 6 human personas (casual slang, academic, terse, broken English, all-caps, confused beginner). |
+| **M-NIAH (Multi-Needle Tracking)** | 25 Cases | **6 Cases** | 2–3 independent variables tracked simultaneously with **dynamic mid-conversation probe positioning** (probed at 35%–80% depth rather than exclusively at the end). |
+| **R-NIAH (Reasoning & Superseding)** | 25 Cases | **6 Cases** | Multi-hop deductive reasoning + **temporal rule updates** (e.g. v1 policy superseded by v2 update mid-dialogue). |
+| **U-NIAH (Unanswerable Traps)** | 25 Cases | **6 Cases** | **Negative abstention traps**: User probes unmentioned parameters (e.g. asking for GPU hours or battery specs never stated). System must honestly state absence without hallucination. |
+| **Total Cases** | **100 Cases** | **25 Cases** | **100% Anti-Leakage: 0 overlapping needles, 0 overlapping probes** |
 
 ### Production Quality Acceptance Criteria:
 1. **Consensus Groundedness**: $\ge 0.850$ (Continuous 4-Judge: DeepEval, TruLens, Promptfoo, Ragas)
@@ -182,7 +186,7 @@ Similarly, Conversational NIAH evaluation provides a proportional 25-case held-o
 
 ## 7. The 3-Tier Evaluation Pyramid (Fast-Val vs. Supreme Court)
 
-Evaluating 75 academic research questions across 6 full frameworks requires **700+ asynchronous LLM API calls**, taking approximately **30 to 40 minutes** under `concurrency=2`.
+Evaluating 100 academic research questions across 6 full frameworks requires **800+ asynchronous LLM API calls**, taking approximately **30 to 40 minutes** under `concurrency=2`.
 
 Inspired by software engineering's classic Test Pyramid, Not-NotebookLM organizes evaluation into a **3-Tier Pyramid**:
 
@@ -197,7 +201,7 @@ Inspired by software engineering's classic Test Pyramid, Not-NotebookLM organize
                         /           \  TIER 2: "Fast-Val Suite" (Promptfoo + Ragas + LlamaIndex)
                        /             \ • The Fast Consensus Triple (Dual-Judge + NLI + Gate)
                       /───────────────\• Frequency: Daily dev loop & prompt hill climbing
-                     /                 \• Duration: ~12 to 15 Minutes
+                     /                 \• Duration: ~6 to 8 Minutes (on Val-25)
                     /                   \
                    /                     \ TIER 1: "Deterministic Smoke Test" (0 Tokens)
                   /                       \• IEEE Tag Syntax + Verbatim PDF Fuzzy Matching
@@ -210,7 +214,7 @@ Analysis of empirical benchmark data reveals the distinct behavioral archetypes 
 1. **RAGAS (`0.850`–`0.920`) and TruLens (`0.880`–`0.960`) are the "Honest Critics"**: Both break text into atomic claims and perform rigorous sentence-level NLI verification. Their verdicts correlate at $>85\%$. Running both simultaneously during rapid development creates unnecessary computational redundancy.
 2. **DeepEval (`0.980`–`1.000`) exhibits Leniency Bias**: DeepEval's G-Eval non-contradiction prompt rarely penalizes subtle extrapolations, giving near-perfect scores on academic texts.
 3. **Promptfoo (`0.890`–`0.960`) is the "Solid Anchor"**: Promptfoo directly mirrors the consensus average of the entire panel while evaluating all three core pillars (Faithfulness, Relevancy, Correctness) in parallel.
-4. **Conclusion**: Running **Promptfoo + Ragas + LlamaIndex (`--fast`)** provides $>92\%$ fidelity to the 6-judge consensus while slashing execution time to **~10 minutes**.
+4. **Conclusion**: Running **Promptfoo + Ragas + LlamaIndex (`--fast`)** on the 25-case validation suite provides $>92\%$ fidelity to the 6-judge consensus while slashing execution time to **~6 to 8 minutes**.
 
 ---
 
@@ -222,16 +226,16 @@ All benchmarks are run headlessly from the project root without launching browse
 # 1. 25-Case Held-Out Validation Benchmark (Daily dev loop, ~6-8 mins):
 PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset val25 --cross-framework --concurrency 2
 
-# 2. 75-Case Comprehensive Scientific Benchmark (Held-Out Test Set / Release Certification, ~30 mins):
-PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full75 --split test --cross-framework --concurrency 2
+# 2. 100-Case Comprehensive Scientific Benchmark (Held-Out Test Set / Release Certification, ~35 mins):
+PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset full100 --split test --cross-framework --concurrency 2
 
 # 3. Fast-Val Mode across the 25-case suite (~3 mins):
 PYTHONPATH=backend backend/venv/bin/python backend/evaluation/run_benchmark.py --dataset val25 --fast --concurrency 2
 
-# 4. 25-Case Conversational NIAH Validation Matrix (Daily dev loop, ~3 mins):
+# 4. 25-Case High-Entropy Conversational NIAH Validation Matrix (~3 mins):
 PYTHONPATH=backend backend/venv/bin/python backend/evaluation/eval_full50_niah.py --split val --mode both --concurrency 2
 
-# 5. 75-Case Multi-Spectral Dual-Cap NIAH Benchmark (Full Release Test Matrix):
+# 5. 100-Case Multi-Spectral Dual-Cap NIAH Benchmark (Full Release Test Matrix):
 PYTHONPATH=backend backend/venv/bin/python backend/evaluation/eval_full50_niah.py --split test --mode both --concurrency 2
 ```
 
