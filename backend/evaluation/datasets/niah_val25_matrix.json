@@ -11,14 +11,14 @@
     ],
     "needles": [
       {
-        "input": "eh min, protokol etik penelitian kita pake nomer IRB #2026-B81 ya",
+        "input": "hey, our research ethics protocol uses number IRB #2026-B81",
         "depth_ratio": 0.1,
         "type": "directive",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Protokol etik IRB #2026-B81.",
-    "probe_query": "apa nomor protokol etik irb yang saya sebut tadi?"
+    "expected_answer": "Ethics protocol IRB #2026-B81.",
+    "probe_query": "what was the ethics protocol number i mentioned earlier?"
   },
   {
     "id": "S-VAL-02",
@@ -116,14 +116,14 @@
     ],
     "needles": [
       {
-        "input": "saya cuma ngerti apple silicon mps, jangan pake cuda ya min",
+        "input": "i only understand apple silicon mps, please don't use cuda",
         "depth_ratio": 0.5,
         "type": "directive",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Apple Silicon Metal (MPS backend only, no CUDA).",
-    "probe_query": "hardware apa yang saya minta gunakan tadi?"
+    "probe_query": "what hardware accelerator did i ask to use earlier?"
   },
   {
     "id": "S-VAL-07",
@@ -158,20 +158,20 @@
     ],
     "needles": [
       {
-        "input": "sampling audio diset 16000hz ya",
+        "input": "set audio sampling to 16000hz",
         "depth_ratio": 0.15,
         "type": "multi",
         "persona": "casual_slang"
       },
       {
-        "input": "mel channel pake 80",
+        "input": "use 80 mel channels",
         "depth_ratio": 0.75,
         "type": "multi",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Sampling rate 16000Hz dan mel channels 80.",
-    "probe_query": "berapa nilai sampling rate dan mel channel tadi?"
+    "expected_answer": "Sampling rate 16000Hz and 80 mel channels.",
+    "probe_query": "what were the audio sampling rate and mel channels i set?"
   },
   {
     "id": "M-VAL-02",
@@ -299,20 +299,20 @@
     ],
     "needles": [
       {
-        "input": "port redisnya 6389 min",
+        "input": "the redis port is 6389",
         "depth_ratio": 0.1,
         "type": "multi",
         "persona": "confused_beginner"
       },
       {
-        "input": "terus ttl-nya 86400 detik 24 jam",
+        "input": "and the ttl is 86400 seconds 24 hours",
         "depth_ratio": 0.85,
         "type": "multi",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Port Redis 6389 dan TTL 86400 detik (24 jam).",
-    "probe_query": "berapa port redis dan ttl cache yang saya sebut tadi?"
+    "expected_answer": "Redis port 6389 and TTL 86400 seconds (24 hours).",
+    "probe_query": "what were the redis port and cache ttl i mentioned?"
   },
   {
     "id": "R-VAL-01",
@@ -326,20 +326,20 @@
     ],
     "needles": [
       {
-        "input": "edge device kita memori ram-nya cuma 8gb ya",
+        "input": "our edge device only has 8gb ram",
         "depth_ratio": 0.2,
         "type": "reasoning",
         "persona": "casual_slang"
       },
       {
-        "input": "model fp16 butuh 14GB, kalo 4-bit quant cuma butuh 5GB",
+        "input": "fp16 model needs 14gb, 4-bit quant only needs 5gb",
         "depth_ratio": 0.75,
         "type": "reasoning",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Tidak bisa jalan di FP16 (8GB < 14GB), tapi bisa jalan di 4-bit quant (5GB <= 8GB).",
-    "probe_query": "bisa gak edge device kita jalanin model ini di FP16 dan di 4-bit quant?"
+    "expected_answer": "Cannot run in FP16 (8GB < 14GB), but can run in 4-bit quantization (5GB <= 8GB).",
+    "probe_query": "can our edge device run this model in FP16 and in 4-bit quantization?"
   },
   {
     "id": "R-VAL-02",
@@ -461,20 +461,20 @@
     ],
     "needles": [
       {
-        "input": "kata dosen harus minimal dapet gain 2.5 BLEU dari baseline",
+        "input": "my professor said we need at least 2.5 BLEU gain over baseline",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "confused_beginner"
       },
       {
-        "input": "hasilnya: baseline 31.2 BLEU, model kita 34.1 BLEU",
+        "input": "results: baseline 31.2 BLEU, our model 34.1 BLEU",
         "depth_ratio": 0.8,
         "type": "reasoning",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Boleh/layak digunakan karena gain-nya 2.9 BLEU (34.1 - 31.2), melebihi syarat minimal 2.5 BLEU.",
-    "probe_query": "apakah hasil model kita layak digunakan menurut arahan dosen tadi?"
+    "expected_answer": "Yes, deploying is justified because the gain is 2.9 BLEU (34.1 - 31.2), which exceeds the 2.5 BLEU threshold.",
+    "probe_query": "is deploying our model justified based on the professor's guidance and test results?"
   },
   {
     "id": "U-VAL-01",
@@ -488,14 +488,14 @@
     ],
     "needles": [
       {
-        "input": "eh laptop gw cuma punya ram 8gb ya min",
+        "input": "hey my laptop only has 8gb ram",
         "depth_ratio": 0.25,
         "type": "negative_trap",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "tadi gw ada bilang merk processor laptop gw intel atau amd gak ya?"
+    "probe_query": "did I mention what brand of processor my laptop has (intel or amd)?"
   },
   {
     "id": "U-VAL-02",
@@ -593,13 +593,13 @@
     ],
     "needles": [
       {
-        "input": "saya simpan modelnya di best_model.pt",
+        "input": "i saved the model in best_model.pt",
         "depth_ratio": 0.8,
         "type": "negative_trap",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "berapa ukuran file best_model.pt dalam gigabyte yang tadi saya sebutin min?"
+    "probe_query": "what was the file size of best_model.pt in gigabytes that i mentioned earlier?"
   }
 ]

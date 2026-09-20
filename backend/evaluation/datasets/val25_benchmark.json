@@ -332,7 +332,7 @@
     "dataset": "qasper_multi",
     "category": "multi_comparative",
     "persona": "casual_slang",
-    "query": "bro coba compare dong Paper [1] (Multilingual Clustering of Streamin) sama Paper [2] (Inexpensive Domain Adaptation of Pr): dataset yg dipake apa aja dan arsitekturnya beda di mana?",
+    "query": "hey bro, can you compare Paper [1] (Multilingual Clustering of Streamin) and Paper [2] (Inexpensive Domain Adaptation of Pr): what datasets did they use and how do the architectures differ?",
     "target_documents": [
       "qasper_1809.00540.txt",
       "qasper_2004.03354.txt"
@@ -430,7 +430,7 @@
     "dataset": "unanswerable",
     "category": "negative_unanswerable",
     "persona": "casual_slang",
-    "query": "min mau nanya, ada gak info berapa upah per jam yang dibayar ke pekerja mechanical turk buat bikin dataset ini?",
+    "query": "hey, quick question, is there any mention of the hourly wage paid to mechanical turk crowd workers to build this dataset?",
     "target_documents": [
       "qasper_1809.00540.txt"
     ],
@@ -462,7 +462,7 @@
     "dataset": "unanswerable",
     "category": "negative_unanswerable",
     "persona": "confused_beginner",
-    "query": "saya kurang paham medis, di paper ini ada disebutin syarat berat badan atau BMI pasien yang gak boleh ikut uji klinis gak ya?",
+    "query": "i'm not from a medical background, does this paper mention any patient body weight or BMI exclusion criteria for the clinical trial?",
     "target_documents": [
       "scifact_1084345.txt"
     ],

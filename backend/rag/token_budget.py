@@ -431,19 +431,20 @@ DIRECTIVE_TAG_KEYWORDS = {
 }
 
 DIRECTIVE_SEMANTIC_PATTERNS = [
-    re.compile(r'\b(?:strictly\s+(?:require|disallow|prohibit|forbid|enforce|mandate|must|restrict|ban)|must\s+strictly|strictly\s+never)\b', re.IGNORECASE),
+    re.compile(r'\b(?:strictly\s+(?:requires?|disallows?|prohibits?|forbids?|enforces?|mandates?|wants?|must|restrict|ban)|must\s+strictly|strictly\s+never)\b', re.IGNORECASE),
     re.compile(r'\b(?:never\s+(?:use|recommend|suggest|include|evaluate|attribute|link)|do\s+not\s+(?:use|include|suggest|attribute|allow|recommend))\b', re.IGNORECASE),
-    re.compile(r'\b(?:don\'?t\s+(?:recommend|use|suggest|include|allow|propose|attribute))\b', re.IGNORECASE),
+    re.compile(r'\b(?:don\'?t\s+(?:recommend|use|suggest|include|allow|propose|attribute|even\s+think))\b', re.IGNORECASE),
     re.compile(r'\b(?:only\s+use|use\s+only|exclusively\s+(?:use|for|target|require|restricted)|targeted\s+exclusively)\b', re.IGNORECASE),
-    re.compile(r'\b(?:our\s+(?:advisor|cluster|server|device|lab|protocol|policy|department|team)\s+(?:strictly\s+)?(?:requires|mandates|has|possesses|caps|limits|specifies))\b', re.IGNORECASE),
+    re.compile(r'\b(?:(?:my|our)\s+(?:[a-z0-9_\-]+\s+){0,3}(?:advisor|professor|boss|lab|team|cluster|server|device|protocol|policy|department)\s+(?:strictly\s+)?(?:requires?|mandates?|wants?|insists?|has|possesses|caps?|limits?|specifies|uses?|employs?|follows?))\b', re.IGNORECASE),
+    re.compile(r'\b(?:IRB\s*(?:protocol|#|[0-9])|ethics\s+protocol)\b', re.IGNORECASE),
     re.compile(r'\b(?:fix(?:ed)?\s+(?:the\s+)?(?:random\s+seed|batch\s+size|learning\s+rate)|seed\s+(?:is\s+)?fixed\s+at)\b', re.IGNORECASE),
     re.compile(r'\b(?:runtime\s+is\s+capped|budget\s+is\s+capped|capped\s+at|hard-capped)\b', re.IGNORECASE),
     re.compile(r'\bunder\s+our\s+(?:[a-z0-9.]+\s+){0,3}(?:policy|protocol|regimen|standard|guideline|rule)\b', re.IGNORECASE),
     re.compile(r'\b(?:supersed(?:ing|ed)|supersedes)\b', re.IGNORECASE),
     re.compile(r'\b(?:must\s+be\s+excluded|must\s+be\s+included|strictly\s+forbid|disallow\s+all)\b', re.IGNORECASE),
-    re.compile(r'\b(?:must\s+(?:resample|extract|initialize|follow|cite|achieve|reside))\b', re.IGNORECASE),
+    re.compile(r'\b(?:must\s+(?:resample|extract|initialize|follow|cite|achieve|reside|use))\b', re.IGNORECASE),
     re.compile(r'\b(?:pembimbing\s+(?:gw|saya)|wajib\s+(?:pakai|gunakan)|jangan\s+(?:pernah|rekomendasi|pake)|catat\s+ya|ingat\s+ya)\b', re.IGNORECASE),
-    re.compile(r'\b(?:remember\s+that\s+our|keep\s+in\s+mind\s+that\s+we|please\s+note\s+that\s+(?:our|we|all))\b', re.IGNORECASE),
+    re.compile(r'\b(?:remember\s+that\s+our|keep\s+in\s+mind\s+that\s+we|please\s+note\s+that\s+(?:our|we|all|my))\b', re.IGNORECASE),
 ]
 
 

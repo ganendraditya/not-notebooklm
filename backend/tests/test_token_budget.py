@@ -410,8 +410,8 @@ def test_extract_colloquial_and_unformatted_directives():
     from rag.token_budget import extract_pinned_directives
 
     messages = [
-        ChatMessage(role=MessageRole.USER, content="eh bro, pembimbing gw wantinya pake korpus multiun aja ya, jgn coba2 rekomendasiin europarl"),
-        ChatMessage(role=MessageRole.ASSISTANT, content="Siap, dicatat."),
+        ChatMessage(role=MessageRole.USER, content="yo bro my advisor strictly wants us to use the MultiUN corpus, don't even think about recommending Europarl"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Understood. Recorded."),
         ChatMessage(role=MessageRole.USER, content="please note that our server has only 16gb ram with zero swap space, cannot run big models"),
         ChatMessage(role=MessageRole.ASSISTANT, content="Understood."),
         ChatMessage(role=MessageRole.USER, content="under our latest v2 policy, epoch count is halved to 25 and batch size doubled to 64"),

@@ -11,14 +11,14 @@
     ],
     "needles": [
       {
-        "input": "eh bro pembimbing gw wantinya pake korpus multiun aja ya, jgn coba2 pake europarl",
+        "input": "yo bro my advisor strictly wants us to use the MultiUN corpus, don't even think about recommending Europarl",
         "depth_ratio": 0.1,
         "type": "directive",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "MultiUN corpus only (never Europarl).",
-    "probe_query": "Apa korpus yang diwajibkan pembimbing saya tadi?"
+    "probe_query": "What corpus did my advisor strictly require earlier?"
   },
   {
     "id": "S-NIAH-02",
@@ -116,14 +116,14 @@
     ],
     "needles": [
       {
-        "input": "laptop saya cuma punya GPU RTX 3060 6GB VRAM, jangan rekomendasi model yg butuh VRAM lebih dari itu ya min",
+        "input": "my laptop only has an RTX 3060 with 6GB VRAM, please don't suggest models that need more than that!",
         "depth_ratio": 0.1,
         "type": "directive",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Maximum 6GB VRAM (NVIDIA RTX 3060 constraint).",
-    "probe_query": "Berapa batas maksimum VRAM GPU yang saya miliki?"
+    "probe_query": "What is the maximum GPU VRAM limit on my laptop based on my note?"
   },
   {
     "id": "S-NIAH-07",
@@ -137,14 +137,14 @@
     ],
     "needles": [
       {
-        "input": "inget ya boss kita cuma targetin deployment di apple silicon mps, jangan pake cuda",
+        "input": "remember boss, we are strictly targeting deployment on apple silicon mps, do not use cuda",
         "depth_ratio": 0.3,
         "type": "directive",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Target deployment is Apple Silicon Metal (MPS backend); no CUDA.",
-    "probe_query": "Target hardware apa yang saya sebutkan untuk deployment?"
+    "probe_query": "What hardware accelerator did I designate for deployment?"
   },
   {
     "id": "S-NIAH-08",
@@ -242,14 +242,14 @@
     ],
     "needles": [
       {
-        "input": "saya dapet pesan error katanya learning rate harus diset 3e-4, tolong inget ya peak lr kita 3e-4",
+        "input": "i got an error saying learning rate must be set to 3e-4, please remember our peak lr is 3e-4",
         "depth_ratio": 0.3,
         "type": "directive",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Peak learning rate must be set to 3e-4.",
-    "probe_query": "Berapa nilai peak learning rate yang saya minta catat tadi?"
+    "probe_query": "What was the peak learning rate value I asked you to note?"
   },
   {
     "id": "S-NIAH-13",
@@ -263,14 +263,14 @@
     ],
     "needles": [
       {
-        "input": "catat ya, kita cuma submit paper ini khusus buat venue ACL 2026, bukan EMNLP",
+        "input": "heads up, we are submitting this paper specifically to ACL 2026, definitely not EMNLP",
         "depth_ratio": 0.5,
         "type": "directive",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Submission is exclusively targeted for ACL 2026 (not EMNLP).",
-    "probe_query": "Target venue konferensi apa yang saya sebutkan tadi?"
+    "probe_query": "Which target conference venue did I specify earlier?"
   },
   {
     "id": "S-NIAH-14",
@@ -368,14 +368,14 @@
     ],
     "needles": [
       {
-        "input": "kata dosen saya loss function harus pake Dice Loss bukan Cross Entropy biasa",
+        "input": "my professor told me the loss function must be Dice Loss, not standard Cross Entropy",
         "depth_ratio": 0.5,
         "type": "directive",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Loss function must use Dice Loss instead of Cross Entropy.",
-    "probe_query": "Apa fungsi loss yang disuruh dosen saya gunakan tadi?"
+    "probe_query": "What loss function did my professor instruct us to use?"
   },
   {
     "id": "S-NIAH-19",
@@ -389,14 +389,14 @@
     ],
     "needles": [
       {
-        "input": "eh iya, token pooling-nya wajib mean-pooling ya, jangan sekali-kali pake CLS token",
+        "input": "by the way, token pooling must strictly be mean-pooling, don't ever use the CLS token",
         "depth_ratio": 0.7,
         "type": "directive",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Must use mean-token pooling; strictly never use CLS token pooling.",
-    "probe_query": "Metode token pooling apa yang saya wajibkan tadi?"
+    "probe_query": "What token pooling method did I mandate earlier?"
   },
   {
     "id": "S-NIAH-20",
@@ -494,14 +494,14 @@
     ],
     "needles": [
       {
-        "input": "saya simpan file modelnya di folder /opt/checkpoints/best_model.pt, jangan lupa path-nya ya min",
+        "input": "i saved the model weights at /opt/checkpoints/best_model.pt, don't forget the path!",
         "depth_ratio": 0.7,
         "type": "directive",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Model checkpoint path is /opt/checkpoints/best_model.pt.",
-    "probe_query": "Di folder path mana saya menyimpan file model tadi?"
+    "probe_query": "At what folder path did I save the model checkpoint earlier?"
   },
   {
     "id": "S-NIAH-25",
@@ -515,14 +515,14 @@
     ],
     "needles": [
       {
-        "input": "inget ya kita rilis pake lisensi apache 2.0, haram hukumnya masukin kode agpl",
+        "input": "keep in mind we release under Apache 2.0, absolutely no AGPL code allowed in our repo",
         "depth_ratio": 0.9,
         "type": "directive",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Repository released under Apache 2.0; AGPL code strictly prohibited.",
-    "probe_query": "Apa lisensi open source kita dan lisensi apa yang dilarang keras?"
+    "probe_query": "What is our open source license and what license is strictly forbidden?"
   },
   {
     "id": "M-NIAH-01",
@@ -536,20 +536,20 @@
     ],
     "needles": [
       {
-        "input": "eh bro ram server kita cuma 16gb ya",
+        "input": "hey bro our server RAM is only 16GB",
         "depth_ratio": 0.15,
         "type": "multi",
         "persona": "casual_slang"
       },
       {
-        "input": "trs gpu kita pake rtx 4090 vram 24gb",
+        "input": "and our GPU is an RTX 4090 with 24GB VRAM",
         "depth_ratio": 0.35,
         "type": "multi",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "RAM server 16GB dan GPU RTX 4090 dengan 24GB VRAM.",
-    "probe_query": "tadi gw sempet sebut spek RAM sama GPU server kita berapa ya?"
+    "expected_answer": "Server RAM is 16GB and GPU is RTX 4090 with 24GB VRAM.",
+    "probe_query": "what RAM and GPU specs did I mention earlier for our server?"
   },
   {
     "id": "M-NIAH-02",
@@ -677,20 +677,20 @@
     ],
     "needles": [
       {
-        "input": "saya cuma boleh pake dataset publik kata dosen",
+        "input": "my professor said we can only use public datasets",
         "depth_ratio": 0.25,
         "type": "multi",
         "persona": "confused_beginner"
       },
       {
-        "input": "terus minimal data test harus 500 baris katanya",
+        "input": "and he also said the test set needs at least 500 rows",
         "depth_ratio": 0.75,
         "type": "multi",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Hanya dataset publik dan minimal 500 baris data test.",
-    "probe_query": "dua aturan dataset apa yang disuruh dosen saya tadi?"
+    "expected_answer": "Public datasets only and minimum 500 rows for the test set.",
+    "probe_query": "what two dataset rules did my professor tell me earlier?"
   },
   {
     "id": "M-NIAH-07",
@@ -704,26 +704,26 @@
     ],
     "needles": [
       {
-        "input": "jgn pake spacy ya",
+        "input": "don't use spacy",
         "depth_ratio": 0.1,
         "type": "multi",
         "persona": "casual_slang"
       },
       {
-        "input": "jgn pake stanford ner juga",
+        "input": "don't use stanford ner either",
         "depth_ratio": 0.45,
         "type": "multi",
         "persona": "casual_slang"
       },
       {
-        "input": "pake custom crf aja",
+        "input": "just use custom crf",
         "depth_ratio": 0.85,
         "type": "multi",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Dilarang pakai spaCy dan Stanford NER; harus pakai custom CRF.",
-    "probe_query": "library apa aja yg dilarang dan model apa yg disuruh pake?"
+    "expected_answer": "Forbidden: spaCy and Stanford NER; Allowed: custom CRF.",
+    "probe_query": "which libraries were forbidden and which model were we told to use?"
   },
   {
     "id": "M-NIAH-08",
@@ -845,20 +845,20 @@
     ],
     "needles": [
       {
-        "input": "min saya lupa tadi nyebut port redis 6389",
+        "input": "hey I forgot, earlier I mentioned redis port is 6389",
         "depth_ratio": 0.15,
         "type": "multi",
         "persona": "confused_beginner"
       },
       {
-        "input": "sama passwordnya secrettoken123",
+        "input": "and password is secrettoken123",
         "depth_ratio": 0.4,
         "type": "multi",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Port Redis 6389 dan password secrettoken123.",
-    "probe_query": "berapa port redis dan password yang tadi saya sebutin?"
+    "expected_answer": "Redis port 6389 and password secrettoken123.",
+    "probe_query": "what were the redis port and password I mentioned earlier?"
   },
   {
     "id": "M-NIAH-13",
@@ -872,20 +872,20 @@
     ],
     "needles": [
       {
-        "input": "gpu cluster kita ada 8 node",
+        "input": "our gpu cluster has 8 nodes",
         "depth_ratio": 0.2,
         "type": "multi",
         "persona": "casual_slang"
       },
       {
-        "input": "masing2 node punya 4 a100",
+        "input": "and each node has 4 a100 gpus",
         "depth_ratio": 0.8,
         "type": "multi",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "8 cluster nodes with 4 NVIDIA A100 GPUs per node (32 A100s total).",
-    "probe_query": "berapa jumlah node dan gpu per node di cluster kita tadi?"
+    "probe_query": "how many nodes and how many gpus per node did I mention for our cluster?"
   },
   {
     "id": "M-NIAH-14",
@@ -1007,20 +1007,20 @@
     ],
     "needles": [
       {
-        "input": "file datanya format parquet",
+        "input": "the data file format is parquet",
         "depth_ratio": 0.1,
         "type": "multi",
         "persona": "confused_beginner"
       },
       {
-        "input": "ukurannya kira2 250 megabyte",
+        "input": "and file size is about 250 megabytes",
         "depth_ratio": 0.45,
         "type": "multi",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Format Parquet dengan ukuran sekitar 250MB.",
-    "probe_query": "apa format file data dan ukurannya yang saya bilang tadi?"
+    "expected_answer": "Parquet format with approximate size of 250MB.",
+    "probe_query": "what data file format and size did I tell you earlier?"
   },
   {
     "id": "M-NIAH-19",
@@ -1034,20 +1034,20 @@
     ],
     "needles": [
       {
-        "input": "loss-nya pake focal loss gamma 2.0 ya",
+        "input": "use focal loss with gamma 2.0",
         "depth_ratio": 0.15,
         "type": "multi",
         "persona": "casual_slang"
       },
       {
-        "input": "label smoothing diset 0.05 aja",
+        "input": "and set label smoothing to 0.05",
         "depth_ratio": 0.8,
         "type": "multi",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Focal Loss dengan gamma 2.0 dan label smoothing 0.05.",
-    "probe_query": "apa setting loss function dan label smoothing kita tadi?"
+    "expected_answer": "Focal Loss with gamma 2.0 and label smoothing 0.05.",
+    "probe_query": "what were our loss function and label smoothing settings?"
   },
   {
     "id": "M-NIAH-20",
@@ -1175,20 +1175,20 @@
     ],
     "needles": [
       {
-        "input": "min tolong catat seed 1337",
+        "input": "please note down seed 1337",
         "depth_ratio": 0.1,
         "type": "multi",
         "persona": "confused_beginner"
       },
       {
-        "input": "sama learning rate 1e-4 ya",
+        "input": "and learning rate 1e-4",
         "depth_ratio": 0.4,
         "type": "multi",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Random seed 1337 dan learning rate 1e-4.",
-    "probe_query": "berapa seed dan learning rate yang saya titip catat tadi?"
+    "expected_answer": "Random seed 1337 and learning rate 1e-4.",
+    "probe_query": "what were the random seed and learning rate I asked you to note?"
   },
   {
     "id": "M-NIAH-25",
@@ -1202,20 +1202,20 @@
     ],
     "needles": [
       {
-        "input": "kita pake embedding bge-m3 ya bro",
+        "input": "we're using bge-m3 embedding model bro",
         "depth_ratio": 0.2,
         "type": "multi",
         "persona": "casual_slang"
       },
       {
-        "input": "reranker-nya pake bge-reranker-large",
+        "input": "and bge-reranker-large for reranker",
         "depth_ratio": 0.8,
         "type": "multi",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Embedding model bge-m3 dan reranker bge-reranker-large.",
-    "probe_query": "model embedding sama reranker apa yg kita sepakati tadi?"
+    "expected_answer": "Embedding model bge-m3 and reranker bge-reranker-large.",
+    "probe_query": "what embedding and reranker models did we decide on earlier?"
   },
   {
     "id": "R-NIAH-01",
@@ -1229,20 +1229,20 @@
     ],
     "needles": [
       {
-        "input": "eh rtx 3090 kita vram-nya 24gb doang ya",
+        "input": "hey our RTX 3090 only has 24GB VRAM",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "casual_slang"
       },
       {
-        "input": "model 70b fp16 butuh vram 140gb buat loading",
+        "input": "loading a 70B FP16 model takes 140GB VRAM",
         "depth_ratio": 0.7,
         "type": "reasoning",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Tidak bisa, karena VRAM GPU cuma 24GB sedangkan model butuh 140GB (kurang 116GB, akan OOM).",
-    "probe_query": "bisa gak gpu kita load model 70b fp16 secara native tanpa quantisasi?"
+    "expected_answer": "No, because the GPU has only 24GB VRAM while the model needs 140GB (short by 116GB, causing OOM).",
+    "probe_query": "can our GPU load this 70B FP16 model natively without quantization?"
   },
   {
     "id": "R-NIAH-02",
@@ -1364,20 +1364,20 @@
     ],
     "needles": [
       {
-        "input": "tadi kata dosen minimal gain harus 2.5 BLEU dari baseline biar boleh dipake",
+        "input": "my professor said we need at least 2.5 BLEU gain over baseline to justify deployment",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "confused_beginner"
       },
       {
-        "input": "hasil test: baseline 31.2 BLEU, model kita 34.1 BLEU",
+        "input": "test results: baseline scored 31.2 BLEU, our model scored 34.1 BLEU",
         "depth_ratio": 0.75,
         "type": "reasoning",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Boleh/layak digunakan, karena gain-nya 2.9 BLEU (34.1 - 31.2), melebihi syarat minimal 2.5 BLEU.",
-    "probe_query": "berdasarkan syarat minimal gain dan hasil test, apakah model kita layak digunakan?"
+    "expected_answer": "Yes, deployment is justified because the gain is 2.9 BLEU (34.1 - 31.2), which exceeds the 2.5 BLEU requirement.",
+    "probe_query": "is deploying our model justified based on the minimum gain threshold and test results?"
   },
   {
     "id": "R-NIAH-07",
@@ -1391,20 +1391,20 @@
     ],
     "needles": [
       {
-        "input": "aturan awal: kita pake 4 node",
+        "input": "initial rule: we use 4 cluster nodes",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "casual_slang"
       },
       {
-        "input": "eh update bro, dapet hibah server jd node kita sekarang 10",
+        "input": "hey update bro, we got a grant so our node count is now 10",
         "depth_ratio": 0.4,
         "type": "reasoning",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "10 node (aturan awal 4 node sudah diupdate setelah dapat hibah).",
-    "probe_query": "total node cluster kita sekarang ada berapa ya?"
+    "expected_answer": "10 nodes (the initial 4-node plan was updated after receiving the grant).",
+    "probe_query": "how many total cluster nodes do we have right now?"
   },
   {
     "id": "R-NIAH-08",
@@ -1526,20 +1526,20 @@
     ],
     "needles": [
       {
-        "input": "kuota token harian kita 100.000 token",
+        "input": "our daily token quota is 100000 tokens",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "confused_beginner"
       },
       {
-        "input": "setiap request chat makan 5.000 token",
+        "input": "each chat request consumes 5000 tokens",
         "depth_ratio": 0.75,
         "type": "reasoning",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "Maksimal 20 request chat per hari (100.000 / 5.000 = 20).",
-    "probe_query": "berapa maksimal request chat yang bisa kita lakukan dalam sehari?"
+    "expected_answer": "Maximum 20 chat requests per day (100000 / 5000 = 20).",
+    "probe_query": "what is the maximum number of chat requests we can perform in a day?"
   },
   {
     "id": "R-NIAH-13",
@@ -1553,20 +1553,20 @@
     ],
     "needles": [
       {
-        "input": "kalo akurasi < 90% kita ga boleh submit paper",
+        "input": "if accuracy is under 90 percent we are not allowed to submit the paper",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "casual_slang"
       },
       {
-        "input": "hasil akhir cuma tembus 87.5%",
+        "input": "final result only reached 87.5 percent",
         "depth_ratio": 0.45,
         "type": "reasoning",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Tidak boleh submit, karena akurasi 87.5% masih di bawah syarat minimal 90%.",
-    "probe_query": "apakah kita boleh submit paper dengan hasil akurasi kita saat ini?"
+    "expected_answer": "Cannot submit, because 87.5% accuracy is below the required 90% threshold.",
+    "probe_query": "are we allowed to submit the paper with our current accuracy result?"
   },
   {
     "id": "R-NIAH-14",
@@ -1694,20 +1694,20 @@
     ],
     "needles": [
       {
-        "input": "awalnya kita mau pake model BERT",
+        "input": "initially we planned to use BERT model",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "confused_beginner"
       },
       {
-        "input": "tapi dosen bilang ganti RoBERTa biar lebih modern",
+        "input": "but my professor told us to switch to RoBERTa for modern baselines",
         "depth_ratio": 0.75,
         "type": "reasoning",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "RoBERTa (menggantikan rencana awal BERT sesuai arahan dosen).",
-    "probe_query": "model apa yang akhirnya kita pilih untuk eksperimen?"
+    "expected_answer": "RoBERTa (superseding the initial BERT plan per the professor's instruction).",
+    "probe_query": "which model did we ultimately select for our experiments?"
   },
   {
     "id": "R-NIAH-19",
@@ -1721,20 +1721,20 @@
     ],
     "needles": [
       {
-        "input": "aturan 1: diskon token 50% kalo query malem",
+        "input": "rule: 50 percent token discount applies for queries sent at night after 10pm",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "casual_slang"
       },
       {
-        "input": "query dilakukan jam 11 malem",
+        "input": "query was sent at 11pm",
         "depth_ratio": 0.8,
         "type": "reasoning",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Dapat diskon 50%, karena query dilakukan pada jam 11 malam.",
-    "probe_query": "apakah query saya berhak dapet diskon token?"
+    "expected_answer": "Yes, receives 50% discount because the query was submitted at 11pm (after 10pm).",
+    "probe_query": "does my query qualify for the 50 percent token discount?"
   },
   {
     "id": "R-NIAH-20",
@@ -1862,20 +1862,20 @@
     ],
     "needles": [
       {
-        "input": "file train.json ada 800 baris",
+        "input": "the train.json file has 800 rows",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "confused_beginner"
       },
       {
-        "input": "file test.json ada 200 baris",
+        "input": "and test.json file has 200 rows",
         "depth_ratio": 0.7,
         "type": "reasoning",
         "persona": "confused_beginner"
       }
     ],
-    "expected_answer": "1.000 baris total (800 train + 200 test).",
-    "probe_query": "berapa total seluruh baris data jika train dan test digabung?"
+    "expected_answer": "1,000 rows total (800 train + 200 test).",
+    "probe_query": "what is the combined total number of rows across train and test datasets?"
   },
   {
     "id": "R-NIAH-25",
@@ -1889,20 +1889,20 @@
     ],
     "needles": [
       {
-        "input": "aturan lab: ga boleh ninggal server nyala lebih dr 48 jam",
+        "input": "lab rule: do not leave the server running jobs for more than 48 hours",
         "depth_ratio": 0.15,
         "type": "reasoning",
         "persona": "casual_slang"
       },
       {
-        "input": "training udah jalan 52 jam",
+        "input": "current job has been running for 52 hours",
         "depth_ratio": 0.8,
         "type": "reasoning",
         "persona": "casual_slang"
       }
     ],
-    "expected_answer": "Sudah melanggar aturan, karena training berjalan 52 jam (melebihi batas maksimal 48 jam).",
-    "probe_query": "apakah status server saat ini melanggar aturan lab?"
+    "expected_answer": "Violates the rule, because the job has been running for 52 hours (exceeding the 48-hour maximum).",
+    "probe_query": "does our current server job status violate the lab rule?"
   },
   {
     "id": "U-NIAH-01",
@@ -1916,14 +1916,14 @@
     ],
     "needles": [
       {
-        "input": "eh bro ram laptop gw cuma 8gb ya",
+        "input": "hey bro my laptop RAM is only 8GB",
         "depth_ratio": 0.3,
         "type": "negative_trap",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "tadi gw ada sebut merk laptop gw gak ya? merk apa?"
+    "probe_query": "did I mention the brand name of my laptop earlier? which brand?"
   },
   {
     "id": "U-NIAH-02",
@@ -2021,14 +2021,14 @@
     ],
     "needles": [
       {
-        "input": "saya simpan modelnya di file best_weights.pt",
+        "input": "i saved the model weights in best_weights.pt",
         "depth_ratio": 0.25,
         "type": "negative_trap",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "berapa ukuran file best_weights.pt dalam gigabyte yang saya sebutkan tadi?"
+    "probe_query": "what was the file size of best_weights.pt in gigabytes that I mentioned?"
   },
   {
     "id": "U-NIAH-07",
@@ -2042,14 +2042,14 @@
     ],
     "needles": [
       {
-        "input": "pembimbing gw nyuruh pake korpus multiun",
+        "input": "my advisor told us to use multiun corpus",
         "depth_ratio": 0.5,
         "type": "negative_trap",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "tadi pembimbing gw ada nyebut batas deadline pengumpulan tesis gak? kapan?"
+    "probe_query": "did my advisor mention any thesis submission deadline date? when?"
   },
   {
     "id": "U-NIAH-08",
@@ -2147,14 +2147,14 @@
     ],
     "needles": [
       {
-        "input": "loss function kita disuruh pake Dice Loss",
+        "input": "our professor told us to use Dice Loss",
         "depth_ratio": 0.9,
         "type": "negative_trap",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "siapa nama dosen pembimbing yang nyuruh pake Dice Loss tadi min?"
+    "probe_query": "what is the full name of the professor who told us to use Dice Loss?"
   },
   {
     "id": "U-NIAH-13",
@@ -2168,14 +2168,14 @@
     ],
     "needles": [
       {
-        "input": "gpu kita pake rtx 4090 vram 24gb ya bro",
+        "input": "our gpu is an rtx 4090 with 24gb vram bro",
         "depth_ratio": 0.1,
         "type": "negative_trap",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "tadi kita beli gpu rtx 4090 di toko komputer mana ya?"
+    "probe_query": "which computer hardware retail store did we buy the RTX 4090 from?"
   },
   {
     "id": "U-NIAH-14",
@@ -2273,14 +2273,14 @@
     ],
     "needles": [
       {
-        "input": "saya cuma punya koneksi internet 10 Mbps di kostan",
+        "input": "i only have a 10 Mbps internet connection in my dorm",
         "depth_ratio": 0.2,
         "type": "negative_trap",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "berapa biaya langganan wifi kostan saya per bulan yang saya sebutin tadi?"
+    "probe_query": "how much is my monthly dorm wifi subscription fee that I mentioned?"
   },
   {
     "id": "U-NIAH-19",
@@ -2294,14 +2294,14 @@
     ],
     "needles": [
       {
-        "input": "token pooling wajib mean-pooling ya",
+        "input": "token pooling must be mean-pooling",
         "depth_ratio": 0.4,
         "type": "negative_trap",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "kenapa dosen kita gasuka sama CLS token? ada gw sebutin alasannya gak?"
+    "probe_query": "why does our professor dislike the CLS token? did I give any reason?"
   },
   {
     "id": "U-NIAH-20",
@@ -2399,14 +2399,14 @@
     ],
     "needles": [
       {
-        "input": "min saya pake laptop windows 11 home edition",
+        "input": "i'm using a windows 11 home laptop",
         "depth_ratio": 0.7,
         "type": "negative_trap",
         "persona": "confused_beginner"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "tadi saya sebut processor laptop saya intel core i5 atau i7 ya?"
+    "probe_query": "did I mention whether my laptop CPU is an Intel Core i5 or i7?"
   },
   {
     "id": "U-NIAH-25",
@@ -2420,13 +2420,13 @@
     ],
     "needles": [
       {
-        "input": "lisensi repo kita apache 2.0 ya",
+        "input": "our repo license is apache 2.0",
         "depth_ratio": 0.8,
         "type": "negative_trap",
         "persona": "casual_slang"
       }
     ],
     "expected_answer": "Unmentioned/Absent. The requested information was never stated, specified, or mentioned in our conversation.",
-    "probe_query": "siapa nama pengacara hak cipta yang nyaranin lisensi apache tadi?"
+    "probe_query": "who was the copyright attorney who recommended the apache license?"
   }
 ]
