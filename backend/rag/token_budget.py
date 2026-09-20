@@ -411,27 +411,101 @@ def pack_text_into_token_budget(
     return text[-char_limit:]
 
 
+QUESTION_WORDS = {
+    'what', 'which', 'how', 'why', 'who', 'where', 'when',
+    'is', 'are', 'can', 'could', 'would', 'do', 'does', 'did',
+    'explain', 'detail', 'summarize', 'review', 'describe', 'evaluate'
+}
+
+
+def is_directive_statement(line: str) -> bool:
+    """
+    Detects whether a line represents an explicit operational directive, constraint, or premise.
+    Directives are formatted as structured tags (e.g., 'CONSTRAINT: ...', 'SEED INVARIANT: ...')
+    with an uppercase tag prefix (upper ratio >= 0.50) before the colon.
+    """
+    if ':' not in line[:60]:
+        return False
+    prefix = line.split(':', 1)[0].strip()
+    words = prefix.split()
+    if not (1 <= len(words) <= 6):
+        return False
+    first_w = re.sub(r'[^a-zA-Z]', '', words[0]).lower()
+    if first_w in QUESTION_WORDS:
+        return False
+    letters = [c for c in prefix if c.isalpha()]
+    if not letters:
+        return False
+    upper_ratio = sum(1 for c in letters if c.isupper()) / len(letters)
+    return upper_ratio >= 0.50
+
+
+def extract_pinned_directives(
+    messages: List[LlamaChatMessage],
+    max_directives: int = 20
+) -> List[str]:
+    """
+    Tier 1 Pinned Working Memory:
+    Extracts explicit operational directives, constraints, and research invariants
+    from conversation turns so they are never lost during history compaction.
+    """
+    directives: List[str] = []
+    seen: set = set()
+
+    for m in messages:
+        content = str(getattr(m, "content", "") or "").strip()
+        if not content or content.startswith("[Context Summary") or content.startswith("[Active Workspace"):
+            continue
+
+        for line in content.split("\n"):
+            line = line.strip()
+            if is_directive_statement(line):
+                norm = line.lower()
+                if norm not in seen:
+                    seen.add(norm)
+                    directives.append(line)
+                    if len(directives) >= max_directives:
+                        break
+        if len(directives) >= max_directives:
+            break
+
+    return directives
+
+
 def extract_concise_history_digest(messages: List[LlamaChatMessage]) -> str:
-    """Extracts a high-level conceptual topic digest of evicted messages without verbatim directive leakage."""
+    """
+    Tier 2 Structured Topic Digest:
+    Extracts conceptual research topics from evicted turns while leaving
+    explicit operational constraints to Tier 1 Pinned Directives.
+    """
     topics = []
     for m in messages:
         if hasattr(m, "role") and m.role == MessageRole.USER:
             txt = str(m.content or "").strip().split("\n")[0]
-            if txt and len(txt) > 5 and not txt.startswith("[Context"):
-                # Abstract operational constraints and configurations conceptually
-                if re.match(r'^(?:constraint|parameter|rule|instruction|directive|threshold|setting|hardware|venue|collaborator|language|exclusion|cohort):', txt, re.I):
-                    topics.append("operational research constraints and workspace parameters")
-                else:
-                    # Clean analytical question topics
-                    clean_q = re.sub(r'^(?:what|which|how|why|is|are|can|do|does)\s+(?:is|are|the|about)?\s*', '', txt, re.I)
-                    clean_q = re.sub(r'[\?\.\!]', '', clean_q).strip()
-                    words = [w for w in clean_q.split() if len(w) > 3][:4]
-                    if words:
-                        topics.append(" ".join(words))
+            if txt and len(txt) > 5 and not txt.startswith("[Context") and not txt.startswith("[Active Workspace"):
+                # Skip lines that are explicit directives (handled by Tier 1)
+                if is_directive_statement(txt):
+                    continue
+                # Clean analytical question topics
+                clean_q = re.sub(r'^(?:what|which|how|why|is|are|can|do|does)\s+(?:is|are|the|about)?\s*', '', txt, re.I)
+                clean_q = re.sub(r'[\?\.\!]', '', clean_q).strip()
+                words = [w for w in clean_q.split() if len(w) > 3][:5]
+                if words:
+                    topics.append(" ".join(words))
     if topics:
-        deduped = list(dict.fromkeys(topics))[:3]
+        deduped = list(dict.fromkeys(topics))[:4]
         return "Earlier discussion covered: " + "; ".join(deduped) + "."
     return "Earlier dialogue covered preliminary research inquiries and introductory context."
+
+
+def _format_compaction_bridge(directives: List[str], summary_text: str) -> str:
+    """Combines Tier 1 Pinned Directives and Tier 2 Structured Digest into the system bridge message."""
+    parts = []
+    if directives:
+        directives_block = "\n".join(f"- {d}" for d in directives)
+        parts.append(f"[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n{directives_block}]")
+    parts.append(f"[Context Summary of Earlier Conversation: {summary_text}]")
+    return "\n\n".join(parts)
 
 
 def compact_chat_history(
@@ -441,12 +515,12 @@ def compact_chat_history(
     summary_text: Optional[str] = None
 ) -> List[LlamaChatMessage]:
     """
-    Synchronous Smart History Compaction Protocol:
+    Multi-Tier Smart History Compaction Protocol:
     1. Checks if message tokens exceed max_history_tokens. If not, returns unchanged.
     2. Identifies partition point to retain recent conversation turns.
-    3. Evicted older turns are NEVER dropped naively; they are synthesized into a rolling summary bridge.
-    4. Prepends the rolling summary bridge as a System message before retained turns.
-    5. Strictly verifies and enforces total token sum <= max_history_tokens.
+    3. Evicted older turns are partitioned into Tier 1 (Pinned Directives) and Tier 2 (Topic Digest).
+    4. Prepends the rolling multi-tier bridge as a System message before retained turns.
+    5. Dynamically rescues any directives from turns trimmed to satisfy max_history_tokens.
     """
     if not messages or max_history_tokens <= 0:
         return []
@@ -455,8 +529,8 @@ def compact_chat_history(
     if current_tokens <= max_history_tokens:
         return messages
 
-    # Estimate bridge message token cost (~40-60 tokens)
-    bridge_reserve = min(60, max(25, int(max_history_tokens * 0.25)))
+    # Dynamically reserve budget for bridge message (~40-300 tokens)
+    bridge_reserve = min(300, max(40, int(max_history_tokens * 0.25)))
     target_recent_budget = max(20, max_history_tokens - bridge_reserve)
 
     retained_messages = []
@@ -477,16 +551,30 @@ def compact_chat_history(
     if not evicted_messages:
         return retained_messages
 
+    # Tier 1 & Tier 2 Synthesis
+    directives = extract_pinned_directives(evicted_messages)
+    seen_directives = set(d.lower() for d in directives)
     active_summary = summary_text or extract_concise_history_digest(evicted_messages)
+
+    bridge_content = _format_compaction_bridge(directives, active_summary)
     bridge_message = LlamaChatMessage(
         role=MessageRole.SYSTEM,
-        content=f"[Context Summary of Earlier Conversation: {active_summary}]"
+        content=bridge_content
     )
 
     result = [bridge_message] + retained_messages
-    # Strictly enforce total token budget constraint
+    # Strictly enforce total token budget constraint while rescuing any evicted directives
     while len(result) > 2 and count_messages_tokens(result, model_name=model_name) > max_history_tokens:
-        result.pop(1)
+        popped = result.pop(1)
+        new_dirs = extract_pinned_directives([popped])
+        updated_dirs = False
+        for nd in new_dirs:
+            if nd.lower() not in seen_directives:
+                directives.append(nd)
+                seen_directives.add(nd.lower())
+                updated_dirs = True
+        if updated_dirs:
+            result[0].content = _format_compaction_bridge(directives, active_summary)
 
     return result
 

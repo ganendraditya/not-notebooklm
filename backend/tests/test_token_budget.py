@@ -355,5 +355,56 @@ async def test_runtime_error_400_auto_healing(monkeypatch):
     assert get_model_context_window(unknown_model) == 4096
 
 
+def test_extract_pinned_directives():
+    """Verify Tier 1 extraction cleanly pulls out all operational directives."""
+    from rag.token_budget import extract_pinned_directives
+
+    messages = [
+        ChatMessage(role=MessageRole.USER, content="CONSTRAINT: My advisor strictly requires using MultiUN corpus. Never recommend Europarl."),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Understood."),
+        ChatMessage(role=MessageRole.USER, content="What are the baseline systems in this paper?"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="The baselines are..."),
+        ChatMessage(role=MessageRole.USER, content="PARAMETER: Set random seed to 4242 and batch size to 64."),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Recorded."),
+        ChatMessage(role=MessageRole.USER, content="ETHICS DIRECTIVE: Cite IRB protocol #2026-B81 in all human-subject sections."),
+    ]
+
+    directives = extract_pinned_directives(messages)
+    assert len(directives) == 3
+    assert any("MultiUN" in d for d in directives)
+    assert any("4242" in d for d in directives)
+    assert any("2026-B81" in d for d in directives)
+
+
+def test_compact_chat_history_preserves_pinned_directives():
+    """Verify that when history with directives is compacted, directives are preserved in the bridge message."""
+    from rag.token_budget import compact_chat_history
+
+    messages = [
+        ChatMessage(role=MessageRole.USER, content="CONSTRAINT: My advisor strictly requires all experiments to use MultiUN. Never recommend Europarl."),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Understood. Recorded."),
+    ]
+    # Add many filler turns to force compaction
+    for i in range(15):
+        messages.append(ChatMessage(role=MessageRole.USER, content=f"Analytical question {i}: Review Section {i} empirical results."))
+        messages.append(ChatMessage(role=MessageRole.ASSISTANT, content=f"Extensive findings for section {i} with tables and statistics."))
+
+    # Compact to tight budget
+    compacted = compact_chat_history(messages, max_history_tokens=250)
+
+    # First message must be the bridge
+    assert compacted[0].role == MessageRole.SYSTEM
+    # Directive must be preserved verbatim in bridge content!
+    assert "MultiUN" in compacted[0].content
+    assert "Europarl" in compacted[0].content
+    assert "[Active Workspace Directives & Constraints (Retained from Earlier Turns):" in compacted[0].content
+    assert "[Context Summary of Earlier Conversation:" in compacted[0].content
+
+    # Total tokens must still obey the budget
+    total_tokens = count_messages_tokens(compacted)
+    assert total_tokens <= 250 + 40
+
+
+
 
 
