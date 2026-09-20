@@ -5,12 +5,12 @@
 
 ## 1. Executive Overview & Core Philosophy
 
-In traditional Machine Learning (ML), models are evaluated on numerical labels or structured classifications using metrics such as Precision, Recall, F1-Score, or RMSE. In contrast, Retrieval-Augmented Generation (RAG) produces open-ended natural language, where identical semantic facts can be phrased in countless ways, and where subtle word changes can introduce subtle hallucinations.
+In traditional Machine Learning (ML), models are evaluated on numerical labels or structured classifications using metrics such as Precision, Recall, F1-Score, or RMSE. Under fixed random seeds, conventional ML evaluations are strictly idempotent and deterministic. In contrast, Retrieval-Augmented Generation (RAG) produces open-ended, entropic natural language, where identical semantic facts can take myriad lexical forms, and where subtle word changes can introduce subtle hallucinations.
 
 To avoid subjective qualitative spot-checks ("eyeball engineering") and prevent **LLM Self-Preference Bias**, Not-NotebookLM establishes a formal **Dual-Track, Multi-Framework Scientific Evaluation Methodology**.
 
 ### Core Evaluation Invariants:
-1. **No Cherry-Picking**: Evaluation questions and document contexts are sourced sequentially from peer-reviewed scientific datasets (AllenAI QASPER, AllenAI SciFact, Princeton ALCE) without manual curation of favorable cases.
+1. **No Cherry-Picking**: Evaluation questions and document contexts are sourced sequentially from peer-reviewed scientific datasets (AllenAI QASPER, AllenAI SciFact) and audited under the Princeton ALCE citation protocol without manual curation of favorable cases.
 2. **Multi-Judge Consensus**: No single AI model or framework has absolute authority. Groundedness and Relevancy are audited concurrently across multiple industry-standard evaluation engines.
 3. **Strict Scale Separation**: Discrete binary (0/1) gatekeepers are segregated from continuous (0.000–1.000) metrics to avoid severe mathematical distortion.
 4. **Comprehensive Academic Research Corpus**: Evaluates across a 75-case benchmark balancing four distinct academic modalities: Single-Paper Deep Comprehension (25 unique arXiv papers), Biomedical Claim Verification (25 unique PubMed papers), Multi-Paper Comparative Synthesis (15 workspaces with 2, 3, and 4 documents), and Negative Abstention Traps (10 unanswerable queries). All 50 underlying documents are unique with zero paper reuse.
@@ -133,7 +133,7 @@ When benchmark scores fall below target thresholds, optimization is executed sys
 
 ## 6. Dataset Topology & Scientific Modalities
 
-The 75-case benchmark (`--dataset full75` or `--dataset full50`) rigorously balances four authentic, peer-reviewed scientific modalities across 50 unique physical papers:
+The 75-case benchmark (`--dataset full75 --split test`) rigorously balances four authentic, peer-reviewed scientific modalities across 50 unique physical papers:
 
 ```text
                        75-CASE SCIENTIFIC BENCHMARK
