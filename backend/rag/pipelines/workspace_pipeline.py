@@ -32,6 +32,43 @@ def extract_key_sentences_from_chunk(text: str, limit: int = 2) -> List[str]:
                     break
     return candidates
 
+async def _inspect_workspace_documents_token_density(
+    chat_id: str,
+    local_docs: List[str],
+    db_records: Dict[str, Any],
+    model_name: Optional[str] = None
+) -> Tuple[int, int, Dict[str, int]]:
+    """
+    Pre-inspects token density across workspace documents (Issue #42).
+    Leverages persistent parsed disk cache (0-5ms) to inspect exact token lengths.
+    Returns:
+        (total_workspace_tokens, max_single_doc_tokens, per_doc_tokens_dict)
+    """
+    per_doc_tokens: Dict[str, int] = {}
+
+    async def _measure_doc(fname: str) -> Tuple[str, int]:
+        fpath = get_doc_file_path(chat_id, fname)
+        if os.path.exists(fpath):
+            try:
+                parsed_text = await asyncio.to_thread(parse_document_to_markdown, fpath)
+                if parsed_text and len(parsed_text.strip()) >= 50:
+                    return fname, count_tokens(parsed_text, model_name=model_name)
+            except Exception as e:
+                logger.debug(f"[Token Density Inspector] Error parsing {fname}: {e}")
+
+        # Fallback to DB metadata abstract/snippet
+        rec = db_records.get(fname, {})
+        fallback_text = rec.get("abstract") or rec.get("snippet") or rec.get("title") or ""
+        return fname, max(100, count_tokens(fallback_text, model_name=model_name))
+
+    results = await asyncio.gather(*(_measure_doc(fn) for fn in local_docs))
+    for fname, tokens in results:
+        per_doc_tokens[fname] = tokens
+
+    total_tokens = sum(per_doc_tokens.values())
+    max_tokens = max(per_doc_tokens.values()) if per_doc_tokens else 0
+    return total_tokens, max_tokens, per_doc_tokens
+
 async def _load_single_doc_snippet_async(
     idx_fname_chat: tuple,
     db_records: Dict[str, Any],
@@ -62,11 +99,19 @@ async def _load_single_doc_snippet_async(
                     is_full_paper = True
                 
                 target_budget = per_doc_token_budget if (per_doc_token_budget and per_doc_token_budget > 0) else 6000
-                content_snippet = pack_text_into_token_budget(
-                    parsed_text,
-                    budget_tokens=target_budget,
-                    model_name=model_name
-                )
+                actual_tokens = count_tokens(parsed_text, model_name=model_name)
+                if actual_tokens > target_budget:
+                    content_snippet = pack_text_into_token_budget(
+                        parsed_text,
+                        budget_tokens=target_budget,
+                        model_name=model_name
+                    )
+                    content_snippet += (
+                        f"\n\n[Note: Document condensed for prompt budget ({actual_tokens:,} -> {target_budget:,} tokens). "
+                        f"Complete document index is searchable via vector retrieval.]"
+                    )
+                else:
+                    content_snippet = parsed_text
         except Exception as parse_err:
             logger.debug(f"[Workspace Pipeline] Doc Parse Error for {fname}: {parse_err}")
 
@@ -129,7 +174,8 @@ async def _retrieve_hybrid_workspace_context(
     4. Packs chunks strictly within max_rag_tokens to prevent Stanford 'Lost in the Middle' degradation.
     """
     total_docs = len(local_docs)
-    catalog_lines = [f"=== WORKSPACE DOCUMENTS CATALOG ({total_docs} DOCUMENTS) ==="]
+    doc_lbl = "DOCUMENT" if total_docs == 1 else "DOCUMENTS"
+    catalog_lines = [f"=== WORKSPACE DOCUMENTS CATALOG ({total_docs} {doc_lbl}) ==="]
 
     for i, fname in enumerate(local_docs):
         d = db_records.get(fname, {})
@@ -138,6 +184,16 @@ async def _retrieve_hybrid_workspace_context(
         venue = f" | Venue: {d.get('journal') or d.get('venue')}" if (d.get("journal") or d.get("venue")) else ""
         doi = f" | DOI: {d.get('doi')}" if d.get("doi") else ""
         snippet = (d.get("abstract") or d.get("snippet") or "").strip()
+        if not snippet and fname:
+            fpath = get_doc_file_path(chat_id, fname)
+            if os.path.exists(fpath):
+                try:
+                    p_text = parse_document_to_markdown(fpath)
+                    if p_text:
+                        clean_first = " ".join(p_text[:600].split())
+                        snippet = clean_first[:350] + "..." if len(clean_first) > 350 else clean_first
+                except Exception:
+                    pass
         if len(snippet) > 350:
             snippet = snippet[:350] + "..."
         catalog_lines.append(f"[{i+1}] {title}{year}{venue}{doi}\nSummary: {snippet or '(No summary available)'}")
@@ -312,12 +368,40 @@ async def handle_workspace_analysis_pipeline(
         user_query=query,
     )
 
+    # 2. Adaptive Token-Density Routing & Truncation Guard (Issue #42):
+    # Instead of naive 'total_doc_count <= 4', measure the actual token density of the workspace.
+    # Compact workspaces (<= 4 short papers, <= threshold tokens) use Direct Full-Context.
+    # Long-form workspaces (books, dissertations, comprehensive reports) or multi-doc workspaces (> 4 docs)
+    # automatically route to Hybrid Vector Search + FlashRank Reranker to prevent silent truncation.
+    if token_budget.max_context >= 128_000:
+        direct_context_threshold = 24_000
+        max_single_doc_threshold = 12_000
+    elif token_budget.max_context >= 32_768:
+        direct_context_threshold = 12_000
+        max_single_doc_threshold = 6_000
+    else:
+        direct_context_threshold = 4_000
+        max_single_doc_threshold = 2_000
+
     if total_doc_count <= 4:
+        total_workspace_tokens, max_single_doc_tokens, per_doc_tokens = await _inspect_workspace_documents_token_density(
+            chat_id=chat_id,
+            local_docs=local_docs,
+            db_records=db_records,
+            model_name=model_name
+        )
+        is_compact_workspace = (
+            total_workspace_tokens <= direct_context_threshold
+            and max_single_doc_tokens <= max_single_doc_threshold
+        )
+    else:
+        total_workspace_tokens = 0
+        max_single_doc_tokens = 0
+        is_compact_workspace = False
+
+    if is_compact_workspace:
         await report_status("Reading full content of loaded workspace documents...")
-        if token_budget.max_context >= 128_000:
-            per_doc_budget = min(20_000, max(4_000, token_budget.max_rag_tokens * 3 // total_doc_count))
-        else:
-            per_doc_budget = max(600, token_budget.max_rag_tokens // max(1, total_doc_count))
+        per_doc_budget = max(max_single_doc_tokens, direct_context_threshold // max(1, total_doc_count))
 
         loaded_results = await asyncio.gather(
             *(_load_single_doc_snippet_async(
@@ -332,6 +416,14 @@ async def handle_workspace_analysis_pipeline(
         for i, (_, snippet) in enumerate(loaded_results, start=1):
             pre_stored_rag_map[str(i)] = extract_key_sentences_from_chunk(snippet, limit=2)
     else:
+        if total_doc_count <= 4:
+            await report_status(
+                f"Long-form document detected ({total_workspace_tokens:,} tokens): Retrieving relevant sections via vector search..."
+            )
+        else:
+            await report_status(
+                f"Workspace catalog ({total_doc_count} documents): Retrieving relevant sections via vector search..."
+            )
         full_docs_context, pre_stored_rag_map = await _retrieve_hybrid_workspace_context(
             chat_id=chat_id,
             query=query,
@@ -346,9 +438,10 @@ async def handle_workspace_analysis_pipeline(
         role=MessageRole.SYSTEM,
         content=system_prompt_text
     )
+    doc_lbl = "DOCUMENT" if total_doc_count == 1 else "DOCUMENTS"
     context_msg = LlamaChatMessage(
         role=MessageRole.SYSTEM,
-        content=f"=== AUTHORITATIVE REFERENCE DOCUMENTS CONTEXT ({total_doc_count} DOCUMENTS) ===\n\n{full_docs_context}"
+        content=f"=== AUTHORITATIVE REFERENCE DOCUMENTS CONTEXT ({total_doc_count} {doc_lbl}) ===\n\n{full_docs_context}"
     )
     chat_msgs = [
         system_msg,

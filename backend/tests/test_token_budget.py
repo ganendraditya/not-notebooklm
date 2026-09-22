@@ -521,6 +521,46 @@ def test_extract_concise_history_digest_non_destructive():
     assert "hyperparameter configurations and evaluation metrics" in digest
 
 
+@pytest.mark.asyncio
+async def test_inspect_workspace_documents_token_density(tmp_path):
+    """Verify Issue #42: Pre-inspection helper accurately calculates token volume from real files and db records."""
+    from rag.pipelines.workspace_pipeline import _inspect_workspace_documents_token_density
+    import utils.file_utils as file_utils
+
+    chat_id = "test_density_inspection_chat"
+    chat_dir = os.path.join(file_utils.UPLOAD_DIR, chat_id)
+    os.makedirs(chat_dir, exist_ok=True)
+
+    file1 = os.path.join(chat_dir, "doc1.txt")
+    with open(file1, "w", encoding="utf-8") as f:
+        # ~100 words (~120 tokens)
+        f.write("This is a test document with repeated content. " * 20)
+
+    db_records = {
+        "doc1.txt": {"title": "Doc 1"},
+        "doc2.pdf": {"title": "Doc 2", "abstract": "This is a fallback abstract for missing file."}
+    }
+
+    try:
+        total_tokens, max_tokens, per_doc = await _inspect_workspace_documents_token_density(
+            chat_id=chat_id,
+            local_docs=["doc1.txt", "doc2.pdf"],
+            db_records=db_records
+        )
+        assert total_tokens > 100
+        assert "doc1.txt" in per_doc
+        assert "doc2.pdf" in per_doc
+        assert max_tokens >= per_doc["doc1.txt"]
+    finally:
+        if os.path.exists(file1):
+            os.remove(file1)
+        if os.path.exists(chat_dir):
+            try:
+                os.rmdir(chat_dir)
+            except Exception:
+                pass
+
+
 
 
 
