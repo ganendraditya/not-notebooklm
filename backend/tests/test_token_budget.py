@@ -428,6 +428,100 @@ def test_extract_colloquial_and_unformatted_directives():
     assert not any("What are the baseline" in d for d in directives)
 
 
+def test_allocate_token_budget_elastic_reclaim_without_rag():
+    """Verify Layer 1: when has_rag=False, unused RAG budget is elastically reclaimed for history."""
+    # 8k model with RAG
+    budget_with_rag = allocate_token_budget(
+        model_name="llama-3-8b",
+        system_prompt="Test system prompt.",
+        user_query="Test query.",
+        has_rag=True,
+    )
+    # 8k model without RAG (pure chat or conversational benchmark)
+    budget_no_rag = allocate_token_budget(
+        model_name="llama-3-8b",
+        system_prompt="Test system prompt.",
+        user_query="Test query.",
+        has_rag=False,
+    )
+
+    assert budget_with_rag.max_rag_tokens > 0
+    assert budget_no_rag.max_rag_tokens == 0
+    # History budget without RAG must be substantially larger due to elastic reclaim
+    assert budget_no_rag.max_history_tokens > budget_with_rag.max_history_tokens
+    assert budget_no_rag.max_history_tokens >= 5000
+
+
+def test_high_recall_declarative_facts_and_superseding_updates():
+    """Verify Layer 2: high-entropy natural phrasing, hardware specs, and superseding updates are captured."""
+    from rag.token_budget import extract_pinned_directives, is_directive_statement
+
+    # Natural conversation examples from 100-case high-entropy suite
+    assert is_directive_statement("batch: 64, seed: 9901, no gpl libraries allowed")
+    assert is_directive_statement("The clinical diagnostic cohort was contributed exclusively by Charité University Hospital Berlin.")
+    assert is_directive_statement("we must fix adamw weight decay to 0.015 with cosine annealing schedule")
+    assert is_directive_statement("heads up, we are submitting this paper specifically to ACL 2026, definitely not EMNLP")
+    assert is_directive_statement("hey bro our server RAM is only 16GB")
+    assert is_directive_statement("and our GPU is an RTX 4090 with 24GB VRAM")
+    assert is_directive_statement("audio rate: 16000hz")
+    assert is_directive_statement("save checkpoint every 2000 step")
+    assert is_directive_statement("candidate study published in year 2012")
+
+    # Inquiries must NOT be directives
+    assert not is_directive_statement("What are the baseline systems and benchmark datasets discussed in this methodology?")
+    assert not is_directive_statement("Explain the hyperparameter configurations and evaluation metrics used in Section 4.")
+    assert not is_directive_statement("Can you summarize the empirical results?")
+    assert not is_directive_statement("How does the proposed approach handle out-of-vocabulary words?")
+    assert not is_directive_statement("thanks a lot!")
+
+
+def test_compact_chat_history_preserves_multi_needle_and_reasoning():
+    """Verify compaction retains multiple needles and reasoning premises in the bridge block."""
+    from rag.token_budget import compact_chat_history
+
+    messages = [
+        ChatMessage(role=MessageRole.USER, content="hey bro our server RAM is only 16GB"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Understood."),
+        ChatMessage(role=MessageRole.USER, content="and our GPU is an RTX 4090 with 24GB VRAM"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Recorded."),
+        ChatMessage(role=MessageRole.USER, content="policy v1: batch size is 32"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Recorded."),
+        ChatMessage(role=MessageRole.USER, content="superseding update policy v2: batch size is doubled to 64"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="Updated."),
+    ]
+    # Add filler turns to trigger compaction
+    for i in range(12):
+        messages.append(ChatMessage(role=MessageRole.USER, content=f"What are the ablation results for section {i}?"))
+        messages.append(ChatMessage(role=MessageRole.ASSISTANT, content=f"Ablation results show improvement in metric {i}."))
+
+    compacted = compact_chat_history(messages, max_history_tokens=300)
+    assert compacted[0].role == MessageRole.SYSTEM
+    bridge = compacted[0].content
+
+    # All needles must be present in the bridge!
+    assert "16GB" in bridge
+    assert "RTX 4090" in bridge
+    assert "policy v1" in bridge
+    assert "superseding update policy v2" in bridge
+
+
+def test_extract_concise_history_digest_non_destructive():
+    """Verify Layer 1 non-destructive digest retains meaningful topic sentences without arbitrary 5-word truncation."""
+    from rag.token_budget import extract_concise_history_digest
+
+    messages = [
+        ChatMessage(role=MessageRole.USER, content="What are the baseline systems and benchmark datasets discussed in this methodology?"),
+        ChatMessage(role=MessageRole.ASSISTANT, content="The baselines are..."),
+        ChatMessage(role=MessageRole.USER, content="Explain the hyperparameter configurations and evaluation metrics used in Section 4."),
+        ChatMessage(role=MessageRole.ASSISTANT, content="The hyperparameters are..."),
+    ]
+
+    digest = extract_concise_history_digest(messages)
+    assert "baseline systems and benchmark datasets" in digest
+    assert "hyperparameter configurations and evaluation metrics" in digest
+
+
+
 
 
 

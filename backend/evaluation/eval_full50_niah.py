@@ -318,6 +318,7 @@ async def evaluate_single_case(
             model_name="llama-3-8b",
             system_prompt="You are an academic research assistant evaluating long conversation history.",
             user_query=probe_query,
+            has_rag=False,
         )
         compacted_history = compact_chat_history(
             list(base_history),
