@@ -562,6 +562,163 @@ def test_workspace_pipeline_hybrid_retrieval_scaling():
         db.commit()
         db.close()
 
+def test_workspace_pipeline_adaptive_token_density_routing_for_long_docs(monkeypatch):
+    """Verify Issue #42: Workspace with <= 4 documents automatically routes to hybrid vector retrieval when long-form text is detected."""
+    import asyncio
+    from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline, _inspect_workspace_documents_token_density
+    from unittest.mock import AsyncMock, MagicMock
+    from database import SessionLocal, Document as DBDocument
+
+    dummy_chat_id = "test_long_book_routing_chat"
+    db = SessionLocal()
+    # 2 books / dissertations (~80k tokens each)
+    docs_to_add = [
+        DBDocument(
+            chat_id=dummy_chat_id,
+            filename="volume_4_book.pdf",
+            title="Zaregoto Volume 4 Monograph",
+            year=2024,
+            abstract="Monograph Part 1 investigation and locked room mystery.",
+            snippet="Volume 4 complete",
+            is_oa=False
+        ),
+        DBDocument(
+            chat_id=dummy_chat_id,
+            filename="volume_5_book.pdf",
+            title="Zaregoto Volume 5 Monograph",
+            year=2024,
+            abstract="Monograph Part 2 investigation, second crime, and epilogue resolution.",
+            snippet="Volume 5 complete",
+            is_oa=False
+        ),
+    ]
+    try:
+        for d in docs_to_add:
+            db.add(d)
+        db.commit()
+    finally:
+        db.close()
+
+    # Simulate long-form token density inspector (e.g. 75,000 tokens per book = 150,000 tokens)
+    async def mock_density_inspector(chat_id, local_docs, db_records, model_name=None):
+        return 150_000, 75_000, {"volume_4_book.pdf": 75_000, "volume_5_book.pdf": 75_000}
+
+    monkeypatch.setattr(
+        "rag.pipelines.workspace_pipeline._inspect_workspace_documents_token_density",
+        mock_density_inspector
+    )
+
+    async def _run():
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.message.content = "Konklusi dari analisis novel: Utsurigi masih hidup di epilog."
+        mock_llm.achat = AsyncMock(return_value=mock_response)
+
+        status_logs = []
+        async def mock_status(text):
+            status_logs.append(text)
+
+        result = await handle_workspace_analysis_pipeline(
+            chat_id=dummy_chat_id,
+            query="Siapa yang masih hidup di epilog volume 5?",
+            local_docs=["volume_4_book.pdf", "volume_5_book.pdf"],
+            formatted_history=[],
+            target_llm=mock_llm,
+            report_status=mock_status
+        )
+        return result, status_logs
+
+    try:
+        result, status_logs = asyncio.run(_run())
+        assert "Utsurigi masih hidup di epilog" in result
+        # Crucial: verify that the system detected long-form text and routed to vector search instead of direct slicing!
+        long_doc_status = any("Long-form document detected" in s and "150,000 tokens" in s for s in status_logs)
+        assert long_doc_status, f"Expected long-form detection in status logs, but got: {status_logs}"
+        assert not any("Reading full content of loaded workspace documents..." in s for s in status_logs)
+    finally:
+        db = SessionLocal()
+        db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat_id).delete()
+        db.commit()
+        db.close()
+
+def test_workspace_pipeline_compact_workspace_direct_full_context(monkeypatch):
+    """Verify Issue #42: Compact workspace (<= 4 short papers, <= threshold tokens) uses direct full-context reading without truncation."""
+    import asyncio
+    from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
+    from unittest.mock import AsyncMock, MagicMock
+    from database import SessionLocal, Document as DBDocument
+
+    dummy_chat_id = "test_compact_papers_chat"
+    db = SessionLocal()
+    # 2 short academic papers (~3,000 tokens each)
+    docs_to_add = [
+        DBDocument(
+            chat_id=dummy_chat_id,
+            filename="paper_alpha.pdf",
+            title="Compact Paper Alpha",
+            year=2024,
+            abstract="Short abstract for paper alpha.",
+            snippet="Alpha overview",
+            is_oa=False
+        ),
+        DBDocument(
+            chat_id=dummy_chat_id,
+            filename="paper_beta.pdf",
+            title="Compact Paper Beta",
+            year=2024,
+            abstract="Short abstract for paper beta.",
+            snippet="Beta overview",
+            is_oa=False
+        ),
+    ]
+    try:
+        for d in docs_to_add:
+            db.add(d)
+        db.commit()
+    finally:
+        db.close()
+
+    # Simulate compact token density (e.g. 3,000 tokens each = 6,000 tokens total)
+    async def mock_density_inspector(chat_id, local_docs, db_records, model_name=None):
+        return 6_000, 3_000, {"paper_alpha.pdf": 3_000, "paper_beta.pdf": 3_000}
+
+    monkeypatch.setattr(
+        "rag.pipelines.workspace_pipeline._inspect_workspace_documents_token_density",
+        mock_density_inspector
+    )
+
+    async def _run():
+        mock_llm = MagicMock()
+        mock_response = MagicMock()
+        mock_response.message.content = "Perbandingan metode paper Alpha dan Beta."
+        mock_llm.achat = AsyncMock(return_value=mock_response)
+
+        status_logs = []
+        async def mock_status(text):
+            status_logs.append(text)
+
+        result = await handle_workspace_analysis_pipeline(
+            chat_id=dummy_chat_id,
+            query="Bandingkan metodologi Alpha dan Beta",
+            local_docs=["paper_alpha.pdf", "paper_beta.pdf"],
+            formatted_history=[],
+            target_llm=mock_llm,
+            report_status=mock_status
+        )
+        return result, status_logs
+
+    try:
+        result, status_logs = asyncio.run(_run())
+        assert "Perbandingan metode" in result
+        # Verify direct full-context was used
+        assert any("Reading full content of loaded workspace documents..." in s for s in status_logs)
+        assert not any("Long-form document detected" in s for s in status_logs)
+    finally:
+        db = SessionLocal()
+        db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat_id).delete()
+        db.commit()
+        db.close()
+
 
 def test_workspace_pipeline_flashrank_empty_fallback():
     """Verify that if FlashRank returns an empty list, the pipeline safely falls back to top nodes."""
