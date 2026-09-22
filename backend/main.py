@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(asyncio.to_thread(heal_legacy_upload_files))
     yield
 
-app = FastAPI(title="Not-NotebookLM API", version="1.7.0", lifespan=lifespan)
+app = FastAPI(title="Not-NotebookLM API", version="1.7.1", lifespan=lifespan)
 
 # Secure static mount: expose only chat media attachments (images/thumbnails)
 # Research documents and ZIP downloads are protected and served exclusively via validated endpoints
