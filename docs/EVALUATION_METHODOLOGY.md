@@ -166,7 +166,7 @@ To enable rapid daily development without risking test-set overfitting ("eval ha
 ### 6.2. Protocol B: High-Entropy Conversational NIAH (`niah_100_matrix.json` & `niah_val25_matrix.json`)
 Conversational NIAH evaluation is organized into **4 balanced categories @ 25 cases each (100 total)** in Test, mirrored by 25 cases in Val. 
 
-> *Note on Dataset Origin:* These conversational cases are synthetic test scenarios custom-crafted specifically for Not-NotebookLM's conversational memory evaluation (adapting the general testing paradigms of Stanford RULER and Anthropic long-context research). They are distinct from the external published academic corpora (QASPER, SciFact, ALCE) used in Protocol A.
+> *Note on Dataset Origin:* These conversational cases are synthetic test scenarios custom-crafted specifically for Not-NotebookLM's conversational memory evaluation. They are distinct from the external published academic corpora (QASPER, SciFact, ALCE) used in Protocol A.
 
 | Category | Test 100 | Val 25 | High-Entropy Features & Linguistic Topology |
 | :--- | :---: | :---: | :--- |

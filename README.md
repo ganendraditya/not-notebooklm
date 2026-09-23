@@ -89,7 +89,7 @@ Performance is audited across established open-source evaluation tools and resea
 
 ### Conversational Memory Scorecard (100-Case Needle-In-A-Haystack Matrix)
 
-To evaluate long-context retrieval and constraint preservation under progressive memory compression, NotbookLM is benchmarked across a custom **100-case Conversational Needle-In-A-Haystack (NIAH)** matrix tailored specifically for academic research dialogues (anchored in Stanford RULER and Anthropic long-context evaluation concepts). The matrix balances four 25-case categories designed to test different memory behaviors: Single-Fact Retrieval, Multi-Variable Tracking, Temporal Reasoning & Superseding Rules, and Negative Abstention Traps.
+To evaluate conversational recall, instruction retention, and constraint preservation under progressive memory compression, NotbookLM is benchmarked across a custom **100-case Conversational Needle-In-A-Haystack (NIAH)** test matrix tailored specifically for research dialogues. The matrix evaluates four 25-case categories: Single-Fact Retrieval, Multi-Variable Tracking, Temporal Reasoning & Superseding Rules, and Negative Abstention Traps.
 
 > **Dataset Clarification:** Unlike the RAG benchmark above (which uses external public datasets: AllenAI QASPER, SciFact, and Princeton ALCE citation protocol), this conversational NIAH matrix consists of synthetic test scenarios custom-built for this application to assess real-world conversational memory degradation, persona shifts, and token-budget compaction.
 
@@ -101,7 +101,7 @@ To evaluate long-context retrieval and constraint preservation under progressive
 | • **Temporal Reasoning & Superseding Rules** | **1.000** | 0.960 |
 | • **Negative Abstention Traps** | **0.960** | 0.920 |
 
-> **Layered Memory Compaction Architecture:** On context-constrained models (e.g. 8K context caps), naive FIFO eviction and brittle keyword heuristics drop critical directives as token history expands. NotbookLM's Layered Memory Compaction (elastic token reclaim, non-destructive topic digests, and high-recall declarative sentence classification) preserves operational directives verbatim in Pinned Working Memory, enabling compact 8K models to match and even slightly outperform 1M native context by avoiding "Lost in the Middle" attention dispersion.
+> **Note on Evaluation Modes:** Mode A evaluates the application's layered compaction pipeline (pinned directives, declarative facts, and conversation digests) constrained to an 8K budget. Mode B feeds the full conversational transcript directly without compaction into a 1M context window model. The high accuracy in Mode A reflects that compact, curated working context helps prevent the model from missing details across long conversational turns.
 
 ### Evaluation Tooling & Dataset References
 
