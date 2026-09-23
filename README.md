@@ -87,17 +87,19 @@ Performance is audited across established open-source evaluation tools and resea
 > * **Methodological Note on RAGAS ($N=38$):** RAGAS multi-statement atomic claim decomposition evaluates all 38 extractive QASPER cases. It is intentionally omitted on 2 unanswerable cases and 10 SciFact verification claims to prevent false penalties on negative abstention.  
 > * **Reproducibility Note:** Decoding temperature is locked to `0.0` to maximize determinism. However, due to the inherent non-deterministic nature of LLM inference (provider-side GPU batching and dual-sided LLM-as-a-judge dynamics), replication runs may still exhibit slight score variations even when using the exact same model pairing. Running the benchmark with alternative backends (e.g. GPT-4o, Claude, or local open-weights models) will naturally yield distinct quantitative figures.
 
-### Conversational Memory Scorecard (100-Case Multi-Spectral NIAH Matrix)
+### Conversational Memory Scorecard (100-Case Needle-In-A-Haystack Matrix)
 
-To evaluate long-context retrieval and constraint preservation under progressive memory compression, NotbookLM is benchmarked across a **100-case Conversational Needle-In-A-Haystack (NIAH)** matrix (anchored in Stanford RULER and Anthropic long-context guidelines) balancing four 25-case quadrants: Single-Needle Retrieval (S-NIAH), Multi-Needle Tracking (M-NIAH), Temporal Reasoning & Superseding Rules (R-NIAH), and Negative Abstention Traps (U-NIAH).
+To evaluate long-context retrieval and constraint preservation under progressive memory compression, NotbookLM is benchmarked across a custom **100-case Conversational Needle-In-A-Haystack (NIAH)** matrix tailored specifically for academic research dialogues (anchored in Stanford RULER and Anthropic long-context evaluation concepts). The matrix balances four 25-case categories designed to test different memory behaviors: Single-Fact Retrieval, Multi-Variable Tracking, Temporal Reasoning & Superseding Rules, and Negative Abstention Traps.
 
-| Evaluation Spectrum | Mode A (8K Context Cap / Layered Compaction) | Mode B (1M Native Context Ingestion) |
+> **Dataset Clarification:** Unlike the RAG benchmark above (which uses external public datasets: AllenAI QASPER, SciFact, and Princeton ALCE citation protocol), this conversational NIAH matrix consists of synthetic test scenarios custom-built for this application to assess real-world conversational memory degradation, persona shifts, and token-budget compaction.
+
+| Evaluation Category | Mode A (8K Context Cap / Layered Compaction) | Mode B (1M Native Context Ingestion) |
 | :--- | :---: | :---: |
 | **Overall Needle Accuracy (100 Cases)** | **0.980** *(98.0%)* | **0.950** *(95.0%)* |
-| • **S-NIAH Retrieval Fidelity** | **0.960** | 0.920 |
-| • **M-NIAH Retrieval Fidelity** | **1.000** | 1.000 |
-| • **R-NIAH Retrieval Fidelity** | **1.000** | 0.960 |
-| • **U-NIAH Abstention Fidelity** | **0.960** | 0.920 |
+| • **Single-Fact Retrieval** | **0.960** | 0.920 |
+| • **Multi-Variable Tracking** | **1.000** | 1.000 |
+| • **Temporal Reasoning & Superseding Rules** | **1.000** | 0.960 |
+| • **Negative Abstention Traps** | **0.960** | 0.920 |
 
 > **Layered Memory Compaction Architecture:** On context-constrained models (e.g. 8K context caps), naive FIFO eviction and brittle keyword heuristics drop critical directives as token history expands. NotbookLM's Layered Memory Compaction (elastic token reclaim, non-destructive topic digests, and high-recall declarative sentence classification) preserves operational directives verbatim in Pinned Working Memory, enabling compact 8K models to match and even slightly outperform 1M native context by avoiding "Lost in the Middle" attention dispersion.
 

@@ -164,14 +164,16 @@ To enable rapid daily development without risking test-set overfitting ("eval ha
 | **Total Cases** | **100 Cases** (~35 mins) | **25 Cases** (~7–8 mins) | **0 overlapping documents, 0 overlapping queries** |
 
 ### 6.2. Protocol B: High-Entropy Conversational NIAH (`niah_100_matrix.json` & `niah_val25_matrix.json`)
-Conversational NIAH evaluation is organized into **4 balanced quadrants @ 25 cases each (100 total)** in Test, mirrored by 25 cases in Val:
+Conversational NIAH evaluation is organized into **4 balanced categories @ 25 cases each (100 total)** in Test, mirrored by 25 cases in Val. 
 
-| Quadrant | Test 100 | Val 25 | High-Entropy Features & Linguistic Topology |
+> *Note on Dataset Origin:* These conversational cases are synthetic test scenarios custom-crafted specifically for Not-NotebookLM's conversational memory evaluation (adapting the general testing paradigms of Stanford RULER and Anthropic long-context research). They are distinct from the external published academic corpora (QASPER, SciFact, ALCE) used in Protocol A.
+
+| Category | Test 100 | Val 25 | High-Entropy Features & Linguistic Topology |
 | :--- | :---: | :---: | :--- |
-| **S-NIAH (Single-Needle Grid)** | 25 Cases | **7 Cases** | 5x5 grid (4K–64K token loads × 10%–90% depths) across 6 human personas (casual slang, academic, terse, broken English, all-caps, confused beginner). |
-| **M-NIAH (Multi-Needle Tracking)** | 25 Cases | **6 Cases** | 2–3 independent variables tracked simultaneously with **dynamic mid-conversation probe positioning** (probed at 35%–80% depth rather than exclusively at the end). |
-| **R-NIAH (Reasoning & Superseding)** | 25 Cases | **6 Cases** | Multi-hop deductive reasoning + **temporal rule updates** (e.g. v1 policy superseded by v2 update mid-dialogue). |
-| **U-NIAH (Unanswerable Traps)** | 25 Cases | **6 Cases** | **Negative abstention traps**: User probes unmentioned parameters (e.g. asking for GPU hours or battery specs never stated). System must honestly state absence without hallucination. |
+| **Single-Fact Retrieval** | 25 Cases | **7 Cases** | 5x5 grid (4K–64K token loads × 10%–90% depths) across 6 human personas (casual slang, academic, terse, broken English, all-caps, confused beginner). |
+| **Multi-Variable Tracking** | 25 Cases | **6 Cases** | 2–3 independent variables tracked simultaneously with **dynamic mid-conversation probe positioning** (probed at 35%–80% depth rather than exclusively at the end). |
+| **Temporal Reasoning & Superseding Rules** | 25 Cases | **6 Cases** | Multi-hop deductive reasoning + **temporal rule updates** (e.g. v1 policy superseded by v2 update mid-dialogue). |
+| **Negative Abstention Traps** | 25 Cases | **6 Cases** | **Negative abstention traps**: User probes unmentioned parameters (e.g. asking for GPU hours or battery specs never stated). System must honestly state absence without hallucination. |
 | **Total Cases** | **100 Cases** | **25 Cases** | **100% Anti-Leakage: 0 overlapping needles, 0 overlapping probes** |
 
 ### Production Quality Acceptance Criteria:
