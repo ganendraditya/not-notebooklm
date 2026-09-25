@@ -20,7 +20,7 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 * **Targeted Document Focus:** One-click "Ask about this document" mode focuses questions exclusively on an individual paper without deselecting other workspace files.
 * **7-Format Citation Generator & Bulk ZIP Export:** Instant generation of verified academic citations in APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS formats, alongside one-click bulk ZIP bundling for entire workspaces.
 * **3-Tier Hybrid Metadata Extractor:** Handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and a document inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
-* **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 75-case benchmark of authentic academic research papers (**AllenAI QASPER & SciFact**) balancing single-paper deep dives, multi-paper comparative synthesis across 2–4 documents, and biomedical claim verification, achieving a 0.953 Composite Consensus score (0.949 Groundedness and 0.923 Answer Relevancy).
+* **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 100-case benchmark of authentic academic research papers (**AllenAI QASPER & SciFact**) balancing single-paper deep dives, multi-paper comparative synthesis across 2–4 documents, and biomedical claim verification, achieving a 0.900 Composite Consensus score (0.876 Groundedness and 0.900 Answer Relevancy).
 * **Layered Conversational Memory & Elastic Token Budgeting:** Dynamic Priority Waterfall and Layered Memory Compaction (elastic token reclaim, non-destructive topic digest, and high-recall declarative sentence classification) that retains operational constraints, parameters, and research invariants verbatim in Pinned Working Memory. Empirically benchmarked on a 100-case Conversational NIAH matrix (Stanford RULER & Anthropic standards), achieving 98.0% needle retention on context-constrained 8K models (100% on multi-needle tracking and temporal rule updates).
 * **Local-First & Multi-Role LLM Architecture:** Runs locally with embedded SQLite and Qdrant. Connects to any OpenAI-compatible API (Ollama, vLLM, DeepSeek, GPT-4o) with tiered primary, fast, and auto-fallback model roles, plus optional S3 storage (Cloudflare R2, MinIO).
 
@@ -63,21 +63,22 @@ Synthesize multiple papers into comparative review matrices. Each finding is tag
 
 To evaluate retrieval, synthesis, and citation accuracy, NotbookLM is benchmarked against public research questions from peer-reviewed scientific datasets rather than ad-hoc queries.
 
-Performance is audited across established open-source evaluation tools and research benchmark protocols on a **50-case scientific benchmark** (evaluated under deterministic greedy decoding `temperature=0.0`):
+Performance is audited across established open-source evaluation tools and research benchmark protocols on a **100-case scientific benchmark** (evaluated under deterministic greedy decoding `temperature=0.0`):
 * **25 Single-Paper Deep Dives:** AllenAI QASPER test split (full-text 15–35 page arXiv papers with tables and empirical metrics).
 * **15 Multi-Paper Comparative Synthesis:** Curated multi-document workspaces comparing 2–3 research papers in structured tables.
 * **10 Biomedical Claim Verifications:** AllenAI SciFact claims testing evidence attribution and false-premise rejection.
 
-### Production Scorecard (50-Case Multi-Paper Scientific Benchmark)
+### Production Scorecard (100-Case Multi-Paper Scientific Benchmark)
 
 | Evaluation Dimension | Benchmark Score | Evaluator Breakdown & Methodology |
 | :--- | :---: | :--- |
-| **Groundedness (Anti-Hallucination)** | **0.949** | Continuous 4-judge mean: DeepEval (`0.985`) + TruLens (`0.942`) + Promptfoo (`0.957`) + RAGAS (`0.919`)* |
-| **Answer Relevancy & Completeness** | **0.923** | Continuous 3-judge mean: DeepEval (`0.956`) + TruLens (`0.853`) + Promptfoo (`0.960`) |
-| **Ground-Truth Correctness** | **0.976** | Dual-judge consensus: LlamaIndex + Promptfoo ground-truth alignment |
-| **Citation Quality (Princeton ALCE)** | **Recall: 0.817 / Precision: 0.760** | Formal statement entailment & citation redundancy penalty *(EMNLP 2023)* |
-| **Strict Binary Entailment (LlamaIndex)** | **0.720** *(36/50 passed)* | Zero-tolerance binary context entailment gate (36 passed, 14 failed; separated from continuous consensus) |
-| **Composite Consensus Score** | **0.953** / 1.000 | Weighted summary index across continuous evaluation dimensions |
+| **Groundedness (Anti-Hallucination)** | **0.876** | Continuous 4-judge mean: DeepEval (`0.998`) + TruLens (`0.916`) + Promptfoo (`0.932`) + Ragas (`0.828`) |
+| **Answer Relevancy & Completeness** | **0.900** | Continuous 3-judge mean: DeepEval (`0.983`) + TruLens (`0.791`) + Promptfoo (`0.966`) |
+| **Ground-Truth Correctness** | **0.871** | Dual-judge consensus: LlamaIndex + Promptfoo ground-truth alignment |
+| **Citation Quality (Princeton ALCE)** | **Recall: 0.938 / Precision: 0.957** | Formal statement entailment & citation redundancy penalty *(EMNLP 2023)* |
+| **Product Invariant: PDF Citation Fidelity** | **100.0%** *(1.000)* | Deterministic Substring & Fuzzy Match on physical source PDF |
+| **Strict Binary Entailment (LlamaIndex)** | **0.780** *(78/100 passed)* | Zero-tolerance binary context entailment gate (separated from continuous consensus) |
+| **Composite Consensus Score** | **0.900** / 1.000 | Weighted summary index across continuous evaluation dimensions |
 
 > **Benchmark Configuration & Model Roles:**  
 > * **System Under Test (NotbookLM Core Pipeline):**  

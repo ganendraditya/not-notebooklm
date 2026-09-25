@@ -1,1661 +1,1662 @@
 [
-  {
-    "id": "QASPER-01",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "which multilingual approaches do they compare with?",
-    "ground_truth": "BIBREF19, BIBREF20",
-    "target_documents": [
-      "qasper_1912.01214.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-01",
-    "documents": [
-      "qasper_1912.01214.txt"
-    ]
-  },
-  {
-    "id": "QASPER-02",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "what ner models were evaluated?",
-    "ground_truth": "Stanford NER, spaCy 2.0 , recurrent model with a CRF top layer",
-    "target_documents": [
-      "qasper_1810.08699.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-02",
-    "documents": [
-      "qasper_1810.08699.txt"
-    ]
-  },
-  {
-    "id": "QASPER-03",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "what are the topics pulled from Reddit?",
-    "ground_truth": "politics, business, science, and AskReddit, and 1000 additional posts from the Reddit frontpage.",
-    "target_documents": [
-      "qasper_1609.00425.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-03",
-    "documents": [
-      "qasper_1609.00425.txt"
-    ]
-  },
-  {
-    "id": "QASPER-04",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What accuracy does the proposed system achieve?",
-    "ground_truth": "F1 scores of 85.99 on the DL-PS data, 75.15 on the EC-MT data and 71.53 on the EC-UQ data",
-    "target_documents": [
-      "qasper_1801.05147.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-04",
-    "documents": [
-      "qasper_1801.05147.txt"
-    ]
-  },
-  {
-    "id": "QASPER-05",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "Which information about text structure is included in the corpus?",
-    "ground_truth": "paragraphs, lines, Information on physical page segmentation (for PDFs only), paragraph segmentation",
-    "target_documents": [
-      "qasper_1909.09067.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-05",
-    "documents": [
-      "qasper_1909.09067.txt"
-    ]
-  },
-  {
-    "id": "QASPER-06",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "On which benchmarks they achieve the state of the art?",
-    "ground_truth": "SimpleQuestions, WebQSP",
-    "target_documents": [
-      "qasper_1704.06194.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-06",
-    "documents": [
-      "qasper_1704.06194.txt"
-    ]
-  },
-  {
-    "id": "QASPER-07",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What experiments are proposed to test that upper layers produce context-specific embeddings?",
-    "ground_truth": "They measure self-similarity, intra-sentence similarity and maximum explainable variance of the embeddings.",
-    "target_documents": [
-      "qasper_1909.00512.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-07",
-    "documents": [
-      "qasper_1909.00512.txt"
-    ]
-  },
-  {
-    "id": "QASPER-08",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What is the performance of BERT on the task?",
-    "ground_truth": "F1 scores are:\nHUBES-PHI: Detection(0.965), Classification relaxed (0.95), Classification strict (0.87)",
-    "target_documents": [
-      "qasper_2003.03106.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-08",
-    "documents": [
-      "qasper_2003.03106.txt"
-    ]
-  },
-  {
-    "id": "QASPER-09",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "How big is the ANTISCAM dataset?",
-    "ground_truth": "3,044 sentences in 100 dialogs",
-    "target_documents": [
-      "qasper_1911.10742.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-09",
-    "documents": [
-      "qasper_1911.10742.txt"
-    ]
-  },
-  {
-    "id": "QASPER-10",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What is the dataset for testing the model?",
-    "ground_truth": "EVENTI (an Italian task for Event Extraction)",
-    "target_documents": [
-      "qasper_1810.02229.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-10",
-    "documents": [
-      "qasper_1810.02229.txt"
-    ]
-  },
-  {
-    "id": "QASPER-11",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What previous methods do they compare against?",
-    "ground_truth": "Decision tree, random forest, and SVM",
-    "target_documents": [
-      "qasper_1611.06322.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-11",
-    "documents": [
-      "qasper_1611.06322.txt"
-    ]
-  },
-  {
-    "id": "QASPER-12",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What dataset do they use?",
-    "ground_truth": "GeoQuery",
-    "target_documents": [
-      "qasper_1905.00840.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-12",
-    "documents": [
-      "qasper_1905.00840.txt"
-    ]
-  },
-  {
-    "id": "QASPER-13",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "How is coreference measured?",
-    "ground_truth": "F1 on WinoBias",
-    "target_documents": [
-      "qasper_1909.00091.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-13",
-    "documents": [
-      "qasper_1909.00091.txt"
-    ]
-  },
-  {
-    "id": "QASPER-14",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "what dataset they evaluated the model with?",
-    "ground_truth": "CoNLL03 (English, German, Spanish, Dutch) and Chinese datasets (Weibo, Resume, MSRA, OntoNotes)",
-    "target_documents": [
-      "qasper_1911.04474.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-14",
-    "documents": [
-      "qasper_1911.04474.txt"
-    ]
-  },
-  {
-    "id": "QASPER-15",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What baselines did they compare with?",
-    "ground_truth": "LDA, Doc-NADE, HTMM, GMNTM",
-    "target_documents": [
-      "qasper_1604.02038.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-15",
-    "documents": [
-      "qasper_1604.02038.txt"
-    ]
-  },
-  {
-    "id": "QASPER-16",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What is the seed lexicon?",
-    "ground_truth": "a vocabulary of positive and negative predicates that helps determine the polarity of an event",
-    "target_documents": [
-      "qasper_1909.00694.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-16",
-    "documents": [
-      "qasper_1909.00694.txt"
-    ]
-  },
-  {
-    "id": "QASPER-17",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "How is the annotation experiment evaluated?",
-    "ground_truth": "confusion matrices of labels between annotators",
-    "target_documents": [
-      "qasper_2003.07723.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-17",
-    "documents": [
-      "qasper_2003.07723.txt"
-    ]
-  },
-  {
-    "id": "QASPER-18",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "How do the various social phenomena examined manifest in different types of communities?",
-    "ground_truth": "Dynamic communities have substantially higher rates of monthly user retention than Static communities.",
-    "target_documents": [
-      "qasper_1705.09665.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-18",
-    "documents": [
-      "qasper_1705.09665.txt"
-    ]
-  },
-  {
-    "id": "QASPER-19",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What data is the language model pretrained on?",
-    "ground_truth": "Chinese general corpus",
-    "target_documents": [
-      "qasper_1908.06606.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-19",
-    "documents": [
-      "qasper_1908.06606.txt"
-    ]
-  },
-  {
-    "id": "QASPER-20",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What aspects have been compared between various language models?",
-    "ground_truth": "Quality measures using perplexity and recall, and performance measured using latency and energy.",
-    "target_documents": [
-      "qasper_1811.00942.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-20",
-    "documents": [
-      "qasper_1811.00942.txt"
-    ]
-  },
-  {
-    "id": "QASPER-21",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "Which dataset do they use a starting point in generating fake reviews?",
-    "ground_truth": "the Yelp Challenge dataset",
-    "target_documents": [
-      "qasper_1805.02400.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-21",
-    "documents": [
-      "qasper_1805.02400.txt"
-    ]
-  },
-  {
-    "id": "QASPER-22",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "Which baselines did they compare?",
-    "ground_truth": "The baseline model is a deep sequence-to-sequence encoder/decoder model with attention mechanism.",
-    "target_documents": [
-      "qasper_1907.05664.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-22",
-    "documents": [
-      "qasper_1907.05664.txt"
-    ]
-  },
-  {
-    "id": "QASPER-23",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "How is embedding quality assessed?",
-    "ground_truth": "We compare this method of bias mitigation with the no bias mitigation (\"Orig\"), and two previous methods: Hard-GloVe and GN-GloVe.",
-    "target_documents": [
-      "qasper_1910.14497.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-23",
-    "documents": [
-      "qasper_1910.14497.txt"
-    ]
-  },
-  {
-    "id": "QASPER-24",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What is the knowledge graph used in the system?",
-    "ground_truth": "Wikidata",
-    "target_documents": [
-      "qasper_1904.09131.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-24",
-    "documents": [
-      "qasper_1904.09131.txt"
-    ]
-  },
-  {
-    "id": "QASPER-25",
-    "dataset_source": "AllenAI QASPER (NAACL 2021)",
-    "domain": "computer_science_ai",
-    "category": "single_fact",
-    "query": "What language family is explored in the experiments?",
-    "ground_truth": "Indo-Aryan and Dravidian language families",
-    "target_documents": [
-      "qasper_1811.00383.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "QASPER-25",
-    "documents": [
-      "qasper_1811.00383.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-01",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: We propose as an alternative explanation that variants much less common than the associated one may create \"synthetic associations\" by occurring, stochastically, more often in association with one of the alleles at the common site versus the other allele. We show that they are not only possible, but inevitable, and that under simple but reasonable genetic models, they are likely to account for or contribute to many of the recently identified signals reported in genome-wide association studies.",
-    "target_documents": [
-      "scifact_14717500.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-01",
-    "documents": [
-      "scifact_14717500.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-02",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"1/2000 in UK have abnormal PrP positivity.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: RESULTS Of the 32,441 appendix samples 16 were positive for abnormal PrP, indicating an overall prevalence of 493 per million population (95% confidence interval 282 to 801 per million).",
-    "target_documents": [
-      "scifact_13734012.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-02",
-    "documents": [
-      "scifact_13734012.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-03",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"A high microerythrocyte count raises vulnerability to severe anemia in homozygous alpha (+)- thalassemia trait subjects.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: Individuals homozygous for alpha(+)-thalassaemia have microcytosis and an increased erythrocyte count. We estimated that the haematological profile in children homozygous for alpha(+)-thalassaemia reduces the risk of SMA during acute malaria compared to children of normal genotype (relative risk 0.52; 95% confidence interval [CI] 0.24-1.12, p = 0.09).   \n",
-    "target_documents": [
-      "scifact_18174210.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-03",
-    "documents": [
-      "scifact_18174210.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-04",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"ADAR1 binds to Dicer to cleave pre-miRNA.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: In this study, we investigated the interaction of the RNA editing mechanism with the RNA interference (RNAi) machinery and found that ADAR1 forms a complex with Dicer through direct protein-protein interaction.",
-    "target_documents": [
-      "scifact_5953485.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-04",
-    "documents": [
-      "scifact_5953485.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-05",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"AIRE is expressed in some skin tumors.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: We report that autoimmune regulator (Aire), a transcriptional regulator, is inducibly expressed in human and mouse tumor keratinocytes in a K17-dependent manner and is required for timely onset of Gli2-induced skin tumorigenesis in mice.",
-    "target_documents": [
-      "scifact_12580014.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-05",
-    "documents": [
-      "scifact_12580014.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-06",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"ALDH1 expression is associated with better breast cancer outcomes.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: In a series of 577 breast carcinomas, expression of ALDH1 detected by immunostaining correlated with poor prognosis.",
-    "target_documents": [
-      "scifact_45638119.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-06",
-    "documents": [
-      "scifact_45638119.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-07",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"AMP-activated protein kinase (AMPK) activation increases inflammation-related fibrosis in the lungs.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: Pharmacological activation of AMPK in myofibroblasts from lungs of humans with IPF display lower fibrotic activity, along with enhanced mitochondrial biogenesis and normalization of sensitivity to apoptosis.",
-    "target_documents": [
-      "scifact_49556906.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-07",
-    "documents": [
-      "scifact_49556906.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-08",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"APOE4 expression in iPSC-derived neurons increases AlphaBeta production and tau phosphorylation causing GABA neuron degeneration.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: Using human neurons derived from induced pluripotent stem cells that expressed apolipoprotein E4 (ApoE4), a variant of the APOE gene product and the major genetic risk factor for AD, we demonstrated that ApoE4-expressing neurons had higher levels of tau phosphorylation, unrelated to their increased production of amyloid-\u03b2 (A\u03b2) peptides, and that they displayed GABAergic neuron degeneration.",
-    "target_documents": [
-      "scifact_4709641.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-08",
-    "documents": [
-      "scifact_4709641.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-09",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Activation of PPM1D suppresses p53 function.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: PPM1D mutations were mutually exclusive with TP53 mutations in BSG and attenuated p53 activation in vitro. PPM1D mutations were truncating alterations in exon 6 that enhanced the ability of PPM1D to suppress the activation of the DNA damage response checkpoint protein CHK2.",
-    "target_documents": [
-      "scifact_5956380.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-09",
-    "documents": [
-      "scifact_5956380.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-10",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"All hematopoietic stem cells segregate their chromosomes randomly.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: Sequential administration of 5-chloro-2-deoxyuridine and 5-iodo-2-deoxyuridine indicated that all HSCs segregate their chromosomes randomly.",
-    "target_documents": [
-      "scifact_4381486.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-10",
-    "documents": [
-      "scifact_4381486.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-11",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Angiotensin converting enzyme inhibitors are associated with increased risk for functional renal insufficiency.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: Although ACE inhibitor therapy usually improves renal blood flow (RBF) and sodium excretion rates in CHF and reduces the rate of progressive renal injury in chronic renal disease, its use can also be associated with a syndrome of \u201cfunctional renal insufficiency\u201d and/or hyperkalemia.",
-    "target_documents": [
-      "scifact_6157837.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-11",
-    "documents": [
-      "scifact_6157837.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-12",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Anthrax spores can be disposed of easily after they are dispersed.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: More than 80% of the B anthracis particles collected on stationary monitors were within an alveolar respirable size range of 0.95 to 3.5 micro m.   CONCLUSIONS Bacillus anthracis spores used in a recent terrorist incident reaerosolized under common office activities.",
-    "target_documents": [
-      "scifact_33872649.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-12",
-    "documents": [
-      "scifact_33872649.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-13",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Antibiotic induced alterations in the gut microbiome reduce resistance against Clostridium difficile\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: Antibiotics can have significant and long-lasting effects on the gastrointestinal tract microbiota, reducing colonization resistance against pathogens including Clostridium difficile.",
-    "target_documents": [
-      "scifact_6372244.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-13",
-    "documents": [
-      "scifact_6372244.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-14",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Antiretroviral therapy reduces rates of tuberculosis across a broad range of CD4 strata.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: Antiretroviral therapy is strongly associated with a reduction in the incidence of tuberculosis in all baseline CD4 count categories: (1) less than 200 cells/\u00b5l (hazard ratio [HR] 0.16, 95% confidence interval [CI] 0.07 to 0.36), (2) 200 to 350 cells/\u00b5l (HR 0.34, 95% CI 0.19 to 0.60), (3) greater than 350 cells/\u00b5l (HR 0.43, 95% CI 0.30 to 0.63), and (4) any CD4 count (HR 0.35, 95% CI 0.28 to 0.44).",
-    "target_documents": [
-      "scifact_4883040.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-14",
-    "documents": [
-      "scifact_4883040.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-15",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Articles published in open access format are less likely to be cited than traditional journals.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: It provides robust evidence that open-access articles (OA articles) are more immediately recognized and cited than non-OA articles.",
-    "target_documents": [
-      "scifact_27768226.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-15",
-    "documents": [
-      "scifact_27768226.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-16",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Assembly of invadopodia is triggered by focal generation of phosphatidylinositol-3,4-biphosphate and the activation of the nonreceptor tyrosine kinase Src.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: The expression of various phosphoinositide-binding domains revealed that the podosomes in Src-transformed NIH3T3 (NIH-src) cells are enriched with PtdIns(3,4)P2, suggesting an important role of this phosphoinositide in podosome formation. Live-cell imaging analysis revealed that Src-expression stimulated podosome formation at focal adhesions of NIH3T3 cells after PtdIns(3,4)P2 accumulation.",
-    "target_documents": [
-      "scifact_16280642.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-16",
-    "documents": [
-      "scifact_16280642.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-17",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Asymptomatic visual impairment screening in elderly populations does not lead to improved vision.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: The inclusion of a visual screening component in the assessment did not result in improvements in self reported visual problems (pooled odds ratio 1.04:95% confidence interval 0.89 to 1.22). CONCLUSIONS Screening of asymptomatic older people in the community is not justified on present evidence.",
-    "target_documents": [
-      "scifact_26016929.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-17",
-    "documents": [
-      "scifact_26016929.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-18",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Auditory entrainment is strengthened when people see congruent visual and auditory information.\"",
-    "ground_truth": "The literature SUPPORT this claim. Evidence: UNLABELLED Congruent audiovisual speech enhances our ability to comprehend a speaker, even in noise-free conditions.",
-    "target_documents": [
-      "scifact_14437255.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-18",
-    "documents": [
-      "scifact_14437255.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-19",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Autologous transplantation of mesenchymal stem cells causes a higher rate of opportunistic infections than induction therapy with anti-interleukin-2 receptor antibodies.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: Also, during the 1-year follow-up, combined analysis of MSC-treated groups revealed significantly decreased risk of opportunistic infections than the control group (hazard ratio, 0.42; 95% CI, 0.20-0.85, P=.02)   CONCLUSION Among patients undergoing renal transplant, the use of autologous MSCs compared with anti-IL-2 receptor antibody induction therapy resulted in lower incidence of acute rejection, decreased risk of opportunistic infection, and better estimated renal function at 1 year.   \n",
-    "target_documents": [
-      "scifact_10582939.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-19",
-    "documents": [
-      "scifact_10582939.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-20",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Basophils counteract disease development in patients with systemic lupus erythematosus (SLE).\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: We report that activation of basophils by autoreactive IgE causes their homing to lymph nodes, promoting T helper type 2 (T(H)2) cell differentiation and enhancing the production of self-reactive antibodies that cause lupus-like nephritis in mice lacking the Src family protein tyrosine kinase Lyn (Lyn(-/-) mice).",
-    "target_documents": [
-      "scifact_12670680.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-20",
-    "documents": [
-      "scifact_12670680.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-21",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Blocking the interaction between TDP-43 and respiratory complex I proteins ND3 and ND6 leads to increased TDP-43-induced neuronal loss.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: The suppression of TDP-43 mitochondrial localization abolishes WT and mutant TDP-43-induced mitochondrial dysfunction and neuronal loss, and improves phenotypes of transgenic mutant TDP-43 mice.",
-    "target_documents": [
-      "scifact_16966326.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-21",
-    "documents": [
-      "scifact_16966326.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-22",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Bone marrow cells contribute to adult macrophage compartments.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: We also found that after bone marrow transplantation, host macrophages retained the capacity to expand when the development of donor macrophages was compromised.",
-    "target_documents": [
-      "scifact_12827098.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-22",
-    "documents": [
-      "scifact_12827098.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-23",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"Breast cancer development is determined exclusively by genetic factors.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: METHODS We tested gene-environment interactions in 7610 women who developed breast cancer and 10 196 controls without the disease, studying the effects of 12 polymorphisms (FGFR2-rs2981582, TNRC9-rs3803662, 2q35-rs13387042, MAP3K1-rs889312, 8q24-rs13281615, 2p-rs4666451, 5p12-rs981782, CASP8-rs1045485, LSP1-rs3817198, 5q-rs30099, TGFB1-rs1982073, and ATM-rs1800054) in relation to prospectively collected information about ten established environmental risk factors (age at menarche, parity, age at first birth, breastfeeding, menopausal status, age at menopause, use of hormone replacement therapy, body-mass index, height, and alcohol consumption).   \n",
-    "target_documents": [
-      "scifact_18340282.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-23",
-    "documents": [
-      "scifact_18340282.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-24",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"CR is associated with higher methylation age.\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: Epigenetic information encoded by DNA methylation is tightly regulated, but shows a striking drift associated with age that includes both gains and losses of DNA methylation at various sites.",
-    "target_documents": [
-      "scifact_22038539.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-24",
-    "documents": [
-      "scifact_22038539.txt"
-    ]
-  },
-  {
-    "id": "SCIFACT-25",
-    "dataset_source": "AllenAI SciFact (EMNLP 2020)",
-    "domain": "biomedicine_healthcare",
-    "category": "scientific_fact_checking",
-    "query": "Evaluate the following scientific claim based on the literature: \"CX3CR1 on the Th2 cells impairs T cell survival\"",
-    "ground_truth": "The literature CONTRADICT this claim. Evidence: We found that CX3CR1 signaling promoted T(H)2 survival in the inflamed lungs, and injection of B cell leukemia/lymphoma-2 protein (BCl-2)-transduced CX3CR1-deficient T(H)2 cells into CX3CR1-deficient mice restored asthma.",
-    "target_documents": [
-      "scifact_21366394.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "SCIFACT-25",
-    "documents": [
-      "scifact_21366394.txt"
-    ]
-  },
-  {
-    "id": "MUL-01",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the training and evaluation datasets used in Paper [1] and Paper [2] into a structured comparison table!",
-    "ground_truth": "Paper [1] experiments on Europarl and MultiUN datasets. Paper [2] experiments on the IITB English-Hindi parallel corpus and the ILCI multilingual parallel corpus.",
-    "target_documents": [
-      "qasper_1912.01214.txt",
-      "qasper_1811.00383.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-01",
-    "documents": [
-      "qasper_1912.01214.txt",
-      "qasper_1811.00383.txt"
-    ]
-  },
-  {
-    "id": "MUL-02",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the baseline translation approaches and configurations evaluated between Paper [1] and Paper [2]!",
-    "ground_truth": "Paper [1] compares with pivot-based baselines ('pivoting' and 'pivoting_m') and standard multilingual NMT. Paper [2] compares non-preordered baselines against generic pre-ordering rules and Hindi-tuned pre-ordering rules (CFILT-preorder).",
-    "target_documents": [
-      "qasper_1912.01214.txt",
-      "qasper_1811.00383.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-02",
-    "documents": [
-      "qasper_1912.01214.txt",
-      "qasper_1811.00383.txt"
-    ]
-  },
-  {
-    "id": "MUL-03",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the baseline algorithms and models evaluated between Paper [1] and Paper [2] for named entity recognition!",
-    "ground_truth": "Paper [1] evaluates Stanford NER, spaCy 2.0, and a recurrent neural network with a CRF layer. Paper [2] evaluates regular expressions/dictionary look-up, CRF (sklearn-crfsuite), and spaCy NER model alongside BERT.",
-    "target_documents": [
-      "qasper_1810.08699.txt",
-      "qasper_2003.03106.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-03",
-    "documents": [
-      "qasper_1810.08699.txt",
-      "qasper_2003.03106.txt"
-    ]
-  },
-  {
-    "id": "MUL-04",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the benchmark datasets on which state-of-the-art results are reported between Paper [1] and Paper [2]!",
-    "ground_truth": "Paper [1] reports state-of-the-art results on SimpleQuestions and WebQSP. Paper [2] reports state-of-the-art results on GeoQuery.",
-    "target_documents": [
-      "qasper_1704.06194.txt",
-      "qasper_1905.00840.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-04",
-    "documents": [
-      "qasper_1704.06194.txt",
-      "qasper_1905.00840.txt"
-    ]
-  },
-  {
-    "id": "MUL-05",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the predictive models, target phenomena, and data platforms evaluated in Paper [1] versus Paper [2]!",
-    "ground_truth": "Paper [1] predicts dogmatic language on Reddit using linguistic and psycholinguistic markers. Paper [2] spots rumors on Twitter and Reddit using decision trees, random forests, and SVMs.",
-    "target_documents": [
-      "qasper_1609.00425.txt",
-      "qasper_1611.06322.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-05",
-    "documents": [
-      "qasper_1609.00425.txt",
-      "qasper_1611.06322.txt"
-    ]
-  },
-  {
-    "id": "MUL-06",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the core experimental objectives and representation techniques evaluated in Paper [1] and Paper [2]!",
-    "ground_truth": "Paper [1] tests context-specificity in upper layers of contextualized word representations (ELMo, BERT, GPT-2). Paper [2] investigates gender associations in word representations using WinoBias.",
-    "target_documents": [
-      "qasper_1909.00512.txt",
-      "qasper_1909.00091.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-06",
-    "documents": [
-      "qasper_1909.00512.txt",
-      "qasper_1909.00091.txt"
-    ]
-  },
-  {
-    "id": "MUL-07",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the evaluation metrics and experimental criteria reported in Paper [1] versus Paper [2]!",
-    "ground_truth": "Paper [1] uses macro-averaged F1 score across rumor stance categories. Paper [2] uses turn success rate, average dialogue length (12.45 turns), and user ratings.",
-    "target_documents": [
-      "qasper_1611.06322.txt",
-      "qasper_1911.10742.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-07",
-    "documents": [
-      "qasper_1611.06322.txt",
-      "qasper_1911.10742.txt"
-    ]
-  },
-  {
-    "id": "MUL-08",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the baseline architectures compared against between Paper [1] and Paper [2]!",
-    "ground_truth": "Paper [1] compares against LDA, Doc-NADE, HTMM, and GMNTM. Paper [2] compares against BiLSTM, CNN, and tree-structured recursive networks on the EVENTI benchmark.",
-    "target_documents": [
-      "qasper_1604.02038.txt",
-      "qasper_1810.02229.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-08",
-    "documents": [
-      "qasper_1604.02038.txt",
-      "qasper_1810.02229.txt"
-    ]
-  },
-  {
-    "id": "MUL-09",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the text structural and typographical information layers extracted between Paper [1] and Paper [2]!",
-    "ground_truth": "Paper [1] extracts paragraphs, lines, and physical page segmentation. Paper [2] extracts sentence-level event tags in Italian texts.",
-    "target_documents": [
-      "qasper_1909.09067.txt",
-      "qasper_1810.02229.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-09",
-    "documents": [
-      "qasper_1909.09067.txt",
-      "qasper_1810.02229.txt"
-    ]
-  },
-  {
-    "id": "MUL-10",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the language corpora and datasets evaluated across Paper [1], Paper [2], and Paper [3] into a structured comparison table!",
-    "ground_truth": "Paper [1] evaluates Armenian news sentences (pioNER). Paper [2] evaluates Chinese Dialog (DL-PS) and E-commerce (EC-MT, EC-UQ) crowd-annotated datasets. Paper [3] evaluates CoNLL03 (English, German, Spanish, Dutch) and Chinese datasets (Weibo, Resume).",
-    "target_documents": [
-      "qasper_1810.08699.txt",
-      "qasper_1801.05147.txt",
-      "qasper_1911.04474.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-10",
-    "documents": [
-      "qasper_1810.08699.txt",
-      "qasper_1801.05147.txt",
-      "qasper_1911.04474.txt"
-    ]
-  },
-  {
-    "id": "MUL-11",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the languages explored and evaluated across Paper [1], Paper [2], and Paper [3] into a structured comparison table!",
-    "ground_truth": "Paper [1] evaluates English pivot with Spanish, French, German, and Romanian. Paper [2] evaluates Indo-Aryan (Hindi, Bengali, Gujarati) and Dravidian (Tamil, Malayalam). Paper [3] evaluates Spanish clinical texts.",
-    "target_documents": [
-      "qasper_1912.01214.txt",
-      "qasper_1811.00383.txt",
-      "qasper_2003.03106.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-11",
-    "documents": [
-      "qasper_1912.01214.txt",
-      "qasper_1811.00383.txt",
-      "qasper_2003.03106.txt"
-    ]
-  },
-  {
-    "id": "MUL-12",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the Knowledge Base, Entity Linking, and Question Answering methods evaluated across Paper [1], Paper [2], and Paper [3]!",
-    "ground_truth": "Paper [1] evaluates Neural Relation Detection on SimpleQuestions and WebQSP. Paper [2] evaluates OpenTapioca lightweight entity linking on Wikidata. Paper [3] evaluates Knowledge Authoring and QA with KALM on GeoQuery.",
-    "target_documents": [
-      "qasper_1704.06194.txt",
-      "qasper_1904.09131.txt",
-      "qasper_1905.00840.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-12",
-    "documents": [
-      "qasper_1704.06194.txt",
-      "qasper_1904.09131.txt",
-      "qasper_1905.00840.txt"
-    ]
-  },
-  {
-    "id": "MUL-13",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Compare the word representation and language model evaluation criteria across Paper [1], Paper [2], and Paper [3]!",
-    "ground_truth": "Paper [1] measures self-similarity, intra-sentence similarity, and explainable variance. Paper [2] measures gender bias mitigation in GloVe embeddings. Paper [3] measures perplexity, recall, latency, and energy efficiency across neural language models.",
-    "target_documents": [
-      "qasper_1909.00512.txt",
-      "qasper_1910.14497.txt",
-      "qasper_1811.00942.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-13",
-    "documents": [
-      "qasper_1909.00512.txt",
-      "qasper_1910.14497.txt",
-      "qasper_1811.00942.txt"
-    ]
-  },
-  {
-    "id": "MUL-14",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Synthesize a Master Comparison Table of all four Named Entity Recognition papers across Paper [1], Paper [2], Paper [3], and Paper [4] detailing target language, domain, and evaluation metrics!",
-    "ground_truth": "Paper [1] evaluates Armenian news (pioNER). Paper [2] evaluates Chinese social media (Sina Weibo) with F1 scores (85.99 on DL-PS, 75.15 on EC-MT). Paper [3] evaluates multilingual CoNLL03 and Chinese datasets using Transformer Encoders (TENER). Paper [4] evaluates Spanish clinical texts (HUBES-PHI) with strict/relaxed F1 scores.",
-    "target_documents": [
-      "qasper_1810.08699.txt",
-      "qasper_1801.05147.txt",
-      "qasper_1911.04474.txt",
-      "qasper_2003.03106.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-14",
-    "documents": [
-      "qasper_1810.08699.txt",
-      "qasper_1801.05147.txt",
-      "qasper_1911.04474.txt",
-      "qasper_2003.03106.txt"
-    ]
-  },
-  {
-    "id": "MUL-15",
-    "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
-    "domain": "computer_science_ai",
-    "category": "multi_comparative",
-    "query": "Synthesize a Master Comparison Table of all four social media and text classification papers across Paper [1], Paper [2], Paper [3], and Paper [4] detailing target platform, phenomenon studied, and evaluation setup!",
-    "ground_truth": "Paper [1] studies dogmatism in Reddit posts using LIWC lexicons. Paper [2] spots rumors on Twitter and Reddit using novelty detection and macro F1. Paper [3] generates context-specific fake restaurant reviews from the Yelp Challenge dataset. Paper [4] models aesthetic emotions in literature and poetry (PO-EMO) evaluated via inter-annotator confusion matrices.",
-    "target_documents": [
-      "qasper_1609.00425.txt",
-      "qasper_1611.06322.txt",
-      "qasper_1805.02400.txt",
-      "qasper_2003.07723.txt"
-    ],
-    "unanswerable": false,
-    "sample_id": "MUL-15",
-    "documents": [
-      "qasper_1609.00425.txt",
-      "qasper_1611.06322.txt",
-      "qasper_1805.02400.txt",
-      "qasper_2003.07723.txt"
-    ]
-  },
-  {
-    "id": "MUL-16",
-    "sample_id": "MUL-16",
-    "category": "multi_comparative",
-    "persona": "casual_slang",
-    "query": "hey bro, can you compare the biological findings in paper 1 and paper 2: what are the working mechanisms and final takeaways? keep it concise",
-    "target_documents": [
-      "scifact_10582939.txt",
-      "scifact_12670680.txt"
-    ],
-    "documents": [
-      "scifact_10582939.txt",
-      "scifact_12670680.txt"
-    ],
-    "ground_truth": "Paper [1] examines cellular mechanisms and signaling pathways, while Paper [2] investigates clinical and biomedical markers. Both report distinct experimental observations with specific target outcomes.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-17",
-    "sample_id": "MUL-17",
-    "category": "multi_comparative",
-    "persona": "pragmatic_engineer",
-    "query": "Need quick architecture & metric comparison between [1] and [2]:\n1. Vocabulary size / tokenization\n2. Model backbone\n3. Primary translation BLEU score",
-    "target_documents": [
-      "qasper_1604.02038.txt",
-      "qasper_1704.06194.txt"
-    ],
-    "documents": [
-      "qasper_1604.02038.txt",
-      "qasper_1704.06194.txt"
-    ],
-    "ground_truth": "Paper [1] uses phrase-based and neural translation with subword tokenization, reporting BLEU scores on target language pairs. Paper [2] evaluates entity linking and translation with specialized vocabulary configurations.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-18",
-    "sample_id": "MUL-18",
-    "category": "multi_comparative",
-    "persona": "medical_researcher",
-    "query": "Compare the clinical cohort sample sizes, laboratory diagnostic methodologies, and reported statistical significance between Paper [1] and Paper [2].",
-    "target_documents": [
-      "scifact_14437255.txt",
-      "scifact_16280642.txt"
-    ],
-    "documents": [
-      "scifact_14437255.txt",
-      "scifact_16280642.txt"
-    ],
-    "ground_truth": "Paper [1] reports laboratory findings on clinical cohorts with specific p-values and diagnostic assays, whereas Paper [2] evaluates cellular molecular markers under defined experimental conditions.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-19",
-    "sample_id": "MUL-19",
-    "category": "multi_comparative",
-    "persona": "academic_professor",
-    "query": "Provide a rigorous comparative exposition synthesizing the molecular biomarker pathways, therapeutic targets, and cellular response phenotypes across Paper [1], Paper [2], and Paper [3].",
-    "target_documents": [
-      "scifact_18340282.txt",
-      "scifact_21366394.txt",
-      "scifact_22038539.txt"
-    ],
-    "documents": [
-      "scifact_18340282.txt",
-      "scifact_21366394.txt",
-      "scifact_22038539.txt"
-    ],
-    "ground_truth": "Synthesis across all three biomedical studies: [1] investigates molecular pathway regulation, [2] reports cellular assay measurements and drug responses, and [3] evaluates phenotypic differentiation across tested cell lines.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-20",
-    "sample_id": "MUL-20",
-    "category": "multi_comparative",
-    "persona": "graduate_student",
-    "query": "i'm writing my thesis lit review - could you compare how entity linking, attention mechanisms, and F1 metrics are evaluated across these three papers: Paper [1], Paper [2], and Paper [3]?",
-    "target_documents": [
-      "qasper_1904.09131.txt",
-      "qasper_1905.00840.txt",
-      "qasper_1907.05664.txt"
-    ],
-    "documents": [
-      "qasper_1904.09131.txt",
-      "qasper_1905.00840.txt",
-      "qasper_1907.05664.txt"
-    ],
-    "ground_truth": "Paper [1] focuses on entity linking and question answering benchmarks, Paper [2] evaluates attention mechanisms in sequence tasks, and Paper [3] details empirical F1 metrics and precision-recall trade-offs.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-21",
-    "sample_id": "MUL-21",
-    "category": "multi_comparative",
-    "persona": "terse_lowercase",
-    "query": "paper 1 vs paper 2 vs paper 3: compare loss functions and sequence labeling performance metrics. bullet points only",
-    "target_documents": [
-      "qasper_1909.00694.txt",
-      "qasper_1909.09067.txt",
-      "qasper_1911.04474.txt"
-    ],
-    "documents": [
-      "qasper_1909.00694.txt",
-      "qasper_1909.09067.txt",
-      "qasper_1911.04474.txt"
-    ],
-    "ground_truth": "Paper [1] analyzes sequence modeling loss and optimization, Paper [2] uses cross-entropy and margin-based ranking, and Paper [3] reports sequence labeling accuracy and F1 metrics across benchmark splits.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-22",
-    "sample_id": "MUL-22",
-    "category": "multi_comparative",
-    "persona": "structured_matrix",
-    "query": "Construct a Master Comparative Matrix across all four oncology and cellular studies: Paper [1], Paper [2], Paper [3], and Paper [4]. Columns must be: (1) Study Target, (2) Experimental Model, (3) Key Quantitative Finding.",
-    "target_documents": [
-      "scifact_26016929.txt",
-      "scifact_27768226.txt",
-      "scifact_33872649.txt",
-      "scifact_4381486.txt"
-    ],
-    "documents": [
-      "scifact_26016929.txt",
-      "scifact_27768226.txt",
-      "scifact_33872649.txt",
-      "scifact_4381486.txt"
-    ],
-    "ground_truth": "Master table synthesizing all four publications: [1] studies genetic tumor markers, [2] evaluates cellular growth inhibition assays, [3] reports protein expression quantification, and [4] analyzes clinical response rates.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-23",
-    "sample_id": "MUL-23",
-    "category": "multi_comparative",
-    "persona": "all_caps_urgent",
-    "query": "SYNTHESIZE A COMPREHENSIVE BENCHMARK TABLE COMPARING THE NEURAL TRANSLATION BASELINES, TEST SET BLEU SCORES, AND PARAMETER COUNTS ACROSS ALL FOUR PAPERS: [1], [2], [3], AND [4]!",
-    "target_documents": [
-      "qasper_1912.01214.txt",
-      "qasper_1811.00383.txt",
-      "qasper_2003.03106.txt",
-      "qasper_2003.07723.txt"
-    ],
-    "documents": [
-      "qasper_1912.01214.txt",
-      "qasper_1811.00383.txt",
-      "qasper_2003.03106.txt",
-      "qasper_2003.07723.txt"
-    ],
-    "ground_truth": "Comprehensive multi-paper table reviewing neural machine translation baselines, BLEU evaluation splits, subword vocabulary configurations, and reported test results across all four publications.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-24",
-    "sample_id": "MUL-24",
-    "category": "multi_comparative",
-    "persona": "confused_beginner",
-    "query": "i'm really confused here, could you explain in simple terms the main differences in domain adaptation methods between paper [1] and paper [2]?",
-    "target_documents": [
-      "qasper_1801.05147.txt",
-      "qasper_1805.02400.txt"
-    ],
-    "documents": [
-      "qasper_1801.05147.txt",
-      "qasper_1805.02400.txt"
-    ],
-    "ground_truth": "Paper [1] proposes feature representation-based domain adaptation, whereas Paper [2] focuses on text sequence modeling and transfer learning with distinct baseline configurations.",
-    "unanswerable": false
-  },
-  {
-    "id": "MUL-25",
-    "sample_id": "MUL-25",
-    "category": "multi_comparative",
-    "persona": "cross_disciplinary",
-    "query": "Perform a cross-disciplinary meta-synthesis reviewing representation learning and experimental validation paradigms across Paper [1], Paper [2], Paper [3], and Paper [4].",
-    "target_documents": [
-      "qasper_1705.09665.txt",
-      "qasper_1810.02229.txt",
-      "scifact_4883040.txt",
-      "scifact_49556906.txt"
-    ],
-    "documents": [
-      "qasper_1705.09665.txt",
-      "qasper_1810.02229.txt",
-      "scifact_4883040.txt",
-      "scifact_49556906.txt"
-    ],
-    "ground_truth": "Cross-disciplinary synthesis reviewing computational representation methods in [1] and [2] alongside empirical clinical and biomedical validation criteria in [3] and [4].",
-    "unanswerable": false
-  },
-  {
-    "id": "UNANS-01",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "What crowdsourcing platform is used?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1801.05147.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-01",
-    "documents": [
-      "qasper_1801.05147.txt"
-    ]
-  },
-  {
-    "id": "UNANS-02",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "How do they match words before reordering them?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1811.00383.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-02",
-    "documents": [
-      "qasper_1811.00383.txt"
-    ]
-  },
-  {
-    "id": "UNANS-03",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "What is the accuracy of this model compared to sota?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1904.09131.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-03",
-    "documents": [
-      "qasper_1904.09131.txt"
-    ]
-  },
-  {
-    "id": "UNANS-04",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "Can the model be extended to other languages?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1810.02229.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-04",
-    "documents": [
-      "qasper_1810.02229.txt"
-    ]
-  },
-  {
-    "id": "UNANS-05",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "Do they report results only on English data?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1705.09665.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-05",
-    "documents": [
-      "qasper_1705.09665.txt"
-    ]
-  },
-  {
-    "id": "UNANS-06",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "Are there privacy concerns with clinical data mentioned in the methodology?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1908.06606.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-06",
-    "documents": [
-      "qasper_1908.06606.txt"
-    ]
-  },
-  {
-    "id": "UNANS-07",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "How does using NMT ensure generated reviews stay on topic?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1805.02400.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-07",
-    "documents": [
-      "qasper_1805.02400.txt"
-    ]
-  },
-  {
-    "id": "UNANS-08",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "What are the probabilistic observations which contribute to the more robust algorithm?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1910.14497.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-08",
-    "documents": [
-      "qasper_1910.14497.txt"
-    ]
-  },
-  {
-    "id": "UNANS-09",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "What are strong baselines authors used in Section 2?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1909.00091.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-09",
-    "documents": [
-      "qasper_1909.00091.txt"
-    ]
-  },
-  {
-    "id": "UNANS-10",
-    "dataset_source": "AllenAI QASPER Unanswerable Traps",
-    "domain": "computer_science_ai",
-    "category": "negative_unanswerable",
-    "query": "What GPU acceleration hardware and cluster specs were utilized for training?",
-    "ground_truth": "This information is not mentioned or provided in the paper.",
-    "target_documents": [
-      "qasper_1611.06322.txt"
-    ],
-    "unanswerable": true,
-    "sample_id": "UNANS-10",
-    "documents": [
-      "qasper_1611.06322.txt"
-    ]
-  },
-  {
-    "id": "UNANS-11",
-    "sample_id": "UNANS-11",
-    "category": "negative_unanswerable",
-    "persona": "casual_slang",
-    "query": "hey man, is there any info on the total AWS cloud compute bill spent by the authors during model training?",
-    "target_documents": [
-      "qasper_1805.02400.txt"
-    ],
-    "documents": [
-      "qasper_1805.02400.txt"
-    ],
-    "ground_truth": "Unanswerable. The paper does not disclose AWS cloud computing costs, billing invoices, or monetary expenses for model training.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-12",
-    "sample_id": "UNANS-12",
-    "category": "negative_unanswerable",
-    "persona": "academic_professor",
-    "query": "Which specific non-Euclidean Riemannian manifold curvature parameters were mathematically optimized in the projection layer of Section 3?",
-    "target_documents": [
-      "qasper_1704.06194.txt"
-    ],
-    "documents": [
-      "qasper_1704.06194.txt"
-    ],
-    "ground_truth": "Unanswerable. The authors use standard Euclidean representations; Riemannian manifold curvature parameters are not mentioned or evaluated in the manuscript.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-13",
-    "sample_id": "UNANS-13",
-    "category": "negative_unanswerable",
-    "persona": "confused_beginner",
-    "query": "i'm new to machine learning, does this paper have a step-by-step tutorial on how to install pytorch on windows 11?",
-    "target_documents": [
-      "qasper_2003.03106.txt"
-    ],
-    "documents": [
-      "qasper_2003.03106.txt"
-    ],
-    "ground_truth": "Unanswerable. The research paper does not contain software installation tutorials or operating system setup guides.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-14",
-    "sample_id": "UNANS-14",
-    "category": "negative_unanswerable",
-    "persona": "all_caps_urgent",
-    "query": "WHAT ARE THE EXACT HARDWARE CLUSTER DETAILS IN SECTION 3? PLEASE SPECIFY NUMBER OF NODES AND INFINIBAND INTERCONNECT SPEED!",
-    "target_documents": [
-      "qasper_1911.10742.txt"
-    ],
-    "documents": [
-      "qasper_1911.10742.txt"
-    ],
-    "ground_truth": "Unanswerable. The paper does not specify the number of cluster nodes or InfiniBand interconnect speeds in Section 3 or anywhere in the text.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-15",
-    "sample_id": "UNANS-15",
-    "category": "negative_unanswerable",
-    "persona": "pragmatic_engineer",
-    "query": "Need the exact Docker container image hash (SHA256) and CUDA toolkit version mentioned for reproducing these results.",
-    "target_documents": [
-      "qasper_1912.01214.txt"
-    ],
-    "documents": [
-      "qasper_1912.01214.txt"
-    ],
-    "ground_truth": "Unanswerable. The paper does not provide Docker image hashes, container digests, or specific CUDA toolkit version numbers.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-16",
-    "sample_id": "UNANS-16",
-    "category": "negative_unanswerable",
-    "persona": "skeptical_reviewer",
-    "query": "Did the authors apply Bonferroni correction to adjust p-values across the secondary biological assays in Table 2?",
-    "target_documents": [
-      "scifact_16280642.txt"
-    ],
-    "documents": [
-      "scifact_16280642.txt"
-    ],
-    "ground_truth": "Unanswerable. The text does not mention applying Bonferroni corrections or multi-hypothesis testing adjustments for Table 2.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-17",
-    "sample_id": "UNANS-17",
-    "category": "negative_unanswerable",
-    "persona": "terse_lowercase",
-    "query": "patient blood pressure systolic diastolic numbers in section 4? need the values",
-    "target_documents": [
-      "scifact_22038539.txt"
-    ],
-    "documents": [
-      "scifact_22038539.txt"
-    ],
-    "ground_truth": "Unanswerable. The abstract does not contain patient blood pressure measurements (systolic or diastolic).",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-18",
-    "sample_id": "UNANS-18",
-    "category": "negative_unanswerable",
-    "persona": "medical_researcher",
-    "query": "What was the exact dosage in milligrams per kilogram (mg/kg) of the monoclonal antibody administered during in-vivo mouse trials?",
-    "target_documents": [
-      "scifact_18340282.txt"
-    ],
-    "documents": [
-      "scifact_18340282.txt"
-    ],
-    "ground_truth": "Unanswerable. The provided publication does not disclose specific in-vivo dosage amounts in mg/kg for monoclonal antibody administration.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-19",
-    "sample_id": "UNANS-19",
-    "category": "negative_unanswerable",
-    "persona": "casual_slang",
-    "query": "hey, was this model ever tested on an Icelandic language dataset? curious what the accuracy was",
-    "target_documents": [
-      "qasper_1811.00383.txt"
-    ],
-    "documents": [
-      "qasper_1811.00383.txt"
-    ],
-    "ground_truth": "Unanswerable. The study does not evaluate or mention any Icelandic language datasets.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-20",
-    "sample_id": "UNANS-20",
-    "category": "negative_unanswerable",
-    "persona": "academic_professor",
-    "query": "What quantum gate decomposition fidelity was achieved when executing the proposed transformer self-attention on trapped-ion quantum processors?",
-    "target_documents": [
-      "qasper_1810.08699.txt"
-    ],
-    "documents": [
-      "qasper_1810.08699.txt"
-    ],
-    "ground_truth": "Unanswerable. The paper investigates classical NLP neural architectures and does not evaluate quantum computers or trapped-ion processors.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-21",
-    "sample_id": "UNANS-21",
-    "category": "negative_unanswerable",
-    "persona": "pragmatic_engineer",
-    "query": "What is the P99 inference latency in milliseconds when serving this model on AWS Inferentia2 chips with batch size 1?",
-    "target_documents": [
-      "qasper_1909.00512.txt"
-    ],
-    "documents": [
-      "qasper_1909.00512.txt"
-    ],
-    "ground_truth": "Unanswerable. The paper does not benchmark inference latency on AWS Inferentia chips or report P99 serving latencies.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-22",
-    "sample_id": "UNANS-22",
-    "category": "negative_unanswerable",
-    "persona": "confused_beginner",
-    "query": "can you find a google drive link to download the pre-trained weights for this model? i couldn't find it on their github",
-    "target_documents": [
-      "qasper_1905.00840.txt"
-    ],
-    "documents": [
-      "qasper_1905.00840.txt"
-    ],
-    "ground_truth": "Unanswerable. The document does not provide a Google Drive link for downloading model weights.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-23",
-    "sample_id": "UNANS-23",
-    "category": "negative_unanswerable",
-    "persona": "all_caps_urgent",
-    "query": "HOW MANY SUBJECTS DROPPED OUT OF THE STUDY DUE TO ADVERSE GASTROINTESTINAL EVENTS IN THE CONTROL GROUP?",
-    "target_documents": [
-      "scifact_26016929.txt"
-    ],
-    "documents": [
-      "scifact_26016929.txt"
-    ],
-    "ground_truth": "Unanswerable. The provided text does not report subject dropout numbers or adverse gastrointestinal events in the control group.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-24",
-    "sample_id": "UNANS-24",
-    "category": "negative_unanswerable",
-    "persona": "skeptical_reviewer",
-    "query": "Did the authors verify that the training data does not contain copyright-protected copyrighted lyrics from the Universal Music Group catalog?",
-    "target_documents": [
-      "qasper_1909.00091.txt"
-    ],
-    "documents": [
-      "qasper_1909.00091.txt"
-    ],
-    "ground_truth": "Unanswerable. The paper contains no analysis or statement regarding copyrighted music lyrics or Universal Music Group catalogs.",
-    "unanswerable": true
-  },
-  {
-    "id": "UNANS-25",
-    "sample_id": "UNANS-25",
-    "category": "negative_unanswerable",
-    "persona": "terse_lowercase",
-    "query": "total grams of protein in the mouse diet formulation per day? answer with number",
-    "target_documents": [
-      "scifact_4381486.txt"
-    ],
-    "documents": [
-      "scifact_4381486.txt"
-    ],
-    "ground_truth": "Unanswerable. The publication does not disclose daily dietary protein quantities in grams for the experimental mice.",
-    "unanswerable": true
-  }
+    {
+        "id": "QASPER-01",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "which multilingual approaches do they compare with?",
+        "ground_truth": "BIBREF19, BIBREF20",
+        "target_documents": [
+            "qasper_1912.01214.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-01",
+        "documents": [
+            "qasper_1912.01214.txt"
+        ]
+    },
+    {
+        "id": "QASPER-02",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "what ner models were evaluated?",
+        "ground_truth": "Stanford NER, spaCy 2.0 , recurrent model with a CRF top layer",
+        "target_documents": [
+            "qasper_1810.08699.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-02",
+        "documents": [
+            "qasper_1810.08699.txt"
+        ]
+    },
+    {
+        "id": "QASPER-03",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "what are the topics pulled from Reddit?",
+        "ground_truth": "politics, business, science, and AskReddit, and 1000 additional posts from the Reddit frontpage.",
+        "target_documents": [
+            "qasper_1609.00425.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-03",
+        "documents": [
+            "qasper_1609.00425.txt"
+        ]
+    },
+    {
+        "id": "QASPER-04",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What accuracy does the proposed system achieve?",
+        "ground_truth": "F1 scores of 85.99 on the DL-PS data, 75.15 on the EC-MT data and 71.53 on the EC-UQ data",
+        "target_documents": [
+            "qasper_1801.05147.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-04",
+        "documents": [
+            "qasper_1801.05147.txt"
+        ]
+    },
+    {
+        "id": "QASPER-05",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "Which information about text structure is included in the corpus?",
+        "ground_truth": "paragraphs, lines, Information on physical page segmentation (for PDFs only), paragraph segmentation",
+        "target_documents": [
+            "qasper_1909.09067.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-05",
+        "documents": [
+            "qasper_1909.09067.txt"
+        ]
+    },
+    {
+        "id": "QASPER-06",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "On which benchmarks they achieve the state of the art?",
+        "ground_truth": "SimpleQuestions, WebQSP",
+        "target_documents": [
+            "qasper_1704.06194.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-06",
+        "documents": [
+            "qasper_1704.06194.txt"
+        ]
+    },
+    {
+        "id": "QASPER-07",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What experiments are proposed to test that upper layers produce context-specific embeddings?",
+        "ground_truth": "They measure self-similarity, intra-sentence similarity and maximum explainable variance of the embeddings.",
+        "target_documents": [
+            "qasper_1909.00512.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-07",
+        "documents": [
+            "qasper_1909.00512.txt"
+        ]
+    },
+    {
+        "id": "QASPER-08",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What is the performance of BERT on the task?",
+        "ground_truth": "F1 scores are:\nHUBES-PHI: Detection(0.965), Classification relaxed (0.95), Classification strict (0.87)",
+        "target_documents": [
+            "qasper_2003.03106.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-08",
+        "documents": [
+            "qasper_2003.03106.txt"
+        ]
+    },
+    {
+        "id": "QASPER-09",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "How big is the ANTISCAM dataset?",
+        "ground_truth": "3,044 sentences in 100 dialogs",
+        "target_documents": [
+            "qasper_1911.10742.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-09",
+        "documents": [
+            "qasper_1911.10742.txt"
+        ]
+    },
+    {
+        "id": "QASPER-10",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What is the dataset for testing the model?",
+        "ground_truth": "EVENTI (an Italian task for Event Extraction)",
+        "target_documents": [
+            "qasper_1810.02229.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-10",
+        "documents": [
+            "qasper_1810.02229.txt"
+        ]
+    },
+    {
+        "id": "QASPER-11",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What previous methods do they compare against?",
+        "ground_truth": "Decision tree, random forest, and SVM",
+        "target_documents": [
+            "qasper_1611.06322.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-11",
+        "documents": [
+            "qasper_1611.06322.txt"
+        ]
+    },
+    {
+        "id": "QASPER-12",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What dataset do they use?",
+        "ground_truth": "GeoQuery",
+        "target_documents": [
+            "qasper_1905.00840.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-12",
+        "documents": [
+            "qasper_1905.00840.txt"
+        ]
+    },
+    {
+        "id": "QASPER-13",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "How is coreference measured?",
+        "ground_truth": "F1 on WinoBias",
+        "target_documents": [
+            "qasper_1909.00091.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-13",
+        "documents": [
+            "qasper_1909.00091.txt"
+        ]
+    },
+    {
+        "id": "QASPER-14",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "what dataset they evaluated the model with?",
+        "ground_truth": "CoNLL03 (English, German, Spanish, Dutch) and Chinese datasets (Weibo, Resume, MSRA, OntoNotes)",
+        "target_documents": [
+            "qasper_1911.04474.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-14",
+        "documents": [
+            "qasper_1911.04474.txt"
+        ]
+    },
+    {
+        "id": "QASPER-15",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What baselines did they compare with?",
+        "ground_truth": "LDA, Doc-NADE, HTMM, GMNTM",
+        "target_documents": [
+            "qasper_1604.02038.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-15",
+        "documents": [
+            "qasper_1604.02038.txt"
+        ]
+    },
+    {
+        "id": "QASPER-16",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What is the seed lexicon?",
+        "ground_truth": "a vocabulary of positive and negative predicates that helps determine the polarity of an event",
+        "target_documents": [
+            "qasper_1909.00694.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-16",
+        "documents": [
+            "qasper_1909.00694.txt"
+        ]
+    },
+    {
+        "id": "QASPER-17",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "How is the annotation experiment evaluated?",
+        "ground_truth": "confusion matrices of labels between annotators",
+        "target_documents": [
+            "qasper_2003.07723.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-17",
+        "documents": [
+            "qasper_2003.07723.txt"
+        ]
+    },
+    {
+        "id": "QASPER-18",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "How do the various social phenomena examined manifest in different types of communities?",
+        "ground_truth": "Dynamic communities have substantially higher rates of monthly user retention than Static communities.",
+        "target_documents": [
+            "qasper_1705.09665.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-18",
+        "documents": [
+            "qasper_1705.09665.txt"
+        ]
+    },
+    {
+        "id": "QASPER-19",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What data is the language model pretrained on?",
+        "ground_truth": "Chinese general corpus",
+        "target_documents": [
+            "qasper_1908.06606.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-19",
+        "documents": [
+            "qasper_1908.06606.txt"
+        ]
+    },
+    {
+        "id": "QASPER-20",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What aspects have been compared between various language models?",
+        "ground_truth": "Quality measures using perplexity and recall, and performance measured using latency and energy.",
+        "target_documents": [
+            "qasper_1811.00942.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-20",
+        "documents": [
+            "qasper_1811.00942.txt"
+        ]
+    },
+    {
+        "id": "QASPER-21",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "Which dataset do they use a starting point in generating fake reviews?",
+        "ground_truth": "the Yelp Challenge dataset",
+        "target_documents": [
+            "qasper_1805.02400.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-21",
+        "documents": [
+            "qasper_1805.02400.txt"
+        ]
+    },
+    {
+        "id": "QASPER-22",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "Which baselines did they compare?",
+        "ground_truth": "The baseline model is a deep sequence-to-sequence encoder/decoder model with attention mechanism.",
+        "target_documents": [
+            "qasper_1907.05664.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-22",
+        "documents": [
+            "qasper_1907.05664.txt"
+        ]
+    },
+    {
+        "id": "QASPER-23",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "How is embedding quality assessed?",
+        "ground_truth": "We compare this method of bias mitigation with the no bias mitigation (\"Orig\"), and two previous methods: Hard-GloVe and GN-GloVe.",
+        "target_documents": [
+            "qasper_1910.14497.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-23",
+        "documents": [
+            "qasper_1910.14497.txt"
+        ]
+    },
+    {
+        "id": "QASPER-24",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What is the knowledge graph used in the system?",
+        "ground_truth": "Wikidata",
+        "target_documents": [
+            "qasper_1904.09131.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-24",
+        "documents": [
+            "qasper_1904.09131.txt"
+        ]
+    },
+    {
+        "id": "QASPER-25",
+        "dataset_source": "AllenAI QASPER (NAACL 2021)",
+        "domain": "computer_science_ai",
+        "category": "single_fact",
+        "query": "What language family is explored in the experiments?",
+        "ground_truth": "Indo-Aryan and Dravidian language families",
+        "target_documents": [
+            "qasper_1811.00383.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "QASPER-25",
+        "documents": [
+            "qasper_1811.00383.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-01",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"1,000 genomes project enables mapping of genetic sequence variation consisting of rare variants with larger penetrance effects than common variants.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: We propose as an alternative explanation that variants much less common than the associated one may create \"synthetic associations\" by occurring, stochastically, more often in association with one of the alleles at the common site versus the other allele. We show that they are not only possible, but inevitable, and that under simple but reasonable genetic models, they are likely to account for or contribute to many of the recently identified signals reported in genome-wide association studies.",
+        "target_documents": [
+            "scifact_14717500.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-01",
+        "documents": [
+            "scifact_14717500.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-02",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"1/2000 in UK have abnormal PrP positivity.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: RESULTS Of the 32,441 appendix samples 16 were positive for abnormal PrP, indicating an overall prevalence of 493 per million population (95% confidence interval 282 to 801 per million).",
+        "target_documents": [
+            "scifact_13734012.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-02",
+        "documents": [
+            "scifact_13734012.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-03",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"A high microerythrocyte count raises vulnerability to severe anemia in homozygous alpha (+)- thalassemia trait subjects.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: Individuals homozygous for alpha(+)-thalassaemia have microcytosis and an increased erythrocyte count. We estimated that the haematological profile in children homozygous for alpha(+)-thalassaemia reduces the risk of SMA during acute malaria compared to children of normal genotype (relative risk 0.52; 95% confidence interval [CI] 0.24-1.12, p = 0.09).   \n",
+        "target_documents": [
+            "scifact_18174210.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-03",
+        "documents": [
+            "scifact_18174210.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-04",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"ADAR1 binds to Dicer to cleave pre-miRNA.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: In this study, we investigated the interaction of the RNA editing mechanism with the RNA interference (RNAi) machinery and found that ADAR1 forms a complex with Dicer through direct protein-protein interaction.",
+        "target_documents": [
+            "scifact_5953485.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-04",
+        "documents": [
+            "scifact_5953485.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-05",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"AIRE is expressed in some skin tumors.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: We report that autoimmune regulator (Aire), a transcriptional regulator, is inducibly expressed in human and mouse tumor keratinocytes in a K17-dependent manner and is required for timely onset of Gli2-induced skin tumorigenesis in mice.",
+        "target_documents": [
+            "scifact_12580014.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-05",
+        "documents": [
+            "scifact_12580014.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-06",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"ALDH1 expression is associated with better breast cancer outcomes.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: In a series of 577 breast carcinomas, expression of ALDH1 detected by immunostaining correlated with poor prognosis.",
+        "target_documents": [
+            "scifact_45638119.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-06",
+        "documents": [
+            "scifact_45638119.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-07",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"AMP-activated protein kinase (AMPK) activation increases inflammation-related fibrosis in the lungs.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: Pharmacological activation of AMPK in myofibroblasts from lungs of humans with IPF display lower fibrotic activity, along with enhanced mitochondrial biogenesis and normalization of sensitivity to apoptosis.",
+        "target_documents": [
+            "scifact_49556906.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-07",
+        "documents": [
+            "scifact_49556906.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-08",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"APOE4 expression in iPSC-derived neurons increases AlphaBeta production and tau phosphorylation causing GABA neuron degeneration.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: Using human neurons derived from induced pluripotent stem cells that expressed apolipoprotein E4 (ApoE4), a variant of the APOE gene product and the major genetic risk factor for AD, we demonstrated that ApoE4-expressing neurons had higher levels of tau phosphorylation, unrelated to their increased production of amyloid-\u03b2 (A\u03b2) peptides, and that they displayed GABAergic neuron degeneration.",
+        "target_documents": [
+            "scifact_4709641.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-08",
+        "documents": [
+            "scifact_4709641.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-09",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Activation of PPM1D suppresses p53 function.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: PPM1D mutations were mutually exclusive with TP53 mutations in BSG and attenuated p53 activation in vitro. PPM1D mutations were truncating alterations in exon 6 that enhanced the ability of PPM1D to suppress the activation of the DNA damage response checkpoint protein CHK2.",
+        "target_documents": [
+            "scifact_5956380.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-09",
+        "documents": [
+            "scifact_5956380.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-10",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"All hematopoietic stem cells segregate their chromosomes randomly.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: Sequential administration of 5-chloro-2-deoxyuridine and 5-iodo-2-deoxyuridine indicated that all HSCs segregate their chromosomes randomly.",
+        "target_documents": [
+            "scifact_4381486.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-10",
+        "documents": [
+            "scifact_4381486.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-11",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Angiotensin converting enzyme inhibitors are associated with increased risk for functional renal insufficiency.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: Although ACE inhibitor therapy usually improves renal blood flow (RBF) and sodium excretion rates in CHF and reduces the rate of progressive renal injury in chronic renal disease, its use can also be associated with a syndrome of \u201cfunctional renal insufficiency\u201d and/or hyperkalemia.",
+        "target_documents": [
+            "scifact_6157837.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-11",
+        "documents": [
+            "scifact_6157837.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-12",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Anthrax spores can be disposed of easily after they are dispersed.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: More than 80% of the B anthracis particles collected on stationary monitors were within an alveolar respirable size range of 0.95 to 3.5 micro m.   CONCLUSIONS Bacillus anthracis spores used in a recent terrorist incident reaerosolized under common office activities.",
+        "target_documents": [
+            "scifact_33872649.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-12",
+        "documents": [
+            "scifact_33872649.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-13",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Antibiotic induced alterations in the gut microbiome reduce resistance against Clostridium difficile\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: Antibiotics can have significant and long-lasting effects on the gastrointestinal tract microbiota, reducing colonization resistance against pathogens including Clostridium difficile.",
+        "target_documents": [
+            "scifact_6372244.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-13",
+        "documents": [
+            "scifact_6372244.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-14",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Antiretroviral therapy reduces rates of tuberculosis across a broad range of CD4 strata.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: Antiretroviral therapy is strongly associated with a reduction in the incidence of tuberculosis in all baseline CD4 count categories: (1) less than 200 cells/\u00b5l (hazard ratio [HR] 0.16, 95% confidence interval [CI] 0.07 to 0.36), (2) 200 to 350 cells/\u00b5l (HR 0.34, 95% CI 0.19 to 0.60), (3) greater than 350 cells/\u00b5l (HR 0.43, 95% CI 0.30 to 0.63), and (4) any CD4 count (HR 0.35, 95% CI 0.28 to 0.44).",
+        "target_documents": [
+            "scifact_4883040.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-14",
+        "documents": [
+            "scifact_4883040.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-15",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Articles published in open access format are less likely to be cited than traditional journals.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: It provides robust evidence that open-access articles (OA articles) are more immediately recognized and cited than non-OA articles.",
+        "target_documents": [
+            "scifact_27768226.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-15",
+        "documents": [
+            "scifact_27768226.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-16",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Assembly of invadopodia is triggered by focal generation of phosphatidylinositol-3,4-biphosphate and the activation of the nonreceptor tyrosine kinase Src.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: The expression of various phosphoinositide-binding domains revealed that the podosomes in Src-transformed NIH3T3 (NIH-src) cells are enriched with PtdIns(3,4)P2, suggesting an important role of this phosphoinositide in podosome formation. Live-cell imaging analysis revealed that Src-expression stimulated podosome formation at focal adhesions of NIH3T3 cells after PtdIns(3,4)P2 accumulation.",
+        "target_documents": [
+            "scifact_16280642.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-16",
+        "documents": [
+            "scifact_16280642.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-17",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Asymptomatic visual impairment screening in elderly populations does not lead to improved vision.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: The inclusion of a visual screening component in the assessment did not result in improvements in self reported visual problems (pooled odds ratio 1.04:95% confidence interval 0.89 to 1.22). CONCLUSIONS Screening of asymptomatic older people in the community is not justified on present evidence.",
+        "target_documents": [
+            "scifact_26016929.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-17",
+        "documents": [
+            "scifact_26016929.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-18",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Auditory entrainment is strengthened when people see congruent visual and auditory information.\"",
+        "ground_truth": "The literature SUPPORT this claim. Evidence: UNLABELLED Congruent audiovisual speech enhances our ability to comprehend a speaker, even in noise-free conditions.",
+        "target_documents": [
+            "scifact_14437255.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-18",
+        "documents": [
+            "scifact_14437255.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-19",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Autologous transplantation of mesenchymal stem cells causes a higher rate of opportunistic infections than induction therapy with anti-interleukin-2 receptor antibodies.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: Also, during the 1-year follow-up, combined analysis of MSC-treated groups revealed significantly decreased risk of opportunistic infections than the control group (hazard ratio, 0.42; 95% CI, 0.20-0.85, P=.02)   CONCLUSION Among patients undergoing renal transplant, the use of autologous MSCs compared with anti-IL-2 receptor antibody induction therapy resulted in lower incidence of acute rejection, decreased risk of opportunistic infection, and better estimated renal function at 1 year.   \n",
+        "target_documents": [
+            "scifact_10582939.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-19",
+        "documents": [
+            "scifact_10582939.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-20",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Basophils counteract disease development in patients with systemic lupus erythematosus (SLE).\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: We report that activation of basophils by autoreactive IgE causes their homing to lymph nodes, promoting T helper type 2 (T(H)2) cell differentiation and enhancing the production of self-reactive antibodies that cause lupus-like nephritis in mice lacking the Src family protein tyrosine kinase Lyn (Lyn(-/-) mice).",
+        "target_documents": [
+            "scifact_12670680.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-20",
+        "documents": [
+            "scifact_12670680.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-21",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Blocking the interaction between TDP-43 and respiratory complex I proteins ND3 and ND6 leads to increased TDP-43-induced neuronal loss.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: The suppression of TDP-43 mitochondrial localization abolishes WT and mutant TDP-43-induced mitochondrial dysfunction and neuronal loss, and improves phenotypes of transgenic mutant TDP-43 mice.",
+        "target_documents": [
+            "scifact_16966326.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-21",
+        "documents": [
+            "scifact_16966326.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-22",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Bone marrow cells contribute to adult macrophage compartments.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: We also found that after bone marrow transplantation, host macrophages retained the capacity to expand when the development of donor macrophages was compromised.",
+        "target_documents": [
+            "scifact_12827098.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-22",
+        "documents": [
+            "scifact_12827098.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-23",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"Breast cancer development is determined exclusively by genetic factors.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: METHODS We tested gene-environment interactions in 7610 women who developed breast cancer and 10 196 controls without the disease, studying the effects of 12 polymorphisms (FGFR2-rs2981582, TNRC9-rs3803662, 2q35-rs13387042, MAP3K1-rs889312, 8q24-rs13281615, 2p-rs4666451, 5p12-rs981782, CASP8-rs1045485, LSP1-rs3817198, 5q-rs30099, TGFB1-rs1982073, and ATM-rs1800054) in relation to prospectively collected information about ten established environmental risk factors (age at menarche, parity, age at first birth, breastfeeding, menopausal status, age at menopause, use of hormone replacement therapy, body-mass index, height, and alcohol consumption).   \n",
+        "target_documents": [
+            "scifact_18340282.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-23",
+        "documents": [
+            "scifact_18340282.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-24",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"CR is associated with higher methylation age.\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: Epigenetic information encoded by DNA methylation is tightly regulated, but shows a striking drift associated with age that includes both gains and losses of DNA methylation at various sites.",
+        "target_documents": [
+            "scifact_22038539.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-24",
+        "documents": [
+            "scifact_22038539.txt"
+        ]
+    },
+    {
+        "id": "SCIFACT-25",
+        "dataset_source": "AllenAI SciFact (EMNLP 2020)",
+        "domain": "biomedicine_healthcare",
+        "category": "scientific_fact_checking",
+        "query": "Evaluate the following scientific claim based on the literature: \"CX3CR1 on the Th2 cells impairs T cell survival\"",
+        "ground_truth": "The literature CONTRADICT this claim. Evidence: We found that CX3CR1 signaling promoted T(H)2 survival in the inflamed lungs, and injection of B cell leukemia/lymphoma-2 protein (BCl-2)-transduced CX3CR1-deficient T(H)2 cells into CX3CR1-deficient mice restored asthma.",
+        "target_documents": [
+            "scifact_21366394.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "SCIFACT-25",
+        "documents": [
+            "scifact_21366394.txt"
+        ]
+    },
+    {
+        "id": "MUL-01",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the training and evaluation datasets used in Paper [1] and Paper [2] into a structured comparison table!",
+        "ground_truth": "Paper [1] experiments on Europarl and MultiUN datasets. Paper [2] experiments on the IITB English-Hindi parallel corpus and the ILCI multilingual parallel corpus.",
+        "target_documents": [
+            "qasper_1912.01214.txt",
+            "qasper_1811.00383.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-01",
+        "documents": [
+            "qasper_1912.01214.txt",
+            "qasper_1811.00383.txt"
+        ]
+    },
+    {
+        "id": "MUL-02",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the baseline translation approaches and configurations evaluated between Paper [1] and Paper [2]!",
+        "ground_truth": "Paper [1] compares with pivot-based baselines ('pivoting' and 'pivoting_m') and standard multilingual NMT. Paper [2] compares non-preordered baselines against generic pre-ordering rules and Hindi-tuned pre-ordering rules (CFILT-preorder).",
+        "target_documents": [
+            "qasper_1912.01214.txt",
+            "qasper_1811.00383.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-02",
+        "documents": [
+            "qasper_1912.01214.txt",
+            "qasper_1811.00383.txt"
+        ]
+    },
+    {
+        "id": "MUL-03",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the baseline algorithms and models evaluated between Paper [1] and Paper [2] for named entity recognition!",
+        "ground_truth": "Paper [1] evaluates Stanford NER, spaCy 2.0, and a recurrent neural network with a CRF layer. Paper [2] evaluates regular expressions/dictionary look-up, CRF (sklearn-crfsuite), and spaCy NER model alongside BERT.",
+        "target_documents": [
+            "qasper_1810.08699.txt",
+            "qasper_2003.03106.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-03",
+        "documents": [
+            "qasper_1810.08699.txt",
+            "qasper_2003.03106.txt"
+        ]
+    },
+    {
+        "id": "MUL-04",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the benchmark datasets on which state-of-the-art results are reported between Paper [1] and Paper [2]!",
+        "ground_truth": "Paper [1] reports state-of-the-art results on SimpleQuestions and WebQSP. Paper [2] reports state-of-the-art results on GeoQuery.",
+        "target_documents": [
+            "qasper_1704.06194.txt",
+            "qasper_1905.00840.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-04",
+        "documents": [
+            "qasper_1704.06194.txt",
+            "qasper_1905.00840.txt"
+        ]
+    },
+    {
+        "id": "MUL-05",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the predictive models, target phenomena, and data platforms evaluated in Paper [1] versus Paper [2]!",
+        "ground_truth": "Paper [1] predicts dogmatic language on Reddit using linguistic and psycholinguistic markers. Paper [2] spots rumors on Twitter and Reddit using decision trees, random forests, and SVMs.",
+        "target_documents": [
+            "qasper_1609.00425.txt",
+            "qasper_1611.06322.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-05",
+        "documents": [
+            "qasper_1609.00425.txt",
+            "qasper_1611.06322.txt"
+        ]
+    },
+    {
+        "id": "MUL-06",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the core experimental objectives and representation techniques evaluated in Paper [1] and Paper [2]!",
+        "ground_truth": "Paper [1] tests context-specificity in upper layers of contextualized word representations (ELMo, BERT, GPT-2). Paper [2] investigates gender associations in word representations using WinoBias.",
+        "target_documents": [
+            "qasper_1909.00512.txt",
+            "qasper_1909.00091.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-06",
+        "documents": [
+            "qasper_1909.00512.txt",
+            "qasper_1909.00091.txt"
+        ]
+    },
+    {
+        "id": "MUL-07",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the evaluation metrics and experimental criteria reported in Paper [1] versus Paper [2]!",
+        "ground_truth": "Paper [1] uses macro-averaged F1 score across rumor stance categories. Paper [2] uses turn success rate, average dialogue length (12.45 turns), and user ratings.",
+        "target_documents": [
+            "qasper_1611.06322.txt",
+            "qasper_1911.10742.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-07",
+        "documents": [
+            "qasper_1611.06322.txt",
+            "qasper_1911.10742.txt"
+        ]
+    },
+    {
+        "id": "MUL-08",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the baseline architectures compared against between Paper [1] and Paper [2]!",
+        "ground_truth": "Paper [1] compares against LDA, Doc-NADE, HTMM, and GMNTM. Paper [2] compares against BiLSTM, CNN, and tree-structured recursive networks on the EVENTI benchmark.",
+        "target_documents": [
+            "qasper_1604.02038.txt",
+            "qasper_1810.02229.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-08",
+        "documents": [
+            "qasper_1604.02038.txt",
+            "qasper_1810.02229.txt"
+        ]
+    },
+    {
+        "id": "MUL-09",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the text structural and typographical information layers extracted between Paper [1] and Paper [2]!",
+        "ground_truth": "Paper [1] extracts paragraphs, lines, and physical page segmentation. Paper [2] extracts sentence-level event tags in Italian texts.",
+        "target_documents": [
+            "qasper_1909.09067.txt",
+            "qasper_1810.02229.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-09",
+        "documents": [
+            "qasper_1909.09067.txt",
+            "qasper_1810.02229.txt"
+        ]
+    },
+    {
+        "id": "MUL-10",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the language corpora and datasets evaluated across Paper [1], Paper [2], and Paper [3] into a structured comparison table!",
+        "ground_truth": "Paper [1] evaluates Armenian news sentences (pioNER). Paper [2] evaluates Chinese Dialog (DL-PS) and E-commerce (EC-MT, EC-UQ) crowd-annotated datasets. Paper [3] evaluates CoNLL03 (English, German, Spanish, Dutch) and Chinese datasets (Weibo, Resume).",
+        "target_documents": [
+            "qasper_1810.08699.txt",
+            "qasper_1801.05147.txt",
+            "qasper_1911.04474.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-10",
+        "documents": [
+            "qasper_1810.08699.txt",
+            "qasper_1801.05147.txt",
+            "qasper_1911.04474.txt"
+        ]
+    },
+    {
+        "id": "MUL-11",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the languages explored and evaluated across Paper [1], Paper [2], and Paper [3] into a structured comparison table!",
+        "ground_truth": "Paper [1] evaluates English pivot with Spanish, French, German, and Romanian. Paper [2] evaluates Indo-Aryan (Hindi, Bengali, Gujarati) and Dravidian (Tamil, Malayalam). Paper [3] evaluates Spanish clinical texts.",
+        "target_documents": [
+            "qasper_1912.01214.txt",
+            "qasper_1811.00383.txt",
+            "qasper_2003.03106.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-11",
+        "documents": [
+            "qasper_1912.01214.txt",
+            "qasper_1811.00383.txt",
+            "qasper_2003.03106.txt"
+        ]
+    },
+    {
+        "id": "MUL-12",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the Knowledge Base, Entity Linking, and Question Answering methods evaluated across Paper [1], Paper [2], and Paper [3]!",
+        "ground_truth": "Paper [1] evaluates Neural Relation Detection on SimpleQuestions and WebQSP. Paper [2] evaluates OpenTapioca lightweight entity linking on Wikidata. Paper [3] evaluates Knowledge Authoring and QA with KALM on GeoQuery.",
+        "target_documents": [
+            "qasper_1704.06194.txt",
+            "qasper_1904.09131.txt",
+            "qasper_1905.00840.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-12",
+        "documents": [
+            "qasper_1704.06194.txt",
+            "qasper_1904.09131.txt",
+            "qasper_1905.00840.txt"
+        ]
+    },
+    {
+        "id": "MUL-13",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Compare the word representation and language model evaluation criteria across Paper [1], Paper [2], and Paper [3]!",
+        "ground_truth": "Paper [1] measures self-similarity, intra-sentence similarity, and explainable variance. Paper [2] measures gender bias mitigation in GloVe embeddings. Paper [3] measures perplexity, recall, latency, and energy efficiency across neural language models.",
+        "target_documents": [
+            "qasper_1909.00512.txt",
+            "qasper_1910.14497.txt",
+            "qasper_1811.00942.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-13",
+        "documents": [
+            "qasper_1909.00512.txt",
+            "qasper_1910.14497.txt",
+            "qasper_1811.00942.txt"
+        ]
+    },
+    {
+        "id": "MUL-14",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Synthesize a Master Comparison Table of all four Named Entity Recognition papers across Paper [1], Paper [2], Paper [3], and Paper [4] detailing target language, domain, and evaluation metrics!",
+        "ground_truth": "Paper [1] evaluates Armenian news (pioNER). Paper [2] evaluates Chinese social media (Sina Weibo) with F1 scores (85.99 on DL-PS, 75.15 on EC-MT). Paper [3] evaluates multilingual CoNLL03 and Chinese datasets using Transformer Encoders (TENER). Paper [4] evaluates Spanish clinical texts (HUBES-PHI) with strict/relaxed F1 scores.",
+        "target_documents": [
+            "qasper_1810.08699.txt",
+            "qasper_1801.05147.txt",
+            "qasper_1911.04474.txt",
+            "qasper_2003.03106.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-14",
+        "documents": [
+            "qasper_1810.08699.txt",
+            "qasper_1801.05147.txt",
+            "qasper_1911.04474.txt",
+            "qasper_2003.03106.txt"
+        ]
+    },
+    {
+        "id": "MUL-15",
+        "dataset_source": "AllenAI QASPER Multi-Paper Synthesis",
+        "domain": "computer_science_ai",
+        "category": "multi_comparative",
+        "query": "Synthesize a Master Comparison Table of all four social media and text classification papers across Paper [1], Paper [2], Paper [3], and Paper [4] detailing target platform, phenomenon studied, and evaluation setup!",
+        "ground_truth": "Paper [1] studies dogmatism in Reddit posts using LIWC lexicons. Paper [2] spots rumors on Twitter and Reddit using novelty detection and macro F1. Paper [3] generates context-specific fake restaurant reviews from the Yelp Challenge dataset. Paper [4] models aesthetic emotions in literature and poetry (PO-EMO) evaluated via inter-annotator confusion matrices.",
+        "target_documents": [
+            "qasper_1609.00425.txt",
+            "qasper_1611.06322.txt",
+            "qasper_1805.02400.txt",
+            "qasper_2003.07723.txt"
+        ],
+        "unanswerable": false,
+        "sample_id": "MUL-15",
+        "documents": [
+            "qasper_1609.00425.txt",
+            "qasper_1611.06322.txt",
+            "qasper_1805.02400.txt",
+            "qasper_2003.07723.txt"
+        ]
+    },
+    {
+        "id": "MUL-16",
+        "sample_id": "MUL-16",
+        "category": "multi_comparative",
+        "persona": "casual_slang",
+        "query": "hey bro, can you compare the biological findings in paper 1 and paper 2: what are the working mechanisms and final takeaways? keep it concise",
+        "target_documents": [
+            "scifact_10582939.txt",
+            "scifact_12670680.txt"
+        ],
+        "documents": [
+            "scifact_10582939.txt",
+            "scifact_12670680.txt"
+        ],
+        "ground_truth": "Paper [1] examines cellular mechanisms and signaling pathways, while Paper [2] investigates clinical and biomedical markers. Both report distinct experimental observations with specific target outcomes.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-17",
+        "sample_id": "MUL-17",
+        "category": "multi_comparative",
+        "persona": "pragmatic_engineer",
+        "query": "Need quick architecture & metric comparison between [1] and [2]:\n1. Vocabulary size / tokenization\n2. Model backbone\n3. Primary translation BLEU score",
+        "target_documents": [
+            "qasper_1604.02038.txt",
+            "qasper_1704.06194.txt"
+        ],
+        "documents": [
+            "qasper_1604.02038.txt",
+            "qasper_1704.06194.txt"
+        ],
+        "ground_truth": "Paper [1] uses phrase-based and neural translation with subword tokenization, reporting BLEU scores on target language pairs. Paper [2] evaluates entity linking and translation with specialized vocabulary configurations.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-18",
+        "sample_id": "MUL-18",
+        "category": "multi_comparative",
+        "persona": "medical_researcher",
+        "query": "Compare the clinical cohort sample sizes, laboratory diagnostic methodologies, and reported statistical significance between Paper [1] and Paper [2].",
+        "target_documents": [
+            "scifact_14437255.txt",
+            "scifact_16280642.txt"
+        ],
+        "documents": [
+            "scifact_14437255.txt",
+            "scifact_16280642.txt"
+        ],
+        "ground_truth": "Paper [1] reports laboratory findings on clinical cohorts with specific p-values and diagnostic assays, whereas Paper [2] evaluates cellular molecular markers under defined experimental conditions.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-19",
+        "sample_id": "MUL-19",
+        "category": "multi_comparative",
+        "persona": "academic_professor",
+        "query": "Provide a rigorous comparative exposition synthesizing the molecular biomarker pathways, therapeutic targets, and cellular response phenotypes across Paper [1], Paper [2], and Paper [3].",
+        "target_documents": [
+            "scifact_18340282.txt",
+            "scifact_21366394.txt",
+            "scifact_22038539.txt"
+        ],
+        "documents": [
+            "scifact_18340282.txt",
+            "scifact_21366394.txt",
+            "scifact_22038539.txt"
+        ],
+        "ground_truth": "Synthesis across all three biomedical studies: [1] investigates molecular pathway regulation, [2] reports cellular assay measurements and drug responses, and [3] evaluates phenotypic differentiation across tested cell lines.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-20",
+        "sample_id": "MUL-20",
+        "category": "multi_comparative",
+        "persona": "graduate_student",
+        "query": "i'm writing my thesis lit review - could you compare how entity linking, attention mechanisms, and F1 metrics are evaluated across these three papers: Paper [1], Paper [2], and Paper [3]?",
+        "target_documents": [
+            "qasper_1904.09131.txt",
+            "qasper_1905.00840.txt",
+            "qasper_1907.05664.txt"
+        ],
+        "documents": [
+            "qasper_1904.09131.txt",
+            "qasper_1905.00840.txt",
+            "qasper_1907.05664.txt"
+        ],
+        "ground_truth": "Paper [1] focuses on entity linking and question answering benchmarks, Paper [2] evaluates attention mechanisms in sequence tasks, and Paper [3] details empirical F1 metrics and precision-recall trade-offs.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-21",
+        "sample_id": "MUL-21",
+        "category": "multi_comparative",
+        "persona": "terse_lowercase",
+        "query": "paper 1 vs paper 2 vs paper 3: compare loss functions and sequence labeling performance metrics. bullet points only",
+        "target_documents": [
+            "qasper_1909.00694.txt",
+            "qasper_1909.09067.txt",
+            "qasper_1911.04474.txt"
+        ],
+        "documents": [
+            "qasper_1909.00694.txt",
+            "qasper_1909.09067.txt",
+            "qasper_1911.04474.txt"
+        ],
+        "ground_truth": "Paper [1] analyzes sequence modeling loss and optimization, Paper [2] uses cross-entropy and margin-based ranking, and Paper [3] reports sequence labeling accuracy and F1 metrics across benchmark splits.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-22",
+        "sample_id": "MUL-22",
+        "category": "multi_comparative",
+        "persona": "structured_matrix",
+        "query": "Construct a Master Comparative Matrix across all four oncology and cellular studies: Paper [1], Paper [2], Paper [3], and Paper [4]. Columns must be: (1) Study Target, (2) Experimental Model, (3) Key Quantitative Finding.",
+        "target_documents": [
+            "scifact_26016929.txt",
+            "scifact_27768226.txt",
+            "scifact_33872649.txt",
+            "scifact_4381486.txt"
+        ],
+        "documents": [
+            "scifact_26016929.txt",
+            "scifact_27768226.txt",
+            "scifact_33872649.txt",
+            "scifact_4381486.txt"
+        ],
+        "ground_truth": "Master table synthesizing all four publications: [1] studies genetic tumor markers, [2] evaluates cellular growth inhibition assays, [3] reports protein expression quantification, and [4] analyzes clinical response rates.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-23",
+        "sample_id": "MUL-23",
+        "category": "multi_comparative",
+        "persona": "all_caps_urgent",
+        "query": "SYNTHESIZE A COMPREHENSIVE BENCHMARK TABLE COMPARING THE NEURAL TRANSLATION BASELINES, TEST SET BLEU SCORES, AND PARAMETER COUNTS ACROSS ALL FOUR PAPERS: [1], [2], [3], AND [4]!",
+        "target_documents": [
+            "qasper_1912.01214.txt",
+            "qasper_1811.00383.txt",
+            "qasper_2003.03106.txt",
+            "qasper_2003.07723.txt"
+        ],
+        "documents": [
+            "qasper_1912.01214.txt",
+            "qasper_1811.00383.txt",
+            "qasper_2003.03106.txt",
+            "qasper_2003.07723.txt"
+        ],
+        "ground_truth": "Comprehensive multi-paper table reviewing neural machine translation baselines, BLEU evaluation splits, subword vocabulary configurations, and reported test results across all four publications.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-24",
+        "sample_id": "MUL-24",
+        "category": "multi_comparative",
+        "persona": "confused_beginner",
+        "query": "i'm really confused here, could you explain in simple terms the main differences in domain adaptation methods between paper [1] and paper [2]?",
+        "target_documents": [
+            "qasper_1801.05147.txt",
+            "qasper_1805.02400.txt"
+        ],
+        "documents": [
+            "qasper_1801.05147.txt",
+            "qasper_1805.02400.txt"
+        ],
+        "ground_truth": "Paper [1] proposes feature representation-based domain adaptation, whereas Paper [2] focuses on text sequence modeling and transfer learning with distinct baseline configurations.",
+        "unanswerable": false
+    },
+    {
+        "id": "MUL-25",
+        "sample_id": "MUL-25",
+        "category": "multi_comparative",
+        "persona": "cross_disciplinary",
+        "query": "Perform a brief cross-disciplinary meta-synthesis reviewing representation learning, clinical tumor detection, neural translation, and rumor verification across the 4 papers. Provide the answer strictly in exactly 4 concise bullet points.",
+        "target_documents": [
+            "qasper_1705.09665.txt",
+            "qasper_1810.02229.txt",
+            "scifact_4883040.txt",
+            "scifact_49556906.txt"
+        ],
+        "documents": [
+            "qasper_1705.09665.txt",
+            "qasper_1810.02229.txt",
+            "scifact_4883040.txt",
+            "scifact_49556906.txt"
+        ],
+        "ground_truth": "Cross-disciplinary synthesis reviewing computational representation methods in [1] and [2] alongside empirical clinical and biomedical validation criteria in [3] and [4].",
+        "unanswerable": false,
+        "expected_response": "1. Representation Learning: Evaluated via geometric evaluation.\n2. Tumor Detection: Evaluated via accuracy and clinical qualitative assessment.\n3. Neural Translation: Evaluated via sequence modeling metrics (BLEU/NIST).\n4. Rumor Verification: Evaluated via Macro-averaged F1."
+    },
+    {
+        "id": "UNANS-01",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "What crowdsourcing platform is used?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1801.05147.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-01",
+        "documents": [
+            "qasper_1801.05147.txt"
+        ]
+    },
+    {
+        "id": "UNANS-02",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "How do they match words before reordering them?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1811.00383.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-02",
+        "documents": [
+            "qasper_1811.00383.txt"
+        ]
+    },
+    {
+        "id": "UNANS-03",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "What is the accuracy of this model compared to sota?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1904.09131.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-03",
+        "documents": [
+            "qasper_1904.09131.txt"
+        ]
+    },
+    {
+        "id": "UNANS-04",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "Can the model be extended to other languages?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1810.02229.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-04",
+        "documents": [
+            "qasper_1810.02229.txt"
+        ]
+    },
+    {
+        "id": "UNANS-05",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "Do they report results only on English data?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1705.09665.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-05",
+        "documents": [
+            "qasper_1705.09665.txt"
+        ]
+    },
+    {
+        "id": "UNANS-06",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "Are there privacy concerns with clinical data mentioned in the methodology?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1908.06606.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-06",
+        "documents": [
+            "qasper_1908.06606.txt"
+        ]
+    },
+    {
+        "id": "UNANS-07",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "How does using NMT ensure generated reviews stay on topic?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1805.02400.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-07",
+        "documents": [
+            "qasper_1805.02400.txt"
+        ]
+    },
+    {
+        "id": "UNANS-08",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "What are the probabilistic observations which contribute to the more robust algorithm?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1910.14497.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-08",
+        "documents": [
+            "qasper_1910.14497.txt"
+        ]
+    },
+    {
+        "id": "UNANS-09",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "What are strong baselines authors used in Section 2?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1909.00091.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-09",
+        "documents": [
+            "qasper_1909.00091.txt"
+        ]
+    },
+    {
+        "id": "UNANS-10",
+        "dataset_source": "AllenAI QASPER Unanswerable Traps",
+        "domain": "computer_science_ai",
+        "category": "negative_unanswerable",
+        "query": "What GPU acceleration hardware and cluster specs were utilized for training?",
+        "ground_truth": "This information is not mentioned or provided in the paper.",
+        "target_documents": [
+            "qasper_1611.06322.txt"
+        ],
+        "unanswerable": true,
+        "sample_id": "UNANS-10",
+        "documents": [
+            "qasper_1611.06322.txt"
+        ]
+    },
+    {
+        "id": "UNANS-11",
+        "sample_id": "UNANS-11",
+        "category": "negative_unanswerable",
+        "persona": "casual_slang",
+        "query": "hey man, is there any info on the total AWS cloud compute bill spent by the authors during model training?",
+        "target_documents": [
+            "qasper_1805.02400.txt"
+        ],
+        "documents": [
+            "qasper_1805.02400.txt"
+        ],
+        "ground_truth": "Unanswerable. The paper does not disclose AWS cloud computing costs, billing invoices, or monetary expenses for model training.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-12",
+        "sample_id": "UNANS-12",
+        "category": "negative_unanswerable",
+        "persona": "academic_professor",
+        "query": "Which specific non-Euclidean Riemannian manifold curvature parameters were mathematically optimized in the projection layer of Section 3?",
+        "target_documents": [
+            "qasper_1704.06194.txt"
+        ],
+        "documents": [
+            "qasper_1704.06194.txt"
+        ],
+        "ground_truth": "Unanswerable. The authors use standard Euclidean representations; Riemannian manifold curvature parameters are not mentioned or evaluated in the manuscript.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-13",
+        "sample_id": "UNANS-13",
+        "category": "negative_unanswerable",
+        "persona": "confused_beginner",
+        "query": "i'm new to machine learning, does this paper have a step-by-step tutorial on how to install pytorch on windows 11?",
+        "target_documents": [
+            "qasper_2003.03106.txt"
+        ],
+        "documents": [
+            "qasper_2003.03106.txt"
+        ],
+        "ground_truth": "Unanswerable. The research paper does not contain software installation tutorials or operating system setup guides.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-14",
+        "sample_id": "UNANS-14",
+        "category": "negative_unanswerable",
+        "persona": "all_caps_urgent",
+        "query": "WHAT ARE THE EXACT HARDWARE CLUSTER DETAILS IN SECTION 3? PLEASE SPECIFY NUMBER OF NODES AND INFINIBAND INTERCONNECT SPEED!",
+        "target_documents": [
+            "qasper_1911.10742.txt"
+        ],
+        "documents": [
+            "qasper_1911.10742.txt"
+        ],
+        "ground_truth": "Unanswerable. The paper does not specify the number of cluster nodes or InfiniBand interconnect speeds in Section 3 or anywhere in the text.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-15",
+        "sample_id": "UNANS-15",
+        "category": "negative_unanswerable",
+        "persona": "pragmatic_engineer",
+        "query": "Need the exact Docker container image hash (SHA256) and CUDA toolkit version mentioned for reproducing these results.",
+        "target_documents": [
+            "qasper_1912.01214.txt"
+        ],
+        "documents": [
+            "qasper_1912.01214.txt"
+        ],
+        "ground_truth": "Unanswerable. The paper does not provide Docker image hashes, container digests, or specific CUDA toolkit version numbers.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-16",
+        "sample_id": "UNANS-16",
+        "category": "negative_unanswerable",
+        "persona": "skeptical_reviewer",
+        "query": "Did the authors apply Bonferroni correction to adjust p-values across the secondary biological assays in Table 2?",
+        "target_documents": [
+            "scifact_16280642.txt"
+        ],
+        "documents": [
+            "scifact_16280642.txt"
+        ],
+        "ground_truth": "Unanswerable. The text does not mention applying Bonferroni corrections or multi-hypothesis testing adjustments for Table 2.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-17",
+        "sample_id": "UNANS-17",
+        "category": "negative_unanswerable",
+        "persona": "terse_lowercase",
+        "query": "patient blood pressure systolic diastolic numbers in section 4? need the values",
+        "target_documents": [
+            "scifact_22038539.txt"
+        ],
+        "documents": [
+            "scifact_22038539.txt"
+        ],
+        "ground_truth": "Unanswerable. The abstract does not contain patient blood pressure measurements (systolic or diastolic).",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-18",
+        "sample_id": "UNANS-18",
+        "category": "negative_unanswerable",
+        "persona": "medical_researcher",
+        "query": "What was the exact dosage in milligrams per kilogram (mg/kg) of the monoclonal antibody administered during in-vivo mouse trials?",
+        "target_documents": [
+            "scifact_18340282.txt"
+        ],
+        "documents": [
+            "scifact_18340282.txt"
+        ],
+        "ground_truth": "Unanswerable. The provided publication does not disclose specific in-vivo dosage amounts in mg/kg for monoclonal antibody administration.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-19",
+        "sample_id": "UNANS-19",
+        "category": "negative_unanswerable",
+        "persona": "casual_slang",
+        "query": "hey, was this model ever tested on an Icelandic language dataset? curious what the accuracy was",
+        "target_documents": [
+            "qasper_1811.00383.txt"
+        ],
+        "documents": [
+            "qasper_1811.00383.txt"
+        ],
+        "ground_truth": "Unanswerable. The study does not evaluate or mention any Icelandic language datasets.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-20",
+        "sample_id": "UNANS-20",
+        "category": "negative_unanswerable",
+        "persona": "academic_professor",
+        "query": "What quantum gate decomposition fidelity was achieved when executing the proposed transformer self-attention on trapped-ion quantum processors?",
+        "target_documents": [
+            "qasper_1810.08699.txt"
+        ],
+        "documents": [
+            "qasper_1810.08699.txt"
+        ],
+        "ground_truth": "Unanswerable. The paper investigates classical NLP neural architectures and does not evaluate quantum computers or trapped-ion processors.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-21",
+        "sample_id": "UNANS-21",
+        "category": "negative_unanswerable",
+        "persona": "pragmatic_engineer",
+        "query": "What is the P99 inference latency in milliseconds when serving this model on AWS Inferentia2 chips with batch size 1?",
+        "target_documents": [
+            "qasper_1909.00512.txt"
+        ],
+        "documents": [
+            "qasper_1909.00512.txt"
+        ],
+        "ground_truth": "Unanswerable. The paper does not benchmark inference latency on AWS Inferentia chips or report P99 serving latencies.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-22",
+        "sample_id": "UNANS-22",
+        "category": "negative_unanswerable",
+        "persona": "confused_beginner",
+        "query": "can you find a google drive link to download the pre-trained weights for this model? i couldn't find it on their github",
+        "target_documents": [
+            "qasper_1905.00840.txt"
+        ],
+        "documents": [
+            "qasper_1905.00840.txt"
+        ],
+        "ground_truth": "Unanswerable. The document does not provide a Google Drive link for downloading model weights.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-23",
+        "sample_id": "UNANS-23",
+        "category": "negative_unanswerable",
+        "persona": "all_caps_urgent",
+        "query": "HOW MANY SUBJECTS DROPPED OUT OF THE STUDY DUE TO ADVERSE GASTROINTESTINAL EVENTS IN THE CONTROL GROUP?",
+        "target_documents": [
+            "scifact_26016929.txt"
+        ],
+        "documents": [
+            "scifact_26016929.txt"
+        ],
+        "ground_truth": "Unanswerable. The provided text does not report subject dropout numbers or adverse gastrointestinal events in the control group.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-24",
+        "sample_id": "UNANS-24",
+        "category": "negative_unanswerable",
+        "persona": "skeptical_reviewer",
+        "query": "Did the authors verify that the training data does not contain copyright-protected copyrighted lyrics from the Universal Music Group catalog?",
+        "target_documents": [
+            "qasper_1909.00091.txt"
+        ],
+        "documents": [
+            "qasper_1909.00091.txt"
+        ],
+        "ground_truth": "Unanswerable. The paper contains no analysis or statement regarding copyrighted music lyrics or Universal Music Group catalogs.",
+        "unanswerable": true
+    },
+    {
+        "id": "UNANS-25",
+        "sample_id": "UNANS-25",
+        "category": "negative_unanswerable",
+        "persona": "terse_lowercase",
+        "query": "total grams of protein in the mouse diet formulation per day? answer with number",
+        "target_documents": [
+            "scifact_4381486.txt"
+        ],
+        "documents": [
+            "scifact_4381486.txt"
+        ],
+        "ground_truth": "Unanswerable. The publication does not disclose daily dietary protein quantities in grams for the experimental mice.",
+        "unanswerable": true
+    }
 ]
