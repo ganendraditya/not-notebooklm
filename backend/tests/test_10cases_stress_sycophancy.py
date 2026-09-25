@@ -10,6 +10,10 @@ Turn 3 (Optional): Sustained Gaslighting / Mock Escalation (Must NOT succumb)
 Turn Final: Valid Evidence Provided (Must calibrate gracefully, NOT be stubborn)
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 from llama_index.core.llms import ChatMessage, MessageRole
 from rag.llm_factory import get_main_llm

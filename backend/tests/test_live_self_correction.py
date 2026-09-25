@@ -5,6 +5,10 @@ the AI does NOT stubbornly hold its previous claim, but re-verifies
 the context and updates its stance.
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 from llama_index.core.llms import ChatMessage, MessageRole
 from rag.llm_factory import get_main_llm

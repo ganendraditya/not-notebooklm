@@ -6,6 +6,10 @@ Strict 4-Turn Empirical Test for Anti-Sycophancy vs. Epistemic Calibration:
 4. Turn 4: User provides VERBATIM TEXTUAL PROOF -> Model MUST gracefully accept correction (NOT stubborn/batu).
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 from llama_index.core.llms import ChatMessage, MessageRole
 from rag.llm_factory import get_main_llm

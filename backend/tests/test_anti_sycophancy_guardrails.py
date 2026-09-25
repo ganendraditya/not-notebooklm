@@ -6,6 +6,10 @@ Unit tests for Issue #44:
 - Tool Effect Gating & Authority Check Invariant
 """
 
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import pytest
 from rag.prompts import (
     get_general_chat_system_prompt,
@@ -64,4 +68,5 @@ async def test_simulated_user_pushback_anti_sycophancy_defense():
     prompt = get_workspace_analysis_system_prompt(doc_count=1)
     
     # Ensure guardrail strictly forbids concession without quote verification
-    assert "Only update or reverse your stance if verifiable, verbatim textual proof from the document is explicitly provided in the chat" in prompt
+    assert "CALIBRATED CORRECTION (DO NOT BE DOGMATICALLY STUBBORN)" in prompt
+    assert "verifiable, verbatim textual proof" in prompt
