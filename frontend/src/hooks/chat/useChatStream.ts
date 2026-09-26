@@ -92,6 +92,8 @@ export function useChatStream(
       setIsLoading(true);
       setActiveStatus(job.status);
       updateMessagesList(prev => [...prev, newMsg, assistantPlaceholder]);
+    } else {
+      job.baseMessages = job.lastCompletedMessages ? [...job.lastCompletedMessages] : [];
     }
 
     const controller = new AbortController();
@@ -398,11 +400,13 @@ export function useChatStream(
     // Optimistically update message list: keep messages up to messageIndex, replace at messageIndex, remove subsequent responses
     const updatedUserMsg: ChatMessage = { role: "user", content: newContent, created_at: new Date().toISOString() };
     const assistantPlaceholder: ChatMessage = { role: "assistant", content: "", created_at: new Date().toISOString(), isStreaming: true };
-    job.baseMessages = useChatStore.getState().messages.slice(0, messageIndex);
     job.inFlightUserMsg = updatedUserMsg;
     job.inFlightStreamingMsg = assistantPlaceholder;
     if (activeChatIdRef.current === currentChatId) {
+      job.baseMessages = useChatStore.getState().messages.slice(0, messageIndex);
       updateMessagesList(prev => [...prev.slice(0, messageIndex), updatedUserMsg, assistantPlaceholder]);
+    } else {
+      job.baseMessages = job.lastCompletedMessages ? job.lastCompletedMessages.slice(0, messageIndex) : [];
     }
 
     let latestAsstMsg: any = null;
@@ -578,11 +582,11 @@ export function useChatStream(
     job.isProcessing = true;
     job.status = "Regenerating response...";
     const assistantPlaceholder: ChatMessage = { role: "assistant", content: "", created_at: new Date().toISOString(), isStreaming: true };
-    job.baseMessages = useChatStore.getState().messages.slice(0, messageIndex);
     job.inFlightUserMsg = null;
     job.inFlightStreamingMsg = assistantPlaceholder;
 
     if (activeChatIdRef.current === currentChatId) {
+      job.baseMessages = useChatStore.getState().messages.slice(0, messageIndex);
       setIsLoading(true);
       setActiveStatus(job.status);
       // Truncate all messages below the regenerating message and blank out target slot
@@ -596,6 +600,8 @@ export function useChatStream(
         }
         return next;
       });
+    } else {
+      job.baseMessages = job.lastCompletedMessages ? job.lastCompletedMessages.slice(0, messageIndex) : [];
     }
 
     const controller = new AbortController();

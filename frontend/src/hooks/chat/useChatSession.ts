@@ -69,8 +69,8 @@ export function useChatSession(
           if (activeChatIdRef.current === id) {
             const currentJob = getChatJob(id);
             setDocuments(data.documents || []);
-            currentJob.lastCompletedMessages = data.messages || [];
             if (!currentJob.isProcessing) {
+              currentJob.lastCompletedMessages = data.messages || [];
               setMessages(data.messages || []);
             } else {
               const dbMessages: ChatMessage[] = data.messages || [];
