@@ -121,6 +121,9 @@ async def test_workspace_pipeline_respects_token_budget():
     dummy_chat = "test_budget_ws_chat"
     db = SessionLocal()
     try:
+        from database import ChatSession
+        session = ChatSession(id=dummy_chat, title="Test Budget WS Chat")
+        db.add(session)
         doc = DBDocument(
             chat_id=dummy_chat,
             filename="massive_paper.pdf",
@@ -163,6 +166,7 @@ async def test_workspace_pipeline_respects_token_budget():
     finally:
         db = SessionLocal()
         db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat).delete()
+        db.query(ChatSession).filter(ChatSession.id == dummy_chat).delete()
         db.commit()
         db.close()
 
