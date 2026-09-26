@@ -404,11 +404,13 @@ def test_workspace_pipeline_execution():
     import asyncio
     from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
     from unittest.mock import AsyncMock, MagicMock
-    from database import SessionLocal, Document as DBDocument
+    from database import SessionLocal, Document as DBDocument, ChatSession
 
     dummy_chat_id = "test_ws_chat_123"
     db = SessionLocal()
     try:
+        session = ChatSession(id=dummy_chat_id, title="Test WS Pipeline")
+        db.add(session)
         dummy_doc = DBDocument(
             chat_id=dummy_chat_id,
             filename="test_paper.pdf",
@@ -447,6 +449,7 @@ def test_workspace_pipeline_execution():
     finally:
         db = SessionLocal()
         db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == dummy_chat_id).delete()
         db.commit()
         db.close()
 
@@ -511,7 +514,7 @@ def test_workspace_pipeline_hybrid_retrieval_scaling():
     import asyncio
     from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
     from unittest.mock import AsyncMock, MagicMock
-    from database import SessionLocal, Document as DBDocument
+    from database import SessionLocal, Document as DBDocument, ChatSession
 
     dummy_chat_id = "test_hybrid_scaling_chat"
     db = SessionLocal()
@@ -528,6 +531,8 @@ def test_workspace_pipeline_hybrid_retrieval_scaling():
         for i in range(1, 6)
     ]
     try:
+        session = ChatSession(id=dummy_chat_id, title="Test Hybrid Scaling")
+        db.add(session)
         for d in docs_to_add:
             db.add(d)
         db.commit()
@@ -559,6 +564,7 @@ def test_workspace_pipeline_hybrid_retrieval_scaling():
     finally:
         db = SessionLocal()
         db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == dummy_chat_id).delete()
         db.commit()
         db.close()
 
@@ -567,7 +573,7 @@ def test_workspace_pipeline_adaptive_token_density_routing_for_long_docs(monkeyp
     import asyncio
     from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline, _inspect_workspace_documents_token_density
     from unittest.mock import AsyncMock, MagicMock
-    from database import SessionLocal, Document as DBDocument
+    from database import SessionLocal, Document as DBDocument, ChatSession
 
     dummy_chat_id = "test_long_book_routing_chat"
     db = SessionLocal()
@@ -593,6 +599,8 @@ def test_workspace_pipeline_adaptive_token_density_routing_for_long_docs(monkeyp
         ),
     ]
     try:
+        session = ChatSession(id=dummy_chat_id, title="Test Long Book Routing")
+        db.add(session)
         for d in docs_to_add:
             db.add(d)
         db.commit()
@@ -638,6 +646,7 @@ def test_workspace_pipeline_adaptive_token_density_routing_for_long_docs(monkeyp
     finally:
         db = SessionLocal()
         db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == dummy_chat_id).delete()
         db.commit()
         db.close()
 
@@ -646,7 +655,7 @@ def test_workspace_pipeline_compact_workspace_direct_full_context(monkeypatch):
     import asyncio
     from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
     from unittest.mock import AsyncMock, MagicMock
-    from database import SessionLocal, Document as DBDocument
+    from database import SessionLocal, Document as DBDocument, ChatSession
 
     dummy_chat_id = "test_compact_papers_chat"
     db = SessionLocal()
@@ -672,6 +681,8 @@ def test_workspace_pipeline_compact_workspace_direct_full_context(monkeypatch):
         ),
     ]
     try:
+        session = ChatSession(id=dummy_chat_id, title="Test Compact Papers")
+        db.add(session)
         for d in docs_to_add:
             db.add(d)
         db.commit()
@@ -716,6 +727,7 @@ def test_workspace_pipeline_compact_workspace_direct_full_context(monkeypatch):
     finally:
         db = SessionLocal()
         db.query(DBDocument).filter(DBDocument.chat_id == dummy_chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == dummy_chat_id).delete()
         db.commit()
         db.close()
 
@@ -792,7 +804,7 @@ def test_commit_with_retry():
 
 def test_storage_delete_files_cleans_vectors(monkeypatch):
     """Verify deleting files via /storage/delete purges Qdrant vector embeddings and database record."""
-    from database import SessionLocal, Document as DBDocument
+    from database import SessionLocal, Document as DBDocument, ChatSession
     from helpers import UPLOAD_DIR
     import rag
 
@@ -805,6 +817,8 @@ def test_storage_delete_files_cleans_vectors(monkeypatch):
 
     db = SessionLocal()
     try:
+        session = ChatSession(id=dummy_chat_id, title="Test Storage Delete")
+        db.add(session)
         doc = DBDocument(
             chat_id=dummy_chat_id,
             filename=dummy_fn,
@@ -836,6 +850,11 @@ def test_storage_delete_files_cleans_vectors(monkeypatch):
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
+        db = SessionLocal()
+        db.query(DBDocument).filter(DBDocument.filename == dummy_fn).delete()
+        db.query(ChatSession).filter(ChatSession.id == dummy_chat_id).delete()
+        db.commit()
+        db.close()
 
 def test_bulk_download_request_schema():
     """Verify BulkDownloadRequest schema is defined and validated in models."""
@@ -976,7 +995,7 @@ def test_citation_highlight_db_persistence():
     """Verify citation highlight results are stored and restored from SQLite across cache purges."""
     import asyncio
     from unittest.mock import AsyncMock, patch
-    from database import SessionLocal, CitationHighlight
+    from database import SessionLocal, CitationHighlight, ChatSession
     from services.highlight_service import get_ai_highlight_passages, _HIGHLIGHT_CACHE
 
     chat_id = "test_persistence_chat"
@@ -988,6 +1007,10 @@ def test_citation_highlight_db_persistence():
 
     db = SessionLocal()
     try:
+        session = ChatSession(id=chat_id, title="Test Persistence")
+        db.add(session)
+        db.commit()
+
         # 1. Run with LLM mock and DB persistence
         with patch("services.highlight_service.acall_fast_with_fallback", new=AsyncMock(return_value=mock_resp)):
             res = asyncio.run(get_ai_highlight_passages(
@@ -1026,6 +1049,7 @@ def test_citation_highlight_db_persistence():
     finally:
         # Clean up test rows
         db.query(CitationHighlight).filter(CitationHighlight.chat_id == chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == chat_id).delete()
         db.commit()
         db.close()
 
@@ -1077,7 +1101,7 @@ def test_auto_ground_worker_and_claim_extractor():
     """Verify background worker automatically extracts claims and pre-locks evidence into SQLite."""
     import asyncio
     from unittest.mock import AsyncMock, patch
-    from database import SessionLocal, Document as DBDocument, CitationHighlight
+    from database import SessionLocal, Document as DBDocument, CitationHighlight, ChatSession
     from services.highlight_service import extract_citations_and_claims, auto_ground_response_citations, get_ai_highlight_passages
 
     sample_table = """| No | Judul & Tahun | Metode & Dataset | Temuan Utama & Metrik Performa |
@@ -1094,6 +1118,8 @@ def test_auto_ground_worker_and_claim_extractor():
     chat_id = "test_auto_ground_chat"
     db = SessionLocal()
     try:
+        session = ChatSession(id=chat_id, title="Test Auto Ground")
+        db.add(session)
         d1 = DBDocument(chat_id=chat_id, filename="Paper1.pdf", title="Deteksi Plat Nomor", snippet="Akurasi 98%, Presisi 98% terbukti pada uji.")
         d2 = DBDocument(chat_id=chat_id, filename="Paper2.txt", title="Deteksi Objek Plat", snippet="mAP 0,893 dan F1-score 0,887 tercapai.")
         db.add_all([d1, d2])
@@ -1123,6 +1149,7 @@ def test_auto_ground_worker_and_claim_extractor():
     finally:
         db.query(CitationHighlight).filter(CitationHighlight.chat_id == chat_id).delete()
         db.query(DBDocument).filter(DBDocument.chat_id == chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == chat_id).delete()
         db.commit()
         db.close()
 

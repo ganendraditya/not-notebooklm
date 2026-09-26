@@ -189,6 +189,7 @@ def test_paper_service_prepare_and_document_response():
 def test_delete_storage_file_and_records_resolves_prefix():
     """Verify delete_storage_file_and_records cleans disk file, DB record, and vector index without zombie leak."""
     from services.storage_service import delete_storage_file_and_records
+    from database import ChatSession
     from utils.file_utils import UPLOAD_DIR
     import uuid
 
@@ -199,6 +200,10 @@ def test_delete_storage_file_and_records_resolves_prefix():
     disk_path = os.path.join(UPLOAD_DIR, disk_filename)
 
     try:
+        session = ChatSession(id=chat_id, title="Test Storage Prefix Session")
+        db.add(session)
+        db.commit()
+
         # Create physical dummy file
         with open(disk_path, "w", encoding="utf-8") as f:
             f.write("Dummy PDF content for Phase 4 test")
@@ -229,17 +234,23 @@ def test_delete_storage_file_and_records_resolves_prefix():
         if os.path.exists(disk_path):
             os.remove(disk_path)
         db.query(Document).filter(Document.chat_id == chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == chat_id).delete()
         db.commit()
         db.close()
 
 def test_delete_multiple_documents_batch():
     """Verify batch deletion in delete_multiple_documents."""
     from services.storage_service import delete_multiple_documents
+    from database import ChatSession
     import uuid
 
     db = SessionLocal()
     chat_id = f"test_bulk_{uuid.uuid4().hex[:8]}"
     try:
+        session = ChatSession(id=chat_id, title="Test Bulk Session")
+        db.add(session)
+        db.commit()
+
         d1 = Document(chat_id=chat_id, filename="bulk_doc_1.pdf", title="Bulk 1")
         d2 = Document(chat_id=chat_id, filename="bulk_doc_2.pdf", title="Bulk 2")
         db.add_all([d1, d2])
@@ -253,6 +264,7 @@ def test_delete_multiple_documents_batch():
         assert remaining == 0
     finally:
         db.query(Document).filter(Document.chat_id == chat_id).delete()
+        db.query(ChatSession).filter(ChatSession.id == chat_id).delete()
         db.commit()
         db.close()
 

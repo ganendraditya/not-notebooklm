@@ -28,7 +28,7 @@ if DATABASE_URL.startswith("sqlite"):
         connect_args={"check_same_thread": False, "timeout": 30}
     )
 
-    # Enable WAL mode and synchronous=NORMAL on every new SQLite connection
+    # Enable WAL mode, synchronous=NORMAL, busy_timeout, and foreign_keys on every new SQLite connection
     @event.listens_for(engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         if isinstance(dbapi_connection, sqlite3.Connection):
@@ -36,6 +36,7 @@ if DATABASE_URL.startswith("sqlite"):
             cursor.execute("PRAGMA journal_mode=WAL;")
             cursor.execute("PRAGMA synchronous=NORMAL;")
             cursor.execute("PRAGMA busy_timeout=30000;")  # 30-second lock wait timeout
+            cursor.execute("PRAGMA foreign_keys=ON;")      # Enforce referential integrity & foreign key constraints
             cursor.close()
 else:
     # PostgreSQL / MySQL enterprise connection pool
@@ -59,13 +60,19 @@ class ChatSession(Base):
     created_at = Column(DateTime, default=get_utc_now)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
     
-    documents = relationship("Document", back_populates="chat_session")
-    messages = relationship("ChatMessage", back_populates="chat_session", order_by="ChatMessage.created_at")
+    documents = relationship("Document", back_populates="chat_session", cascade="all, delete-orphan")
+    messages = relationship("ChatMessage", back_populates="chat_session", order_by="ChatMessage.created_at", cascade="all, delete-orphan")
     research_profiles = relationship(
         "ResearchProfile",
         back_populates="chat_session",
         cascade="all, delete-orphan",
         order_by="ResearchProfile.created_at"
+    )
+    citation_highlights = relationship(
+        "CitationHighlight",
+        back_populates="chat_session",
+        cascade="all, delete-orphan",
+        order_by="CitationHighlight.created_at"
     )
 
 class Document(Base):
@@ -114,12 +121,14 @@ class CitationHighlight(Base):
     __tablename__ = "citation_highlights"
     
     id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column(String, ForeignKey("chat_sessions.id"), index=True)
+    chat_id = Column(String, ForeignKey("chat_sessions.id", ondelete="CASCADE"), index=True)
     doc_id = Column(Integer, index=True)
     claim_hash = Column(String, index=True)
     claim = Column(Text)
     passages_json = Column(Text) # JSON-serialized list of verbatim string quotes
     created_at = Column(DateTime, default=get_utc_now)
+
+    chat_session = relationship("ChatSession", back_populates="citation_highlights")
 
 class ResearchProfile(Base):
     __tablename__ = "research_profiles"
@@ -217,6 +226,12 @@ def auto_migrate_schema():
                 )
             """))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_research_profiles_chat_active ON research_profiles (chat_id, is_active)"))
+
+            # Clean up any legacy orphan records that predate PRAGMA foreign_keys=ON enforcement
+            conn.execute(text("DELETE FROM citation_highlights WHERE chat_id NOT IN (SELECT id FROM chat_sessions)"))
+            conn.execute(text("DELETE FROM documents WHERE chat_id NOT IN (SELECT id FROM chat_sessions)"))
+            conn.execute(text("DELETE FROM chat_messages WHERE chat_id NOT IN (SELECT id FROM chat_sessions)"))
+            conn.execute(text("DELETE FROM research_profiles WHERE chat_id NOT IN (SELECT id FROM chat_sessions)"))
 
     except Exception as e:
         logger.warning(f"[DB Migration Warning]: {e}")

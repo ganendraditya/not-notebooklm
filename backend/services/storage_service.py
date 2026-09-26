@@ -3,7 +3,7 @@ import logging
 from typing import List, Optional, Set
 from sqlalchemy.orm import Session
 
-from database import Document, ChatSession, ChatMessage, commit_with_retry
+from database import Document, ChatSession, ChatMessage, CitationHighlight, ResearchProfile, commit_with_retry
 from utils.file_utils import get_doc_file_path, UPLOAD_DIR, TEMP_ZIPS_DIR, CHAT_MEDIA_DIR
 import rag
 
@@ -69,7 +69,9 @@ def delete_chat_session_cascade(db: Session, chat_id: str) -> bool:
     except Exception as e:
         logger.warning(f"[Storage] Vector cleanup failed for chat {chat_id}: {e}")
 
-    # 3. Clean database records
+    # 3. Clean database records (cascade child tables before parent session)
+    db.query(CitationHighlight).filter(CitationHighlight.chat_id == chat_id).delete(synchronize_session=False)
+    db.query(ResearchProfile).filter(ResearchProfile.chat_id == chat_id).delete(synchronize_session=False)
     db.query(Document).filter(Document.chat_id == chat_id).delete(synchronize_session=False)
     db.query(ChatMessage).filter(ChatMessage.chat_id == chat_id).delete(synchronize_session=False)
     db.delete(chat)
