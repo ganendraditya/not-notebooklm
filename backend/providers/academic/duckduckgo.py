@@ -50,8 +50,7 @@ KNOWN_ACADEMIC_VENUES = {
     "jstor.org": "JSTOR",
     "ssrn.com": "SSRN",
     "academia.edu": "Academia.edu",
-    "scispace.com": "SciSpace",
-    "semanticscholar.org": "Semantic Scholar"
+    "scispace.com": "SciSpace"
 }
 
 OPEN_ACCESS_DOMAINS = {

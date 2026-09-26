@@ -1,0 +1,13 @@
+# Ruff configuration for NotbookLM backend
+target-version = "py311"
+line-length = 150
+
+[lint]
+# Core Pyflakes (F) and Syntax (E9) rules: catches undefined names, unused imports/variables, duplicate keys
+select = ["F", "E9"]
+ignore = []
+
+[lint.per-file-ignores]
+# Test suites and offline evaluation scripts can have mock imports or exploratory variables
+"tests/*" = ["F401", "F841"]
+"evaluation/*" = ["F401", "F841", "F541"]

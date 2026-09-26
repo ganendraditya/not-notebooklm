@@ -12,7 +12,7 @@ import os
 import re
 import logging
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Tuple, Union, Callable
+from typing import List, Dict, Any, Optional, Tuple, Callable
 import inspect
 
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole

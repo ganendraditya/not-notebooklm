@@ -1,7 +1,6 @@
 import re
 import json
 import logging
-from typing import List
 from database import SessionLocal, Document as DBDocument
 from rag.prompts import get_source_deletion_prompt
 from rag.llm_factory import acall_fast_with_fallback
@@ -56,7 +55,7 @@ async def handle_source_removal_pipeline(
         resp_text = f"Successfully removed **{num_deleted} requested document(s)** from sources:\n\n"
         for dt in deleted_titles:
             resp_text += f"- ❌ {dt}\n"
-        resp_text += f"\nYour workspace sources have been updated per your request."
+        resp_text += "\nYour workspace sources have been updated per your request."
         
         action_payload = json.dumps({"action": "bulk_delete", "deleted_doc_ids": to_delete_ids})
         return f"{resp_text}\n\n<!-- SOURCES_ACTION: {action_payload} -->"

@@ -1,18 +1,16 @@
 import os
-import re
 import json
 import logging
 import asyncio
 from typing import List, Tuple, Dict, Any, AsyncGenerator, Optional
 from sqlalchemy.orm import Session
 
-from database import Document, ChatSession, SessionLocal, commit_with_retry
+from database import Document, SessionLocal, commit_with_retry
 import models
 import rag
 from providers.academic import resolve_and_fetch_authentic_pdf
 from utils.file_utils import (
     UPLOAD_DIR,
-    MAX_SOURCES_PER_CHAT,
     sanitize_paper_filename,
 )
 from utils.pdf_utils import is_authentic_pdf_bytes

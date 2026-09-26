@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from database import engine, Base, SessionLocal, Document
 
-from utils.file_utils import UPLOAD_DIR, TEMP_ZIPS_DIR, CHAT_MEDIA_DIR, get_doc_file_path
+from utils.file_utils import CHAT_MEDIA_DIR, get_doc_file_path
 from utils.pdf_utils import is_binary_pdf
 from routers import (
     chats_router,

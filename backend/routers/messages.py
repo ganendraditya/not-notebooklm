@@ -1,8 +1,7 @@
 import json
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 

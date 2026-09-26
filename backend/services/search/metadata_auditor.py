@@ -77,7 +77,7 @@ Output ONLY valid JSON matching:
                 logger.warning(f"[AI Auditor] Fast LLM failed: {fast_err}")
                 fb_llm = get_fallback_llm()
                 if fb_llm and fb_llm is not active_llm:
-                    logger.info(f"[AI Auditor] Cascading to fallback LLM...")
+                    logger.info("[AI Auditor] Cascading to fallback LLM...")
                     res = fb_llm.complete(prompt)
             if res and res.text:
                 clean_json_str = extract_json_from_llm(res.text)

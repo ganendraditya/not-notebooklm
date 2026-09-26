@@ -30,13 +30,16 @@ echo -e "${BLUE}====================================================${NC}"
 # Frontend Checks
 # ------------------------------------------------------------------------------
 if [ "$RUN_FRONTEND" = true ]; then
-    echo -e "\n${YELLOW}📦 [Frontend] 1/3: Linting...${NC}"
+    echo -e "\n${YELLOW}📦 [Frontend] 1/4: Linting...${NC}"
     (cd "$ROOT_DIR/frontend" && npm run lint)
 
-    echo -e "\n${YELLOW}🧪 [Frontend] 2/3: Running Unit Tests...${NC}"
+    echo -e "\n${YELLOW}🔍 [Frontend] 2/4: Type Checking (TypeScript)...${NC}"
+    (cd "$ROOT_DIR/frontend" && npm run type-check)
+
+    echo -e "\n${YELLOW}🧪 [Frontend] 3/4: Running Unit Tests...${NC}"
     (cd "$ROOT_DIR/frontend" && npm test)
 
-    echo -e "\n${YELLOW}🏗️  [Frontend] 3/3: Building Next.js application...${NC}"
+    echo -e "\n${YELLOW}🏗️  [Frontend] 4/4: Building Next.js application...${NC}"
     (cd "$ROOT_DIR/frontend" && NEXT_PUBLIC_API_URL="http://localhost:8000" npm run build)
 
     echo -e "${GREEN}✓ Frontend checks passed!${NC}"
@@ -46,7 +49,6 @@ fi
 # Backend Checks
 # ------------------------------------------------------------------------------
 if [ "$RUN_BACKEND" = true ]; then
-    echo -e "\n${YELLOW}🐍 [Backend] 1/2: Syntax & Compilation Verification...${NC}"
     cd "$ROOT_DIR/backend"
 
     # Activate virtual environment if present
@@ -56,9 +58,13 @@ if [ "$RUN_BACKEND" = true ]; then
         source "$ROOT_DIR/venv/bin/activate"
     fi
 
+    echo -e "\n${YELLOW}🧹 [Backend] 1/3: Linting (Ruff)...${NC}"
+    ruff check .
+
+    echo -e "\n${YELLOW}🐍 [Backend] 2/3: Syntax & Compilation Verification...${NC}"
     python -m compileall -q -x 'venv|__pycache__' .
 
-    echo -e "\n${YELLOW}🧪 [Backend] 2/2: Running Pytest Suite...${NC}"
+    echo -e "\n${YELLOW}🧪 [Backend] 3/3: Running Pytest Suite...${NC}"
     pytest -v -m "not live" tests/test_*.py
 
     echo -e "${GREEN}✓ Backend checks passed!${NC}"

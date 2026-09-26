@@ -1,8 +1,7 @@
-import os
 import re
 import urllib.parse
 import logging
-from typing import Optional, List, Callable
+from typing import Optional, List
 import requests
 import threading
 import concurrent.futures
@@ -252,7 +251,8 @@ def resolve_and_fetch_authentic_pdf(
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(workers))
     try:
-        futures = [executor.submit(w) for w in workers]
+        for w in workers:
+            executor.submit(w)
         stop_event.wait(timeout=10.0)
     finally:
         executor.shutdown(wait=False, cancel_futures=True)

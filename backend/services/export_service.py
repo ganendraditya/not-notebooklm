@@ -1,5 +1,4 @@
 import os
-import io
 import json
 import zipfile
 import asyncio
@@ -111,7 +110,7 @@ async def generate_bulk_zip_stream(
                 ]
                 for idx, item in enumerate(skipped_docs, 1):
                     summary_lines.append(f"{idx}. {item['title']}")
-                    summary_lines.append(f"   Status : Naskah Berbayar (Paywalled) / Proteksi Repositori (HTTP 403)")
+                    summary_lines.append("   Status : Naskah Berbayar (Paywalled) / Proteksi Repositori (HTTP 403)")
                     summary_lines.append(f"   DOI / Tautan Resmi : {item['url']}")
                     summary_lines.append("")
                 summary_lines.append("Silakan unduh naskah lengkap melalui tautan resmi penerbit di atas.")

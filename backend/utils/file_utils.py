@@ -1,7 +1,6 @@
 import os
 import re
 import urllib.parse
-from typing import Optional
 
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "uploads"))
 TEMP_ZIPS_DIR = os.path.join(UPLOAD_DIR, "temp_zips")
@@ -116,7 +115,7 @@ def get_doc_file_path(chat_id: str, filename: str) -> str:
             ]:
                 if storage_adapter.ensure_local_copy(candidate_key, default_path):
                     return default_path
-    except Exception as se:
+    except Exception:
         pass
 
     # Default fallback

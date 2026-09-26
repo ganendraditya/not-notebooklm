@@ -1,9 +1,7 @@
-import os
 import re
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List
 
-from llama_index.core.llms import LLM
 from utils.text_processing import (
     normalize_title_str,
     is_valid_academic_title,
@@ -13,8 +11,16 @@ from providers.academic import fetch_europe_pmc, fetch_openalex, fetch_crossref,
 from services.search import (
     plan_academic_search,
     judge_and_filter_papers_with_llm,
-    audit_paper_metadata_with_ai
+    audit_paper_metadata_with_ai,
 )
+
+__all__ = [
+    "get_existing_notebook_sources_signatures",
+    "search_academic_papers_planned",
+    "plan_academic_search",
+    "judge_and_filter_papers_with_llm",
+    "audit_paper_metadata_with_ai",
+]
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -133,8 +139,8 @@ def search_academic_papers_planned(
     min_year = plan.get("min_year")
     min_citations = int(plan.get("min_citations") or 0)
     open_access_only = bool(plan.get("open_access_only", False))
-    scopus_quartiles = [q.upper() for q in (plan.get("scopus_quartiles") or [])]
-    sinta_tiers = [s.upper() for s in (plan.get("sinta_tiers") or [])]
+    _scopus_quartiles = [q.upper() for q in (plan.get("scopus_quartiles") or [])]
+    _sinta_tiers = [s.upper() for s in (plan.get("sinta_tiers") or [])]
     exclude_preprints = bool(plan.get("exclude_preprints", False))
     
     def is_candidate_duplicate_local(title: str, doi: str) -> bool:

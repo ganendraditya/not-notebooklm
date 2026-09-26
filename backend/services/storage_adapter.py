@@ -6,7 +6,7 @@ Provides unified, decoupled object storage synchronization alongside local disk 
 import os
 import logging
 import threading
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 logger = logging.getLogger("uvicorn.error")
 

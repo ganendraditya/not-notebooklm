@@ -1,7 +1,6 @@
 import logging
 import urllib.parse
 import requests
-import re
 import html
 from typing import List, Optional
 

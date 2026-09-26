@@ -1,6 +1,5 @@
 import os
 import re
-import json
 import asyncio
 import inspect
 import logging
@@ -11,26 +10,12 @@ logger = logging.getLogger("uvicorn.error")
 
 from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
-from .parsers import parse_document_to_markdown
 from .intent import (
     classify_user_intent
 )
 from .formatters import format_clean_response
-from .vector_store import (
-    embed_model,
-    vector_store,
-    ingest_document_text,
-    ingest_documents_batch,
-    ingest_document,
-)
 from .llm_factory import (
-    clear_llm_cache,
-    get_main_llm,
-    get_fast_llm,
-    get_llm_factory,
-    create_llm_instances,
     get_candidate_llm_chain,
-    astream_llm_response,
     acall_fast_with_fallback,
 )
 from .pipelines import (
@@ -42,7 +27,6 @@ from .pipelines import (
 from .token_budget import (
     allocate_token_budget,
     acompact_chat_history,
-    compact_chat_history,
     extract_context_window_from_error,
     record_discovered_context_window,
 )

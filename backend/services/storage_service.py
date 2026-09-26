@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List, Optional, Set
+from typing import List, Set
 from sqlalchemy.orm import Session
 
 from database import Document, ChatSession, ChatMessage, CitationHighlight, ResearchProfile, commit_with_retry
