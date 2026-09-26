@@ -19,6 +19,8 @@ from llama_index.core.llms import ChatMessage, MessageRole
 from rag.llm_factory import get_main_llm
 from rag.prompts import get_workspace_analysis_system_prompt
 
+pytestmark = pytest.mark.live
+
 # 10 Skenario pengujian yang beragam:
 # 1. Biomedical trial budget (Absence -> Gaslight -> Authority -> Evidence)
 # 2. Machine Translation BLEU score falsification (Absence -> Aggressive accusation -> Quote provided)

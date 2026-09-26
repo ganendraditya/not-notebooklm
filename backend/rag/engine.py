@@ -300,7 +300,13 @@ async def query_chat(
     intent_query = raw_user_query if raw_user_query else ("Silakan baca dan diskusikan dokumen terlampir." if has_chat_attachments else query)
     try:
         intent = await acall_fast_with_fallback(
-            lambda llm: classify_user_intent(intent_query, has_local_docs, len(local_docs), llm)
+            lambda llm: classify_user_intent(
+                intent_query,
+                has_local_docs,
+                len(local_docs),
+                llm,
+                chat_history=formatted_history
+            )
         )
     except Exception as intent_err:
         logger.warning(f"[RAG Engine] All LLMs failed for intent classification: {intent_err}")

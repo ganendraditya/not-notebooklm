@@ -66,4 +66,4 @@ jobs:
 
       - name: Run Backend Pytest Suite
         run: |
-          pytest -v
+          pytest -v -m "not live"
