@@ -123,11 +123,12 @@ export function useChatStream(
           };
           if (activeChatIdRef.current === targetChatId) {
             updateMessagesList(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+              const lastIdx = prev.length - 1;
+              if (lastIdx >= 0 && prev[lastIdx].role === "assistant") {
+                const targetMsg = prev[lastIdx];
                 return [
-                  ...prev.slice(0, -1),
-                  { ...lastMsg, content: displayed }
+                  ...prev.slice(0, lastIdx),
+                  { ...targetMsg, content: displayed, isStreaming: true }
                 ];
               } else {
                 return [
@@ -143,9 +144,9 @@ export function useChatStream(
           const finalizedAsst = { ...asstMsg, isStreaming: false };
           if (activeChatIdRef.current === targetChatId) {
             updateMessagesList(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-                return [...prev.slice(0, -1), finalizedAsst];
+              const lastIdx = prev.length - 1;
+              if (lastIdx >= 0 && prev[lastIdx].role === "assistant") {
+                return [...prev.slice(0, lastIdx), finalizedAsst];
               }
               return [...prev, finalizedAsst];
             });

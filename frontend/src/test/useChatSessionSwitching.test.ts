@@ -137,4 +137,92 @@ describe("useChatSession Chat Switching State Isolation", () => {
     expect(lastCall[2].role).toBe("assistant");
     expect(lastCall[2].content).toBe("Generating response...");
   });
+
+  it("prevents full-turn duplication (user + assistant) when backend DB has already committed both messages", async () => {
+    const sessions: ChatSession[] = [
+      { id: "chat-1", title: "Chat 1", created_at: new Date().toISOString() },
+    ];
+    const setSessions = vi.fn();
+    const setActiveChatId = vi.fn();
+    const setDocuments = vi.fn();
+    const setPendingSources = vi.fn();
+    const setMessages = vi.fn();
+    const setTargetedSource = vi.fn();
+    const setViewingDoc = vi.fn();
+    const setQueuedPrompts = vi.fn();
+    const setIsLoading = vi.fn();
+    const setActiveStatus = vi.fn();
+    const setCurrentView = vi.fn();
+    const updateSessionsList = vi.fn();
+    const activeChatIdRef = { current: "chat-1" as string | null };
+
+    const inFlightUserMsg: ChatMessage = { role: "user", content: "Prompt in chat 1", created_at: new Date().toISOString() };
+    const inFlightStreamingMsg: ChatMessage = { role: "assistant", content: "Generating response...", created_at: new Date().toISOString(), isStreaming: true };
+
+    const jobsMap = new Map<string, ChatJobState>();
+    jobsMap.set("chat-1", {
+      controller: new AbortController(),
+      queue: [],
+      isProcessing: true,
+      status: "Finalizing response...",
+      inFlightUserMsg,
+      inFlightStreamingMsg,
+      baseMessages: [],
+      lastCompletedMessages: null,
+    });
+
+    const getChatJob = (id: string) => jobsMap.get(id)!;
+
+    // Backend DB ALREADY saved BOTH the user prompt AND the finished assistant response
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.endsWith("/chats/chat-1")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          id: "chat-1",
+          title: "Chat 1",
+          documents: [],
+          messages: [
+            { role: "user", content: "Prompt in chat 1", created_at: new Date().toISOString() },
+            { role: "assistant", content: "Finished response from server", created_at: new Date().toISOString() }
+          ]
+        }), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    });
+
+    const { result } = renderHook(() =>
+      useChatSession(
+        "http://localhost:8000",
+        sessions,
+        setSessions,
+        "chat-2",
+        setActiveChatId,
+        setDocuments,
+        setPendingSources,
+        setMessages,
+        setTargetedSource,
+        setViewingDoc,
+        setQueuedPrompts,
+        setIsLoading,
+        setActiveStatus,
+        setCurrentView,
+        updateSessionsList,
+        getChatJob,
+        activeChatIdRef
+      )
+    );
+
+    // Switch/select chat-1 from chat-2 while inFlight turn is present
+    await act(async () => {
+      activeChatIdRef.current = "chat-1";
+      result.current.handleSelectChat("chat-1");
+    });
+
+    // Verify setMessages never has duplicate pairs of (user + assistant)
+    const lastCall = setMessages.mock.calls[setMessages.mock.calls.length - 1][0] as ChatMessage[];
+    expect(lastCall).toHaveLength(2);
+    expect(lastCall[0].content).toBe("Prompt in chat 1");
+    expect(lastCall[0].role).toBe("user");
+    expect(lastCall[1].role).toBe("assistant");
+    expect(lastCall[1].content).toBe("Generating response...");
+  });
 });

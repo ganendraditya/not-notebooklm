@@ -74,19 +74,19 @@ export function useChatSession(
               setMessages(data.messages || []);
             } else {
               const dbMessages: ChatMessage[] = data.messages || [];
-              const lastDbMsg = dbMessages.length > 0 ? dbMessages[dbMessages.length - 1] : null;
+              let userMsgIndexInDb = -1;
+              if (currentJob.inFlightUserMsg) {
+                for (let i = dbMessages.length - 1; i >= 0; i--) {
+                  if (dbMessages[i].role === "user" && dbMessages[i].content === currentJob.inFlightUserMsg.content) {
+                    userMsgIndexInDb = i;
+                    break;
+                  }
+                }
+              }
 
-              // Check if backend DB already persisted the in-flight user message to avoid duplicate bubbles
-              const dbAlreadyHasUserMsg = Boolean(
-                lastDbMsg &&
-                lastDbMsg.role === "user" &&
-                currentJob.inFlightUserMsg &&
-                lastDbMsg.content === currentJob.inFlightUserMsg.content
-              );
-
-              if (dbAlreadyHasUserMsg) {
-                // Strip the duplicate user message from baseMessages, keeping authoritative history
-                currentJob.baseMessages = dbMessages.slice(0, -1);
+              if (userMsgIndexInDb !== -1) {
+                // Strip this in-flight turn and any subsequent messages from baseMessages to prevent duplicates
+                currentJob.baseMessages = dbMessages.slice(0, userMsgIndexInDb);
               } else {
                 currentJob.baseMessages = dbMessages;
               }
