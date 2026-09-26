@@ -102,6 +102,7 @@ def delete_document_by_id(db: Session, chat_id: str, doc_id: int) -> bool:
     except Exception as se:
         logger.debug(f"[StorageAdapter Doc Delete Warning]: {se}")
         
+    db.query(CitationHighlight).filter(CitationHighlight.chat_id == chat_id, CitationHighlight.doc_id == doc_id).delete(synchronize_session=False)
     db.delete(doc)
     commit_with_retry(db)
     return True
@@ -133,6 +134,7 @@ def delete_multiple_documents(db: Session, chat_id: str, doc_ids: List[int]) -> 
         deleted_count += 1
         
     if valid_ids:
+        db.query(CitationHighlight).filter(CitationHighlight.chat_id == chat_id, CitationHighlight.doc_id.in_(valid_ids)).delete(synchronize_session=False)
         db.query(Document).filter(Document.id.in_(valid_ids)).delete(synchronize_session=False)
         commit_with_retry(db)
     return deleted_count

@@ -229,6 +229,7 @@ def auto_migrate_schema():
 
             # Clean up any legacy orphan records that predate PRAGMA foreign_keys=ON enforcement
             conn.execute(text("DELETE FROM citation_highlights WHERE chat_id NOT IN (SELECT id FROM chat_sessions)"))
+            conn.execute(text("DELETE FROM citation_highlights WHERE doc_id IS NOT NULL AND doc_id NOT IN (SELECT id FROM documents)"))
             conn.execute(text("DELETE FROM documents WHERE chat_id NOT IN (SELECT id FROM chat_sessions)"))
             conn.execute(text("DELETE FROM chat_messages WHERE chat_id NOT IN (SELECT id FROM chat_sessions)"))
             conn.execute(text("DELETE FROM research_profiles WHERE chat_id NOT IN (SELECT id FROM chat_sessions)"))
