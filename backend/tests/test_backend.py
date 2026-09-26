@@ -41,6 +41,24 @@ def test_chat_lifecycle():
     res_check = client.get(f"/chats/{chat_id}")
     assert res_check.status_code == 404
 
+@pytest.mark.asyncio
+async def test_generate_chat_title_post_response():
+    """Verify smart chat title generation with both user message and assistant synthesis context."""
+    from rag.engine import generate_chat_title
+    
+    # Test fallback extraction when LLM unavailable or with short greeting
+    greeting_title = await generate_chat_title("halo bro apa kabar")
+    assert isinstance(greeting_title, str)
+    assert len(greeting_title) > 0
+
+    # Test with prompt and assistant response
+    user_prompt = "Bisakah kamu jelaskan arsitektur transformer dan attention mechanism?"
+    assistant_resp = "Transformer menggunakan self-attention mechanism untuk memproses data sekuensial secara paralel tanpa RNN."
+    title = await generate_chat_title(user_prompt, assistant_response=assistant_resp)
+    assert isinstance(title, str)
+    assert len(title) > 0
+    assert not title.startswith("Title:")
+
 def test_chats_pagination():
     """Verify limit and offset pagination on GET /chats."""
     created_ids = []

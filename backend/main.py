@@ -105,3 +105,7 @@ app.include_router(storage_router)
 @app.get("/")
 def root():
     return {"status": "ok", "app": "Not-NotebookLM API"}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

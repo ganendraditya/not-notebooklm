@@ -1,8 +1,9 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { type ChatMessage, type Attachment, useChatStore } from "@/stores/chatStore";
 import { consumeSSEStream } from "@/lib/sse";
 import { sendSystemNotification } from "@/lib/notifications";
 import { createSmoothTextStreamer } from "@/lib/smoothStreamer";
+import { formatExecutionDuration } from "@/lib/utils";
 
 // Queue now needs to store attachments too
 export interface QueuedMessage {
@@ -21,6 +22,8 @@ export interface ChatJobState {
   lastCompletedMessages: ChatMessage[] | null;
 }
 
+const getTimestampNow = () => Date.now();
+
 export function useChatStream(
   backendUrl: string,
   activeChatIdRef: React.MutableRefObject<string | null>,
@@ -36,6 +39,15 @@ export function useChatStream(
   handleEnsureChatSessionRef: React.MutableRefObject<(suggestedTitle?: string) => Promise<string>>
 ) {
   const chatJobsRef = useRef<Map<string, ChatJobState>>(new Map());
+  const dismissTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    const timeouts = dismissTimeoutsRef.current;
+    return () => {
+      timeouts.forEach(t => clearTimeout(t));
+      timeouts.clear();
+    };
+  }, []);
 
   const getChatJob = (chatId: string): ChatJobState => {
     if (!chatJobsRef.current.has(chatId)) {
@@ -51,6 +63,33 @@ export function useChatStream(
       });
     }
     return chatJobsRef.current.get(chatId)!;
+  };
+
+  const recordSessionCompletion = (targetChatId: string) => {
+    const currentExec = useChatStore.getState().sessionExecutions[targetChatId];
+    const startTime = currentExec?.startedAt || getTimestampNow();
+    const elapsedSec = Math.max(1, Math.round((getTimestampNow() - startTime) / 1000));
+    const formattedDuration = formatExecutionDuration(elapsedSec);
+
+    useChatStore.getState().setSessionExecution(targetChatId, {
+      status: "completed",
+      startedAt: startTime,
+      durationFormatted: formattedDuration,
+    });
+
+    if (activeChatIdRef.current === targetChatId) {
+      if (dismissTimeoutsRef.current.has(targetChatId)) {
+        clearTimeout(dismissTimeoutsRef.current.get(targetChatId)!);
+      }
+      const timerId = setTimeout(() => {
+        dismissTimeoutsRef.current.delete(targetChatId);
+        const store = useChatStore.getState();
+        if (activeChatIdRef.current === targetChatId && store.sessionExecutions[targetChatId]?.status === "completed") {
+          store.dismissSessionExecution(targetChatId);
+        }
+      }, 3500);
+      dismissTimeoutsRef.current.set(targetChatId, timerId);
+    }
   };
 
   const processNextInQueue = async (targetChatId: string) => {
@@ -69,6 +108,14 @@ export function useChatStream(
     const nextMessage = job.queue.shift()!;
     job.isProcessing = true;
     job.status = "Analyzing query & reasoning...";
+    if (dismissTimeoutsRef.current.has(targetChatId)) {
+      clearTimeout(dismissTimeoutsRef.current.get(targetChatId)!);
+      dismissTimeoutsRef.current.delete(targetChatId);
+    }
+    useChatStore.getState().setSessionExecution(targetChatId, {
+      status: "running",
+      startedAt: getTimestampNow(),
+    });
 
     const newMsg: ChatMessage = { 
       role: "user", 
@@ -163,6 +210,8 @@ export function useChatStream(
           job.inFlightUserMsg = null;
           job.inFlightStreamingMsg = null;
           job.baseMessages = [];
+
+          recordSessionCompletion(targetChatId);
 
           // Trigger system / browser notification if user is away in another tab
           const cleanPreview = (asstMsg.content || "")
@@ -276,6 +325,7 @@ export function useChatStream(
         job.inFlightUserMsg = null;
         job.inFlightStreamingMsg = null;
         job.baseMessages = [];
+        useChatStore.getState().dismissSessionExecution(targetChatId);
         if (activeChatIdRef.current === targetChatId) {
           setIsLoading(false);
         }
@@ -301,6 +351,7 @@ export function useChatStream(
     job.inFlightUserMsg = null;
     job.inFlightStreamingMsg = null;
     job.baseMessages = [];
+    useChatStore.getState().dismissSessionExecution(currentChatId);
 
     setQueuedPrompts([]);
     setIsLoading(false);
@@ -346,7 +397,7 @@ export function useChatStream(
   const handleSendMessage = async (text: string, attachments?: Attachment[]) => {
     let currentChatId = activeChatIdRef.current;
     if (!currentChatId) {
-      currentChatId = await handleEnsureChatSessionRef.current(text);
+      currentChatId = await handleEnsureChatSessionRef.current();
     }
     if (!currentChatId) return;
 
@@ -386,6 +437,10 @@ export function useChatStream(
     job.queue = [];
     job.isProcessing = true;
     job.status = "Analyzing query & reasoning...";
+    useChatStore.getState().setSessionExecution(currentChatId, {
+      status: "running",
+      startedAt: getTimestampNow(),
+    });
 
     if (activeChatIdRef.current === currentChatId) {
       setQueuedPrompts([]);
@@ -461,6 +516,8 @@ export function useChatStream(
         job.inFlightUserMsg = null;
         job.inFlightStreamingMsg = null;
         job.baseMessages = [];
+
+        recordSessionCompletion(currentChatId);
 
         const cleanPreview = (asstMsg.content || "")
           .replace(/<!--[\s\S]*?-->/g, "")
@@ -565,6 +622,7 @@ export function useChatStream(
         job.inFlightUserMsg = null;
         job.inFlightStreamingMsg = null;
         job.baseMessages = [];
+        useChatStore.getState().dismissSessionExecution(currentChatId);
         if (activeChatIdRef.current === currentChatId) {
           setIsLoading(false);
         }
@@ -582,6 +640,10 @@ export function useChatStream(
 
     job.isProcessing = true;
     job.status = "Regenerating response...";
+    useChatStore.getState().setSessionExecution(currentChatId, {
+      status: "running",
+      startedAt: getTimestampNow(),
+    });
     const assistantPlaceholder: ChatMessage = { role: "assistant", content: "", created_at: new Date().toISOString(), isStreaming: true };
     job.inFlightUserMsg = null;
     job.inFlightStreamingMsg = assistantPlaceholder;
@@ -662,6 +724,8 @@ export function useChatStream(
         job.inFlightUserMsg = null;
         job.inFlightStreamingMsg = null;
         job.baseMessages = [];
+
+        recordSessionCompletion(currentChatId);
 
         const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
         if (actionMatch) {
@@ -752,6 +816,7 @@ export function useChatStream(
         job.inFlightUserMsg = null;
         job.inFlightStreamingMsg = null;
         job.baseMessages = [];
+        useChatStore.getState().dismissSessionExecution(currentChatId);
         if (activeChatIdRef.current === currentChatId) {
           setIsLoading(false);
         }

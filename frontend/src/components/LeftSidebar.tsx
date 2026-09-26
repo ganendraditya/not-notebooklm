@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ChatSession } from "@/stores/chatStore";
+import { ChatSession, useChatStore } from "@/stores/chatStore";
+import { formatExecutionDuration } from "@/lib/utils";
 import { useTranslation } from "@/lib/i18n";
 import packageInfo from "../../package.json";
 
@@ -34,6 +35,23 @@ interface LeftSidebarProps {
   onTogglePinChat?: (id: string) => void;
   onToggleSidebar?: () => void;
   onOpenSettings?: () => void;
+}
+
+function LiveTickingTimer({ startedAt }: { startedAt: number }) {
+  const [seconds, setSeconds] = useState(() => Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt]);
+
+  return (
+    <span className="shrink-0 text-[11px] font-mono font-medium text-blue-400 mr-1.5 animate-pulse">
+      {formatExecutionDuration(seconds)}
+    </span>
+  );
 }
 
 export default function LeftSidebar({ 
@@ -58,6 +76,7 @@ export default function LeftSidebar({
   const [chatToDelete, setChatToDelete] = useState<ChatSession | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const sessionExecutions = useChatStore((s) => s.sessionExecutions);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -219,28 +238,46 @@ export default function LeftSidebar({
             const renderSessionItem = (session: ChatSession) => {
               const isActive = currentView === "chat" && activeChatId === session.id;
               const isMenuOpen = openMenuId === session.id;
+              const execution = sessionExecutions[session.id];
+              const isRunning = execution?.status === "running";
+              const isCompleted = execution?.status === "completed";
+
+              let leadingIcon = <MessageSquare size={16} className="shrink-0 text-app-text-dim" />;
+              if (isRunning) {
+                leadingIcon = <span className="shrink-0 w-2 h-2 rounded-full bg-blue-500 animate-pulse ml-0.5 mr-0.5" />;
+              } else if (isCompleted) {
+                leadingIcon = <span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500 ml-0.5 mr-0.5" />;
+              } else if (session.is_pinned) {
+                leadingIcon = <Pin size={16} className="shrink-0 text-amber-500 fill-amber-500/20" />;
+              }
 
               return (
                 <div key={session.id} className="relative group">
                   <div
                     onClick={() => onSelectChat(session.id)}
-                    className={`w-full flex items-center justify-between px-2 py-2 rounded-lg transition-all cursor-pointer text-xs ${
+                    className={`w-full flex items-center justify-between px-2 py-2 rounded-lg text-xs font-normal transition-colors cursor-pointer ${
                       isActive 
-                        ? "bg-app-item-active text-app-text font-medium shadow-sm" 
+                        ? "bg-app-item-active text-app-text font-normal shadow-sm" 
                         : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 truncate mr-1">
-                      {session.is_pinned ? (
-                        <Pin size={16} className="shrink-0 text-amber-500 fill-amber-500/20" />
-                      ) : (
-                        <MessageSquare size={16} className="shrink-0 text-app-text-dim" />
-                      )}
-                      <span className="truncate">{session.title}</span>
+                    <div className="flex items-center gap-2.5 truncate mr-1.5 flex-1 min-w-0">
+                      {leadingIcon}
+                      <span className="truncate flex-1">{session.title}</span>
                     </div>
 
-                    {/* Three-dots button on hover */}
+                    {/* Execution Duration Badge & Options */}
                     <div className="shrink-0 flex items-center">
+                      {isRunning && execution && (
+                        <LiveTickingTimer startedAt={execution.startedAt} />
+                      )}
+                      {isCompleted && execution?.durationFormatted && (
+                        <span className="shrink-0 text-[11px] font-mono font-medium text-emerald-400 mr-1.5">
+                          {execution.durationFormatted}
+                        </span>
+                      )}
+
+                      {/* Three-dots button on hover */}
                       <Tooltip content={t('left.options')} side="top">
                         <button
                           onClick={(e) => {

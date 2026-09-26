@@ -33,10 +33,11 @@ from .token_budget import (
 
 load_dotenv()
 
-async def generate_chat_title(first_user_message: str) -> str:
+async def generate_chat_title(first_user_message: str, assistant_response: Optional[str] = None) -> str:
     """
     Generates a concise, professional, and descriptive conversation title (max 4-6 words)
-    like standard ChatGPT/Claude from the user's first prompt, eliminating colloquial filler.
+    like standard ChatGPT/Claude from the user's first prompt and assistant response synthesis,
+    eliminating colloquial filler.
     """
     clean_prompt = first_user_message.strip()
     if not clean_prompt:
@@ -53,16 +54,23 @@ async def generate_chat_title(first_user_message: str) -> str:
         fallback_title = clean_prompt[:35]
     fallback_title = fallback_title.title()[:45].strip()
 
+    context_block = f"User Message: {clean_prompt}\n"
+    if assistant_response and assistant_response.strip():
+        resp_clean = " ".join(re.sub(r'<!--[\s\S]*?-->', '', assistant_response).split())[:400]
+        if resp_clean:
+            context_block += f"Assistant Response Summary: {resp_clean}\n"
+
     # Use Fast LLM for rapid, lightweight title generation (with fallback cascade)
     title_prompt = (
         "You are an AI conversation title generator.\n"
-        "Task: Create a concise, professional title (2 to 5 words max) summarizing the topic of the user's message.\n"
+        "Task: Create a concise, professional title (2 to 5 words max) summarizing the topic of the user's inquiry.\n"
         "Guidelines:\n"
+        "- Use both the user query and assistant response summary to identify the true research topic or methodology accurately.\n"
         "- Match the EXACT language/dialect of the user's prompt (if English -> English; if Indonesian -> Indonesian; if Portuguese/Spanish/other -> that exact language).\n"
         "- If the prompt is just a greeting or short test word like 'tes', 'test', 'ping', 'halo', 'hi', simply return 'Test Conversation' or 'New Chat' in the corresponding language.\n"
         "- Do not translate or assume Indonesian if the prompt is English or ambiguous.\n"
         "- Output ONLY the title text. No quotes, no markdown, no punctuation, no 'Title:' prefix.\n\n"
-        f"User Message: {clean_prompt}\n"
+        f"{context_block}"
         "Title:"
     )
 

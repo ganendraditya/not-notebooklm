@@ -14,6 +14,12 @@ export interface Attachment {
   url?: string;
 }
 
+export interface SessionExecutionStatus {
+  status: "running" | "completed";
+  startedAt: number;
+  durationFormatted?: string;
+}
+
 export type MessageRole = "user" | "assistant" | "system";
 
 export interface ChatMessage {
@@ -33,6 +39,7 @@ interface ChatStore {
   isLoading: boolean;
   activeStatus: string | null;
   queuedPrompts: string[];
+  sessionExecutions: Record<string, SessionExecutionStatus>;
   
   setSessions: (sessions: ChatSession[]) => void;
   setActiveChatId: (id: string | null) => void;
@@ -40,6 +47,8 @@ interface ChatStore {
   setIsLoading: (isLoading: boolean) => void;
   setActiveStatus: (status: string | null) => void;
   setQueuedPrompts: (prompts: string[]) => void;
+  setSessionExecution: (chatId: string, execution: SessionExecutionStatus | null) => void;
+  dismissSessionExecution: (chatId: string) => void;
   
   bumpSessionToTop: (chatId: string) => void;
   addMessage: (message: ChatMessage) => void;
@@ -55,6 +64,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   isLoading: false,
   activeStatus: null,
   queuedPrompts: [],
+  sessionExecutions: {},
 
   setSessions: (sessions) => set({ sessions }),
   setActiveChatId: (activeChatId) => set({ activeChatId }),
@@ -62,6 +72,24 @@ export const useChatStore = create<ChatStore>((set) => ({
   setIsLoading: (isLoading) => set({ isLoading }),
   setActiveStatus: (activeStatus) => set({ activeStatus }),
   setQueuedPrompts: (queuedPrompts) => set({ queuedPrompts }),
+  setSessionExecution: (chatId, execution) => {
+    if (!execution) {
+      useChatStore.getState().dismissSessionExecution(chatId);
+      return;
+    }
+    set((state) => ({
+      sessionExecutions: {
+        ...state.sessionExecutions,
+        [chatId]: execution,
+      }
+    }));
+  },
+  dismissSessionExecution: (chatId) => set((state) => {
+    if (!state.sessionExecutions[chatId]) return state;
+    const next = { ...state.sessionExecutions };
+    delete next[chatId];
+    return { sessionExecutions: next };
+  }),
 
   bumpSessionToTop: (chatId) => set((state) => {
     const idx = state.sessions.findIndex(s => s.id === chatId);

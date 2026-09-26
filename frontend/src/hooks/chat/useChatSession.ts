@@ -1,7 +1,8 @@
 import { useRef, useEffect, useCallback } from "react";
-import { type ChatSession, type ChatMessage } from "@/stores/chatStore";
+import { type ChatSession, type ChatMessage, useChatStore } from "@/stores/chatStore";
 import { type Document, type PendingSourceItem, type TargetedSource } from "@/stores/documentStore";
 import { type ChatJobState } from "./useChatStream";
+import { formatDefaultSessionTitle } from "@/lib/utils";
 
 export function useChatSession(
   backendUrl: string,
@@ -35,6 +36,9 @@ export function useChatSession(
     try {
       localStorage.setItem("last_active_chat_id", id);
     } catch {}
+    if (useChatStore.getState().sessionExecutions[id]?.status === "completed") {
+      useChatStore.getState().dismissSessionExecution(id);
+    }
     if (activeChatId === id) {
       setViewingDoc(null);
       return;
@@ -196,14 +200,8 @@ export function useChatSession(
 
     pendingSessionCreationRef.current = (async () => {
       try {
-        // Initial placeholder title while AI generates the smart topic name
-        let title = (suggestedTitle || "New Research").trim();
-        title = title.replace(/^(find|search|look up|get|paper on|journal about|research on|tolong carikan|cariin)\s+/i, "");
-        if (title.length > 30) {
-          title = title.substring(0, 30) + "...";
-        }
-        if (!title) title = "New Research";
-        title = title.charAt(0).toUpperCase() + title.slice(1);
+        // Initial clean default title while AI generates the smart topic name post-response
+        const title = suggestedTitle?.trim() || formatDefaultSessionTitle();
 
         const res = await fetch(`${backendUrl}/chats`, {
           method: "POST",
@@ -249,6 +247,7 @@ export function useChatSession(
 
   const handleDeleteChat = async (id: string) => {
     try {
+      useChatStore.getState().dismissSessionExecution(id);
       await fetch(`${backendUrl}/chats/${id}`, { method: "DELETE" });
       updateSessionsList(prev => prev.filter(s => s.id !== id));
       if (activeChatId === id) {

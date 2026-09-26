@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import React from "react";
 import LeftSidebar from "../components/LeftSidebar";
 import { I18nProvider } from "../lib/i18n";
-import { ChatSession } from "../stores/chatStore";
+import { ChatSession, useChatStore } from "../stores/chatStore";
 
 const renderWithI18n = (ui: React.ReactElement) => {
   return render(<I18nProvider>{ui}</I18nProvider>);
@@ -116,6 +116,37 @@ describe("LeftSidebar Component", () => {
       />
     );
 
-    expect(screen.getByText("v1.7.5")).toBeInTheDocument();
+    expect(screen.getByText("v1.8.0")).toBeInTheDocument();
+  });
+
+  it("renders live running execution indicator and completed duration badge properly", () => {
+    act(() => {
+      useChatStore.getState().setSessionExecution("chat-1", {
+        status: "running",
+        startedAt: Date.now() - 5000,
+      });
+      useChatStore.getState().setSessionExecution("chat-2", {
+        status: "completed",
+        startedAt: Date.now() - 65000,
+        durationFormatted: "1m 5s",
+      });
+    });
+
+    renderWithI18n(
+      <LeftSidebar
+        sessions={mockSessions}
+        activeChatId="chat-1"
+        onSelectChat={vi.fn()}
+        onCreateChat={vi.fn()}
+        onDeleteChat={vi.fn()}
+        onRenameChat={vi.fn()}
+      />
+    );
+
+    // chat-2 should display completed duration "1m 5s"
+    expect(screen.getByText("1m 5s")).toBeInTheDocument();
+
+    // chat-1 should display a ticking timer (e.g. "5s" or similar)
+    expect(screen.getByText(/^\d+s$/)).toBeInTheDocument();
   });
 });

@@ -84,32 +84,15 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
     chat_history = extract_chat_history_from_db_messages(all_msgs)
     
     # Check if chat is still using default/raw initial title and needs smart AI naming
-    is_initial_chat_state = len(all_msgs) <= 1 or chat.title in ("New Chat", "New Research", "") or (chat.title and chat.title.endswith("..."))
+    is_initial_chat_state = (
+        len(all_msgs) <= 1
+        or chat.title in ("New Chat", "New Research", "")
+        or (chat.title and chat.title.startswith("New session"))
+        or (chat.title and chat.title.endswith("..."))
+    )
     
     async def stream_worker(emitter: SSEStreamEmitter):
-        # 1. Background smart title generation if new chat (non-blocking)
-        title_task = None
-        if is_initial_chat_state:
-            async def run_smart_title_gen():
-                try:
-                    ai_title = await rag.generate_chat_title(query.message)
-                    if ai_title:
-                        from database import SessionLocal
-                        t_db = SessionLocal()
-                        try:
-                            t_chat = t_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-                            if t_chat:
-                                t_chat.title = ai_title
-                                commit_with_retry(t_db)
-                        finally:
-                            t_db.close()
-                        await emitter.emit_event({"type": "title_update", "title": ai_title, "chat_id": chat_id})
-                except Exception as title_err:
-                    logger.debug(f"[Title Update Error]: {title_err}")
-
-            title_task = asyncio.create_task(run_smart_title_gen())
-
-        # 2. Main response generation
+        # 1. Main response generation (streaming smoothly to user)
         resp_text = await rag.query_chat(
             chat_id, 
             query.message, 
@@ -119,13 +102,25 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
             reset_callback=emitter.emit_clear_delta
         )
 
-        if title_task and not title_task.done():
-            try:
-                await asyncio.wait_for(title_task, timeout=5.0)
-            except Exception:
-                pass
-
         save_stream_assistant_response(chat_id, resp_text)
+
+        # 2. Post-response smart title generation (aware of both user inquiry and assistant synthesis)
+        if is_initial_chat_state:
+            try:
+                ai_title = await rag.generate_chat_title(query.message, assistant_response=resp_text)
+                if ai_title:
+                    from database import SessionLocal
+                    t_db = SessionLocal()
+                    try:
+                        t_chat = t_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
+                        if t_chat:
+                            t_chat.title = ai_title
+                            commit_with_retry(t_db)
+                    finally:
+                        t_db.close()
+                    await emitter.emit_event({"type": "title_update", "title": ai_title, "chat_id": chat_id})
+            except Exception as title_err:
+                logger.debug(f"[Title Update Error]: {title_err}")
 
         # Asynchronous background memory extraction & contradiction reconciliation (Issue #11)
         try:
