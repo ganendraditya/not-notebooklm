@@ -14,6 +14,8 @@ from llama_index.core.llms import ChatMessage, MessageRole
 from rag.llm_factory import get_main_llm
 from rag.prompts import get_workspace_analysis_system_prompt
 
+pytestmark = pytest.mark.live
+
 
 @pytest.mark.asyncio
 async def test_re_verification_and_self_correction_when_user_corrects():

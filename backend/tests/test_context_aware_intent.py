@@ -93,6 +93,7 @@ async def test_classify_user_intent_injects_dialogue_trace_into_prompt():
     assert "User Prompt: \"Lalu bagaimana dengan limitasinya?\"" in prompt_sent
 
 
+@pytest.mark.live
 @pytest.mark.asyncio
 async def test_live_fast_llm_anaphora_intent_resolution():
     """Live test verifying that Fast LLM correctly resolves follow-up queries using conversation context."""
