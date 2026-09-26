@@ -13,7 +13,7 @@ describe("useChatSession Chat Switching State Isolation", () => {
     vi.restoreAllMocks();
   });
 
-  it("restores in-flight streaming messages and prevents stale bleeding when switching back to generating chat", async () => {
+  it("restores in-flight streaming messages without duplicate user bubbles when switching back to generating chat", async () => {
     const sessions: ChatSession[] = [
       { id: "chat-1", title: "Chat 1", created_at: new Date().toISOString() },
       { id: "chat-2", title: "Chat 2", created_at: new Date().toISOString() },
@@ -60,7 +60,7 @@ describe("useChatSession Chat Switching State Isolation", () => {
 
     const getChatJob = (id: string) => jobsMap.get(id)!;
 
-    // Mock fetch for chat details
+    // Mock fetch for chat details: backend DB ALREADY has the in-flight user message persisted!
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.endsWith("/chats/chat-2")) {
         return Promise.resolve(new Response(JSON.stringify({
@@ -75,7 +75,11 @@ describe("useChatSession Chat Switching State Isolation", () => {
           id: "chat-1",
           title: "Chat 1",
           documents: [],
-          messages: [{ role: "user", content: "Initial message", created_at: new Date().toISOString() }]
+          // Notice: DB already persisted "Prompt in chat 1" as the last message
+          messages: [
+            { role: "user", content: "Initial message", created_at: new Date().toISOString() },
+            { role: "user", content: "Prompt in chat 1", created_at: new Date().toISOString() }
+          ]
         }), { status: 200 }));
       }
       return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
@@ -124,11 +128,13 @@ describe("useChatSession Chat Switching State Isolation", () => {
 
     rerender({ activeId: "chat-1" });
 
-    // It should immediately restore chat-1's in-flight state without waiting for fetch
-    expect(setMessages).toHaveBeenCalledWith([
-      { role: "user", content: "Initial message", created_at: expect.any(String) },
-      inFlightUserMsg,
-      inFlightStreamingMsg
-    ]);
+    // Verify the latest call to setMessages: it should have exactly ONE "Prompt in chat 1", NOT duplicated!
+    const lastCall = setMessages.mock.calls[setMessages.mock.calls.length - 1][0] as ChatMessage[];
+    expect(lastCall).toHaveLength(3);
+    expect(lastCall[0].content).toBe("Initial message");
+    expect(lastCall[1].content).toBe("Prompt in chat 1");
+    expect(lastCall[1].role).toBe("user");
+    expect(lastCall[2].role).toBe("assistant");
+    expect(lastCall[2].content).toBe("Generating response...");
   });
 });
