@@ -50,6 +50,18 @@ export function useChatSession(
     setActiveStatus(job.status);
     setQueuedPrompts(job.queue.map(q => q.text));
 
+    // Immediately reflect the selected chat's messages to prevent showing stale messages from previous chat
+    if (job.isProcessing) {
+      const inFlight: ChatMessage[] = [];
+      if (job.inFlightUserMsg) inFlight.push(job.inFlightUserMsg);
+      if (job.inFlightStreamingMsg) inFlight.push(job.inFlightStreamingMsg);
+      setMessages([...(job.baseMessages || []), ...inFlight]);
+    } else if (job.lastCompletedMessages) {
+      setMessages(job.lastCompletedMessages);
+    } else {
+      setMessages([]);
+    }
+
     fetch(`${backendUrl}/chats/${id}`)
         .then(res => res.json())
         .then(data => {
@@ -57,8 +69,15 @@ export function useChatSession(
           if (activeChatIdRef.current === id) {
             const currentJob = getChatJob(id);
             setDocuments(data.documents || []);
+            currentJob.lastCompletedMessages = data.messages || [];
             if (!currentJob.isProcessing) {
               setMessages(data.messages || []);
+            } else {
+              currentJob.baseMessages = data.messages || [];
+              const inFlight: ChatMessage[] = [];
+              if (currentJob.inFlightUserMsg) inFlight.push(currentJob.inFlightUserMsg);
+              if (currentJob.inFlightStreamingMsg) inFlight.push(currentJob.inFlightStreamingMsg);
+              setMessages([...currentJob.baseMessages, ...inFlight]);
             }
           }
         })

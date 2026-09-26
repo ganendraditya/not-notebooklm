@@ -52,6 +52,10 @@ export default function ChatClient() {
     queue: [],
     isProcessing: false,
     status: null,
+    inFlightUserMsg: null,
+    inFlightStreamingMsg: null,
+    baseMessages: [],
+    lastCompletedMessages: null,
   }));
 
   // 1. Hook for Session DB logic

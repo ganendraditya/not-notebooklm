@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { type ChatMessage, type Attachment } from "@/stores/chatStore";
+import { type ChatMessage, type Attachment, useChatStore } from "@/stores/chatStore";
 import { consumeSSEStream } from "@/lib/sse";
 import { sendSystemNotification } from "@/lib/notifications";
 import { createSmoothTextStreamer } from "@/lib/smoothStreamer";
@@ -15,6 +15,10 @@ export interface ChatJobState {
   queue: QueuedMessage[];
   isProcessing: boolean;
   status: string | null;
+  inFlightUserMsg: ChatMessage | null;
+  inFlightStreamingMsg: ChatMessage | null;
+  baseMessages: ChatMessage[];
+  lastCompletedMessages: ChatMessage[] | null;
 }
 
 export function useChatStream(
@@ -40,6 +44,10 @@ export function useChatStream(
         queue: [],
         isProcessing: false,
         status: null,
+        inFlightUserMsg: null,
+        inFlightStreamingMsg: null,
+        baseMessages: [],
+        lastCompletedMessages: null,
       });
     }
     return chatJobsRef.current.get(chatId)!;
@@ -62,22 +70,27 @@ export function useChatStream(
     job.isProcessing = true;
     job.status = "Analyzing query & reasoning...";
 
+    const newMsg: ChatMessage = { 
+      role: "user", 
+      content: nextMessage.text, 
+      created_at: new Date().toISOString(),
+      attachments: nextMessage.attachments
+    };
+    const assistantPlaceholder: ChatMessage = {
+      role: "assistant",
+      content: "",
+      created_at: new Date().toISOString(),
+      isStreaming: true
+    };
+
+    job.inFlightUserMsg = newMsg;
+    job.inFlightStreamingMsg = assistantPlaceholder;
+
     if (activeChatIdRef.current === targetChatId) {
+      job.baseMessages = [...useChatStore.getState().messages];
       setQueuedPrompts(job.queue.map(q => q.text));
       setIsLoading(true);
       setActiveStatus(job.status);
-      const newMsg: ChatMessage = { 
-        role: "user", 
-        content: nextMessage.text, 
-        created_at: new Date().toISOString(),
-        attachments: nextMessage.attachments
-      };
-      const assistantPlaceholder: ChatMessage = {
-        role: "assistant",
-        content: "",
-        created_at: new Date().toISOString(),
-        isStreaming: true
-      };
       updateMessagesList(prev => [...prev, newMsg, assistantPlaceholder]);
     }
 
@@ -100,6 +113,12 @@ export function useChatStream(
 
       const smoother = createSmoothTextStreamer({
         onUpdate: (displayed) => {
+          job.inFlightStreamingMsg = {
+            role: "assistant",
+            content: displayed,
+            created_at: job.inFlightStreamingMsg?.created_at || new Date().toISOString(),
+            isStreaming: true
+          };
           if (activeChatIdRef.current === targetChatId) {
             updateMessagesList(prev => {
               const lastMsg = prev[prev.length - 1];
@@ -119,19 +138,28 @@ export function useChatStream(
         },
         onDone: () => {
           const asstMsg = latestAsstMsg || { role: "assistant", content: "", created_at: new Date().toISOString() };
+          const finalizedAsst = { ...asstMsg, isStreaming: false };
           if (activeChatIdRef.current === targetChatId) {
             updateMessagesList(prev => {
               const lastMsg = prev[prev.length - 1];
               if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-                return [...prev.slice(0, -1), { ...asstMsg, isStreaming: false }];
+                return [...prev.slice(0, -1), finalizedAsst];
               }
-              return [...prev, asstMsg];
+              return [...prev, finalizedAsst];
             });
             setIsLoading(false);
             setActiveStatus(null);
           }
+          job.lastCompletedMessages = [
+            ...(job.baseMessages || []),
+            ...(job.inFlightUserMsg ? [job.inFlightUserMsg] : []),
+            finalizedAsst
+          ];
           job.isProcessing = false;
           job.status = null;
+          job.inFlightUserMsg = null;
+          job.inFlightStreamingMsg = null;
+          job.baseMessages = [];
 
           // Trigger system / browser notification if user is away in another tab
           const cleanPreview = (asstMsg.content || "")
@@ -242,6 +270,9 @@ export function useChatStream(
       // If no valid response was completed (e.g. aborted or errored out), clean up loading state immediately
       if (!latestAsstMsg || controller.signal.aborted) {
         job.isProcessing = false;
+        job.inFlightUserMsg = null;
+        job.inFlightStreamingMsg = null;
+        job.baseMessages = [];
         if (activeChatIdRef.current === targetChatId) {
           setIsLoading(false);
         }
@@ -264,6 +295,9 @@ export function useChatStream(
     job.queue = [];
     job.isProcessing = false;
     job.status = null;
+    job.inFlightUserMsg = null;
+    job.inFlightStreamingMsg = null;
+    job.baseMessages = [];
 
     setQueuedPrompts([]);
     setIsLoading(false);
@@ -294,6 +328,9 @@ export function useChatStream(
       job.controller.abort();
       job.controller = null;
     }
+    job.inFlightUserMsg = null;
+    job.inFlightStreamingMsg = null;
+    job.baseMessages = [];
 
     // 3. Put the promoted prompt as next and start processing immediately
     job.queue = [promptToPromote, ...job.queue];
@@ -361,6 +398,9 @@ export function useChatStream(
     // Optimistically update message list: keep messages up to messageIndex, replace at messageIndex, remove subsequent responses
     const updatedUserMsg: ChatMessage = { role: "user", content: newContent, created_at: new Date().toISOString() };
     const assistantPlaceholder: ChatMessage = { role: "assistant", content: "", created_at: new Date().toISOString(), isStreaming: true };
+    job.baseMessages = useChatStore.getState().messages.slice(0, messageIndex);
+    job.inFlightUserMsg = updatedUserMsg;
+    job.inFlightStreamingMsg = assistantPlaceholder;
     if (activeChatIdRef.current === currentChatId) {
       updateMessagesList(prev => [...prev.slice(0, messageIndex), updatedUserMsg, assistantPlaceholder]);
     }
@@ -369,6 +409,12 @@ export function useChatStream(
 
     const smoother = createSmoothTextStreamer({
       onUpdate: (displayed) => {
+        job.inFlightStreamingMsg = {
+          role: "assistant",
+          content: displayed,
+          created_at: job.inFlightStreamingMsg?.created_at || new Date().toISOString(),
+          isStreaming: true
+        };
         if (activeChatIdRef.current === currentChatId) {
           updateMessagesList(prev => {
             const lastMsg = prev[prev.length - 1];
@@ -386,21 +432,30 @@ export function useChatStream(
           });
         }
       },
-        onDone: () => {
-          const asstMsg = latestAsstMsg || { role: "assistant", content: "", created_at: new Date().toISOString() };
-          if (activeChatIdRef.current === currentChatId) {
-            updateMessagesList(prev => {
-              const lastMsg = prev[prev.length - 1];
-              if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-                return [...prev.slice(0, -1), { ...asstMsg, isStreaming: false }];
-              }
-              return [...prev, asstMsg];
-            });
-            setIsLoading(false);
-            setActiveStatus(null);
-          }
-          job.isProcessing = false;
-          job.status = null;
+      onDone: () => {
+        const asstMsg = latestAsstMsg || { role: "assistant", content: "", created_at: new Date().toISOString() };
+        const finalizedAsst = { ...asstMsg, isStreaming: false };
+        if (activeChatIdRef.current === currentChatId) {
+          updateMessagesList(prev => {
+            const lastMsg = prev[prev.length - 1];
+            if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
+              return [...prev.slice(0, -1), finalizedAsst];
+            }
+            return [...prev, finalizedAsst];
+          });
+          setIsLoading(false);
+          setActiveStatus(null);
+        }
+        job.lastCompletedMessages = [
+          ...(job.baseMessages || []),
+          ...(job.inFlightUserMsg ? [job.inFlightUserMsg] : []),
+          finalizedAsst
+        ];
+        job.isProcessing = false;
+        job.status = null;
+        job.inFlightUserMsg = null;
+        job.inFlightStreamingMsg = null;
+        job.baseMessages = [];
 
         const cleanPreview = (asstMsg.content || "")
           .replace(/<!--[\s\S]*?-->/g, "")
@@ -502,6 +557,9 @@ export function useChatStream(
       }
       if (!latestAsstMsg || controller.signal.aborted) {
         job.isProcessing = false;
+        job.inFlightUserMsg = null;
+        job.inFlightStreamingMsg = null;
+        job.baseMessages = [];
         if (activeChatIdRef.current === currentChatId) {
           setIsLoading(false);
         }
@@ -519,6 +577,11 @@ export function useChatStream(
 
     job.isProcessing = true;
     job.status = "Regenerating response...";
+    const assistantPlaceholder: ChatMessage = { role: "assistant", content: "", created_at: new Date().toISOString(), isStreaming: true };
+    job.baseMessages = useChatStore.getState().messages.slice(0, messageIndex);
+    job.inFlightUserMsg = null;
+    job.inFlightStreamingMsg = assistantPlaceholder;
+
     if (activeChatIdRef.current === currentChatId) {
       setIsLoading(true);
       setActiveStatus(job.status);
@@ -544,6 +607,12 @@ export function useChatStream(
 
     const smoother = createSmoothTextStreamer({
       onUpdate: (displayed) => {
+        job.inFlightStreamingMsg = {
+          role: "assistant",
+          content: displayed,
+          created_at: job.inFlightStreamingMsg?.created_at || new Date().toISOString(),
+          isStreaming: true
+        };
         if (activeChatIdRef.current === currentChatId) {
           updateMessagesList(prev => {
             const next = [...prev];
@@ -563,21 +632,29 @@ export function useChatStream(
           content: "",
           created_at: new Date().toISOString()
         };
+        const finalizedAsst = { ...asstMsg, isStreaming: false };
         if (activeChatIdRef.current === currentChatId) {
           updateMessagesList(prev => {
             const next = prev.slice(0, messageIndex + 1);
             if (next[messageIndex]) {
-              next[messageIndex] = { ...asstMsg, isStreaming: false };
+              next[messageIndex] = finalizedAsst;
             } else {
-              next.push(asstMsg);
+              next.push(finalizedAsst);
             }
             return next;
           });
           setIsLoading(false);
           setActiveStatus(null);
         }
+        job.lastCompletedMessages = [
+          ...(job.baseMessages || []),
+          finalizedAsst
+        ];
         job.isProcessing = false;
         job.status = null;
+        job.inFlightUserMsg = null;
+        job.inFlightStreamingMsg = null;
+        job.baseMessages = [];
 
         const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
         if (actionMatch) {
@@ -665,6 +742,9 @@ export function useChatStream(
       }
       if (!latestAsstMsg || controller.signal.aborted) {
         job.isProcessing = false;
+        job.inFlightUserMsg = null;
+        job.inFlightStreamingMsg = null;
+        job.baseMessages = [];
         if (activeChatIdRef.current === currentChatId) {
           setIsLoading(false);
         }
