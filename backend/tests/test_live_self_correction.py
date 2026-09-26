@@ -32,10 +32,10 @@ async def test_re_verification_and_self_correction_when_user_corrects():
     # --- Turn 1: Pertanyaan umum di mana AI mungkin melewatkan Appendix ---
     user_q1 = "Apakah model ini ada pengujian dengan stochastic depth drop rate?"
     
-    # Kita simulasikan Turn 1 di mana model awalnya salah/belum melihat (misal model jawab tidak ada)
+    # Simulated Turn 1 where model initially missed the appendix
     simulated_initial_wrong_answer = (
-        "Bagian ini tidak ditemukan dalam kutipan dokumen yang tersedia di sistem saat ini. "
-        "Dokumen hanya membahas evaluasi umum Vision Transformer pada ImageNet [1]."
+        "This detail is not found in the documents currently available in the system. "
+        "The document only discusses general Vision Transformer evaluation on ImageNet [1]."
     )
 
     # --- Turn 2: User membetulkan dengan petunjuk nyata dari dokumen ---

@@ -23,14 +23,14 @@ def test_general_chat_prompt_contains_anti_sycophancy_and_boundary_honesty():
     # 1. Closed-Book & Anti-Parametric Leakage
     assert "CLOSED-BOOK BOUNDARY HONESTY" in prompt
     assert "parametric memory" in prompt.lower()
-    assert "Bagian ini tidak ditemukan dalam kutipan dokumen yang tersedia" in prompt
+    assert "This detail is not found in the documents currently available" in prompt
     assert "NEVER blame the user's file integrity" in prompt
 
     # 2. Anti-Sycophancy & Objective Skepticism
     assert "ANTI-SYCOPHANCY & OBJECTIVE SKEPTICISM" in prompt
     assert "sycophantic agreement" in prompt.lower()
     assert "flip-flop" in prompt.lower()
-    assert "Berdasarkan kutipan yang saya miliki, data X tidak tercatat" in prompt
+    assert "Based on the excerpts available to me, data X is not recorded" in prompt
 
     # 3. Tool Effect Gating & Authority Checks
     assert "TOOL EFFECT GATING & AUTHORITY CHECKS" in prompt
@@ -45,13 +45,13 @@ def test_workspace_analysis_prompt_contains_anti_sycophancy_and_boundary_honesty
     assert "NO PARAMETRIC LEAKAGE" in prompt
     assert "DIRECT NEGATIVE ABSTENTION" in prompt
     assert "NO USER UPLOAD BLAME" in prompt
-    assert "Bagian ini tidak ditemukan dalam kutipan dokumen yang tersedia di sistem saat ini" in prompt
+    assert "This detail is not found in the documents currently available in the system" in prompt
 
     # 2. Anti-Sycophancy & Objective Skepticism
     assert "ANTI-SYCOPHANCY & OBJECTIVE SKEPTICISM" in prompt
     assert "sycophantic agreement" in prompt.lower()
     assert "flip-flop" in prompt.lower()
-    assert "Berdasarkan kutipan yang saya miliki, data X tidak tercatat" in prompt
+    assert "Based on the excerpts available to me, data X is not recorded" in prompt
 
     # 3. Tool Effect Gating & Authority Checks
     assert "TOOL EFFECT GATING (AUTHORITY CHECK INVARIANT)" in prompt

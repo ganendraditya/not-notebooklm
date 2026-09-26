@@ -493,13 +493,20 @@ async def main():
     print("-" * 95)
     print(f"{f'Overall Needle Accuracy ({len(all_results)} Cases)':<45} | {f'{mean_8k:.3f}':<24} | {f'{mean_1m:.3f}':<20}")
     
+    tier_display_names = {
+        "s_niah": "Single-Needle Retrieval",
+        "m_niah": "Multi-Needle Tracking",
+        "r_niah": "Reasoning & Deduction",
+        "u_niah": "Negative Abstention"
+    }
+
     # Sub-tier statistics
     for t_name in ["s_niah", "m_niah", "r_niah", "u_niah"]:
         sub_8k = [r["score_8k"] for r in all_results if r["tier"] == t_name and r["score_8k"] is not None]
         sub_1m = [r["score_1m"] for r in all_results if r["tier"] == t_name and r["score_1m"] is not None]
         avg_8k = f"{sum(sub_8k)/len(sub_8k):.3f}" if sub_8k else "N/A"
         avg_1m = f"{sum(sub_1m)/len(sub_1m):.3f}" if sub_1m else "N/A"
-        t_label = f"• {t_name.upper()} Retrieval Fidelity" if t_name != "u_niah" else "• U_NIAH Abstention Fidelity"
+        t_label = f"• {tier_display_names.get(t_name, t_name.upper())} Fidelity"
         print(f"{t_label:<45} | {avg_8k:<24} | {avg_1m:<20}")
 
     print("=" * 95)
@@ -529,7 +536,7 @@ async def main():
     out_md = REPORTS_DIR / f"benchmark_niah_dual_cap{suffix}.md"
     md_lines = [
         f"# Not-NotebookLM Dual-Cap Conversational NIAH Benchmark Report ({split_title})",
-        "*Multi-Spectral Needle-In-A-Haystack Evaluation across S-NIAH, M-NIAH, and R-NIAH (Stanford RULER & Anthropic Standards)*\n",
+        "*Needle-In-A-Haystack Evaluation across Single-Needle, Multi-Needle Tracking, and Reasoning Chains (Stanford RULER & Anthropic Standards)*\n",
         f"- **Split**: `{args.split}`",
         f"- **Total Cases Evaluated**: {len(all_results)} Cases",
         f"- **Mode A (8K Cap / Compaction)**: `{mean_8k:.3f}` overall accuracy",
@@ -544,7 +551,7 @@ async def main():
         sub_1m = [r["score_1m"] for r in all_results if r["tier"] == t_name and r["score_1m"] is not None]
         a_8k = f"{sum(sub_8k)/len(sub_8k):.3f}" if sub_8k else "N/A"
         a_1m = f"{sum(sub_1m)/len(sub_1m):.3f}" if sub_1m else "N/A"
-        tier_label = f"**{t_name.upper()} Fidelity**" if t_name != "u_niah" else "**U_NIAH Abstention Fidelity**"
+        tier_label = f"**{tier_display_names.get(t_name, t_name.upper())} Fidelity**"
         md_lines.append(f"| {tier_label} | `{a_8k}` | `{a_1m}` |")
 
     if args.tier in ("all", "s_niah") and any(r["tier"] == "s_niah" for r in all_results):
