@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef } from "react";
 import { type ChatMessage, type Attachment, useChatStore } from "@/stores/chatStore";
 import { consumeSSEStream } from "@/lib/sse";
 import { sendSystemNotification } from "@/lib/notifications";
@@ -39,15 +39,6 @@ export function useChatStream(
   handleEnsureChatSessionRef: React.MutableRefObject<(suggestedTitle?: string) => Promise<string>>
 ) {
   const chatJobsRef = useRef<Map<string, ChatJobState>>(new Map());
-  const dismissTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-
-  useEffect(() => {
-    const timeouts = dismissTimeoutsRef.current;
-    return () => {
-      timeouts.forEach(t => clearTimeout(t));
-      timeouts.clear();
-    };
-  }, []);
 
   const getChatJob = (chatId: string): ChatJobState => {
     if (!chatJobsRef.current.has(chatId)) {
@@ -76,20 +67,6 @@ export function useChatStream(
       startedAt: startTime,
       durationFormatted: formattedDuration,
     });
-
-    if (activeChatIdRef.current === targetChatId) {
-      if (dismissTimeoutsRef.current.has(targetChatId)) {
-        clearTimeout(dismissTimeoutsRef.current.get(targetChatId)!);
-      }
-      const timerId = setTimeout(() => {
-        dismissTimeoutsRef.current.delete(targetChatId);
-        const store = useChatStore.getState();
-        if (activeChatIdRef.current === targetChatId && store.sessionExecutions[targetChatId]?.status === "completed") {
-          store.dismissSessionExecution(targetChatId);
-        }
-      }, 3500);
-      dismissTimeoutsRef.current.set(targetChatId, timerId);
-    }
   };
 
   const processNextInQueue = async (targetChatId: string) => {
@@ -108,10 +85,6 @@ export function useChatStream(
     const nextMessage = job.queue.shift()!;
     job.isProcessing = true;
     job.status = "Analyzing query & reasoning...";
-    if (dismissTimeoutsRef.current.has(targetChatId)) {
-      clearTimeout(dismissTimeoutsRef.current.get(targetChatId)!);
-      dismissTimeoutsRef.current.delete(targetChatId);
-    }
     useChatStore.getState().setSessionExecution(targetChatId, {
       status: "running",
       startedAt: getTimestampNow(),
@@ -158,6 +131,12 @@ export function useChatStream(
           attachments: nextMessage.attachments
         }),
         signal: controller.signal
+      });
+
+      // Calibrate start timestamp to actual HTTP stream inception
+      useChatStore.getState().setSessionExecution(targetChatId, {
+        status: "running",
+        startedAt: getTimestampNow(),
       });
 
       const smoother = createSmoothTextStreamer({
@@ -256,6 +235,7 @@ export function useChatStream(
         if (data.type === "title_update" && data.title) {
           const updatedTitle = data.title;
           updateSessionsList(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
+          useChatStore.getState().updateSessionsList(prev => prev.map(s => s.id === targetChatId ? { ...s, title: updatedTitle } : s));
           if (activeChatIdRef.current === targetChatId) {
             document.title = `${updatedTitle} - NotbookLM`;
           }

@@ -292,11 +292,17 @@ export default function ChatClient() {
                 setMobileTab("chat");
               }}
               onOpenLibrary={(cat) => {
+                if (activeChatId && useChatStore.getState().sessionExecutions[activeChatId]?.status === "completed") {
+                  useChatStore.getState().dismissSessionExecution(activeChatId);
+                }
                 setLibraryInitialCategory(cat || "all");
                 setCurrentView("library");
                 setMobileTab("chat");
               }}
               onOpenSearch={() => {
+                if (activeChatId && useChatStore.getState().sessionExecutions[activeChatId]?.status === "completed") {
+                  useChatStore.getState().dismissSessionExecution(activeChatId);
+                }
                 setCurrentView("search");
                 setMobileTab("chat");
               }}

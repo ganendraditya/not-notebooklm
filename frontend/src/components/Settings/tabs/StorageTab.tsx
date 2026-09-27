@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ChevronRight, Check, Minus } from "lucide-react";
+import { AlertTriangle, ChevronRight, Check, Minus, Loader2 } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
@@ -397,7 +397,9 @@ export default function StorageTab({
         <div 
           onClick={(e) => {
             e.stopPropagation();
-            setIsDeleteConfirmOpen(false);
+            if (!isDeletingChats) {
+              setIsDeleteConfirmOpen(false);
+            }
           }}
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-100"
         >
@@ -417,8 +419,9 @@ export default function StorageTab({
               <Button
                 variant="ghost"
                 size="sm"
+                disabled={isDeletingChats}
                 onClick={() => setIsDeleteConfirmOpen(false)}
-                className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer h-8"
+                className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer h-8"
               >
                 Cancel
               </Button>
@@ -426,9 +429,16 @@ export default function StorageTab({
                 size="sm"
                 disabled={isDeletingChats}
                 onClick={handleBulkDeleteChats}
-                className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium cursor-pointer h-8"
+                className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer h-8"
               >
-                {isDeletingChats ? t('settings.deleting') : t('settings.deleteSelected')}
+                {isDeletingChats ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={13} className="animate-spin" />
+                    {t('settings.deleting')}
+                  </span>
+                ) : (
+                  t('settings.deleteSelected')
+                )}
               </Button>
             </div>
           </div>
@@ -470,11 +480,12 @@ export default function StorageTab({
             <Button
               variant="ghost"
               size="sm"
+              disabled={isResetting}
               onClick={() => {
                 setIsResetConfirmOpen(false);
                 setResetConfirmInput("");
               }}
-              className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover cursor-pointer h-8"
+              className="text-xs text-app-text-muted hover:text-app-text hover:bg-app-item-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer h-8"
             >
               Cancel
             </Button>
@@ -482,9 +493,16 @@ export default function StorageTab({
               size="sm"
               disabled={resetConfirmInput.trim().toLowerCase() !== "reset-all-data" || isResetting}
               onClick={handleFactoryReset}
-              className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium cursor-pointer h-8"
+              className="text-xs bg-red-600 hover:bg-red-500 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer h-8"
             >
-              {isResetting ? "Resetting..." : "Confirm & Reset All"}
+              {isResetting ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={13} className="animate-spin" />
+                  Resetting...
+                </span>
+              ) : (
+                "Confirm & Reset All"
+              )}
             </Button>
           </div>
         </div>

@@ -36,8 +36,11 @@ export function useChatSession(
     try {
       localStorage.setItem("last_active_chat_id", id);
     } catch {}
-    if (useChatStore.getState().sessionExecutions[id]?.status === "completed") {
-      useChatStore.getState().dismissSessionExecution(id);
+    const prevChatId = activeChatIdRef.current;
+    if (prevChatId && prevChatId !== id) {
+      if (useChatStore.getState().sessionExecutions[prevChatId]?.status === "completed") {
+        useChatStore.getState().dismissSessionExecution(prevChatId);
+      }
     }
     if (activeChatId === id) {
       setViewingDoc(null);
@@ -231,6 +234,10 @@ export function useChatSession(
     try {
       localStorage.setItem("last_active_chat_id", "");
     } catch {}
+    const prevChatId = activeChatIdRef.current;
+    if (prevChatId && useChatStore.getState().sessionExecutions[prevChatId]?.status === "completed") {
+      useChatStore.getState().dismissSessionExecution(prevChatId);
+    }
     activeChatIdRef.current = null;
     pendingSessionCreationRef.current = null;
     setActiveChatId(null);
