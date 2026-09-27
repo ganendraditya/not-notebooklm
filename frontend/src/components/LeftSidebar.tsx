@@ -242,13 +242,13 @@ export default function LeftSidebar({
               const isRunning = execution?.status === "running";
               const isCompleted = execution?.status === "completed";
 
-              let leadingIcon = <MessageSquare size={16} className="shrink-0 text-app-text-dim" />;
+              let leadingIcon = <MessageSquare size={16} className="text-app-text-dim" />;
               if (isRunning) {
-                leadingIcon = <span className="shrink-0 w-2 h-2 rounded-full bg-blue-500 animate-pulse ml-0.5 mr-0.5" />;
+                leadingIcon = <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />;
               } else if (isCompleted) {
-                leadingIcon = <span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500 ml-0.5 mr-0.5" />;
+                leadingIcon = <span className="w-2 h-2 rounded-full bg-emerald-500" />;
               } else if (session.is_pinned) {
-                leadingIcon = <Pin size={16} className="shrink-0 text-amber-500 fill-amber-500/20" />;
+                leadingIcon = <Pin size={16} className="text-amber-500 fill-amber-500/20" />;
               }
 
               return (
@@ -262,7 +262,9 @@ export default function LeftSidebar({
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate mr-1.5 flex-1 min-w-0">
-                      {leadingIcon}
+                      <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+                        {leadingIcon}
+                      </div>
                       <span className="truncate flex-1">{session.title}</span>
                     </div>
 
