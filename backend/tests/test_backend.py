@@ -59,6 +59,42 @@ async def test_generate_chat_title_post_response():
     assert len(title) > 0
     assert not title.startswith("Title:")
 
+def test_decoupled_fast_llm_dual_agent_profiles():
+    """Verify that Fast LLM and Main LLM are always distinct client instances with isolated profiles."""
+    from unittest.mock import patch
+    from rag.llm_factory import get_main_llm, get_fast_llm, get_candidate_llm_chain
+
+    # Case 1: Single-model setup (LLM_FAST_MODEL omitted/empty)
+    with patch.dict(os.environ, {
+        "LLM_MODEL": "ag/gemini-3.8-flash-high",
+        "LLM_FAST_MODEL": "",
+        "NINEROUTER_FAST_MODEL": "",
+        "LLM_BASE_URL": "http://localhost:20128/v1",
+        "LLM_API_KEY": "sk-mock-test"
+    }):
+        main_inst = get_main_llm(force_refresh=True)
+        fast_inst = get_fast_llm(force_refresh=True)
+
+        # Must be distinct memory instances (isolated agents)
+        assert main_inst is not fast_inst
+        assert id(main_inst) != id(fast_inst)
+
+        # Both use main model name
+        assert getattr(main_inst, "model") == "ag/gemini-3.8-flash-high"
+        assert getattr(fast_inst, "model") == "ag/gemini-3.8-flash-high"
+
+        # Profiles must be strictly decoupled
+        assert getattr(main_inst, "max_tokens") == 16384
+        assert getattr(main_inst, "timeout") == 120.0
+        assert getattr(fast_inst, "max_tokens") == 4096
+        assert getattr(fast_inst, "timeout") == 45.0
+
+        # Candidate chain should not redundantly add identical model as fallback candidate
+        chain = get_candidate_llm_chain()
+        chain_models = [label for _, label in chain]
+        assert any("Primary Synthesizer" in label for label in chain_models)
+        assert not any("Fast Lite" in label for label in chain_models)
+
 def test_chats_pagination():
     """Verify limit and offset pagination on GET /chats."""
     created_ids = []

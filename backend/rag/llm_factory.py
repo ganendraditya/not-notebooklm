@@ -117,7 +117,8 @@ def get_fast_llm(force_refresh: bool = False):
     """
     Returns the Fast / Lite LLM.
     Powers rapid micro-tasks: intent triage, query planning, paper relevance judging, auto title generation.
-    If LLM_FAST_MODEL is identical to LLM_MODEL or not configured, reuses the Primary LLM instance.
+    Always creates an isolated fast agent instance with lean parameters (max_tokens=4096, timeout=45.0s),
+    defaulting to LLM_MODEL if LLM_FAST_MODEL is not explicitly configured or identical.
     """
     global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
     current_sig = _get_env_config_signature()
@@ -126,19 +127,16 @@ def get_fast_llm(force_refresh: bool = False):
 
     base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _get_gateway_credentials()
 
-    # Re-use main instance directly if models are identical
-    if fast_model == model:
-        _CACHED_FAST_LLM = get_main_llm(force_refresh=force_refresh)
-        _CACHED_CONFIG_HASH = current_sig
-        return _CACHED_FAST_LLM
+    # Default to main model string if fast_model is empty, while maintaining isolated client profile
+    target_fast_model = fast_model or model
 
     _CACHED_FAST_LLM = None
-    if has_gateway:
+    if has_gateway and target_fast_model:
         try:
             _CACHED_FAST_LLM = OpenAILike(
                 api_base=base_url,
                 api_key=api_key,
-                model=fast_model,
+                model=target_fast_model,
                 is_chat_model=True,
                 is_function_calling_model=True,
                 max_tokens=4096,
@@ -146,7 +144,7 @@ def get_fast_llm(force_refresh: bool = False):
                 timeout=45.0
             )
         except Exception as e:
-            logger.warning(f"[LLM Factory] Failed to initialize Fast LLM ({fast_model}): {e}")
+            logger.warning(f"[LLM Factory] Failed to initialize Fast LLM ({target_fast_model}): {e}")
 
     if _CACHED_FAST_LLM is None:
         _CACHED_FAST_LLM = get_main_llm(force_refresh=force_refresh)
@@ -258,9 +256,12 @@ def get_candidate_llm_chain():
         fb_label = getattr(fb_inst, "model", "fallback")
         add_candidate(fb_inst, f"Fallback Model ({fb_label})")
 
-    if fast_instance and fast_instance != main_instance:
-        label = getattr(fast_instance, "model", "default")
-        add_candidate(fast_instance, f"Fast Lite ({label})")
+    if fast_instance:
+        main_model_name = getattr(main_instance, "model", None)
+        fast_model_name = getattr(fast_instance, "model", None)
+        # Only add fast instance to fallback chain if it uses a distinct underlying model
+        if fast_model_name and main_model_name and fast_model_name != main_model_name:
+            add_candidate(fast_instance, f"Fast Lite ({fast_model_name})")
 
     return candidate_llms
 
