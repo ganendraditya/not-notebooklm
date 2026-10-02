@@ -214,7 +214,13 @@ async def _retrieve_hybrid_workspace_context(
         filters = MetadataFilters(
             filters=[MetadataFilter(key="chat_id", operator=FilterOperator.EQ, value=chat_id)]
         )
-        retriever = index.as_retriever(filters=filters, similarity_top_k=25)
+        # Leverage hybrid search (dense + BM25 sparse) if hybrid is enabled on vector store
+        query_mode = "hybrid" if getattr(vector_store, "enable_hybrid", False) else "default"
+        retriever = index.as_retriever(
+            filters=filters,
+            similarity_top_k=25,
+            vector_store_query_mode=query_mode,
+        )
         nodes = await retriever.aretrieve(query)
 
         if nodes:

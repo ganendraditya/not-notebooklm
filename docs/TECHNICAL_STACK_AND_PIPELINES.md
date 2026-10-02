@@ -24,9 +24,10 @@ Not-NotebookLM dibangun dengan arsitektur decoupled (Client-Server terpisah, hea
 |                                                                                         |
 |  +-----------------------------------------------------------------------------------+  |
 |  |                             LLM Gateway & Cascading Factory                       |  |
-|  |  - Primary / Heavy LLM (LLM_MODEL, 16k context, 120s timeout)                      |  |
-|  |  - Fast / Lite LLM (LLM_FAST_MODEL, 4k context, 45s timeout)                       |  |
+|  |  - Primary / Heavy LLM (LLM_MODEL, max 16k output tokens, 120s timeout)           |  |
+|  |  - Fast / Lite LLM (LLM_FAST_MODEL, max 4k output tokens, 45s timeout)            |  |
 |  |  - Fallback LLM (LLM_FALLBACK_MODEL, automatic failover)                          |  |
+|  |  * Input context window is dynamic & auto-detected via token_budget.py (8k-128k+)  |  |
 |  +-----------------------------------------------------------------------------------+  |
 |                                                                                         |
 |  +-----------------------------------------------------------------------------------+  |
@@ -70,6 +71,7 @@ Not-NotebookLM dibangun dengan arsitektur decoupled (Client-Server terpisah, hea
 | **Vector Database** | Qdrant Client | `>= 1.12.0` | Vector database berkecepatan tinggi, kompatibel remote server atau embedded disk persistence. |
 | **Embedding Model** | Multilingual E5 Small | `intfloat/multilingual-e5-small` (384 dim) | Default local offline embeddings (93+ bahasa), zero external API cost. |
 | **Alternative Embedding** | Google GenAI | `models/text-embedding-004` (768 dim) | High-accuracy Google cloud embedding via `llama-index-embeddings-google-genai`. |
+| **Sparse Lexical BM25** | FastEmbed | `>= 0.8.0, < 0.9.0` (`Qdrant/bm25`) | Tokenizer & sparse embedding generator ONNX ultra-ringan untuk exact match keyword, DOI, dan akronim (Issue #9). |
 | **Cross-Encoder Reranker** | FlashRank | `0.2.10` (`ms-marco-TinyBERT-L-2-v2`) | Cross-encoder ultra-cepat (<10ms) berbasis ONNX/in-memory singleton tanpa dependency GPU berat. |
 | **Relational Database** | SQLite (WAL Mode) | SQLite3 via SQLAlchemy `2.0.52` | Penyimpanan persisten metadata dokumen, sesi chat, pesan, citations, dan memory profile. |
 | **Object Storage Adapter**| Boto3 S3 Client | `>= 1.34.0` | Adapter terpadu untuk Cloudflare R2, MinIO self-hosted, atau AWS S3 dengan fallback disk. |
@@ -261,9 +263,10 @@ Not-NotebookLM menerapkan strategi pengambilan kontekstual adaptif berdasarkan k
       +---------------------------------------+       +---------------------------------------+
       |        DIRECT CONTEXT PACKING         |       |      HYBRID RETRIEVAL & RERANKING     |
       | - Token Budget Inspector              |       | - Build Structured Document Catalog   |
-      | - Pack all full-text documents        |       | - Qdrant Vector Retrieval (Top-25)    |
-      |   directly into prompt headroom       |       | - FlashRank Cross-Encoder Rerank      |
-      | - Maximum fidelity & zero recall loss |       |   (Top-12 most relevant excerpts)     |
+      | - Pack all full-text documents        |       | - Hybrid Qdrant Retrieval (Top-25:    |
+      |   directly into prompt headroom       |       |   Dense E5 + FastEmbed BM25 via RRF)  |
+      | - Maximum fidelity & zero recall loss |       | - FlashRank Cross-Encoder Rerank      |
+      |                                       |       |   (Top-12 most relevant excerpts)     |
       |                                       |       | - Solves Stanford 'Lost in Middle'    |
       +-------------------+-------------------+       +-------------------+-------------------+
                           |                                               |
