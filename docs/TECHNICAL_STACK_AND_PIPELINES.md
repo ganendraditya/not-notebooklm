@@ -69,8 +69,8 @@ Not-NotebookLM dibangun dengan arsitektur decoupled (Client-Server terpisah, hea
 | **RAG Orchestrator** | LlamaIndex Core | `>= 0.11.0` | Abstraksi document, vector store index, retriever node, dynamic chat messages. |
 | **LLM Gateway Client**| `llama-index-llms-openai-like` | `>= 0.2.0` | Menghubungkan ke gateway OpenAI-compatible (9Router, LiteLLM, Ollama, OpenRouter). |
 | **Vector Database** | Qdrant Client | `>= 1.12.0` | Vector database berkecepatan tinggi, kompatibel remote server atau embedded disk persistence. |
-| **Embedding Model** | Multilingual E5 Small | `intfloat/multilingual-e5-small` (384 dim) | Default local offline embeddings (93+ bahasa), zero external API cost. |
-| **Alternative Embedding** | Google GenAI | `models/text-embedding-004` (768 dim) | High-accuracy Google cloud embedding via `llama-index-embeddings-google-genai`. |
+| **Dense Semantic Embedding** | FastEmbed ONNX | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dim) | Default local offline dense embeddings (50+ bahasa), zero external API cost, 100% CPU-native via ONNX Runtime (Zero-PyTorch). |
+| **Alternative Embedding** | Google GenAI | `models/gemini-embedding-001` (3072 dim) | High-accuracy Google cloud embedding via `llama-index-embeddings-google-genai` (auto-routed to `not_notebooklm_gemini_3072`). |
 | **Sparse Lexical BM25** | FastEmbed | `>= 0.8.0, < 0.9.0` (`Qdrant/bm25`) | Tokenizer & sparse embedding generator ONNX ultra-ringan untuk exact match keyword, DOI, dan akronim (Issue #9). |
 | **Cross-Encoder Reranker** | FlashRank | `0.2.10` (`ms-marco-TinyBERT-L-2-v2`) | Cross-encoder ultra-cepat (<10ms) berbasis ONNX/in-memory singleton tanpa dependency GPU berat. |
 | **Relational Database** | SQLite (WAL Mode) | SQLite3 via SQLAlchemy `2.0.52` | Penyimpanan persisten metadata dokumen, sesi chat, pesan, citations, dan memory profile. |
@@ -94,11 +94,13 @@ Sistem menggunakan pendekatan **Tri-Layer Storage** yang menjamin persistensi, p
 +----------------------------+-----------------------------+-------------------------+
 | 1. SQLite Relational DB    | 2. Qdrant Vector DB         | 3. File & Media Storage |
 |    (backend/not_notebooklm.db)|    (backend/qdrant_data/)   |    (Local / S3 / R2)    |
-| - ChatSessions             | - not_notebooklm_e5         | - Original PDF / DOCX   |
-| - Documents (metadata)     | - not_notebooklm_gemini     | - Chat Media / Images   |
-| - ChatMessages (variants)  | - Dense Vector Embeddings   | - .parsed_cache/ (MD)   |
-| - CitationHighlights       | - Metadata filters:         | - temp_zips/ (Export)   |
-| - ResearchProfiles (Memory)|   chat_id, filename, section|                         |
+| - ChatSessions             | - not_notebooklm_fastembed  | - Original PDF / DOCX   |
+| - Documents (metadata)     | - not_notebooklm_e5 (legacy)| - Chat Media / Images   |
+| - ChatMessages (variants)  | - not_notebooklm_gemini_3072| - .parsed_cache/ (MD)   |
+| - CitationHighlights       | - not_notebooklm_gemini     | - temp_zips/ (Export)   |
+| - ResearchProfiles (Memory)| - Hybrid: Dense + BM25 RRF  |                         |
+|                            | - Metadata filters:         |                         |
+|                            |   chat_id, filename, section|                         |
 +----------------------------+-----------------------------+-------------------------+
 ```
 
@@ -119,8 +121,10 @@ Sistem menggunakan pendekatan **Tri-Layer Storage** yang menjamin persistensi, p
   - **Embedded Disk (Default):** Menyimpan point vectors di `backend/qdrant_data/` dengan multi-thread safe lock.
   - **Remote Server:** Menggunakan `QDRANT_URL` dan `QDRANT_API_KEY` (Docker atau Qdrant Cloud cluster).
 - **Collections:**
-  - `not_notebooklm_e5`: Khusus vektor 384 dimensi dari model `multilingual-e5-small`.
-  - `not_notebooklm_gemini`: Khusus vektor 768 dimensi dari model Google GenAI.
+  - `not_notebooklm_fastembed`: Koleksi default dense 384 dimensi dari FastEmbed ONNX (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`) + sparse BM25.
+  - `not_notebooklm_e5`: Koleksi legacy dense 384 dimensi (terisolasi untuk mencegah vector space mismatch).
+  - `not_notebooklm_gemini_3072`: Khusus vektor 3072 dimensi dari model Google GenAI aktif (`models/gemini-embedding-001`).
+  - `not_notebooklm_gemini`: Khusus vektor legacy 768 dimensi dari model lama.
 - **Payload Indexing:** Disaring menggunakan metadata filter `chat_id`, `filename`, dan `canonical_section`.
 
 ### 3.3 File System & Object Storage Adapter (`storage_adapter.py`)
@@ -264,8 +268,9 @@ Not-NotebookLM menerapkan strategi pengambilan kontekstual adaptif berdasarkan k
       |        DIRECT CONTEXT PACKING         |       |      HYBRID RETRIEVAL & RERANKING     |
       | - Token Budget Inspector              |       | - Build Structured Document Catalog   |
       | - Pack all full-text documents        |       | - Hybrid Qdrant Retrieval (Top-25:    |
-      |   directly into prompt headroom       |       |   Dense E5 + FastEmbed BM25 via RRF)  |
-      | - Maximum fidelity & zero recall loss |       | - FlashRank Cross-Encoder Rerank      |
+      |   directly into prompt headroom       |       |   FastEmbed Dense MiniLM + FastEmbed  |
+      | - Maximum fidelity & zero recall loss |       |   BM25 via RRF)                       |
+      |                                       |       | - FlashRank Cross-Encoder Rerank      |
       |                                       |       |   (Top-12 most relevant excerpts)     |
       |                                       |       | - Solves Stanford 'Lost in Middle'    |
       +-------------------+-------------------+       +-------------------+-------------------+

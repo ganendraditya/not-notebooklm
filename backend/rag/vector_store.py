@@ -1,7 +1,8 @@
 import os
+import asyncio
 import logging
 import threading
-from typing import Optional
+from typing import Optional, List, Any
 from dotenv import load_dotenv
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore as _BaseQdrantVectorStore
@@ -81,6 +82,51 @@ except ImportError:
         GoogleGenAIEmbedding = None
 
 try:
+    from fastembed import TextEmbedding as FastEmbedTextEmbedding
+except ImportError:
+    FastEmbedTextEmbedding = None
+
+try:
+    from llama_index.core.embeddings import BaseEmbedding
+except ImportError:
+    BaseEmbedding = object  # Fallback for type annotation safety
+
+class FastEmbedDenseEmbedding(BaseEmbedding):
+    """Native ONNX-powered dense multilingual embedding provider using FastEmbed.
+    Zero-PyTorch footprint, sub-millisecond CPU latency, and ~220MB model footprint."""
+
+    model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    _engine: Any = None
+
+    def __init__(self, model_name: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", **kwargs):
+        super().__init__(model_name=model_name, **kwargs)
+        if FastEmbedTextEmbedding is None:
+            raise RuntimeError("fastembed package is not installed. Please install fastembed>=0.8.0.")
+        self._engine = FastEmbedTextEmbedding(model_name=model_name)
+
+    def _get_query_embedding(self, query: str) -> List[float]:
+        return list(self._engine.embed([query]))[0].tolist()
+
+    async def _aget_query_embedding(self, query: str) -> List[float]:
+        return await asyncio.to_thread(self._get_query_embedding, query)
+
+    def _get_text_embedding(self, text: str) -> List[float]:
+        return list(self._engine.embed([text]))[0].tolist()
+
+    async def _aget_text_embedding(self, text: str) -> List[float]:
+        return await asyncio.to_thread(self._get_text_embedding, text)
+
+    def _get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        return [vec.tolist() for vec in self._engine.embed(texts)]
+
+    async def _aget_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        return await asyncio.to_thread(self._get_text_embeddings, texts)
+
+try:
     from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 except Exception:
     HuggingFaceEmbedding = None
@@ -113,10 +159,10 @@ else:
 
 
 def init_embedding_and_vector_store():
-    """Initializes embeddings (Local Multilingual E5 or Google GenAI / Gemini) and associates with Qdrant."""
+    """Initializes embeddings (Local FastEmbed Multilingual ONNX or Google GenAI / Gemini) and associates with Qdrant."""
     env_provider = os.getenv("EMBEDDING_PROVIDER", "local").lower()
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    embedding_model = os.getenv("GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
+    embedding_model = os.getenv("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001")
 
     # Helper to instantiate QdrantVectorStore with hybrid BM25 and schema capability detection
     def _create_hybrid_qdrant_store(collection_name: str) -> QdrantVectorStore:
@@ -154,16 +200,43 @@ def init_embedding_and_vector_store():
                 batch_size=20,
             )
 
+    def _get_gemini_collection_name(model_name: str) -> str:
+        """Determines Qdrant collection name based on Gemini model dimensionality (3072 dim vs 768 dim)."""
+        # gemini-embedding-001 and gemini-embedding-2-preview output 3072-dimensional vectors
+        if "001" in model_name or "preview" in model_name:
+            return "not_notebooklm_gemini_3072"
+        return "not_notebooklm_gemini"
+
+    # 1. Cloud Provider: Google Gemini GenAI Embedding
     if env_provider in ("gemini", "google") and gemini_key and not gemini_key.startswith("your_"):
         if GoogleGenAIEmbedding is not None:
             try:
                 embed_model = GoogleGenAIEmbedding(model_name=embedding_model, api_key=gemini_key)
-                vstore = _create_hybrid_qdrant_store("not_notebooklm_gemini")
+                target_col = _get_gemini_collection_name(embedding_model)
+                vstore = _create_hybrid_qdrant_store(target_col)
                 return embed_model, vstore
             except Exception as e:
-                logger.warning(f"[RAG Engine] Google GenAI Embedding initialization failed ({e}), falling back to local Multilingual E5 embeddings.")
+                logger.warning(f"[RAG Engine] Google GenAI Embedding initialization failed ({e}), falling back to local FastEmbed ONNX embeddings.")
 
-    # Default Local Offline Embeddings (Multilingual 93+ languages)
+    # 2. Primary Local-First Provider: FastEmbed Multilingual ONNX (Zero-PyTorch, ~220MB, 384 dimensions)
+    if FastEmbedTextEmbedding is not None:
+        try:
+            embed_model = FastEmbedDenseEmbedding(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+            target_col = "not_notebooklm_fastembed"
+            try:
+                existing_cols = [c.name for c in qdrant_client.get_collections().collections]
+                if "not_notebooklm_e5" in existing_cols:
+                    logger.info("[RAG Engine] Legacy 'not_notebooklm_e5' collection detected. Using isolated 'not_notebooklm_fastembed' collection to prevent vector space collision.")
+            except Exception:
+                pass
+
+            vstore = _create_hybrid_qdrant_store(target_col)
+            logger.info(f"[RAG Engine] FastEmbed Multilingual ONNX initialized successfully (Collection: {target_col}).")
+            return embed_model, vstore
+        except Exception as e:
+            logger.warning(f"[RAG Engine] FastEmbed dense embedding loading failed: {e}")
+
+    # 3. Secondary Local Provider Fallback: Legacy HuggingFace (if installed)
     if HuggingFaceEmbedding is not None:
         try:
             embed_model = HuggingFaceEmbedding(model_name="intfloat/multilingual-e5-small")
@@ -172,13 +245,14 @@ def init_embedding_and_vector_store():
         except Exception as e:
             logger.warning(f"[RAG Engine] HuggingFace Embedding loading failed: {e}")
 
-    # Ultimate fallback to Google GenAI / Gemini
+    # 4. Ultimate fallback to Google GenAI / Gemini
     if GoogleGenAIEmbedding is not None and gemini_key and not gemini_key.startswith("your_"):
         embed_model = GoogleGenAIEmbedding(model_name=embedding_model, api_key=gemini_key)
-        vstore = _create_hybrid_qdrant_store("not_notebooklm")
+        target_col = _get_gemini_collection_name(embedding_model)
+        vstore = _create_hybrid_qdrant_store(target_col)
         return embed_model, vstore
 
-    raise RuntimeError("No embedding provider available or valid API key configured. Please install llama-index-embeddings-huggingface or set GEMINI_API_KEY.")
+    raise RuntimeError("No embedding provider available or valid API key configured. FastEmbed or Gemini API key is required.")
 
 
 def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
@@ -231,7 +305,14 @@ def delete_document_vectors(chat_id: str, doc_filename: Optional[str] = None):
             collections = [c.name for c in collections_response.collections if c.name.startswith("not_notebooklm")]
         except Exception as e:
             logger.warning(f"[Qdrant] Failed listing collections for deletion: {e}")
-            collections = ["not_notebooklm_e5", "not_notebooklm_bge", "not_notebooklm_gemini", "not_notebooklm"]
+            collections = [
+                "not_notebooklm_fastembed",
+                "not_notebooklm_gemini_3072",
+                "not_notebooklm_e5",
+                "not_notebooklm_bge",
+                "not_notebooklm_gemini",
+                "not_notebooklm",
+            ]
             
         for coll in collections:
             try:
