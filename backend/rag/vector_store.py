@@ -118,11 +118,47 @@ def init_embedding_and_vector_store():
     gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     embedding_model = os.getenv("GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
 
+    # Helper to instantiate QdrantVectorStore with hybrid BM25 and schema capability detection
+    def _create_hybrid_qdrant_store(collection_name: str) -> QdrantVectorStore:
+        can_enable_hybrid = True
+        try:
+            # Check if collection already exists on disk/remote without sparse vectors schema
+            existing_info = qdrant_client.get_collection(collection_name)
+            if existing_info and not getattr(existing_info.config.params, "sparse_vectors", None):
+                logger.warning(
+                    f"[VectorStore] Existing collection '{collection_name}' lacks sparse vectors schema. "
+                    "Safely running in dense-only mode to prevent ValueError crashes."
+                )
+                can_enable_hybrid = False
+        except Exception:
+            # Collection does not exist yet; fresh creation will configure sparse vectors automatically
+            can_enable_hybrid = True
+
+        try:
+            return QdrantVectorStore(
+                collection_name=collection_name,
+                client=qdrant_client,
+                enable_hybrid=can_enable_hybrid,
+                fastembed_sparse_model="Qdrant/bm25" if can_enable_hybrid else None,
+                batch_size=20,
+            )
+        except Exception as e:
+            logger.warning(
+                f"[VectorStore] Hybrid initialization failed for {collection_name} ({e}). "
+                "Falling back to dense-only vector store."
+            )
+            return QdrantVectorStore(
+                collection_name=collection_name,
+                client=qdrant_client,
+                enable_hybrid=False,
+                batch_size=20,
+            )
+
     if env_provider in ("gemini", "google") and gemini_key and not gemini_key.startswith("your_"):
         if GoogleGenAIEmbedding is not None:
             try:
                 embed_model = GoogleGenAIEmbedding(model_name=embedding_model, api_key=gemini_key)
-                vstore = QdrantVectorStore(collection_name="not_notebooklm_gemini", client=qdrant_client, enable_hybrid=False, batch_size=20)
+                vstore = _create_hybrid_qdrant_store("not_notebooklm_gemini")
                 return embed_model, vstore
             except Exception as e:
                 logger.warning(f"[RAG Engine] Google GenAI Embedding initialization failed ({e}), falling back to local Multilingual E5 embeddings.")
@@ -131,7 +167,7 @@ def init_embedding_and_vector_store():
     if HuggingFaceEmbedding is not None:
         try:
             embed_model = HuggingFaceEmbedding(model_name="intfloat/multilingual-e5-small")
-            vstore = QdrantVectorStore(collection_name="not_notebooklm_e5", client=qdrant_client, enable_hybrid=False, batch_size=20)
+            vstore = _create_hybrid_qdrant_store("not_notebooklm_e5")
             return embed_model, vstore
         except Exception as e:
             logger.warning(f"[RAG Engine] HuggingFace Embedding loading failed: {e}")
@@ -139,7 +175,7 @@ def init_embedding_and_vector_store():
     # Ultimate fallback to Google GenAI / Gemini
     if GoogleGenAIEmbedding is not None and gemini_key and not gemini_key.startswith("your_"):
         embed_model = GoogleGenAIEmbedding(model_name=embedding_model, api_key=gemini_key)
-        vstore = QdrantVectorStore(collection_name="not_notebooklm", client=qdrant_client, enable_hybrid=False, batch_size=20)
+        vstore = _create_hybrid_qdrant_store("not_notebooklm")
         return embed_model, vstore
 
     raise RuntimeError("No embedding provider available or valid API key configured. Please install llama-index-embeddings-huggingface or set GEMINI_API_KEY.")
