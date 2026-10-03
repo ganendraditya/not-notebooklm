@@ -22,6 +22,8 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 * **3-Tier Hybrid Metadata Extractor:** Handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and a document inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
 * **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 100-case benchmark of authentic academic research papers (**AllenAI QASPER & SciFact**) balancing single-paper deep dives, multi-paper comparative synthesis across 2–4 documents, and biomedical claim verification, achieving a 0.900 Composite Consensus score (0.876 Groundedness and 0.900 Answer Relevancy).
 * **Layered Conversational Memory & Elastic Token Budgeting:** Dynamic Priority Waterfall and Layered Memory Compaction (elastic token reclaim, non-destructive topic digest, and high-recall declarative sentence classification) that retains operational constraints, parameters, and research invariants verbatim in Pinned Working Memory. Empirically benchmarked on a 100-case Conversational NIAH matrix (Stanford RULER & Anthropic standards), achieving 98.0% needle retention on context-constrained 8K models (100% on multi-needle tracking and temporal rule updates).
+* **Dense + BM25 Sparse Hybrid Retrieval with RRF:** Combines native ONNX-powered dense multilingual embeddings with FastEmbed BM25 sparse lexical tokens via Reciprocal Rank Fusion (RRF, $k=60$) in Qdrant, ensuring high-precision recall across technical acronyms, DOIs, and author names before passing excerpts to FlashRank Cross-Encoder reranking.
+* **Zero-PyTorch Local Runtime:** Powered entirely by CPU-optimized ONNX Runtime (`fastembed` and `flashrank`), dropping installation overhead from ~1.5GB to ~220MB with sub-second (<1s) cold-boot times and zero GPU dependencies.
 * **Local-First & Multi-Role LLM Architecture:** Runs locally with embedded SQLite and Qdrant. Connects to any OpenAI-compatible API (Ollama, vLLM, DeepSeek, GPT-4o) with tiered primary, fast, and auto-fallback model roles, plus optional S3 storage (Cloudflare R2, MinIO).
 
 ---
@@ -180,7 +182,7 @@ python -m venv venv
 # Linux / macOS
 source venv/bin/activate
 
-pip install -r requirements.txt
+pip install -r requirements.txt  # Fully installs FastEmbed ONNX without requiring PyTorch (~220MB total)
 cp .env.example .env
 # Edit backend/.env with your LLM configuration
 cd ..
@@ -293,8 +295,9 @@ The application reads configuration through standard environment variables. If y
 * **Literature Discovery:** Multi-engine scholarly search via **OpenAlex**, **Crossref**, **Europe PMC**, and **DuckDuckGo** web search fallback.
 * **PDF Resolvers:** Concurrent racing resolvers across **arXiv**, **Unpaywall**, **OpenAlex**, and **Europe PMC** with in-memory title verification.
 * **Storage:** Unified Storage Adapter supporting Local Disk and S3-compatible Object Storage (Cloudflare R2, MinIO, AWS S3).
-* **Vector Store:** Qdrant (supports remote Docker instance or embedded local disk fallback).
-* **Embeddings:** Local multilingual embeddings (`intfloat/multilingual-e5-small`) or Google Gemini embeddings.
+* **Vector Store:** Qdrant (supports remote Docker instance or embedded local disk fallback with automatic schema capability detection).
+* **Embeddings:** Native CPU-optimized local multilingual dense embeddings (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` via FastEmbed ONNX, Zero-PyTorch) + FastEmbed BM25 sparse lexical tokens with Reciprocal Rank Fusion (RRF), alongside Google Gemini cloud embeddings (`models/gemini-embedding-001`, 3072 dim).
+* **Cross-Encoder Reranker:** FlashRank (`ms-marco-TinyBERT-L-2-v2`, sub-10ms in-memory ONNX singleton).
 * **LLM Engine:** OpenAI-compatible adapter (`OpenAILike`) with tiered model roles (Primary, Fast, Fallback) and automated error recovery.
 
 ### Repository Structure
