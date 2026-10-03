@@ -221,7 +221,13 @@ async def _retrieve_hybrid_workspace_context(
             similarity_top_k=25,
             vector_store_query_mode=query_mode,
         )
-        nodes = await retriever.aretrieve(query)
+        # Support both async and sync mock retrievers in tests and production
+        if hasattr(retriever, "aretrieve") and asyncio.iscoroutinefunction(retriever.aretrieve):
+            nodes = await retriever.aretrieve(query)
+        elif getattr(vector_store, "_aclient", None) is not None:
+            nodes = await retriever.aretrieve(query)
+        else:
+            nodes = await asyncio.to_thread(retriever.retrieve, query)
 
         if nodes:
             if report_status:
