@@ -2,6 +2,8 @@ import os
 import asyncio
 import logging
 import threading
+import time
+import requests
 from typing import Optional, List, Any
 from dotenv import load_dotenv
 
@@ -126,6 +128,83 @@ class FastEmbedDenseEmbedding(BaseEmbedding):
             return []
         return await asyncio.to_thread(self._get_text_embeddings, texts)
 
+class OpenAICompatibleEmbedding(BaseEmbedding):
+    """Universal OpenAI-compatible embedding client (/v1/embeddings).
+    Supports Ollama, OpenAI, vLLM, Voyage AI, and LiteLLM with 3-tier retry backoff."""
+
+    base_url: str = "http://localhost:11434/v1"
+    api_key: str = ""
+    model_name: str = "nomic-embed-text"
+    timeout: float = 30.0
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:11434/v1",
+        api_key: str = "",
+        model_name: str = "nomic-embed-text",
+        timeout: float = 30.0,
+        **kwargs
+    ):
+        clean_url = base_url.rstrip("/")
+        if not clean_url.endswith("/v1"):
+            clean_url = f"{clean_url}/v1"
+        super().__init__(model_name=model_name, **kwargs)
+        self.base_url = clean_url
+        self.api_key = api_key
+        self.timeout = timeout
+
+    def _call_api_with_retry(self, texts: List[str]) -> List[List[float]]:
+        endpoint = f"{self.base_url}/embeddings"
+        headers = {"Content-Type": "application/json"}
+        if self.api_key and not self.api_key.startswith("your_"):
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {"input": texts, "model": self.model_name}
+        delays = [1.0, 2.0, 4.0]
+
+        last_error = None
+        for attempt in range(len(delays) + 1):
+            try:
+                resp = requests.post(endpoint, json=payload, headers=headers, timeout=self.timeout)
+                if resp.status_code == 200:
+                    data = resp.json().get("data", [])
+                    # Sort by index if provided
+                    sorted_data = sorted(data, key=lambda x: x.get("index", 0))
+                    return [item["embedding"] for item in sorted_data]
+                else:
+                    raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+            except Exception as e:
+                last_error = e
+                if attempt < len(delays):
+                    time.sleep(delays[attempt])
+
+        raise RuntimeError(f"[OpenAICompatibleEmbedding] Failed after 3 retries: {last_error}")
+
+    def _get_query_embedding(self, query: str) -> List[float]:
+        res = self._call_api_with_retry([query])
+        return res[0] if res else []
+
+    async def _aget_query_embedding(self, query: str) -> List[float]:
+        return await asyncio.to_thread(self._get_query_embedding, query)
+
+    def _get_text_embedding(self, text: str) -> List[float]:
+        res = self._call_api_with_retry([text])
+        return res[0] if res else []
+
+    async def _aget_text_embedding(self, text: str) -> List[float]:
+        return await asyncio.to_thread(self._get_text_embedding, text)
+
+    def _get_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        return self._call_api_with_retry(texts)
+
+    async def _aget_text_embeddings(self, texts: List[str]) -> List[List[float]]:
+        if not texts:
+            return []
+        return await asyncio.to_thread(self._get_text_embeddings, texts)
+
+
 try:
     from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 except Exception:
@@ -218,23 +297,43 @@ def init_embedding_and_vector_store():
             except Exception as e:
                 logger.warning(f"[RAG Engine] Google GenAI Embedding initialization failed ({e}), falling back to local FastEmbed ONNX embeddings.")
 
-    # 2. Primary Local-First Provider: FastEmbed Multilingual ONNX (Zero-PyTorch, ~220MB, 384 dimensions)
-    if FastEmbedTextEmbedding is not None:
+    # 2. Universal OpenAI-Compatible Embedding (/v1/embeddings, e.g. Ollama, OpenAI, Voyage AI)
+    if env_provider in ("openai", "custom", "universal"):
+        custom_url = os.getenv("EMBEDDING_BASE_URL", "http://localhost:11434/v1").strip()
+        custom_key = os.getenv("EMBEDDING_API_KEY", "").strip()
+        custom_model = os.getenv("EMBEDDING_MODEL_NAME", "nomic-embed-text").strip()
         try:
-            embed_model = FastEmbedDenseEmbedding(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-            target_col = "not_notebooklm_fastembed"
-            try:
-                existing_cols = [c.name for c in qdrant_client.get_collections().collections]
-                if "not_notebooklm_e5" in existing_cols:
-                    logger.info("[RAG Engine] Legacy 'not_notebooklm_e5' collection detected. Using isolated 'not_notebooklm_fastembed' collection to prevent vector space collision.")
-            except Exception:
-                pass
-
+            embed_model = OpenAICompatibleEmbedding(
+                base_url=custom_url,
+                api_key=custom_key,
+                model_name=custom_model,
+            )
+            # Sniff dimensions safely to bind collection
+            test_vec = embed_model._get_query_embedding("dimension test")
+            dim = len(test_vec) if test_vec else 768
+            safe_model_tag = custom_model.replace("/", "_").replace(":", "_").lower()
+            target_col = f"not_notebooklm_custom_{safe_model_tag}_{dim}"
             vstore = _create_hybrid_qdrant_store(target_col)
-            logger.info(f"[RAG Engine] FastEmbed Multilingual ONNX initialized successfully (Collection: {target_col}).")
+            logger.info(f"[RAG Engine] Universal OpenAI-Compatible Embedding initialized ({custom_model}, dim={dim}). Collection: {target_col}")
             return embed_model, vstore
         except Exception as e:
-            logger.warning(f"[RAG Engine] FastEmbed dense embedding loading failed: {e}")
+            logger.warning(f"[RAG Engine] Universal embedding initialization failed ({e}). Falling back to local FastEmbed ONNX.")
+
+    # 3. Primary Local-First Provider: FastEmbed Multilingual ONNX (Zero-PyTorch, ~220MB, 384 dimensions)
+    if FastEmbedTextEmbedding is not None:
+        local_model_target = os.getenv("LOCAL_EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2").strip()
+        try:
+            embed_model = FastEmbedDenseEmbedding(model_name=local_model_target)
+            if "e5" in local_model_target.lower():
+                target_col = "not_notebooklm_fastembed_e5_1024"
+            else:
+                target_col = "not_notebooklm_fastembed"
+
+            vstore = _create_hybrid_qdrant_store(target_col)
+            logger.info(f"[RAG Engine] FastEmbed Multilingual ONNX initialized successfully ({local_model_target}, Collection: {target_col}).")
+            return embed_model, vstore
+        except Exception as e:
+            logger.warning(f"[RAG Engine] FastEmbed dense embedding loading failed for {local_model_target}: {e}")
 
     # 3. Secondary Local Provider Fallback: Legacy HuggingFace (if installed)
     if HuggingFaceEmbedding is not None:
@@ -334,19 +433,27 @@ except Exception:
 delete_qdrant_vectors = delete_document_vectors
 
 _flashrank_ranker = None
+_flashrank_model_cached = None
 _flashrank_lock = threading.Lock()
 
-def get_flashrank_ranker(model_name: str = "ms-marco-TinyBERT-L-2-v2"):
-    """Singleton getter for FlashRank cross-encoder to prevent disk reload per query (thread-safe)."""
-    global _flashrank_ranker
-    if _flashrank_ranker is None:
+def get_flashrank_ranker(model_name: Optional[str] = None):
+    """
+    Singleton getter for FlashRank cross-encoder to prevent disk reload per query (thread-safe).
+    Supports dynamic model switching (TinyBERT, MiniLM, MultiBERT) via environment variable or argument.
+    """
+    global _flashrank_ranker, _flashrank_model_cached
+    target_model = model_name or os.getenv("RERANKER_MODEL", "ms-marco-TinyBERT-L-2-v2").strip()
+
+    if _flashrank_ranker is None or _flashrank_model_cached != target_model:
         with _flashrank_lock:
-            if _flashrank_ranker is None:
+            if _flashrank_ranker is None or _flashrank_model_cached != target_model:
                 try:
                     from flashrank import Ranker
-                    _flashrank_ranker = Ranker(model_name=model_name)
+                    _flashrank_ranker = Ranker(model_name=target_model)
+                    _flashrank_model_cached = target_model
+                    logger.info(f"[FlashRank] Successfully loaded reranker model: {target_model}")
                 except Exception as e:
-                    logger.warning(f"[FlashRank] Failed to initialize Ranker ({model_name}): {e}")
+                    logger.warning(f"[FlashRank] Failed to initialize Ranker ({target_model}): {e}")
                     return None
     return _flashrank_ranker
 

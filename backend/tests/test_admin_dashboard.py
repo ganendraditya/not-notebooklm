@@ -157,12 +157,13 @@ def test_admin_update_llm_config_with_profiles():
 
     # Test factory credential resolution for different tiers
     from rag.llm_factory import _resolve_tier_credentials
-    base_p, key_p, mod_p, _, _, _, has_p = _resolve_tier_credentials("primary")
+    base_p, key_p, mod_p, _, _, _, has_p, proto_p = _resolve_tier_credentials("primary")
     assert base_p == "https://api.deepseek.com/v1"
     assert key_p == "sk-deepseek-secret"
     assert mod_p == "deepseek-reasoner"
+    assert proto_p == "openai"
 
-    base_f, key_f, _, fast_m, _, _, _ = _resolve_tier_credentials("fast")
+    base_f, key_f, _, fast_m, _, _, _, proto_f = _resolve_tier_credentials("fast")
     assert base_f == "http://localhost:11434/v1"
     assert fast_m == "llama-3.2-3b"
 

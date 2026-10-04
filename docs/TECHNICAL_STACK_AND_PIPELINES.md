@@ -121,6 +121,8 @@ The system employs a **Tri-Layer Storage** approach ensuring persistence, query 
   - **Remote Server:** Configured via `QDRANT_URL` and `QDRANT_API_KEY` (Docker or Qdrant Cloud cluster).
 - **Collections:**
   - `not_notebooklm_fastembed`: Default 384-dimensional dense collection generated via FastEmbed ONNX (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`) + sparse BM25.
+  - `not_notebooklm_fastembed_e5_1024`: 1024-dimensional dense collection generated via FastEmbed ONNX (`intfloat/multilingual-e5-large`) + sparse BM25.
+  - `not_notebooklm_custom_*`: Auto-dimensioned isolated collections for Universal OpenAI-Compatible endpoints (`POST /v1/embeddings`, e.g. Ollama, OpenAI, Voyage AI).
   - `not_notebooklm_e5`: Legacy 384-dimensional dense collection (isolated to prevent vector space collisions).
   - `not_notebooklm_gemini_3072`: Dedicated 3072-dimensional collection for active Google GenAI embeddings (`models/gemini-embedding-001`).
   - `not_notebooklm_gemini`: Legacy 768-dimensional collection for older cloud models.
@@ -170,6 +172,12 @@ The Fast LLM is strictly decoupled for low-latency auxiliary micro-tasks:
 4. **Early-Draft Conversation Title:** Generates a 3-5 word concise topic title within 1.5 seconds (`backend/services/search/title_generator.py`).
 5. **Interactive Highlight Evidence Locator:** Matches synthesized claims against verbatim document sentences (`backend/services/highlight_service.py`).
 6. **Research Memory Extraction & Reconciliation:** Discovers new research constraints and supersedes contradictory rules (`backend/services/memory_service.py`).
+
+### 4.2 Native Dual-Protocol Engine (OpenAI + Anthropic Direct)
+
+To support arbitrary model providers and direct official keys without forcing third-party proxies, `backend/rag/llm_factory.py` implements protocol auto-detection and multi-driver dispatch:
+1. **OpenAI Protocol (`OpenAILike`):** Default standard (`/v1/chat/completions`) routing to DeepSeek, Grok (xAI), Ollama, vLLM, Groq, 9Router, and OpenAI.
+2. **Native Anthropic Protocol (`LlamaAnthropic`):** Direct communication with `api.anthropic.com/v1/messages` using `x-api-key` headers and `anthropic-version: 2023-06-01`. Automatically detected when `base_url` targets `anthropic.com` or API keys start with `sk-ant-`.
 
 ---
 
