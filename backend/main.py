@@ -17,6 +17,7 @@ from routers import (
     papers_router,
     settings_router,
     storage_router,
+    admin_router,
 )
 
 logger = logging.getLogger("uvicorn.error")
@@ -101,6 +102,7 @@ app.include_router(documents_router)
 app.include_router(papers_router)
 app.include_router(settings_router)
 app.include_router(storage_router)
+app.include_router(admin_router)
 
 @app.get("/")
 def root():

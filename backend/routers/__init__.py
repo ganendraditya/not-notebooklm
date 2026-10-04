@@ -4,6 +4,7 @@ from .documents import router as documents_router
 from .papers import router as papers_router
 from .settings import router as settings_router
 from .storage import router as storage_router
+from .admin import router as admin_router
 
 __all__ = [
     "chats_router",
@@ -12,4 +13,5 @@ __all__ = [
     "papers_router",
     "settings_router",
     "storage_router",
+    "admin_router",
 ]
