@@ -21,6 +21,25 @@ from services.admin_service import mask_secret, update_env_variable, update_mult
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def isolate_test_env(monkeypatch):
+    """Isolates all test runs to a temporary .env file to prevent mutating developer production configuration."""
+    with tempfile.NamedTemporaryFile("w+", delete=False) as tf:
+        tf.write("STORAGE_TYPE=local\nLLM_MODEL=gpt-4o\n")
+        temp_path = tf.name
+
+    monkeypatch.setenv("TEST_ENV_PATH", temp_path)
+    # Reset storage type environment to local
+    orig_env = os.environ.copy()
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(orig_env)
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
 def test_mask_secret_utility():
     """Verify secrets are masked to prevent leak in logs or client-side dumps."""
     assert mask_secret("") == ""
