@@ -8,6 +8,11 @@ from dotenv import load_dotenv
 
 from llama_index.llms.openai_like import OpenAILike
 
+try:
+    from llama_index.llms.anthropic import Anthropic as LlamaAnthropic
+except ImportError:
+    LlamaAnthropic = None
+
 load_dotenv()
 logger = logging.getLogger("uvicorn.error")
 
@@ -101,13 +106,21 @@ def _resolve_tier_credentials(tier: str = "primary"):
         or os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
     )
 
+    protocol = profile.get("protocol", "").strip().lower() if profile else ""
+    if not protocol:
+        # Auto-detect Anthropic protocol from URL or key prefix
+        if "anthropic.com" in base_url.lower() or api_key.startswith("sk-ant-"):
+            protocol = "anthropic"
+        else:
+            protocol = "openai"
+
     try:
         temperature = float(os.getenv("LLM_TEMPERATURE", "0.1").strip())
     except (ValueError, TypeError):
         temperature = 0.1
 
     has_gateway = bool(api_key and not api_key.startswith("your_") and api_key != "dummy_key")
-    return base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway
+    return base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway, protocol
 
 
 def _get_gateway_credentials():
@@ -163,6 +176,52 @@ def clear_llm_cache():
     _CACHED_CONFIG_HASH = None
 
 
+def _create_llm_instance(
+    protocol: str,
+    base_url: str,
+    api_key: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    timeout: float
+) -> Optional[Any]:
+    """
+    Factory helper to instantiate either an OpenAI-compatible or direct Anthropic Claude LLM client.
+    Handles protocol routing, token ceilings, and timeout contracts.
+    """
+    if protocol == "anthropic":
+        if LlamaAnthropic is not None:
+            try:
+                # Direct Native Anthropic protocol
+                return LlamaAnthropic(
+                    model=model,
+                    api_key=api_key,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    timeout=timeout,
+                )
+            except Exception as e:
+                logger.warning(f"[LLM Factory] Failed to initialize native Anthropic LLM ({model}): {e}")
+        else:
+            logger.warning("[LLM Factory] llama-index-llms-anthropic not installed. Falling back to OpenAILike.")
+
+    # Default: OpenAI-compatible protocol (OpenAI, DeepSeek, Grok, Ollama, 9Router, etc.)
+    try:
+        return OpenAILike(
+            api_base=base_url,
+            api_key=api_key,
+            model=model,
+            is_chat_model=True,
+            is_function_calling_model=True,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            timeout=timeout,
+        )
+    except Exception as e:
+        logger.warning(f"[LLM Factory] Failed to initialize OpenAILike LLM ({model}): {e}")
+        return None
+
+
 def get_main_llm(force_refresh: bool = False):
     """
     Returns the Primary / Heavy LLM.
@@ -173,23 +232,19 @@ def get_main_llm(force_refresh: bool = False):
     if not force_refresh and _CACHED_MAIN_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_MAIN_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _resolve_tier_credentials("primary")
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway, protocol = _resolve_tier_credentials("primary")
 
     _CACHED_MAIN_LLM = None
     if has_gateway:
-        try:
-            _CACHED_MAIN_LLM = OpenAILike(
-                api_base=base_url,
-                api_key=api_key,
-                model=model,
-                is_chat_model=True,
-                is_function_calling_model=True,
-                max_tokens=16384,
-                temperature=temperature,
-                timeout=120.0
-            )
-        except Exception as e:
-            logger.warning(f"[LLM Factory] Failed to initialize Primary LLM ({model}): {e}")
+        _CACHED_MAIN_LLM = _create_llm_instance(
+            protocol=protocol,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            temperature=temperature,
+            max_tokens=16384,
+            timeout=120.0,
+        )
 
     _CACHED_CONFIG_HASH = current_sig
     return _CACHED_MAIN_LLM
@@ -206,26 +261,22 @@ def get_fast_llm(force_refresh: bool = False):
     if not force_refresh and _CACHED_FAST_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_FAST_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _resolve_tier_credentials("fast")
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway, protocol = _resolve_tier_credentials("fast")
 
     # Default to main model string if fast_model is empty, while maintaining isolated client profile
     target_fast_model = fast_model or model
 
     _CACHED_FAST_LLM = None
     if has_gateway and target_fast_model:
-        try:
-            _CACHED_FAST_LLM = OpenAILike(
-                api_base=base_url,
-                api_key=api_key,
-                model=target_fast_model,
-                is_chat_model=True,
-                is_function_calling_model=True,
-                max_tokens=4096,
-                temperature=temperature,
-                timeout=45.0
-            )
-        except Exception as e:
-            logger.warning(f"[LLM Factory] Failed to initialize Fast LLM ({target_fast_model}): {e}")
+        _CACHED_FAST_LLM = _create_llm_instance(
+            protocol=protocol,
+            base_url=base_url,
+            api_key=api_key,
+            model=target_fast_model,
+            temperature=temperature,
+            max_tokens=4096,
+            timeout=45.0,
+        )
 
     if _CACHED_FAST_LLM is None:
         _CACHED_FAST_LLM = get_main_llm(force_refresh=force_refresh)
@@ -245,23 +296,19 @@ def get_fallback_llm(force_refresh: bool = False):
     if not force_refresh and _CACHED_FALLBACK_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_FALLBACK_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _resolve_tier_credentials("fallback")
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway, protocol = _resolve_tier_credentials("fallback")
     if not has_gateway or not fallback_model:
         return None
 
-    try:
-        _CACHED_FALLBACK_LLM = OpenAILike(
-            api_base=base_url,
-            api_key=api_key,
-            model=fallback_model,
-            is_chat_model=True,
-            is_function_calling_model=True,
-            max_tokens=16384,
-            temperature=temperature,
-            timeout=120.0
-        )
-    except Exception as e:
-        logger.warning(f"[LLM Factory] Failed to initialize Fallback LLM ({fallback_model}): {e}")
+    _CACHED_FALLBACK_LLM = _create_llm_instance(
+        protocol=protocol,
+        base_url=base_url,
+        api_key=api_key,
+        model=fallback_model,
+        temperature=temperature,
+        max_tokens=16384,
+        timeout=120.0,
+    )
 
     _CACHED_CONFIG_HASH = current_sig
     return _CACHED_FALLBACK_LLM

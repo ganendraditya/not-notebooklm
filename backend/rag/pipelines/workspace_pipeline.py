@@ -236,11 +236,18 @@ async def _retrieve_hybrid_workspace_context(
             try:
                 from flashrank import RerankRequest
                 from rag.vector_store import get_flashrank_ranker
+
+                # Decouple top_n context slicing via environment variable (default 12 for high recall)
+                try:
+                    top_n_cutoff = int(os.getenv("RERANKER_TOP_N", "12").strip())
+                except (ValueError, TypeError):
+                    top_n_cutoff = 12
+
                 ranker = get_flashrank_ranker()
                 if not ranker:
                     raise RuntimeError("FlashRank Ranker unavailable")
                 passages = [{"id": idx, "text": n.node.get_content()[:1500]} for idx, n in enumerate(nodes)]
-                reranked = ranker.rerank(RerankRequest(query=query, passages=passages))[:12]
+                reranked = ranker.rerank(RerankRequest(query=query, passages=passages))[:top_n_cutoff]
                 selected_nodes = [nodes[item["id"]] for item in reranked if "id" in item and 0 <= item["id"] < len(nodes)]
             except Exception as rank_err:
                 logger.debug(f"[Workspace Hybrid] FlashRank fallback: {rank_err}")
