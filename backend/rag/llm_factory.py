@@ -234,13 +234,15 @@ def get_fast_llm(force_refresh: bool = False):
     return _CACHED_FAST_LLM
 
 
-def get_fallback_llm():
+def get_fallback_llm(force_refresh: bool = False):
     """
     Returns the Fallback LLM instance (singleton, lazily created).
     Used as a safety net when both Primary and Fast models fail at runtime (rate limit, quota exhaustion).
+    Validates configuration signature to prevent serving stale instances upon admin settings update.
     """
-    global _CACHED_FALLBACK_LLM
-    if _CACHED_FALLBACK_LLM is not None:
+    global _CACHED_FALLBACK_LLM, _CACHED_CONFIG_HASH
+    current_sig = _get_env_config_signature()
+    if not force_refresh and _CACHED_FALLBACK_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_FALLBACK_LLM
 
     base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _resolve_tier_credentials("fallback")
@@ -261,6 +263,7 @@ def get_fallback_llm():
     except Exception as e:
         logger.warning(f"[LLM Factory] Failed to initialize Fallback LLM ({fallback_model}): {e}")
 
+    _CACHED_CONFIG_HASH = current_sig
     return _CACHED_FALLBACK_LLM
 
 
