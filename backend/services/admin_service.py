@@ -4,9 +4,10 @@ Manages BYOK LLM credentials, S3 storage providers, secret manager adapters,
 and vector database health diagnostics without modifying repository source files.
 """
 
-import os
+import json
 import logging
-from typing import Dict, Any, Optional, Tuple
+import os
+from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -33,6 +34,41 @@ def _sanitize_env_value(val: Any) -> str:
     # Strip dangerous newlines and control characters that break .env format
     cleaned = raw.replace("\r", "").replace("\n", " ").strip()
     return cleaned
+
+
+def get_gateway_profiles() -> List[Dict[str, Any]]:
+    """
+    Parses and returns registered OpenAI-compatible gateway profiles.
+    Falls back gracefully to synthesizing a 'default' profile from LLM_BASE_URL and LLM_API_KEY.
+    """
+    raw_json = os.getenv("LLM_PROFILES_JSON", "").strip()
+    profiles: List[Dict[str, Any]] = []
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json)
+            if isinstance(parsed, list):
+                profiles = parsed
+        except Exception as e:
+            logger.warning(f"[AdminService] Failed to parse LLM_PROFILES_JSON: {e}")
+
+    # Ensure there is always at least one default profile matching base credentials
+    default_base_url = (
+        os.getenv("LLM_BASE_URL", "").strip()
+        or os.getenv("NINEROUTER_BASE_URL", "").strip()
+        or "http://localhost:20128/v1"
+    )
+    default_api_key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
+
+    has_default = any(p.get("id") == "default" for p in profiles)
+    if not profiles or not has_default:
+        profiles.insert(0, {
+            "id": "default",
+            "name": "Default Gateway",
+            "base_url": default_base_url,
+            "api_key": default_api_key,
+        })
+
+    return profiles
 
 
 def get_config_file_path() -> str:
@@ -146,6 +182,22 @@ def get_system_admin_config() -> Dict[str, Any]:
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
     gemini_model = os.getenv("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001").strip()
 
+    # Profiles & Tier Bindings
+    raw_profiles = get_gateway_profiles()
+    masked_profiles = [
+        {
+            "id": p.get("id", "default"),
+            "name": p.get("name", "Gateway"),
+            "base_url": p.get("base_url", ""),
+            "api_key_masked": mask_secret(p.get("api_key", "")),
+            "has_api_key": bool(p.get("api_key") and not str(p.get("api_key")).startswith("your_")),
+        }
+        for p in raw_profiles
+    ]
+    primary_pid = os.getenv("LLM_PRIMARY_PROFILE_ID", "default").strip()
+    fast_pid = os.getenv("LLM_FAST_PROFILE_ID", primary_pid).strip()
+    fallback_pid = os.getenv("LLM_FALLBACK_PROFILE_ID", primary_pid).strip()
+
     return {
         "llm": {
             "base_url": base_url,
@@ -155,6 +207,10 @@ def get_system_admin_config() -> Dict[str, Any]:
             "fast_model": fast_model,
             "fallback_model": fallback_model or None,
             "temperature": temp,
+            "profiles": masked_profiles,
+            "primary_profile_id": primary_pid,
+            "fast_profile_id": fast_pid,
+            "fallback_profile_id": fallback_pid,
         },
         "storage": {
             "storage_type": storage_type,

@@ -1,3 +1,11 @@
+export interface GatewayProfile {
+  id: string;
+  name: string;
+  base_url: string;
+  api_key_masked: string;
+  has_api_key: boolean;
+}
+
 export interface AdminConfig {
   llm: {
     base_url: string;
@@ -7,6 +15,10 @@ export interface AdminConfig {
     fast_model: string;
     fallback_model: string | null;
     temperature: number;
+    profiles: GatewayProfile[];
+    primary_profile_id: string;
+    fast_profile_id: string;
+    fallback_profile_id: string;
   };
   storage: {
     storage_type: "local" | "s3";

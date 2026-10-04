@@ -1,8 +1,9 @@
+import inspect
+import json
+import logging
 import os
 import re
-import inspect
-import logging
-from typing import Optional, Callable, Any
+from typing import Any, Callable, Dict, Optional
 from dotenv import load_dotenv
 
 from llama_index.llms.openai_like import OpenAILike
@@ -25,7 +26,88 @@ def _get_env_config_signature():
         os.getenv("LLM_FAST_MODEL", "") or os.getenv("NINEROUTER_FAST_MODEL", ""),
         os.getenv("LLM_FALLBACK_MODEL", "") or os.getenv("NINEROUTER_FALLBACK_MODEL", ""),
         os.getenv("LLM_TEMPERATURE", ""),
+        os.getenv("LLM_PROFILES_JSON", ""),
+        os.getenv("LLM_PRIMARY_PROFILE_ID", ""),
+        os.getenv("LLM_FAST_PROFILE_ID", ""),
+        os.getenv("LLM_FALLBACK_PROFILE_ID", ""),
     )
+
+
+def _get_profile_by_id(profile_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Resolves specific gateway profile from LLM_PROFILES_JSON or synthesizes default profile."""
+    raw_json = os.getenv("LLM_PROFILES_JSON", "").strip()
+    if raw_json:
+        try:
+            profiles = json.loads(raw_json)
+            if isinstance(profiles, list):
+                for p in profiles:
+                    if p.get("id") == profile_id:
+                        return p
+        except Exception as e:
+            logger.warning(f"[LLM Factory] Error parsing LLM_PROFILES_JSON for profile {profile_id}: {e}")
+
+    default_base_url = (
+        os.getenv("LLM_BASE_URL", "").strip()
+        or os.getenv("NINEROUTER_BASE_URL", "").strip()
+        or "http://localhost:20128/v1"
+    )
+    default_api_key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
+    return {
+        "id": "default",
+        "name": "Default Gateway",
+        "base_url": default_base_url,
+        "api_key": default_api_key,
+    }
+
+
+def _resolve_tier_credentials(tier: str = "primary"):
+    """
+    Resolves OpenAI-compatible gateway credentials for a specific tier (primary, fast, fallback).
+    Enables per-tier profile routing while maintaining 100% backwards compatibility with global LLM_BASE_URL.
+    """
+    profile_id_env = {
+        "primary": "LLM_PRIMARY_PROFILE_ID",
+        "fast": "LLM_FAST_PROFILE_ID",
+        "fallback": "LLM_FALLBACK_PROFILE_ID",
+    }.get(tier, "LLM_PRIMARY_PROFILE_ID")
+
+    target_pid = os.getenv(profile_id_env, "default").strip() or "default"
+    profile = _get_profile_by_id(target_pid) or _get_profile_by_id("default")
+
+    base_url = profile.get("base_url", "").strip() if profile else ""
+    if not base_url:
+        base_url = (
+            os.getenv("LLM_BASE_URL", "").strip()
+            or os.getenv("NINEROUTER_BASE_URL", "").strip()
+            or "http://localhost:20128/v1"
+        )
+
+    api_key = profile.get("api_key", "").strip() if profile else ""
+    if not api_key:
+        api_key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
+
+    model = (
+        os.getenv("LLM_MODEL", "").strip()
+        or os.getenv("NINEROUTER_MODEL", "").strip()
+        or "gpt-4o"
+    )
+    fast_model = (
+        os.getenv("LLM_FAST_MODEL", "").strip()
+        or os.getenv("NINEROUTER_FAST_MODEL", "").strip()
+        or model
+    )
+    fallback_model = (
+        os.getenv("LLM_FALLBACK_MODEL", "").strip()
+        or os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
+    )
+
+    try:
+        temperature = float(os.getenv("LLM_TEMPERATURE", "0.1").strip())
+    except (ValueError, TypeError):
+        temperature = 0.1
+
+    has_gateway = bool(api_key and not api_key.startswith("your_") and api_key != "dummy_key")
+    return base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway
 
 
 def _get_gateway_credentials():
@@ -91,7 +173,7 @@ def get_main_llm(force_refresh: bool = False):
     if not force_refresh and _CACHED_MAIN_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_MAIN_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _get_gateway_credentials()
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _resolve_tier_credentials("primary")
 
     _CACHED_MAIN_LLM = None
     if has_gateway:
@@ -117,15 +199,14 @@ def get_fast_llm(force_refresh: bool = False):
     """
     Returns the Fast / Lite LLM.
     Powers rapid micro-tasks: intent triage, query planning, paper relevance judging, auto title generation.
-    Always creates an isolated fast agent instance with lean parameters (max_tokens=4096, timeout=45.0s),
-    defaulting to LLM_MODEL if LLM_FAST_MODEL is not explicitly configured or identical.
+    Always creates an isolated fast agent instance with lean parameters (max_tokens=4096, timeout=45.0s).
     """
     global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_CONFIG_HASH
     current_sig = _get_env_config_signature()
     if not force_refresh and _CACHED_FAST_LLM is not None and _CACHED_CONFIG_HASH == current_sig:
         return _CACHED_FAST_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _get_gateway_credentials()
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _resolve_tier_credentials("fast")
 
     # Default to main model string if fast_model is empty, while maintaining isolated client profile
     target_fast_model = fast_model or model
@@ -162,8 +243,8 @@ def get_fallback_llm():
     if _CACHED_FALLBACK_LLM is not None:
         return _CACHED_FALLBACK_LLM
 
-    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _get_gateway_credentials()
-    if not has_gateway or not fallback_model or fallback_model == model:
+    base_url, api_key, model, fast_model, fallback_model, temperature, has_gateway = _resolve_tier_credentials("fallback")
+    if not has_gateway or not fallback_model:
         return None
 
     try:
