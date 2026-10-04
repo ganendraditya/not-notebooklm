@@ -35,6 +35,11 @@ def _sanitize_env_value(val: Any) -> str:
     return cleaned
 
 
+def get_config_file_path() -> str:
+    """Returns active config file path, prioritizing TEST_ENV_PATH if set during test runs."""
+    return os.getenv("TEST_ENV_PATH", "").strip() or CONFIG_FILE_PATH
+
+
 def update_env_variable(key: str, value: str, env_path: Optional[str] = None) -> bool:
     """Safely updates or appends a key-value pair in the local .env file and os.environ."""
     return update_multiple_env_variables({key: value}, env_path=env_path)
@@ -42,7 +47,7 @@ def update_env_variable(key: str, value: str, env_path: Optional[str] = None) ->
 
 def update_multiple_env_variables(updates: Dict[str, str], env_path: Optional[str] = None) -> bool:
     """Updates multiple environment variables in a single atomic file write with sanitization."""
-    target_path = env_path or CONFIG_FILE_PATH
+    target_path = env_path or get_config_file_path()
     sanitized_updates = {
         _sanitize_env_value(k): _sanitize_env_value(v)
         for k, v in updates.items()
