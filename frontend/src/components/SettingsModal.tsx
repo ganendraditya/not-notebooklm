@@ -5,7 +5,9 @@ import {
   X, 
   HardDrive, 
   Settings, 
-  Bell
+  Bell,
+  Sliders,
+  ExternalLink
 } from "lucide-react";
 import { ChatSession } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
@@ -148,6 +150,22 @@ export default function SettingsModal({
               <Bell size={15} className={activeTab === "notifications" ? "text-blue-500" : "text-app-text-dim"} />
               <span>{t('settings.notifications')}</span>
             </button>
+
+            <div className="pt-2 mt-2 border-t border-app-divider">
+              <a
+                href="/admin"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors"
+                title="Open Dedicated Web Control Dashboard"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Sliders size={15} className="text-purple-400" />
+                  <span>Control Plane</span>
+                </span>
+                <ExternalLink size={12} className="text-app-text-dim" />
+              </a>
+            </div>
           </div>
 
           {/* Settings Tab Content */}

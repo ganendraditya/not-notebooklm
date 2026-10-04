@@ -116,7 +116,7 @@ describe("LeftSidebar Component", () => {
       />
     );
 
-    expect(screen.getByText("v1.9.1")).toBeInTheDocument();
+    expect(screen.getByText("v1.10.0")).toBeInTheDocument();
   });
 
   it("renders live running execution indicator and completed duration badge properly", () => {

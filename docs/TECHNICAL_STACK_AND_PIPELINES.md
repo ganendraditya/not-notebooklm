@@ -6,15 +6,18 @@ Comprehensive technical specification document for **Not-NotebookLM**: an academ
 
 ## 1. High-Level System Architecture
 
-Not-NotebookLM is built on a decoupled architecture (separated Client-Server, headless Vector Database, and pluggable Hybrid Object Storage):
+Not-NotebookLM is built on a decoupled architecture separating the **User Research Workspace** from the **Management Control Plane**, backed by a headless Vector Database and pluggable Hybrid Object Storage:
 
 ```
 +-----------------------------------------------------------------------------------+
-|                        FRONTEND CLIENT (Next.js 16 + Tailwind v4)                 |
-|  - Split-Pane Reader: PDF / DOCX / Markdown view with dynamic citation jump       |
-|  - Real-time SSE Chat: Token-by-token streaming, Markdown math, interactive badges|
-|  - Literature Discovery Modal: Search, triage, bulk ingest, racing download logs  |
-|  - Research Profile Manager: Active constraints, objectives, and domain memory    |
+|                        DUAL-WEB APPLICATION LAYER (Next.js 16)                    |
+|                                                                                   |
+|  [PORT 2026 / WORKSPACE]                        [PORT 2027 / CONTROL DASHBOARD]   |
+|  - Split-Pane Academic Reader                   - Model Gateways & BYOK Form      |
+|  - Real-time SSE Chat & Math                    - S3 / R2 / MinIO Storage Switcher|
+|  - Literature Discovery Modal                   - Infisical / Doppler Secrets     |
+|  - Declarative Research Profile Memory          - FastEmbed ONNX vs Gemini Engine |
+|  - Inline Verbatim Highlight Badges             - SQLite & Qdrant Live Health     |
 +-----------------------------------------+-----------------------------------------+
                                           |
                         HTTP / SSE Events | JSON Payload
@@ -278,6 +281,15 @@ Unlike generic summary buffers that lose granular constraints, NotbookLM maintai
   2. Fast LLM extracts new facts (`inserted`) and detects superseded/invalidated facts (`invalidated`).
   3. Status updates are committed transactionally to `research_profiles`.
   4. Active facts are injected into subsequent System Prompts with a strict 250-token budget.
+
+### 5.6 Dedicated Control Plane & Management Service (`admin_service.py`)
+
+To decouple low-level configuration from the researcher workspace, the **Control Dashboard** (Port 2027 / `/admin`) manages system credentials and engine parameters via REST:
+- **BYOK Gateway Tiering:** Form inputs for Primary, Fast, and Fallback models with real-time ping latency benchmarking against the OpenAI-compatible gateway (`POST /admin/test/llm`).
+- **Object Storage Toggle:** Real-time switcher between Local Disk and S3/R2/MinIO object buckets with live credential validation (`POST /admin/test/storage`).
+- **Secret Manager Injection:** Adapter selector supporting Local `.env`, Infisical CLI (`INFISICAL_ENV`, `INFISICAL_PROJECT_ID`), and Doppler CLI (`DOPPLER_PROJECT`, `DOPPLER_CONFIG`).
+- **Vector Engine Switching:** Hot-switching between CPU-native FastEmbed ONNX (384-dim) and Google Gemini GenAI (3072-dim).
+- **System Health Diagnostics:** Direct telemetry querying SQLite WAL record counts, Qdrant collection point volumes, and disk capacity.
 
 ---
 

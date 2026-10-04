@@ -104,6 +104,14 @@ def get_s3_client():
             return None
 
 
+def reset_s3_client():
+    """Thread-safe reset of cached S3 client instance upon configuration change."""
+    global _S3_CLIENT, _S3_INITIALIZED
+    with _S3_LOCK:
+        _S3_CLIENT = None
+        _S3_INITIALIZED = False
+
+
 def upload_file(local_path: str, s3_key: str, content_type: Optional[str] = None) -> bool:
     """Uploads a local file to S3 storage bucket. Gracefully skips if S3 is disabled."""
     client = get_s3_client()

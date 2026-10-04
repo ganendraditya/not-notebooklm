@@ -456,11 +456,12 @@ def test_storage_path_traversal_protection():
 def test_workspace_pipeline_execution():
     """Verify workspace analysis pipeline executes without DetachedInstanceError or import errors."""
     import asyncio
+    import uuid
     from rag.pipelines.workspace_pipeline import handle_workspace_analysis_pipeline
     from unittest.mock import AsyncMock, MagicMock
     from database import SessionLocal, Document as DBDocument, ChatSession
 
-    dummy_chat_id = "test_ws_chat_123"
+    dummy_chat_id = f"test_ws_chat_{uuid.uuid4().hex[:8]}"
     db = SessionLocal()
     try:
         session = ChatSession(id=dummy_chat_id, title="Test WS Pipeline")
