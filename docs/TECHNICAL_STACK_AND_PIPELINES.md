@@ -293,6 +293,19 @@ To decouple low-level configuration from the researcher workspace, the **Control
 - **Vector Engine Switching:** Hot-switching between CPU-native FastEmbed ONNX (384-dim) and Google Gemini GenAI (3072-dim).
 - **System Health Diagnostics:** Direct telemetry querying SQLite WAL record counts, Qdrant collection point volumes, and disk capacity.
 
+### 5.7 Consumer Terminal Installer & Process Orchestration (`cli/`)
+
+To eliminate setup friction for non-developer researchers and students, NotbookLM features a dedicated terminal wizard and process daemon orchestrator:
+- **Zero-Friction One-Line Shell Bootstrap (`install.sh`):** Automates system detection, runtime directory isolation (`~/.notbooklm/`), and symlinking global executable `notbooklm` into `~/.local/bin`.
+- **Interactive First-Run Wizard (`notbooklm init`):**
+  - **Embedding Engine Selector:** Radio selection between FastEmbed MiniLM-L12, Multilingual E5-Large, Google Gemini (with graceful backtracking escape hatch), or Skip.
+  - **3-Layer Path Validation Guard:** Strict inspection verifying directory traversal rejection (`../`), illegal character blocking, and live filesystem writeability.
+  - **Smart Socket Collision Detection:** Actively scans for occupied ports and auto-increments adjacent 4-digit port pairs (e.g. 2026/2027 -> 2028/2029).
+  - **OS Auto-Start Integration:** Installs user-level LaunchAgent plist (`~/Library/LaunchAgents/dev.notbooklm.daemon.plist`).
+- **Interactive Multi-Action Launcher Menu (`notbooklm start` / `notbooklm`):**
+  - Arrow-key menu providing direct browser launch to Research Workspace (Port 2026), Control Dashboard (Port 2027), live activity logs streaming, detached background execution, and graceful process shutdown.
+- **Process Lifecycle CLI Subcommands:** `notbooklm status`, `notbooklm stop`, and `notbooklm admin`.
+
 ---
 
 ## 6. Evaluation Frameworks & Quality Guardrails

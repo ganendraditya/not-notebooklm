@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# NotbookLM Unified Command-Line Executable Wrapper
+
+set -e
+
+# Resolve repository root directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+ROOT_DIR="$( cd -P "$( dirname "$SOURCE" )/.." >/dev/null 2>&1 && pwd )"
+
+# Resolve Python binary (virtualenv preferred)
+if [ -f "$ROOT_DIR/backend/venv/bin/python" ]; then
+    PYTHON_BIN="$ROOT_DIR/backend/venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+else
+    echo "Error: Python 3 runtime not found. Please install Python 3.10+." >&2
+    exit 1
+fi
+
+export PYTHONPATH="$ROOT_DIR/backend:${PYTHONPATH:-}"
+exec "$PYTHON_BIN" -m cli.main "$@"
