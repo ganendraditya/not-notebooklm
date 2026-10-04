@@ -4,10 +4,11 @@ Provides dedicated REST endpoints to inspect, test, and persist system settings
 for LLMs, S3 Storage, Secret Providers, FastEmbed ONNX, and System Health.
 """
 
+import json
+import logging
 import os
 import shutil
-import logging
-from typing import Optional, Dict
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -30,13 +31,24 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # Request Payload Schemas (Strict Pydantic Contracts)
 # ---------------------------------------------------------------------------
 
+class GatewayProfilePayload(BaseModel):
+    id: str = Field(..., description="Unique profile identifier, e.g. 'deepseek' or 'ollama'")
+    name: str = Field(..., description="Human-readable profile name")
+    base_url: str = Field(..., description="OpenAI-compatible base URL")
+    api_key: Optional[str] = Field(None, description="Secret API key (omit to keep unchanged if masked)")
+
+
 class LLMConfigRequest(BaseModel):
-    base_url: str = Field(..., description="OpenAI-compatible gateway URL")
+    base_url: str = Field(..., description="OpenAI-compatible gateway URL (default gateway)")
     api_key: Optional[str] = Field(None, description="Secret API key (omit or null to preserve existing)")
     model: str = Field(..., description="Primary heavy synthesis model name")
     fast_model: Optional[str] = Field(None, description="Fast triage model name (defaults to model)")
     fallback_model: Optional[str] = Field(None, description="Optional fallback model")
     temperature: float = Field(0.1, ge=0.0, le=2.0, description="Sampling temperature")
+    profiles: Optional[List[GatewayProfilePayload]] = Field(None, description="List of registered gateway profiles")
+    primary_profile_id: Optional[str] = Field("default", description="Profile ID bound to Primary tier")
+    fast_profile_id: Optional[str] = Field("default", description="Profile ID bound to Fast tier")
+    fallback_profile_id: Optional[str] = Field("default", description="Profile ID bound to Fallback tier")
 
 
 class LLMTestRequest(BaseModel):
@@ -95,9 +107,29 @@ def update_llm_config(payload: LLMConfigRequest):
         "LLM_FAST_MODEL": (payload.fast_model.strip() if payload.fast_model else payload.model.strip()),
         "LLM_FALLBACK_MODEL": (payload.fallback_model.strip() if payload.fallback_model else ""),
         "LLM_TEMPERATURE": str(payload.temperature),
+        "LLM_PRIMARY_PROFILE_ID": payload.primary_profile_id.strip() if payload.primary_profile_id else "default",
+        "LLM_FAST_PROFILE_ID": payload.fast_profile_id.strip() if payload.fast_profile_id else "default",
+        "LLM_FALLBACK_PROFILE_ID": payload.fallback_profile_id.strip() if payload.fallback_profile_id else "default",
     }
     if payload.api_key and payload.api_key.strip():
         updates["LLM_API_KEY"] = payload.api_key.strip()
+
+    if payload.profiles is not None:
+        from services.admin_service import get_gateway_profiles
+        existing_profiles_map = {p["id"]: p for p in get_gateway_profiles()}
+
+        sanitized_profiles: List[Dict[str, Any]] = []
+        for p in payload.profiles:
+            existing = existing_profiles_map.get(p.id, {})
+            # If new api_key is supplied and non-empty, use it; otherwise retain existing unmasked secret
+            final_key = p.api_key.strip() if (p.api_key and p.api_key.strip()) else existing.get("api_key", "")
+            sanitized_profiles.append({
+                "id": p.id.strip(),
+                "name": p.name.strip(),
+                "base_url": p.base_url.strip(),
+                "api_key": final_key,
+            })
+        updates["LLM_PROFILES_JSON"] = json.dumps(sanitized_profiles)
 
     update_multiple_env_variables(updates)
     clear_llm_cache()
@@ -113,13 +145,26 @@ def update_llm_config(payload: LLMConfigRequest):
 async def test_llm_endpoint(payload: LLMTestRequest):
     """Executes a live test call against the configured LLM endpoint."""
     target_base = payload.base_url.strip()
-    configured_base = os.getenv("LLM_BASE_URL", "").strip() or os.getenv("NINEROUTER_BASE_URL", "").strip() or "http://localhost:20128/v1"
+
+    # Check against global configured base as well as any registered profile base URLs
+    from services.admin_service import get_gateway_profiles
+    known_base_urls = {
+        (os.getenv("LLM_BASE_URL", "").strip() or os.getenv("NINEROUTER_BASE_URL", "").strip() or "http://localhost:20128/v1")
+    }
+    for p in get_gateway_profiles():
+        if p.get("base_url"):
+            known_base_urls.add(p["base_url"].strip())
 
     if payload.api_key and payload.api_key.strip():
         key = payload.api_key.strip()
-    elif target_base == configured_base:
-        # Only permit using ambient production key when testing the currently configured gateway URL
-        key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
+    elif target_base in known_base_urls:
+        # Check matching profile for stored key or fall back to ambient LLM_API_KEY
+        matching_key = None
+        for p in get_gateway_profiles():
+            if p.get("base_url", "").strip() == target_base and p.get("api_key"):
+                matching_key = p["api_key"].strip()
+                break
+        key = matching_key or os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
     else:
         return {
             "success": False,

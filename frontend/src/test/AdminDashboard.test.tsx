@@ -11,6 +11,18 @@ const mockConfig = {
     fast_model: "gpt-4o-mini",
     fallback_model: null,
     temperature: 0.1,
+    profiles: [
+      {
+        id: "default",
+        name: "Default Gateway",
+        base_url: "http://localhost:20128/v1",
+        api_key_masked: "sk-...1234",
+        has_api_key: true,
+      }
+    ],
+    primary_profile_id: "default",
+    fast_profile_id: "default",
+    fallback_profile_id: "default",
   },
   storage: {
     storage_type: "local",
@@ -94,7 +106,7 @@ describe("AdminPage Control Dashboard", () => {
   it("switches across tabs cleanly without errors", async () => {
     render(<AdminPage />);
     await waitFor(() => {
-      expect(screen.getByText("Model Gateways & BYOK")).toBeInTheDocument();
+      expect(screen.getByText("Universal OpenAI-Compatible Gateway Vault")).toBeInTheDocument();
     });
 
     // Click Storage tab

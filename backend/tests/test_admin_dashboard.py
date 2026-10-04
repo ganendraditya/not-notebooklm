@@ -112,6 +112,61 @@ def test_admin_config_endpoint():
     assert data["embedding"]["hybrid_bm25_enabled"] is True
 
 
+def test_admin_update_llm_config_with_profiles():
+    """Verify POST /admin/config/llm updates multiple gateway profiles and per-tier bindings."""
+    payload = {
+        "base_url": "http://localhost:20128/v1",
+        "api_key": "sk-mainkey",
+        "model": "deepseek-reasoner",
+        "fast_model": "llama-3.2-3b",
+        "fallback_model": "grok-beta",
+        "temperature": 0.15,
+        "profiles": [
+            {
+                "id": "deepseek",
+                "name": "DeepSeek Official",
+                "base_url": "https://api.deepseek.com/v1",
+                "api_key": "sk-deepseek-secret"
+            },
+            {
+                "id": "ollama",
+                "name": "Local Ollama",
+                "base_url": "http://localhost:11434/v1",
+                "api_key": ""
+            }
+        ],
+        "primary_profile_id": "deepseek",
+        "fast_profile_id": "ollama",
+        "fallback_profile_id": "deepseek"
+    }
+    res = client.post("/admin/config/llm", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["config"]["primary_profile_id"] == "deepseek"
+    assert data["config"]["fast_profile_id"] == "ollama"
+
+    # Verify GET /admin/config returns masked profiles
+    res_get = client.get("/admin/config")
+    assert res_get.status_code == 200
+    cfg = res_get.json()["llm"]
+    assert len(cfg["profiles"]) >= 2
+    ds_prof = next(p for p in cfg["profiles"] if p["id"] == "deepseek")
+    assert ds_prof["api_key_masked"] == "sk-...cret"
+    assert ds_prof["has_api_key"] is True
+
+    # Test factory credential resolution for different tiers
+    from rag.llm_factory import _resolve_tier_credentials
+    base_p, key_p, mod_p, _, _, _, has_p = _resolve_tier_credentials("primary")
+    assert base_p == "https://api.deepseek.com/v1"
+    assert key_p == "sk-deepseek-secret"
+    assert mod_p == "deepseek-reasoner"
+
+    base_f, key_f, _, fast_m, _, _, _ = _resolve_tier_credentials("fast")
+    assert base_f == "http://localhost:11434/v1"
+    assert fast_m == "llama-3.2-3b"
+
+
 def test_admin_update_llm_config():
     """Verify POST /admin/config/llm updates model parameters."""
     payload = {

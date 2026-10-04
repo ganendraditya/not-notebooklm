@@ -285,6 +285,8 @@ Unlike generic summary buffers that lose granular constraints, NotbookLM maintai
 ### 5.6 Dedicated Control Plane & Management Service (`admin_service.py`)
 
 To decouple low-level configuration from the researcher workspace, the **Control Dashboard** (Port 2027 / `/admin`) manages system credentials and engine parameters via REST:
+- **Universal Multi-Profile Gateway Vault:** Configure multiple OpenAI-compatible gateway profiles (e.g. DeepSeek, Grok, 9Router, Ollama, Groq, vLLM) with individual endpoints and API keys (`LLM_PROFILES_JSON`).
+- **Tiered Profile Routing:** Bind Primary Heavy, Fast Micro, and Fallback tiers to separate gateway profiles (`LLM_PRIMARY_PROFILE_ID`, `LLM_FAST_PROFILE_ID`, `LLM_FALLBACK_PROFILE_ID`) while maintaining 100% backwards compatibility with single-key setups.
 - **BYOK Gateway Tiering:** Form inputs for Primary, Fast, and Fallback models with real-time ping latency benchmarking against the OpenAI-compatible gateway (`POST /admin/test/llm`).
 - **Object Storage Toggle:** Real-time switcher between Local Disk and S3/R2/MinIO object buckets with live credential validation (`POST /admin/test/storage`).
 - **Secret Manager Injection:** Adapter selector supporting Local `.env`, Infisical CLI (`INFISICAL_ENV`, `INFISICAL_PROJECT_ID`), and Doppler CLI (`DOPPLER_PROJECT`, `DOPPLER_CONFIG`).
