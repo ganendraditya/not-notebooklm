@@ -55,6 +55,7 @@ class LLMTestRequest(BaseModel):
     base_url: str
     api_key: Optional[str] = None
     model: str
+    profile_id: Optional[str] = Field(None, description="Optional profile ID to explicitly resolve stored credentials")
 
 
 class StorageConfigRequest(BaseModel):
@@ -131,6 +132,13 @@ def update_llm_config(payload: LLMConfigRequest):
             })
         updates["LLM_PROFILES_JSON"] = json.dumps(sanitized_profiles)
 
+        # Synchronize default/primary key if omitted in top-level payload but present in selected profile
+        if not (payload.api_key and payload.api_key.strip()):
+            selected_pid = payload.primary_profile_id.strip() if payload.primary_profile_id else "default"
+            matched_prof = next((sp for sp in sanitized_profiles if sp["id"] == selected_pid), None)
+            if matched_prof and matched_prof.get("api_key"):
+                updates["LLM_API_KEY"] = matched_prof["api_key"]
+
     update_multiple_env_variables(updates)
     clear_llm_cache()
 
@@ -146,25 +154,27 @@ async def test_llm_endpoint(payload: LLMTestRequest):
     """Executes a live test call against the configured LLM endpoint."""
     target_base = payload.base_url.strip()
 
-    # Check against global configured base as well as any registered profile base URLs
     from services.admin_service import get_gateway_profiles
+    profiles = get_gateway_profiles()
     known_base_urls = {
         (os.getenv("LLM_BASE_URL", "").strip() or os.getenv("NINEROUTER_BASE_URL", "").strip() or "http://localhost:20128/v1")
     }
-    for p in get_gateway_profiles():
+    for p in profiles:
         if p.get("base_url"):
             known_base_urls.add(p["base_url"].strip())
 
     if payload.api_key and payload.api_key.strip():
         key = payload.api_key.strip()
+    elif payload.profile_id:
+        # Explicit profile ID match takes strict precedence over arbitrary URL matching
+        matching = next((p for p in profiles if p.get("id") == payload.profile_id), None)
+        key = matching.get("api_key", "").strip() if matching else ""
+        if not key:
+            key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
     elif target_base in known_base_urls:
-        # Check matching profile for stored key or fall back to ambient LLM_API_KEY
-        matching_key = None
-        for p in get_gateway_profiles():
-            if p.get("base_url", "").strip() == target_base and p.get("api_key"):
-                matching_key = p["api_key"].strip()
-                break
-        key = matching_key or os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
+        # Fall back to URL matching when profile_id is not supplied
+        matching = next((p for p in profiles if p.get("base_url", "").strip() == target_base and p.get("api_key")), None)
+        key = matching.get("api_key", "").strip() if matching else (os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip())
     else:
         return {
             "success": False,

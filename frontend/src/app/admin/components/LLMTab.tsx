@@ -103,6 +103,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
           base_url: profile.base_url,
           api_key: keyToTest,
           model: model || "gpt-4o",
+          profile_id: profile.id,
         }),
       });
       const data = await res.json();
