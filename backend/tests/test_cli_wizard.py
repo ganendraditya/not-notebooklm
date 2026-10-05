@@ -81,8 +81,11 @@ def test_cli_config_persistence_and_defaults(monkeypatch):
     """Verify CLI configuration roundtrip serialization."""
     with tempfile.TemporaryDirectory() as td:
         temp_cfg = Path(td) / "config.json"
+        temp_env = Path(td) / ".env"
+        temp_env.write_text("STORAGE_TYPE=local\n", encoding="utf-8")
         monkeypatch.setattr("cli.wizard.CONFIG_FILE", temp_cfg)
         monkeypatch.setattr("cli.wizard.CONFIG_DIR", Path(td))
+        monkeypatch.setenv("TEST_ENV_PATH", str(temp_env))
 
         initial = get_stored_cli_config()
         assert initial["workspace_port"] == 2026

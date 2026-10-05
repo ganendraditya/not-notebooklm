@@ -8,6 +8,7 @@ Guides users step-by-step through:
 All prompts and instructions written strictly in clear, accessible English.
 """
 
+import os
 import sys
 import json
 import logging
@@ -67,8 +68,12 @@ def save_cli_config(config: Dict[str, Any]):
         json.dump(config, f, indent=2)
 
     # Synchronize to backend/.env if repository root is located
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    backend_env = repo_root / "backend" / ".env"
+    test_env = os.getenv("TEST_ENV_PATH", "").strip()
+    if test_env and Path(test_env).parent.exists():
+        backend_env = Path(test_env)
+    else:
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        backend_env = repo_root / "backend" / ".env"
     if backend_env.parent.exists():
         from services.admin_service import update_multiple_env_variables
         updates = {
