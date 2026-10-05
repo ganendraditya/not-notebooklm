@@ -119,12 +119,49 @@ describe("AdminPage Control Dashboard", () => {
 
     // Click Embedding Engine tab
     fireEvent.click(screen.getByRole("button", { name: /Embedding Engine/i }));
-    expect(screen.getByText("Embedding Engine & Vector Dimensions")).toBeInTheDocument();
+    expect(screen.getByText("Universal Embedding Vault & Reranker Manager")).toBeInTheDocument();
+    expect(screen.getByText("Cross-Encoder Reranker Manager")).toBeInTheDocument();
 
     // Click System Health tab
     fireEvent.click(screen.getByRole("button", { name: /System Health/i }));
     expect(screen.getByText("System Diagnostics & Resource Health")).toBeInTheDocument();
     expect(screen.getByText("SQLite WAL")).toBeInTheDocument();
     expect(screen.getByText("not_notebooklm_fastembed")).toBeInTheDocument();
+  });
+
+  it("opens and handles Add Gateway modal dialogs and secret visibility toggles", async () => {
+    render(<AdminPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Universal OpenAI-Compatible Gateway Vault")).toBeInTheDocument();
+    });
+
+    // 1. Open Add OpenAI Compatible Modal
+    const addOpenAiBtn = screen.getByRole("button", { name: /Add OpenAI Compatible/i });
+    fireEvent.click(addOpenAiBtn);
+
+    expect(screen.getByText("Add OpenAI Compatible Gateway")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/e\.g\. DeepSeek Official/i)).toBeInTheDocument();
+
+    // Close modal via Cancel button
+    const cancelBtn = screen.getByRole("button", { name: /Cancel/i });
+    fireEvent.click(cancelBtn);
+    expect(screen.queryByText("Add OpenAI Compatible Gateway")).not.toBeInTheDocument();
+
+    // 2. Open Add Anthropic Claude Modal
+    const addAnthropicBtn = screen.getByRole("button", { name: /Add Anthropic Claude/i });
+    fireEvent.click(addAnthropicBtn);
+
+    expect(screen.getByText("Add Anthropic Claude Gateway")).toBeInTheDocument();
+
+    // Press Escape to close modal
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByText("Add Anthropic Claude Gateway")).not.toBeInTheDocument();
+
+    // 3. Open Edit Modal on default card
+    const editBtn = screen.getByTitle("Edit Provider Settings");
+    fireEvent.click(editBtn);
+
+    expect(screen.getByText(/Edit Gateway:/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
   });
 });

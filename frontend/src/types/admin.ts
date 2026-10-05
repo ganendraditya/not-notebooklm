@@ -4,6 +4,7 @@ export interface GatewayProfile {
   base_url: string;
   api_key_masked: string;
   has_api_key: boolean;
+  protocol?: "openai" | "anthropic";
 }
 
 export interface AdminConfig {
@@ -37,13 +38,21 @@ export interface AdminConfig {
     doppler_config: string;
   };
   embedding: {
-    provider: "local" | "gemini";
+    provider: "local" | "gemini" | "openai" | "custom";
     gemini_model: string;
     gemini_key_masked: string;
     has_gemini_key: boolean;
     local_model: string;
-    local_dimensions: number;
+    custom_base_url?: string;
+    custom_model_name?: string;
+    custom_key_masked?: string;
+    has_custom_key?: boolean;
+    custom_local_path?: string;
     hybrid_bm25_enabled: boolean;
+  };
+  reranker?: {
+    model: string;
+    top_n: number;
   };
 }
 

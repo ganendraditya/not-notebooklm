@@ -4,6 +4,7 @@ Provides dedicated REST endpoints to inspect, test, and persist system settings
 for LLMs, S3 Storage, Secret Providers, FastEmbed ONNX, and System Health.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -19,6 +20,8 @@ from services.admin_service import (
     update_multiple_env_variables,
     test_llm_connection,
     test_s3_storage_connection,
+    test_embedding_endpoint,
+    test_reranker_instance,
 )
 from rag.llm_factory import clear_llm_cache
 
@@ -36,6 +39,7 @@ class GatewayProfilePayload(BaseModel):
     name: str = Field(..., description="Human-readable profile name")
     base_url: str = Field(..., description="OpenAI-compatible base URL")
     api_key: Optional[str] = Field(None, description="Secret API key (omit to keep unchanged if masked)")
+    protocol: Optional[str] = Field("openai", description="Protocol: 'openai' or 'anthropic'")
 
 
 class LLMConfigRequest(BaseModel):
@@ -56,6 +60,7 @@ class LLMTestRequest(BaseModel):
     api_key: Optional[str] = None
     model: str
     profile_id: Optional[str] = Field(None, description="Optional profile ID to explicitly resolve stored credentials")
+    protocol: Optional[str] = Field("openai", description="Protocol: 'openai' or 'anthropic'")
 
 
 class StorageConfigRequest(BaseModel):
@@ -84,9 +89,29 @@ class SecretProviderConfigRequest(BaseModel):
 
 
 class EmbeddingConfigRequest(BaseModel):
-    provider: str = Field(..., pattern="^(local|gemini)$", description="Embedding provider: local or gemini")
+    provider: str = Field(..., pattern="^(local|gemini|openai|custom)$", description="Embedding provider: local, gemini, or openai/custom")
+    local_model: Optional[str] = Field(None, description="Local ONNX model identifier (optional override)")
     gemini_key: Optional[str] = Field(None, description="Google Gemini API key if using gemini provider")
     gemini_model: Optional[str] = Field("models/gemini-embedding-001", description="Gemini embedding model name")
+    custom_base_url: Optional[str] = Field("http://localhost:11434/v1", description="Base URL for OpenAI-compatible embeddings")
+    custom_key: Optional[str] = Field(None, description="API Key for OpenAI-compatible embeddings")
+    custom_model_name: Optional[str] = Field("nomic-embed-text", description="Model name for OpenAI-compatible embeddings")
+    custom_local_path: Optional[str] = Field("", description="Local disk path for custom model loading")
+
+
+class EmbeddingTestRequest(BaseModel):
+    base_url: str = Field(..., description="OpenAI-compatible embedding base URL")
+    api_key: Optional[str] = Field(None, description="Optional API Key")
+    model_name: str = Field(..., description="Target embedding model identifier")
+
+
+class RerankerConfigRequest(BaseModel):
+    model: str = Field("ms-marco-TinyBERT-L-2-v2", description="FlashRank reranker model identifier")
+    top_n: int = Field(12, ge=3, le=30, description="Top chunks to slice for context synthesis")
+
+
+class RerankerTestRequest(BaseModel):
+    model: str = Field("ms-marco-TinyBERT-L-2-v2", description="FlashRank model to test")
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +154,7 @@ def update_llm_config(payload: LLMConfigRequest):
                 "name": p.name.strip(),
                 "base_url": p.base_url.strip(),
                 "api_key": final_key,
+                "protocol": (p.protocol.strip() if p.protocol else existing.get("protocol", "openai")) or "openai",
             })
         updates["LLM_PROFILES_JSON"] = json.dumps(sanitized_profiles)
 
@@ -163,6 +189,7 @@ async def test_llm_endpoint(payload: LLMTestRequest):
         if p.get("base_url"):
             known_base_urls.add(p["base_url"].strip())
 
+    matching = None
     if payload.api_key and payload.api_key.strip():
         key = payload.api_key.strip()
     elif payload.profile_id:
@@ -189,10 +216,13 @@ async def test_llm_endpoint(payload: LLMTestRequest):
             "latency_ms": 0.0,
         }
 
+    protocol = payload.protocol or (matching.get("protocol", "openai") if matching else "openai")
+
     success, message, latency_ms = await test_llm_connection(
         base_url=target_base,
         api_key=key,
         model=payload.model.strip(),
+        protocol=protocol,
     )
     return {
         "success": success,
@@ -301,15 +331,26 @@ def update_secret_provider_config(payload: SecretProviderConfigRequest):
 
 @router.post("/config/embeddings")
 def update_embedding_config(payload: EmbeddingConfigRequest):
-    """Switches embedding engine between FastEmbed ONNX local and Google Gemini cloud."""
+    """Switches and persists embedding engine settings (Local FastEmbed, OpenAI-compatible /v1, Gemini)."""
     updates: Dict[str, str] = {
         "EMBEDDING_PROVIDER": payload.provider.lower(),
     }
+    if payload.local_model:
+        updates["LOCAL_EMBEDDING_MODEL"] = payload.local_model.strip()
     if payload.provider == "gemini":
         if payload.gemini_key and payload.gemini_key.strip():
             updates["GEMINI_API_KEY"] = payload.gemini_key.strip()
         if payload.gemini_model:
             updates["GEMINI_EMBEDDING_MODEL"] = payload.gemini_model.strip()
+    elif payload.provider in ("openai", "custom"):
+        if payload.custom_base_url:
+            updates["EMBEDDING_BASE_URL"] = payload.custom_base_url.strip()
+        if payload.custom_key and payload.custom_key.strip():
+            updates["EMBEDDING_API_KEY"] = payload.custom_key.strip()
+        if payload.custom_model_name:
+            updates["EMBEDDING_MODEL_NAME"] = payload.custom_model_name.strip()
+        if payload.custom_local_path:
+            updates["CUSTOM_EMBEDDING_PATH"] = payload.custom_local_path.strip()
 
     update_multiple_env_variables(updates)
 
@@ -325,8 +366,63 @@ def update_embedding_config(payload: EmbeddingConfigRequest):
 
     return {
         "status": "success",
-        "message": f"Embedding provider switched to: {payload.provider}",
+        "message": f"Embedding provider updated to: {payload.provider}",
         "config": get_system_admin_config()["embedding"],
+    }
+
+
+@router.post("/test/embeddings")
+async def test_embedding_connection_endpoint(payload: EmbeddingTestRequest):
+    """Executes live connectivity test to an OpenAI-compatible /v1/embeddings endpoint and sniffs dimensions."""
+    key = payload.api_key.strip() if payload.api_key else os.getenv("EMBEDDING_API_KEY", "").strip()
+    success, message, dim, latency_ms = await asyncio.to_thread(
+        test_embedding_endpoint,
+        base_url=payload.base_url.strip(),
+        api_key=key,
+        model_name=payload.model_name.strip(),
+    )
+    return {
+        "success": success,
+        "message": message,
+        "dimensions": dim,
+        "latency_ms": latency_ms,
+    }
+
+
+@router.post("/config/reranker")
+def update_reranker_config(payload: RerankerConfigRequest):
+    """Updates and persists cross-encoder reranker settings and context slice cutoff."""
+    updates: Dict[str, str] = {
+        "RERANKER_MODEL": payload.model.strip(),
+        "RERANKER_TOP_N": str(payload.top_n),
+    }
+    update_multiple_env_variables(updates)
+
+    # Refresh cached reranker instance
+    try:
+        from rag.vector_store import get_flashrank_ranker
+        get_flashrank_ranker(model_name=payload.model.strip())
+    except Exception as e:
+        logger.warning(f"[Admin] Failed to warm reranker {payload.model}: {e}")
+
+    return {
+        "status": "success",
+        "message": f"Reranker settings updated to: {payload.model} (Top-N: {payload.top_n})",
+        "config": get_system_admin_config()["reranker"],
+    }
+
+
+@router.post("/test/reranker")
+async def test_reranker_endpoint(payload: RerankerTestRequest):
+    """Executes live ranking benchmark with 2 test passages to verify reranker operational readiness."""
+    success, message, latency_ms = await asyncio.to_thread(
+        test_reranker_instance,
+        model_name=payload.model.strip(),
+    )
+    return {
+        "success": success,
+        "message": message,
+        "latency_ms": latency_ms,
     }
 
 

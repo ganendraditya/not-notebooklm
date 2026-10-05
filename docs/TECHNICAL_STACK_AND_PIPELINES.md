@@ -293,12 +293,13 @@ Unlike generic summary buffers that lose granular constraints, NotbookLM maintai
 ### 5.6 Dedicated Control Plane & Management Service (`admin_service.py`)
 
 To decouple low-level configuration from the researcher workspace, the **Control Dashboard** (Port 2027 / `/admin`) manages system credentials and engine parameters via REST:
-- **Universal Multi-Profile Gateway Vault:** Configure multiple OpenAI-compatible gateway profiles (e.g. DeepSeek, Grok, 9Router, Ollama, Groq, vLLM) with individual endpoints and API keys (`LLM_PROFILES_JSON`).
-- **Tiered Profile Routing:** Bind Primary Heavy, Fast Micro, and Fallback tiers to separate gateway profiles (`LLM_PRIMARY_PROFILE_ID`, `LLM_FAST_PROFILE_ID`, `LLM_FALLBACK_PROFILE_ID`) while maintaining 100% backwards compatibility with single-key setups.
+- **Dual-Protocol Gateway Vault:** Configure multiple OpenAI-compatible gateway profiles or direct native Anthropic Claude keys (`+ Add OpenAI Compatible`, `+ Add Anthropic Claude`) with individual endpoints and API keys.
+- **Universal Multi-Mode Embedding Vault:** Hot-switch between FastEmbed local catalog (MiniLM-L12, Multilingual E5-Large), universal OpenAI-compatible endpoints (`/v1/embeddings`), Google Gemini GenAI, or custom local model paths with automated dimension sniffing and Qdrant collection isolation.
+- **Cross-Encoder Reranker Manager:** Live benchmark testing for FlashRank models (TinyBERT, MiniLM-L12, MultiBERT) with a configurable context slice cutoff slider (`top_n`).
+- **Staged Configuration & Workspace Fallback Notice:** Changes made in the dashboard stage cleanly without terminating active in-flight chats, and non-intrusive top banners alert users if primary cloud embedding encounters network failure and drops to local offline fallback.
 - **BYOK Gateway Tiering:** Form inputs for Primary, Fast, and Fallback models with real-time ping latency benchmarking against the OpenAI-compatible gateway (`POST /admin/test/llm`).
 - **Object Storage Toggle:** Real-time switcher between Local Disk and S3/R2/MinIO object buckets with live credential validation (`POST /admin/test/storage`).
 - **Secret Manager Injection:** Adapter selector supporting Local `.env`, Infisical CLI (`INFISICAL_ENV`, `INFISICAL_PROJECT_ID`), and Doppler CLI (`DOPPLER_PROJECT`, `DOPPLER_CONFIG`).
-- **Vector Engine Switching:** Hot-switching between CPU-native FastEmbed ONNX (384-dim) and Google Gemini GenAI (3072-dim).
 - **System Health Diagnostics:** Direct telemetry querying SQLite WAL record counts, Qdrant collection point volumes, and disk capacity.
 
 ### 5.7 Consumer Terminal Installer & Process Orchestration (`cli/`)

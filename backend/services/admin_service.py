@@ -181,6 +181,18 @@ def get_system_admin_config() -> Dict[str, Any]:
     embedding_provider = os.getenv("EMBEDDING_PROVIDER", "local").strip().lower()
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
     gemini_model = os.getenv("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001").strip()
+    custom_embed_url = os.getenv("EMBEDDING_BASE_URL", "http://localhost:11434/v1").strip()
+    custom_embed_key = os.getenv("EMBEDDING_API_KEY", "").strip()
+    custom_embed_model = os.getenv("EMBEDDING_MODEL_NAME", "nomic-embed-text").strip()
+    local_embed_model = os.getenv("LOCAL_EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2").strip()
+    custom_local_path = os.getenv("CUSTOM_EMBEDDING_PATH", "").strip()
+
+    # 5. Reranker Settings
+    reranker_model = os.getenv("RERANKER_MODEL", "ms-marco-TinyBERT-L-2-v2").strip()
+    try:
+        reranker_top_n = int(os.getenv("RERANKER_TOP_N", "12").strip())
+    except (ValueError, TypeError):
+        reranker_top_n = 12
 
     # Profiles & Tier Bindings
     raw_profiles = get_gateway_profiles()
@@ -191,6 +203,7 @@ def get_system_admin_config() -> Dict[str, Any]:
             "base_url": p.get("base_url", ""),
             "api_key_masked": mask_secret(p.get("api_key", "")),
             "has_api_key": bool(p.get("api_key") and not str(p.get("api_key")).startswith("your_")),
+            "protocol": p.get("protocol", "openai"),
         }
         for p in raw_profiles
     ]
@@ -233,29 +246,58 @@ def get_system_admin_config() -> Dict[str, Any]:
             "gemini_model": gemini_model,
             "gemini_key_masked": mask_secret(gemini_key),
             "has_gemini_key": bool(gemini_key and not gemini_key.startswith("your_")),
-            "local_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 (FastEmbed ONNX, 384-dim)",
-            "local_dimensions": 384,
+            "local_model": local_embed_model,
+            "local_dimensions": 1024 if "e5" in local_embed_model.lower() else 384,
+            "custom_base_url": custom_embed_url,
+            "custom_model_name": custom_embed_model,
+            "custom_key_masked": mask_secret(custom_embed_key),
+            "has_custom_key": bool(custom_embed_key and not custom_embed_key.startswith("your_")),
+            "custom_local_path": custom_local_path,
             "hybrid_bm25_enabled": True,
+        },
+        "reranker": {
+            "model": reranker_model,
+            "top_n": reranker_top_n,
         },
     }
 
 
-async def test_llm_connection(base_url: str, api_key: str, model: str) -> Tuple[bool, str, float]:
-    """Tests connectivity to the specified OpenAI-compatible LLM gateway with latency measurement."""
+async def test_llm_connection(
+    base_url: str,
+    api_key: str,
+    model: str,
+    protocol: str = "openai",
+) -> Tuple[bool, str, float]:
+    """Tests connectivity to the specified LLM gateway (OpenAI-compatible or native Anthropic) with latency measurement."""
     import time
-    from llama_index.llms.openai_like import OpenAILike
     from llama_index.core.llms import ChatMessage as LlamaChatMessage, MessageRole
 
     start_time = time.perf_counter()
     try:
-        test_client = OpenAILike(
-            api_base=base_url,
-            api_key=api_key,
-            model=model,
-            is_chat_model=True,
-            max_tokens=10,
-            timeout=15.0,
-        )
+        if protocol == "anthropic":
+            from llama_index.llms.anthropic import Anthropic as LlamaAnthropic
+            test_model = (
+                model
+                if (model and not model.startswith("gpt-") and "claude" in model.lower())
+                else "claude-3-5-haiku-20241022"
+            )
+            test_client = LlamaAnthropic(
+                model=test_model,
+                api_key=api_key,
+                base_url=base_url if base_url and not base_url.startswith("https://api.anthropic.com") else None,
+                max_tokens=10,
+                timeout=15.0,
+            )
+        else:
+            from llama_index.llms.openai_like import OpenAILike
+            test_client = OpenAILike(
+                api_base=base_url,
+                api_key=api_key,
+                model=model,
+                is_chat_model=True,
+                max_tokens=10,
+                timeout=15.0,
+            )
         test_msg = [LlamaChatMessage(role=MessageRole.USER, content="Ping")]
         resp = await test_client.achat(test_msg)
         latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
@@ -288,7 +330,6 @@ def test_s3_storage_connection(
             config=Config(signature_version="s3v4", connect_timeout=5, retries={"max_attempts": 1}),
         )
 
-        # Check bucket accessibility
         try:
             s3.head_bucket(Bucket=bucket)
             return True, f"Successfully connected to bucket '{bucket}' on {endpoint}"
@@ -301,3 +342,63 @@ def test_s3_storage_connection(
         return False, "boto3 library is not installed in the environment."
     except Exception as e:
         return False, f"S3 connection failed: {str(e)}"
+
+
+def test_embedding_endpoint(
+    base_url: str,
+    api_key: str,
+    model_name: str
+) -> Tuple[bool, str, int, float]:
+    """
+    Tests connectivity to an OpenAI-compatible /v1/embeddings endpoint.
+    Performs live dimension sniffing and measures latency.
+    """
+    import time
+    from rag.vector_store import OpenAICompatibleEmbedding
+
+    start_time = time.perf_counter()
+    try:
+        embedder = OpenAICompatibleEmbedding(
+            base_url=base_url,
+            api_key=api_key,
+            model_name=model_name,
+            timeout=10.0,
+        )
+        vec = embedder._get_query_embedding("connectivity probe")
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        if not vec:
+            return False, "Endpoint returned empty embedding array.", 0, latency_ms
+        dim = len(vec)
+        return True, f"Success! Verified {dim}-dimensional vector embeddings.", dim, latency_ms
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        return False, f"Embedding connection failed: {str(e)}", 0, latency_ms
+
+
+def test_reranker_instance(
+    model_name: str
+) -> Tuple[bool, str, float]:
+    """
+    Tests live FlashRank cross-encoder ranking and measures execution time.
+    """
+    import time
+    from flashrank import RerankRequest
+    from rag.vector_store import get_flashrank_ranker
+
+    start_time = time.perf_counter()
+    try:
+        ranker = get_flashrank_ranker(model_name=model_name)
+        if not ranker:
+            return False, f"Failed to instantiate reranker model '{model_name}'.", 0.0
+        passages = [
+            {"id": 0, "text": "First test passage about academic literature synthesis."},
+            {"id": 1, "text": "Second test passage discussing vector database indexing."},
+        ]
+        res = ranker.rerank(RerankRequest(query="literature synthesis", passages=passages))
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        if res and len(res) == 2:
+            return True, f"Reranker '{model_name}' operational! Ranked 2 passages in {latency_ms}ms.", latency_ms
+        return False, "Reranker returned malformed rank results.", latency_ms
+    except Exception as e:
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        return False, f"Reranker test error: {str(e)}", latency_ms

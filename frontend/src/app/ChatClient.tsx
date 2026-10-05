@@ -176,8 +176,40 @@ export default function ChatClient() {
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
   const [mobileTab, setMobileTab] = useState<"menu" | "chat" | "sources">("chat");
 
+  // Status notice from backend (e.g. offline local fallback notice)
+  const [systemNotice, setSystemNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check system status for offline fallback mode
+    fetch(`${backendUrl}/admin/config`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.embedding?.provider === "local" && data?.embedding?.gemini_key_masked) {
+          // Gemini key configured but local FastEmbed is active
+          setSystemNotice("Notice: Workspace is operating with Local FastEmbed embeddings.");
+        }
+      })
+      .catch(() => {});
+  }, [backendUrl]);
+
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-app-bg text-app-text">
+      {/* Top Banner Notice: Non-intrusive Alert (Staged Reload / Fallback) */}
+      {systemNotice && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-xs text-amber-300 flex items-center justify-between shrink-0 z-50">
+          <span className="flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{systemNotice}</span>
+          </span>
+          <button
+            onClick={() => setSystemNotice(null)}
+            className="text-amber-400 hover:text-amber-200 px-1 py-0.5 rounded cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Mobile/Tablet NotebookLM Top Header Bar (< lg) */}
       <div className="lg:hidden shrink-0 bg-app-sidebar border-b border-app-border z-50 flex flex-col">
         {/* Row 1: Brand / Active Chat Title + Settings Gear Icon */}

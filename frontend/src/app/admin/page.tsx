@@ -192,7 +192,12 @@ export default function AdminPage() {
                 <SecretsTab config={config.secrets} backendUrl={backendUrl} onSaved={fetchConfig} />
               )}
               {activeTab === "embedding" && (
-                <EmbeddingTab config={config.embedding} backendUrl={backendUrl} onSaved={fetchConfig} />
+                <EmbeddingTab
+                  config={config.embedding}
+                  rerankerConfig={config.reranker}
+                  backendUrl={backendUrl}
+                  onSaved={fetchConfig}
+                />
               )}
               {activeTab === "health" && (
                 <SystemHealthTab
