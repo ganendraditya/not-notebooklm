@@ -2,7 +2,7 @@
 
 Provides:
 - Interactive setup wizard (`notbooklm init`).
-- 9Router-inspired interactive start menu (`notbooklm` or `notbooklm start`).
+- Interactive start menu (`notbooklm` or `notbooklm start`).
 - Status inspection and process lifecycle commands.
 """
 
@@ -79,7 +79,7 @@ def cmd_admin():
 
 def run_interactive_start_menu():
     """
-    Renders the 9Router-inspired interactive selection menu upon launching `notbooklm start`.
+    Renders the interactive selection menu upon launching `notbooklm start`.
     Options:
       ★ Open Research Workspace (Browser)
       ☆ Open Control Dashboard (Settings & BYOK)
