@@ -313,7 +313,8 @@ To eliminate setup friction for non-developer researchers and students, NotbookL
   - **OS Auto-Start Integration:** Installs user-level LaunchAgent plist (`~/Library/LaunchAgents/dev.notbooklm.daemon.plist`).
 - **Interactive Multi-Action Launcher Menu (`notbooklm start` / `notbooklm`):**
   - Arrow-key menu providing direct browser launch to Research Workspace (Port 2026), Control Dashboard (Port 2027), live activity logs streaming, detached background execution, and graceful process shutdown.
-- **Process Lifecycle CLI Subcommands:** `notbooklm status`, `notbooklm stop`, and `notbooklm admin`.
+- **Process Lifecycle CLI Subcommands:** `notbooklm status`, `notbooklm stop`, `notbooklm admin`, and `notbooklm update` (checks GitHub Atom releases feed with 24-hour local caching and guided upgrade execution).
+- **Strict UNIX Signal & Navigation Semantics:** In live activity logs, pressing `Enter` or `q` exits cleanly to the main menu without stopping servers, while `Ctrl+C` initiates graceful daemon termination (`cmd_stop()`).
 
 ---
 

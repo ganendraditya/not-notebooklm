@@ -24,7 +24,8 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 * **Layered Conversational Memory & Elastic Token Budgeting:** Dynamic Priority Waterfall and Layered Memory Compaction (elastic token reclaim, non-destructive topic digest, and high-recall declarative sentence classification) that retains operational constraints, parameters, and research invariants verbatim in Pinned Working Memory. Empirically benchmarked on a 100-case Conversational NIAH matrix (Stanford RULER & Anthropic standards), achieving 98.0% needle retention on context-constrained 8K models (100% on multi-needle tracking and temporal rule updates).
 * **Dense + BM25 Sparse Hybrid Retrieval with RRF:** Combines native ONNX-powered dense multilingual embeddings with FastEmbed BM25 sparse lexical tokens via Reciprocal Rank Fusion (RRF, $k=60$) in Qdrant, ensuring high-precision recall across technical acronyms, DOIs, and author names before passing excerpts to FlashRank Cross-Encoder reranking.
 * **Zero-PyTorch Local Runtime:** Powered entirely by CPU-optimized ONNX Runtime (`fastembed` and `flashrank`), dropping installation overhead from ~1.5GB to ~220MB with sub-second (<1s) cold-boot times and zero GPU dependencies.
-* **Local-First & Multi-Role LLM Architecture:** Runs locally with embedded SQLite and Qdrant. Connects to any OpenAI-compatible API (Ollama, vLLM, DeepSeek, GPT-4o) with tiered primary, fast, and auto-fallback model roles, plus optional S3 storage (Cloudflare R2, MinIO).
+* **Dual-Protocol Engine & Multi-Profile Vault:** Connects to any OpenAI-compatible gateway (DeepSeek, Grok, Ollama, Groq, vLLM) or direct native Anthropic Claude protocol (`api.anthropic.com`). Route Primary, Fast, and Fallback tiers to separate keys and endpoints with automated recovery.
+* **In-App Control Dashboard & Setup CLI:** Includes an interactive consumer setup wizard (`notbooklm init / start`) and a dedicated browser control plane (Port 2027 / `/admin`) for visual gateway management, dimension sniffing, and storage toggling.
 
 ---
 
@@ -122,101 +123,127 @@ To evaluate conversational recall, instruction retention, and constraint preserv
 
 ---
 
-## Quickstart
+## Quickstart & Installation
 
-You can run this project in two ways:
+Choose the setup option that best matches your workflow:
 
-### Option 1: Quickstart via Docker
-Runs all services in containers without requiring local Python or Node.js installations.
+### Option 1: Terminal Installer & CLI (Recommended for End-Users)
+Installs NotbookLM locally with an isolated runtime environment and an interactive first-run setup wizard:
 
-1. **Clone repository:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/ganendraditya/not-notebooklm/main/install.sh | bash
+```
+
+Once installed, launch the application anytime from any directory in your terminal:
+```bash
+notbooklm
+```
+*(Running `notbooklm` or `notbooklm start` launches background services and opens an interactive terminal menu to open the workspace in your browser, configure settings, stream live logs, or run silently in the background.)*
+
+* **Check running processes & ports:** `notbooklm status`
+* **Open Control Dashboard directly:** `notbooklm admin`
+* **Stop background services:** `notbooklm stop`
+
+---
+
+### Option 2: Docker Compose (Isolated Containers)
+Runs all services in pre-configured containers without requiring local Python or Node.js installations on your host machine:
+
+1. **Clone repository and enter project directory:**
    ```bash
    git clone https://github.com/ganendraditya/not-notebooklm.git
    cd not-notebooklm
    ```
 
-2. **Setup environment variables:**
+2. **Configure environment:**
    ```bash
    cp backend/.env.example backend/.env
+   # Configure your API key or model preferences in backend/.env
    ```
-   *Configure your API key and model preferences in `backend/.env`.*
 
-3. **Start services with Docker Compose:**
+3. **Start services:**
    ```bash
    docker compose up -d
    ```
 
-4. **Access the application:**
-   * **Frontend Web App:** `http://localhost:3000`
-   * **Backend API Docs:** `http://localhost:8000/docs`
-   * **Qdrant Dashboard:** `http://localhost:6333/dashboard`
+* **Frontend Web App:** `http://localhost:3000`
+* **Control Dashboard:** `http://localhost:3000/admin` (or port 2027 in bare-metal mode)
+* **Backend API Docs:** `http://localhost:8000/docs`
+* **Qdrant Dashboard:** `http://localhost:6333/dashboard`
 
 ---
 
-### Option 2: Local Development (Bare-Metal)
-For active development directly on your machine.
+### Option 3: Local Clone & Bare-Metal Development (For Developers & Contributors)
+Ideal if you want to inspect, debug, or contribute code directly with live hot-reloading.
 
-> **Bare-Metal Default Stack:**
-> By default in bare-metal mode, NotbookLM operates on an embedded local stack:
-> * **Relational Database:** SQLite (`backend/not_notebooklm.db`)
-> * **Object Storage:** Local file system (`uploads/` and `uploads/chat_media/`)
-> * **Vector Engine:** Embedded in-process Qdrant (`backend/qdrant_data/`)
->
-> This default enables immediate local setup without running external services.
->
-> **Production and Multi-User Setup:**
-> For server deployments or multi-user environments:
-> 1. **S3 Object Storage:** Set `STORAGE_TYPE=s3` in `backend/.env` to connect to Cloudflare R2 or MinIO. This ensures uploaded research papers and chat attachments persist across server restarts.
-> 2. **Dedicated Vector Server:** Run a standalone Qdrant container (`docker run -d -p 6333:6333 qdrant/qdrant`) and configure `QDRANT_URL=http://localhost:6333` in `backend/.env` for independent indexing and lower backend memory usage.
-> 3. **Docker Compose:** Alternatively, running `docker compose up -d` (Option 1) manages these services automatically.
+#### 1. Clone & Enter Project Root
+First, clone the repository and navigate into the root directory:
+```bash
+git clone https://github.com/ganendraditya/not-notebooklm.git
+cd not-notebooklm
+```
 
-#### 1. Initial Setup (Dependencies & Configuration)
+#### 2. Install Dependencies & Setup Environment
 
-**Backend:**
+**Backend Environment:**
 ```bash
 cd backend
-python -m venv venv
+python3 -m venv venv
 
-# Windows
-.\venv\Scripts\activate
-# Linux / macOS
+# Activate virtual environment:
+# - Linux / macOS:
 source venv/bin/activate
+# - Windows (PowerShell):
+.\venv\Scripts\activate
 
-pip install -r requirements.txt  # Fully installs FastEmbed ONNX without requiring PyTorch (~220MB total)
+# Install dependencies (FastEmbed ONNX, FlashRank, FastAPI):
+pip install -r requirements.txt
 cp .env.example .env
-# Edit backend/.env with your LLM configuration
 cd ..
 ```
 
-**Frontend:**
+**Frontend Environment:**
 ```bash
 cd frontend
 npm install
 cd ..
 ```
 
-#### 2. Start Servers
+#### 3. Start Servers
 
-##### Recommended: One-Click Startup Script
-Launch both backend and frontend servers simultaneously with a single command from the project root:
+You can start the development servers using either the automated one-click developer runner or separate terminal windows:
+
+##### Method A: One-Click Dev Runner (Recommended)
+From the project root (`not-notebooklm`), execute the startup script corresponding to your operating system. It features an integrated **Port Guard** (safely cleans stale processes on ports 8000/3000) and streams live console logs directly to your terminal:
 
 - **Linux / macOS:**
   ```bash
+  cd not-notebooklm
   ./start.sh
   ```
 - **Windows (PowerShell):**
   ```powershell
+  cd not-notebooklm
   .\start.ps1
   ```
+Press `Ctrl+C` in the terminal to gracefully stop both servers.
 
-Both startup scripts include an integrated **Port Guard** that automatically detects and safely terminates orphaned processes on ports 8000 and 3000, preventing `Address already in use` launch errors.
+##### Method B: Separate Terminals (Dedicated Logs)
+If you prefer dedicated terminal windows for backend and frontend logs:
 
-##### Alternative: Manual Startup (Separate Terminals)
-If you prefer running services in separate terminal windows for dedicated logs:
-- **Backend:** `cd backend && source venv/bin/activate && uvicorn main:app --reload --port 8000` (or `.\venv\Scripts\activate` on Windows)
-- **Frontend:** `cd frontend && npm run dev`
+* **Terminal 1 (Backend API):**
+  ```bash
+  cd not-notebooklm/backend
+  source venv/bin/activate       # Windows: .\venv\Scripts\activate
+  uvicorn main:app --reload --port 8000
+  ```
+* **Terminal 2 (Frontend App):**
+  ```bash
+  cd not-notebooklm/frontend
+  npm run dev
+  ```
 
-Open `http://localhost:3000` in your browser.
+Open `http://localhost:3000` for the workspace, and `http://localhost:3000/admin` (or port 2027) for the Control Dashboard.
 
 ##### Pre-Flight Verification Script
 Mirror the automated GitHub Actions CI pipeline locally before committing or creating pull requests:
@@ -227,9 +254,21 @@ Runs frontend linting, unit tests (`vitest`), Next.js production build, backend 
 
 ---
 
-## LLM Configuration
+## System Configuration: In-App Dashboard or .env
 
-NotbookLM integrates with any OpenAI-compatible endpoint or gateway. Providers and models can be changed via environment variables without modifying application code.
+NotbookLM supports two configuration workflows:
+
+### 1. In-App Control Dashboard (Visual Web UI)
+For quick setup without manually editing plaintext files, open the **Control Dashboard** at `http://localhost:3000/admin` (or `http://localhost:2027` in bare-metal mode, or run `notbooklm admin`):
+* **Universal Gateway Vault:** Add, edit, test, and delete OpenAI-compatible endpoints (DeepSeek, Grok, Ollama, Groq, vLLM) or direct native Anthropic Claude protocol with instant per-provider saving.
+* **Tiered Routing:** Bind Primary Heavy, Fast Micro, and Fallback models to distinct gateway profiles with zero layout-shift diagnostic latency testing.
+* **Retrieval & Reranker Manager:** Select between CPU FastEmbed ONNX (MiniLM-L12 or Multilingual E5-Large), universal `/v1/embeddings`, Google Gemini (3072-dim), or custom disk paths, plus FlashRank cross-encoder context cutoff adjustments (`top_n`).
+* **Storage & Secrets:** Switch between local disk and S3/R2/MinIO object storage, or connect Doppler / Infisical secret vaults.
+
+### 2. File-Based Configuration (`backend/.env`)
+For headless servers, automated environments, or Docker containers, configure environment variables directly in `backend/.env`.
+
+NotbookLM integrates with any OpenAI-compatible endpoint or native Anthropic Claude direct gateway. Providers and models can be changed via environment variables without modifying application code.
 
 ### Core Variables (`backend/.env`)
 
@@ -305,6 +344,7 @@ The application reads configuration through standard environment variables. If y
 ```text
 .
 ├── backend
+│   ├── cli                      # Consumer CLI engine and interactive setup wizard
 │   ├── database.py              # SQLite + SQLAlchemy session manager with WAL mode
 │   ├── evaluation               # Multi-framework scientific evaluation benchmark suite
 │   │   ├── datasets             # Curated QASPER, SciFact, and multi-paper test suites
@@ -343,8 +383,11 @@ The application reads configuration through standard environment variables. If y
 │   │   └── stores               # Zustand state stores (chatStore, searchStore, readerStore)
 │   ├── package.json             # Frontend package metadata and dependencies
 │   └── vitest.config.ts         # Vitest unit test configuration
+├── bin
+│   └── notbooklm                # Unified CLI executable wrapper
 ├── check.sh                     # CI mirror pre-flight verification script (lint, test, build)
 ├── docker-compose.yml           # Multi-container orchestration (App + Qdrant)
+├── install.sh                   # One-line consumer terminal installer
 ├── start.sh                     # One-click startup script with port guard (Linux/macOS)
 └── start.ps1                    # One-click startup script with port guard (Windows)
 ```
