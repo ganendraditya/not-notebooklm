@@ -33,11 +33,15 @@ Imported and uploaded sources appear in the right-hand **Sources** panel with pe
 * **Verified Paper vs. Local Manuscript:** Authentic journal publications retain official publisher metadata, while local documents (such as theses, student projects, or CVs) are cleanly cataloged without artificial journal labels.
 * **Bulk ZIP Export:** Download original documents individually or bundle multiple selected sources into a single organized ZIP package.
 
+![Deterministic Source Management](docs/assets/sources-sorting-parity.png)
+
 ### 3. Integrated Document Reader & Targeted Focus
 Inspect full manuscripts directly within the workspace:
 * **Dual-View Inspection:** Stream authentic publication PDFs directly in the browser or switch to extracted full-text for citation navigation.
 * **Ask About This Document:** Focus queries exclusively on a single source with one click, bypassing manual workspace deselection.
 * **Multi-Format Citation Generator:** Export clean, verified academic citations across APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS.
+
+![Integrated Document Reader](docs/assets/document-reader-modes.png)
 
 ### 4. Grounded Synthesis & Bidirectional Citation Highlighting
 Synthesize multiple papers into comparative review matrices. Each finding is tagged with traceable citation badges (`[1]`, `[2]`). Clicking any citation opens the document reader and automatically scrolls to highlight the exact supporting sentence in the source text:
