@@ -35,6 +35,10 @@ Imported and uploaded sources appear in the right-hand **Sources** panel with pe
 
 ![Deterministic Source Management](docs/assets/sources-sorting-parity.png)
 
+> **Sorting Parity & Reference Index Integrity:**  
+> * **Left Panel (Default Ingestion Order):** Displays sources in chronological upload order (`1.` to `5.`).  
+> * **Right Panel (Reverse Alphabetical Sort / Title Z to A):** Demonstrates that re-ordering sources by title (`3.`, `1.`, `5.`, `4.`, `2.`) preserves each paper's permanent reference index (`1.`, `2.`, `3.`), preventing citation corruption across turns.
+
 ### 3. Integrated Document Reader & Targeted Focus
 Inspect full manuscripts directly within the workspace:
 * **Dual-View Inspection:** Stream authentic publication PDFs directly in the browser or switch to extracted full-text for citation navigation.
