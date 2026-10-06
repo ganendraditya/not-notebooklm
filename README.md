@@ -10,22 +10,11 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 
 ### Highlights
 
-* **Deterministic Workspace Citation Indexing:** Every document retains a fixed, immutable citation number (`1.`, `2.`, `3.`) across all turns of the conversation based on a deterministic ID-ascending contract. When a document is removed, the system cleanly rearranges remaining indices without numeric fragmentation.
-* **Automated Literature Discovery & Web Fallback:** Queries global academic registries (**OpenAlex**, **Crossref**, and **Europe PMC**) with automatic **DuckDuckGo** web search fallback when academic registries yield sparse results, iterative candidate pool retrieval, language-aware filtering, and DOI/title deduplication.
-* **Full-Text PDF & Metadata Resolution:** Locates and downloads open-access PDFs via concurrent racing resolvers (**arXiv**, **Unpaywall**, **OpenAlex**, **Europe PMC**) with in-memory title verification, while enriching paper records with journal quartiles and citation counts.
-* **Multi-Format Ingestion & Bibliography Splitting:** Ingests PDF, DOCX, TXT, and Markdown files. Multi-entry BibTeX (`.bib`) and RIS (`.ris`) collections are automatically disassembled on upload into standalone workspace documents with optimistic loading spinners and real-time open-access PDF resolution.
-* **Asynchronous Auto-Grounding & SQLite Persistence:** Citation grounding runs asynchronously after generation via Fast LLM and is persisted in SQLite (`citation_highlights`). A 4-tier matching engine (exact verbatim, n-gram intersection, fallback span, and multi-bullet context cursor) accurately highlights supporting passages in the document reader.
-* **Cell-Level Citation Matrices & Markdown Export:** Synthesizes literature into structured comparative review matrices with verifiable citations embedded directly in individual table cells, accompanied by 1-click Markdown table copy and native KaTeX math equation rendering.
-* **Interactive Split-Pane Reader & Jump-to-Highlight:** Bidirectional citation navigation—clicking any citation badge in a response or table cell automatically opens the document reader, scrolls to the page, and highlights the exact supporting passage.
-* **Targeted Document Focus:** One-click "Ask about this document" mode focuses questions exclusively on an individual paper without deselecting other workspace files.
-* **7-Format Citation Generator & Bulk ZIP Export:** Instant generation of verified academic citations in APA 7th, IEEE, Harvard, MLA 9th, Chicago, BibTeX, and RIS formats, alongside one-click bulk ZIP bundling for entire workspaces.
-* **3-Tier Hybrid Metadata Extractor:** Handles user-uploaded documents (PDF, Word, Markdown, Text) via DOI auto-resolution, Crossref title matching, and a document inspector tailored for theses, dissertations, and institutional reports without fabricating false citations.
-* **Benchmarked Literature Synthesis:** Evaluated across established open-source evaluation tools and research protocols (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on a 100-case benchmark of authentic academic research papers (**AllenAI QASPER & SciFact**) balancing single-paper deep dives, multi-paper comparative synthesis across 2–4 documents, and biomedical claim verification, achieving a 0.900 Composite Consensus score (0.876 Groundedness and 0.900 Answer Relevancy).
-* **Layered Conversational Memory & Elastic Token Budgeting:** Dynamic Priority Waterfall and Layered Memory Compaction (elastic token reclaim, non-destructive topic digest, and high-recall declarative sentence classification) that retains operational constraints, parameters, and research invariants verbatim in Pinned Working Memory. Empirically benchmarked on a 100-case Conversational NIAH matrix (Stanford RULER & Anthropic standards), achieving 98.0% needle retention on context-constrained 8K models (100% on multi-needle tracking and temporal rule updates).
-* **Dense + BM25 Sparse Hybrid Retrieval with RRF:** Combines native ONNX-powered dense multilingual embeddings with FastEmbed BM25 sparse lexical tokens via Reciprocal Rank Fusion (RRF, $k=60$) in Qdrant, ensuring high-precision recall across technical acronyms, DOIs, and author names before passing excerpts to FlashRank Cross-Encoder reranking.
-* **Zero-PyTorch Local Runtime:** Powered entirely by CPU-optimized ONNX Runtime (`fastembed` and `flashrank`), dropping installation overhead from ~1.5GB to ~220MB with sub-second (<1s) cold-boot times and zero GPU dependencies.
-* **Dual-Protocol Engine & Multi-Profile Vault:** Connects to any OpenAI-compatible gateway (DeepSeek, Grok, Ollama, Groq, vLLM) or direct native Anthropic Claude protocol (`api.anthropic.com`). Route Primary, Fast, and Fallback tiers to separate keys and endpoints with automated recovery.
-* **In-App Control Dashboard & Setup CLI:** Includes an interactive consumer setup wizard (`notbooklm init / start`) and a dedicated browser control plane (Port 2027 / `/admin`) for visual gateway management, dimension sniffing, and storage toggling.
+* **Verifiable Citations & Instant Jump-to-Highlight:** Every finding and matrix cell is anchored to verifiable citations (`[1]`, `[2]`). Clicking any citation badge opens the integrated split-pane document reader, navigates to the exact page, and highlights the supporting passage.
+* **Cell-Level Comparative Synthesis Matrices:** Synthesizes literature into structured comparative review tables with verifiable evidence anchored to individual cells, KaTeX mathematical notation, and 1-click clipboard export into Word, Google Docs, Notion, or Obsidian.
+* **Automated Literature Discovery & Racing PDF Resolvers:** Screens scholarly registries (**OpenAlex**, **Crossref**, **Europe PMC**) with automatic **DuckDuckGo** web search fallback, concurrent racing resolvers for open-access PDFs (**arXiv**, **Unpaywall**), and automated multi-entry BibTeX/RIS disassembly.
+* **Hardware-Friendly & Model-Agnostic (BYOK):** Runs locally by default with embedded relational storage (SQLite WAL) and in-process vector indexing (Qdrant) under a lightweight CPU-native footprint (~220MB initial weights, zero GPU dependencies out-of-the-box). Connects to any local runner (Ollama, vLLM) or external cloud gateway (DeepSeek, native Anthropic Claude direct, OpenAI).
+* **Empirically Benchmarked Scientific Rigor:** Audited across 6 open-source evaluation frameworks (**RAGAS**, **DeepEval**, **TruLens**, **Promptfoo**, **LlamaIndex**, and **Princeton ALCE**) on authentic scientific datasets (**AllenAI QASPER & SciFact**) achieving a 0.900 Composite Consensus score and 98% Conversational Memory needle retention.
 
 ---
 
@@ -134,14 +123,15 @@ Installs NotbookLM locally with an isolated runtime environment and an interacti
 curl -fsSL https://raw.githubusercontent.com/ganendraditya/not-notebooklm/main/install.sh | bash
 ```
 
-Once installed, launch the application anytime from any directory in your terminal:
+Once installed, launch the application anytime from any directory:
 ```bash
 notbooklm
 ```
-*(Running `notbooklm` or `notbooklm start` launches background services and opens an interactive terminal menu to open the workspace in your browser, configure settings, stream live logs, or run silently in the background.)*
+Opens the interactive start menu to launch the workspace, inspect logs, or manage background services.
 
 * **Check running processes & ports:** `notbooklm status`
 * **Open Control Dashboard directly:** `notbooklm admin`
+* **Check or install updates:** `notbooklm update`
 * **Stop background services:** `notbooklm stop`
 
 ---

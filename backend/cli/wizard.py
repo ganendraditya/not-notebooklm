@@ -308,6 +308,6 @@ def run_init_wizard(auto_download_weights: bool = True) -> Dict[str, Any]:
     print(f"{GREEN}{'=' * 60}{RESET}\n")
 
     print(f"{BOLD}To start your workspace anytime, simply execute:{RESET}")
-    print(f"  {CYAN}$ notbooklm{RESET}  or  {CYAN}$ notbooklm start{RESET}\n")
+    print(f"  {CYAN}$ notbooklm{RESET}\n")
 
     return final_config
