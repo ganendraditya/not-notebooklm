@@ -344,7 +344,8 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
     }
   };
 
-  const persistUpdatedProfiles = async (updatedProfiles: GatewayProfile[]) => {
+  const persistUpdatedProfiles = async (updatedProfiles: GatewayProfile[]): Promise<boolean> => {
+    const previousProfiles = profiles;
     setProfiles(updatedProfiles);
     try {
       const payloadProfiles = updatedProfiles.map((p) => ({
@@ -380,18 +381,21 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
 
       if (res.ok) {
         onSaved();
+        return true;
       } else {
         const errorData = await res.json().catch(() => ({}));
         setStatusMessage({
           text: errorData.detail || "Failed to update model settings.",
           error: true,
         });
-        setProfiles(config.profiles || []);
+        setProfiles(previousProfiles);
+        return false;
       }
     } catch (err) {
       console.error("Failed to persist model visibility update:", err);
       setStatusMessage({ text: "Failed to persist model visibility update.", error: true });
-      setProfiles(config.profiles || []);
+      setProfiles(previousProfiles);
+      return false;
     }
   };
 
@@ -407,7 +411,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
     persistUpdatedProfiles(updated);
   };
 
-  const handleAddModel = (profileId: string) => {
+  const handleAddModel = async (profileId: string) => {
     if (!newModelId.trim()) return;
     const trimmedId = newModelId.trim();
     const trimmedName = newModelName.trim() || trimmedId;
@@ -435,10 +439,12 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
       };
     });
 
-    setNewModelId("");
-    setNewModelName("");
-    setAddingModelProfileId(null);
-    persistUpdatedProfiles(updated);
+    const success = await persistUpdatedProfiles(updated);
+    if (success) {
+      setNewModelId("");
+      setNewModelName("");
+      setAddingModelProfileId(null);
+    }
   };
 
   const handleDeleteModel = (profileId: string, modelId: string) => {

@@ -399,6 +399,12 @@ def get_custom_session_llm(model: str, profile_id: Optional[str] = None) -> Opti
     except (ValueError, TypeError):
         temperature = 0.1
 
+    current_sig = _get_env_config_signature()
+    global _CACHED_CONFIG_HASH, _CACHED_SESSION_LLMS
+    if _CACHED_CONFIG_HASH != current_sig:
+        _CACHED_SESSION_LLMS.clear()
+        _CACHED_CONFIG_HASH = current_sig
+
     cache_key = (protocol, base_url, api_key, target_model, temperature)
     if cache_key in _CACHED_SESSION_LLMS:
         return _CACHED_SESSION_LLMS[cache_key]

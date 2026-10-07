@@ -65,8 +65,8 @@ def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
     db_chat = ChatSession(
         id=chat_id, 
         title=chat.title, 
-        model=chat.model, 
-        profile_id=chat.profile_id, 
+        model=chat.model.strip() if chat.model and chat.model.strip() else None, 
+        profile_id=chat.profile_id.strip() if chat.profile_id and chat.profile_id.strip() else None, 
         created_at=now, 
         updated_at=now
     )

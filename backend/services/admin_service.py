@@ -39,7 +39,7 @@ def _sanitize_env_value(val: Any) -> str:
 def _normalize_profile_models(profile: Dict[str, Any], default_model: str) -> List[Dict[str, Any]]:
     """Ensures each profile possesses a valid list of models with enabled toggles."""
     raw_models = profile.get("models")
-    if isinstance(raw_models, list):
+    if isinstance(raw_models, list) and raw_models:
         cleaned = []
         for m in raw_models:
             if isinstance(m, dict) and m.get("id"):
@@ -54,7 +54,8 @@ def _normalize_profile_models(profile: Dict[str, Any], default_model: str) -> Li
                     "name": m.strip(),
                     "enabled": True,
                 })
-        return cleaned
+        if cleaned:
+            return cleaned
 
     # Fallback default models based on profile properties
     pid = profile.get("id", "")
