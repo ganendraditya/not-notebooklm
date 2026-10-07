@@ -71,14 +71,16 @@ export function ModelSwitcher({
     }
     // Default model
     const def = availableModels.find((m) => m.is_default);
-    return def ? def.id : availableModels[0]?.id || "gpt-4o";
+    if (def) return def.id;
+    return availableModels[0]?.id || "gpt-4o";
   }, [currentSession, activeChatId, pendingNewChatModel, availableModels]);
 
   const activeProfileId = useMemo(() => {
     if (currentSession?.profile_id) return currentSession.profile_id;
     if (!activeChatId && pendingNewChatModel?.profile_id) return pendingNewChatModel.profile_id;
     const def = availableModels.find((m) => m.is_default);
-    return def ? def.profile_id : availableModels[0]?.profile_id || "default";
+    if (def) return def.profile_id;
+    return availableModels[0]?.profile_id || "default";
   }, [currentSession, activeChatId, pendingNewChatModel, availableModels]);
 
   const activeModel = useMemo(() => {

@@ -64,7 +64,7 @@ interface ChatStore {
   dismissSessionExecution: (chatId: string) => void;
   setAvailableModels: (models: WorkspaceModel[]) => void;
   setPendingNewChatModel: (selection: { model: string; profile_id: string } | null) => void;
-  updateSessionModel: (chatId: string, model: string | null, profileId: string | null) => void;
+  updateSessionModel: (chatId: string, model: string | null, profile_id: string | null) => void;
   
   bumpSessionToTop: (chatId: string) => void;
   addMessage: (message: ChatMessage) => void;

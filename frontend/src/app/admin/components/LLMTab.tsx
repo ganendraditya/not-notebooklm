@@ -357,6 +357,9 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
       }));
 
       const activePrimary = updatedProfiles.find((p) => p.id === primaryProfileId) || updatedProfiles[0];
+      if (!activePrimary) {
+        throw new Error("No gateway profile available to persist.");
+      }
 
       const res = await fetch(`${backendUrl}/admin/config/llm`, {
         method: "POST",
@@ -410,7 +413,12 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
     const trimmedName = newModelName.trim() || trimmedId;
 
     const targetProf = profiles.find((p) => p.id === profileId);
-    if (targetProf && (targetProf.models || []).some((m) => m.id === trimmedId)) {
+    if (
+      targetProf &&
+      (targetProf.models || []).some(
+        (m) => m.id.toLowerCase() === trimmedId.toLowerCase()
+      )
+    ) {
       setStatusMessage({
         text: `Model identifier "${trimmedId}" is already registered.`,
         error: true,
@@ -714,7 +722,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text">
                       <Cpu size={12} className="text-blue-400" />
                       <span>Models & Workspace Visibility</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-app-input-surface border border-app-border text-app-text-muted">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-app-input-surface border border-app-border text-app-text-muted">
                         {(prof.models || []).filter((m) => m.enabled).length}/{(prof.models || []).length} active
                       </span>
                     </div>
@@ -808,7 +816,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
 
                           <div className="flex items-center gap-2 shrink-0">
                             <span
-                              className={`text-[9px] font-mono px-1.5 py-0.2 rounded-full border ${
+                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full border ${
                                 m.enabled
                                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                   : "bg-app-card text-app-text-dim border-app-border"

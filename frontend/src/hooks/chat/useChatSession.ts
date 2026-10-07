@@ -178,17 +178,19 @@ export function useChatSession(
       .catch(err => console.error("Failed to fetch sessions:", err));
 
     // Fetch available models for workspace dynamic model switching
-    fetch(`${backendUrl}/llm/models`)
-      .then(res => {
+    const fetchAvailableModels = async () => {
+      try {
+        const res = await fetch(`${backendUrl}/llm/models`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then(data => {
+        const data = await res.json();
         if (data && Array.isArray(data.workspace_models)) {
           useChatStore.getState().setAvailableModels(data.workspace_models);
         }
-      })
-      .catch(err => console.debug("Failed to fetch available models:", err));
+      } catch (err) {
+        console.debug("Failed to fetch available models:", err);
+      }
+    };
+    fetchAvailableModels();
     // Intentionally run once on component mount to hydrate sessions from persistent storage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
