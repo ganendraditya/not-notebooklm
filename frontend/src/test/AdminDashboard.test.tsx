@@ -164,4 +164,19 @@ describe("AdminPage Control Dashboard", () => {
     expect(screen.getByText(/Edit Gateway:/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
   });
+
+  it("renders models under gateway profile and allows toggling workspace visibility", async () => {
+    render(<AdminPage />);
+    await waitFor(() => {
+      expect(screen.getByText("Models & Workspace Visibility")).toBeInTheDocument();
+    });
+
+    // Check that Add Model button is present
+    const addModelBtn = screen.getByRole("button", { name: /Add Model/i });
+    expect(addModelBtn).toBeInTheDocument();
+
+    // Click Add Model to open inline form
+    fireEvent.click(addModelBtn);
+    expect(screen.getByPlaceholderText(/e\.g\. deepseek-reasoner/i)).toBeInTheDocument();
+  });
 });

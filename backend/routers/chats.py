@@ -62,7 +62,14 @@ os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
 def create_chat(chat: models.ChatSessionCreate, db: Session = Depends(get_db)):
     chat_id = str(uuid.uuid4())
     now = get_utc_now()
-    db_chat = ChatSession(id=chat_id, title=chat.title, created_at=now, updated_at=now)
+    db_chat = ChatSession(
+        id=chat_id, 
+        title=chat.title, 
+        model=chat.model.strip() if chat.model and chat.model.strip() else None, 
+        profile_id=chat.profile_id.strip() if chat.profile_id and chat.profile_id.strip() else None, 
+        created_at=now, 
+        updated_at=now
+    )
     db.add(db_chat)
     commit_with_retry(db)
     db.refresh(db_chat)
@@ -115,6 +122,8 @@ def get_chat(chat_id: str, db: Session = Depends(get_db)):
         created_at=chat.created_at,
         updated_at=chat.updated_at,
         is_pinned=chat.is_pinned,
+        model=chat.model,
+        profile_id=chat.profile_id,
         documents=doc_responses,
         messages=msg_responses
     )
@@ -126,7 +135,12 @@ def update_chat(chat_id: str, update: models.ChatSessionUpdate, db: Session = De
     chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not chat:
         raise HTTPException(status_code=404, detail="Chat not found")
-    chat.title = update.title
+    if update.title is not None:
+        chat.title = update.title
+    if update.model is not None:
+        chat.model = update.model.strip() if update.model.strip() else None
+    if update.profile_id is not None:
+        chat.profile_id = update.profile_id.strip() if update.profile_id.strip() else None
     chat.updated_at = get_utc_now()
     commit_with_retry(db)
     db.refresh(chat)

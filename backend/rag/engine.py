@@ -251,7 +251,14 @@ async def query_chat(
     
     db = SessionLocal()
     local_docs = []
+    chat_model_override = None
+    chat_profile_id_override = None
     try:
+        from database import ChatSession as DBChatSession
+        db_chat = db.query(DBChatSession).filter(DBChatSession.id == chat_id).first()
+        if db_chat:
+            chat_model_override = db_chat.model
+            chat_profile_id_override = db_chat.profile_id
         db_docs = db.query(DBDocument).filter(DBDocument.chat_id == chat_id).order_by(DBDocument.id.asc()).all()
         local_docs = [d.filename for d in db_docs]
     finally:
@@ -259,7 +266,13 @@ async def query_chat(
         
     has_local_docs = len(local_docs) > 0
     formatted_history = format_llama_history(chat_history)
-    candidate_llms = get_candidate_llm_chain()
+    try:
+        candidate_llms = get_candidate_llm_chain(
+            model_override=chat_model_override,
+            profile_id_override=chat_profile_id_override
+        )
+    except TypeError:
+        candidate_llms = get_candidate_llm_chain()
 
     if not candidate_llms:
         return "Error: Tidak ada LLM Provider yang terkonfigurasi. Silakan periksa file .env."

@@ -36,6 +36,59 @@ def _sanitize_env_value(val: Any) -> str:
     return cleaned
 
 
+def _normalize_profile_models(profile: Dict[str, Any], default_model: str) -> List[Dict[str, Any]]:
+    """Ensures each profile possesses a valid list of models with enabled toggles."""
+    raw_models = profile.get("models")
+    if isinstance(raw_models, list) and raw_models:
+        cleaned = []
+        for m in raw_models:
+            if isinstance(m, dict) and m.get("id"):
+                cleaned.append({
+                    "id": str(m["id"]).strip(),
+                    "name": str(m.get("name") or m["id"]).strip(),
+                    "enabled": bool(m.get("enabled", True)),
+                })
+            elif isinstance(m, str) and m.strip():
+                cleaned.append({
+                    "id": m.strip(),
+                    "name": m.strip(),
+                    "enabled": True,
+                })
+        if cleaned:
+            return cleaned
+
+    # Fallback default models based on profile properties
+    pid = profile.get("id", "")
+    proto = profile.get("protocol", "openai")
+    base_url = profile.get("base_url", "").lower()
+
+    if pid == "default" or "20128" in base_url or "9router" in base_url:
+        return [{"id": default_model, "name": default_model, "enabled": True}]
+    elif proto == "anthropic" or "anthropic.com" in base_url:
+        return [
+            {"id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet", "enabled": True},
+            {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku", "enabled": True},
+        ]
+    elif "deepseek.com" in base_url:
+        return [
+            {"id": "deepseek-chat", "name": "DeepSeek V3", "enabled": True},
+            {"id": "deepseek-reasoner", "name": "DeepSeek R1", "enabled": True},
+        ]
+    elif "api.x.ai" in base_url:
+        return [{"id": "grok-2-latest", "name": "Grok 2", "enabled": True}]
+    elif "groq.com" in base_url:
+        return [{"id": "llama-3.3-70b-versatile", "name": "LLaMA 3.3 70B", "enabled": True}]
+    elif "api.openai.com" in base_url:
+        return [
+            {"id": "gpt-4o", "name": "GPT-4o", "enabled": True},
+            {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "enabled": True},
+        ]
+    elif "11434" in base_url:
+        return [{"id": "llama3.2", "name": "Llama 3.2", "enabled": True}]
+    else:
+        return [{"id": default_model, "name": default_model, "enabled": True}]
+
+
 def get_gateway_profiles() -> List[Dict[str, Any]]:
     """
     Parses and returns registered OpenAI-compatible gateway profiles.
@@ -58,6 +111,7 @@ def get_gateway_profiles() -> List[Dict[str, Any]]:
         or "http://localhost:20128/v1"
     )
     default_api_key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
+    default_model = os.getenv("LLM_MODEL", "gpt-4o").strip() or "gpt-4o"
 
     has_default = any(p.get("id") == "default" for p in profiles)
     if not profiles or not has_default:
@@ -67,6 +121,10 @@ def get_gateway_profiles() -> List[Dict[str, Any]]:
             "base_url": default_base_url,
             "api_key": default_api_key,
         })
+
+    # Ensure each profile has normalized models list
+    for p in profiles:
+        p["models"] = _normalize_profile_models(p, default_model=default_model)
 
     return profiles
 
@@ -204,6 +262,7 @@ def get_system_admin_config() -> Dict[str, Any]:
             "api_key_masked": mask_secret(p.get("api_key", "")),
             "has_api_key": bool(p.get("api_key") and not str(p.get("api_key")).startswith("your_")),
             "protocol": p.get("protocol", "openai"),
+            "models": p.get("models", []),
         }
         for p in raw_profiles
     ]

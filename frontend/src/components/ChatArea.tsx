@@ -26,6 +26,7 @@ import { InChatMessageComponent } from "./chat/ChatMessageItem";
 import { UserMessageBubble } from "./chat/UserMessageBubble";
 import { ChatInputBox, Attachment } from "./chat/ChatInput";
 import { CitationContext } from "./chat/CitationParser";
+import { ModelSwitcher } from "./chat/ModelSwitcher";
 import { useTranslation } from "@/lib/i18n";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -62,6 +63,7 @@ interface ChatAreaProps {
   onRegenerateMessage?: (messageIndex: number) => void;
   onSelectVariant?: (messageIndex: number, variantIndex: number) => void;
   onOpenStorage?: () => void;
+  onOpenSettings?: () => void;
 }
 
 function isInsideInnerScrollContainer(
@@ -117,7 +119,8 @@ export default function ChatArea({
   chatTitle = "",
   onRegenerateMessage,
   onSelectVariant,
-  onOpenStorage
+  onOpenStorage,
+  onOpenSettings
 }: ChatAreaProps) {
   const { t } = useTranslation();
   
@@ -437,7 +440,7 @@ export default function ChatArea({
     <div className="flex-1 flex flex-col h-full bg-app-bg text-app-text overflow-hidden relative">
       {/* 1. Top Fixed Pane Header (NotebookLM Split-Pane Architecture) */}
       <div className="w-full h-[52px] px-4 flex items-center justify-between border-b border-app-border bg-app-sidebar shrink-0 z-20 select-none">
-        {/* Left: Open Sidebar Button + "Chat" Title */}
+        {/* Left: Open Sidebar Button + "Chat" Title + Model Switcher */}
         <div className="flex items-center gap-2.5">
           {!isSidebarOpen && onOpenSidebar && (
             <Tooltip content={t('chat.openSidebar')} side="bottom">
@@ -454,6 +457,12 @@ export default function ChatArea({
           <span className="font-semibold text-sm text-app-text tracking-tight">
             {t('nav.chat') || "Chat"}
           </span>
+
+          <ModelSwitcher
+            backendUrl={backendUrl}
+            activeChatId={activeChatId}
+            onOpenSettings={onOpenSettings}
+          />
         </div>
 
         {/* Right: Context Menu & Sources Controls */}

@@ -4,15 +4,21 @@ from datetime import datetime
 
 class ChatSessionCreate(BaseModel):
     title: str = "New Chat"
+    model: Optional[str] = None
+    profile_id: Optional[str] = None
 
 class ChatSessionUpdate(BaseModel):
-    title: str
+    title: Optional[str] = None
+    model: Optional[str] = None
+    profile_id: Optional[str] = None
 
 class ChatSessionResponse(BaseModel):
     model_config = {"from_attributes": True}
     id: str
     title: str
     is_pinned: Optional[bool] = False
+    model: Optional[str] = None
+    profile_id: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
