@@ -80,6 +80,7 @@ Not-NotebookLM is built on a decoupled architecture separating the **User Resear
 | **Token Budgeting** | Tiktoken | `>= 0.7.0` | Precise token counting per OpenAI/compatible model family for dynamic context allocation. |
 | **Code Hygiene** | Ruff | `>= 0.8.0` | High-speed linter & formatter enforcing Python code quality standards. |
 | **Testing Harness** | Pytest + Vitest | `pytest 9.1`, `vitest 4.1` | Isolated testing for backend (asyncio) and frontend UI components. |
+| **Dev Tooling Runtime** | Node.js / Bun | `Node 22`, `Bun 1.4` | Universal dependency baseline via npm with local macOS execution accelerated by Bun. |
 
 ---
 
