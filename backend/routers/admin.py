@@ -163,7 +163,7 @@ def update_llm_config(payload: LLMConfigRequest):
                     if m.id and m.id.strip():
                         models_list.append({
                             "id": m.id.strip(),
-                            "name": m.name.strip() if m.name else m.id.strip(),
+                            "name": m.name.strip() if (m.name and m.name.strip()) else m.id.strip(),
                             "enabled": bool(m.enabled),
                         })
             else:

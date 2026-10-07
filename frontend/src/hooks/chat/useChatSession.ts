@@ -232,6 +232,9 @@ export function useChatSession(
             profile_id: pendingModel?.profile_id || undefined
           })
         });
+        if (!res.ok) {
+          throw new Error(`Failed to create chat session: ${res.status} ${res.statusText}`);
+        }
         const newChat = await res.json();
         useChatStore.getState().setPendingNewChatModel(null);
         try {
