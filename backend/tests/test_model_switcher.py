@@ -1,3 +1,5 @@
+import os
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 from main import app
@@ -67,15 +69,20 @@ def test_llm_models_workspace_models_endpoint():
 
 def test_get_candidate_llm_chain_with_model_override():
     """Verify get_candidate_llm_chain puts model_override as the first synthesizer."""
-    clear_llm_cache()
-    # Default without override
-    chain_default = get_candidate_llm_chain()
-    assert len(chain_default) > 0
+    with patch.dict(os.environ, {
+        "LLM_API_KEY": "sk-test-mock-api-key-12345",
+        "LLM_MODEL": "gpt-4o",
+        "LLM_BASE_URL": "http://localhost:20128/v1",
+    }):
+        clear_llm_cache()
+        # Default without override
+        chain_default = get_candidate_llm_chain()
+        assert len(chain_default) > 0
 
-    # With override
-    chain_override = get_candidate_llm_chain(model_override="test-custom-model-id", profile_id_override="default")
-    assert len(chain_override) > 0
-    first_llm, first_label = chain_override[0]
-    assert "Session Model (test-custom-model-id)" in first_label
-    assert getattr(first_llm, "model", None) == "test-custom-model-id"
-    clear_llm_cache()
+        # With override
+        chain_override = get_candidate_llm_chain(model_override="test-custom-model-id", profile_id_override="default")
+        assert len(chain_override) > 0
+        first_llm, first_label = chain_override[0]
+        assert "Session Model (test-custom-model-id)" in first_label
+        assert getattr(first_llm, "model", None) == "test-custom-model-id"
+        clear_llm_cache()
