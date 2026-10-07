@@ -15,6 +15,7 @@ Not-NotebookLM is built on a decoupled architecture separating the **User Resear
 |  [PORT 2026 / WORKSPACE]                        [PORT 2027 / CONTROL DASHBOARD]   |
 |  - Split-Pane Academic Reader                   - Model Gateways & BYOK Form      |
 |  - Real-time SSE Chat & Math                    - S3 / R2 / MinIO Storage Switcher|
+|  - In-Workspace Dynamic Model Switcher          - Model Visibility Toggles (#73)  |
 |  - Literature Discovery Modal                   - Infisical / Doppler Secrets     |
 |  - Declarative Research Profile Memory          - FastEmbed ONNX vs Gemini Engine |
 |  - Inline Verbatim Highlight Badges             - SQLite & Qdrant Live Health     |
@@ -28,6 +29,7 @@ Not-NotebookLM is built on a decoupled architecture separating the **User Resear
 |  +-----------------------------------------------------------------------------+  |
 |  |                        LLM Gateway & Cascading Factory                      |  |
 |  |  - Primary / Heavy LLM (LLM_MODEL, max 16k output tokens, 120s timeout)     |  |
+|  |  - Session-Bound Model Override (per-chat binding via workspace dropdown)    |  |
 |  |  - Fast / Lite LLM (LLM_FAST_MODEL, max 4k output tokens, 45s timeout)      |  |
 |  |  - Fallback LLM (LLM_FALLBACK_MODEL, automatic failover)                    |  |
 |  |  * Input context window is dynamic & auto-detected via token_budget.py      |  |
@@ -108,7 +110,7 @@ The system employs a **Tri-Layer Storage** approach ensuring persistence, query 
 - **Path:** `backend/not_notebooklm.db` (can be redirected to PostgreSQL via `DATABASE_URL`).
 - **Concurrency Mode:** SQLite executes with `PRAGMA journal_mode=WAL;`, `PRAGMA synchronous=NORMAL;`, `PRAGMA busy_timeout=30000;` (30-second lock timeout for write concurrency), and `PRAGMA foreign_keys=ON;`.
 - **Primary Tables:**
-  1. `chat_sessions`: `id` (UUID), `title`, `is_pinned`, `created_at`, `updated_at`.
+  1. `chat_sessions`: `id` (UUID), `title`, `is_pinned`, `model` (session override), `profile_id`, `created_at`, `updated_at`.
   2. `documents`: `id`, `chat_id`, `filename`, `title`, `authors` (JSON), `year`, `journal`, `journal_metric`, `doi`, `url`, `pdf_url`, `abstract`, `abstract_type`, `is_oa`, `access_status`, `snippet`, `venue`, `citations`, `quality_tier`.
   3. `chat_messages`: `id`, `chat_id`, `role`, `content`, `attachments_json`, `variants_json` (multi-response switching), `active_variant_index`, `created_at`.
   4. `citation_highlights`: `id`, `chat_id`, `doc_id`, `claim_hash` (SHA256 normalized claim), `claim`, `passages_json` (verbatim quote array), `created_at`.

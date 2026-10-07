@@ -6,6 +6,17 @@ export interface ChatSession {
   created_at: string;
   updated_at?: string;
   is_pinned?: boolean;
+  model?: string | null;
+  profile_id?: string | null;
+}
+
+export interface WorkspaceModel {
+  id: string;
+  name: string;
+  profile_id: string;
+  profile_name: string;
+  protocol?: "openai" | "anthropic";
+  is_default?: boolean;
 }
 
 export interface Attachment {
@@ -40,6 +51,8 @@ interface ChatStore {
   activeStatus: string | null;
   queuedPrompts: string[];
   sessionExecutions: Record<string, SessionExecutionStatus>;
+  availableModels: WorkspaceModel[];
+  pendingNewChatModel: { model: string; profile_id: string } | null;
   
   setSessions: (sessions: ChatSession[]) => void;
   setActiveChatId: (id: string | null) => void;
@@ -49,6 +62,9 @@ interface ChatStore {
   setQueuedPrompts: (prompts: string[]) => void;
   setSessionExecution: (chatId: string, execution: SessionExecutionStatus | null) => void;
   dismissSessionExecution: (chatId: string) => void;
+  setAvailableModels: (models: WorkspaceModel[]) => void;
+  setPendingNewChatModel: (selection: { model: string; profile_id: string } | null) => void;
+  updateSessionModel: (chatId: string, model: string | null, profileId: string | null) => void;
   
   bumpSessionToTop: (chatId: string) => void;
   addMessage: (message: ChatMessage) => void;
@@ -65,6 +81,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   activeStatus: null,
   queuedPrompts: [],
   sessionExecutions: {},
+  availableModels: [],
+  pendingNewChatModel: null,
 
   setSessions: (sessions) => set({ sessions }),
   setActiveChatId: (activeChatId) => set({ activeChatId }),
@@ -72,6 +90,13 @@ export const useChatStore = create<ChatStore>((set) => ({
   setIsLoading: (isLoading) => set({ isLoading }),
   setActiveStatus: (activeStatus) => set({ activeStatus }),
   setQueuedPrompts: (queuedPrompts) => set({ queuedPrompts }),
+  setAvailableModels: (availableModels) => set({ availableModels }),
+  setPendingNewChatModel: (pendingNewChatModel) => set({ pendingNewChatModel }),
+  updateSessionModel: (chatId, model, profile_id) => set((state) => ({
+    sessions: state.sessions.map((s) =>
+      s.id === chatId ? { ...s, model, profile_id } : s
+    ),
+  })),
   setSessionExecution: (chatId, execution) => {
     if (!execution) {
       useChatStore.getState().dismissSessionExecution(chatId);

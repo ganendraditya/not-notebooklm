@@ -57,6 +57,8 @@ class ChatSession(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4())) # UUID string
     title = Column(String, default="New Chat")
     is_pinned = Column(Boolean, default=False, nullable=True)
+    model = Column(String, nullable=True)
+    profile_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=get_utc_now)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
     
@@ -159,6 +161,10 @@ def auto_migrate_schema():
                 conn.execute(text("UPDATE chat_sessions SET updated_at = created_at WHERE updated_at IS NULL"))
             if "is_pinned" not in cols:
                 conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN is_pinned BOOLEAN DEFAULT 0"))
+            if "model" not in cols:
+                conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN model VARCHAR"))
+            if "profile_id" not in cols:
+                conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN profile_id VARCHAR"))
 
             # Documents
             res_docs = conn.execute(text("PRAGMA table_info(documents)")).fetchall()

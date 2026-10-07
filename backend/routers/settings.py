@@ -62,8 +62,9 @@ def factory_reset_storage(payload: dict, db: Session = Depends(get_db)):
 
 @router.get("/llm/models")
 def get_llm_models():
-    """Returns active LLM configuration info dynamically."""
+    """Returns active LLM configuration info dynamically, including enabled models for the workspace."""
     from rag.llm_factory import get_main_llm, get_fast_llm, get_fallback_llm
+    from services.admin_service import get_gateway_profiles
     
     main_instance = get_main_llm()
     fast_instance = get_fast_llm()
@@ -72,12 +73,59 @@ def get_llm_models():
     main_model = getattr(main_instance, "model", None) or os.getenv("LLM_MODEL", "gpt-4o")
     fast_model = getattr(fast_instance, "model", None) or os.getenv("LLM_FAST_MODEL", main_model)
     fallback_model = getattr(fallback_instance, "model", None) or os.getenv("LLM_FALLBACK_MODEL", "")
-    
+    primary_pid = os.getenv("LLM_PRIMARY_PROFILE_ID", "default").strip() or "default"
+
+    # Collect enabled models across all configured gateway profiles for workspace selection
+    profiles = get_gateway_profiles()
+    workspace_models = []
+    seen_keys = set()
+
+    for p in profiles:
+        p_id = p.get("id", "default")
+        p_name = p.get("name", "Gateway")
+        p_proto = p.get("protocol", "openai")
+        models_list = p.get("models", [])
+
+        if not models_list and p_id == primary_pid:
+            models_list = [{"id": main_model, "name": main_model, "enabled": True}]
+
+        for m in models_list:
+            if m.get("enabled", True):
+                m_id = m.get("id")
+                if not m_id:
+                    continue
+                key = (p_id, m_id)
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    is_def = (p_id == primary_pid and m_id == main_model)
+                    workspace_models.append({
+                        "id": m_id,
+                        "name": m.get("name") or m_id,
+                        "profile_id": p_id,
+                        "profile_name": p_name,
+                        "protocol": p_proto,
+                        "is_default": is_def,
+                    })
+
+    if not workspace_models:
+        workspace_models.append({
+            "id": main_model,
+            "name": main_model,
+            "profile_id": primary_pid,
+            "profile_name": "Default Gateway",
+            "protocol": "openai",
+            "is_default": True,
+        })
+    elif not any(m.get("is_default") for m in workspace_models):
+        workspace_models[0]["is_default"] = True
+
     return {
         "status": "success",
         "tiered_architecture": True,
         "main_model": main_model,
         "fast_model": fast_model,
         "fallback_model": fallback_model or None,
+        "primary_profile_id": primary_pid,
+        "workspace_models": workspace_models,
         "description": f"Two-Tier Engine: Heavy Synthesis powered by {main_model}, Rapid Triage & Auditing powered by {fast_model}." + (f" Fallback cascade: {fallback_model}." if fallback_model else "")
     }

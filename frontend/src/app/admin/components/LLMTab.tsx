@@ -91,6 +91,17 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
   const [statusMessage, setStatusMessage] = useState<{ text: string; error?: boolean } | null>(null);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
+  // Model Visibility Management State
+  const [addingModelProfileId, setAddingModelProfileId] = useState<string | null>(null);
+  const [newModelId, setNewModelId] = useState("");
+  const [newModelName, setNewModelName] = useState("");
+
+  useEffect(() => {
+    if (config.profiles && config.profiles.length > 0) {
+      setProfiles(config.profiles);
+    }
+  }, [config.profiles]);
+
   // Dedicated Modal State
   const [modal, setModal] = useState<ModalState>({
     isOpen: false,
@@ -262,6 +273,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
           : "••••••••"
         : modal.existingMaskedKey;
 
+      const existingProf = profiles.find((p) => p.id === modal.profileId);
       const updatedProfile: GatewayProfile = {
         id: modal.profileId,
         name: modal.name.trim(),
@@ -269,6 +281,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
         api_key_masked: safeMaskedKey,
         has_api_key: Boolean(modal.apiKey.trim() || modal.hasExistingKey),
         protocol: modal.protocol,
+        models: modal.mode === "edit" ? existingProf?.models || [] : undefined,
       };
 
       let newProfiles: GatewayProfile[];
@@ -292,6 +305,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
         base_url: p.base_url,
         api_key: newKeys[p.id]?.trim() || undefined,
         protocol: p.protocol || "openai",
+        models: p.models || [],
       }));
 
       const activePrimary = newProfiles.find((p) => p.id === primaryProfileId) || newProfiles[0];
@@ -330,6 +344,104 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
     }
   };
 
+  const persistUpdatedProfiles = async (updatedProfiles: GatewayProfile[]) => {
+    setProfiles(updatedProfiles);
+    try {
+      const payloadProfiles = updatedProfiles.map((p) => ({
+        id: p.id,
+        name: p.name,
+        base_url: p.base_url,
+        api_key: profileKeys[p.id]?.trim() || undefined,
+        protocol: p.protocol || "openai",
+        models: p.models || [],
+      }));
+
+      const activePrimary = updatedProfiles.find((p) => p.id === primaryProfileId) || updatedProfiles[0];
+
+      const res = await fetch(`${backendUrl}/admin/config/llm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          base_url: activePrimary.base_url,
+          api_key: profileKeys[activePrimary.id]?.trim() || undefined,
+          model: model,
+          fast_model: fastModel.trim() || undefined,
+          fallback_model: fallbackModel.trim() || undefined,
+          temperature: Number(temperature),
+          profiles: payloadProfiles,
+          primary_profile_id: primaryProfileId,
+          fast_profile_id: fastProfileId,
+          fallback_profile_id: fallbackProfileId,
+        }),
+      });
+
+      if (res.ok) {
+        onSaved();
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setStatusMessage({
+          text: errorData.detail || "Failed to update model settings.",
+          error: true,
+        });
+        setProfiles(config.profiles || []);
+      }
+    } catch (err) {
+      console.error("Failed to persist model visibility update:", err);
+      setStatusMessage({ text: "Failed to persist model visibility update.", error: true });
+      setProfiles(config.profiles || []);
+    }
+  };
+
+  const handleToggleModelVisibility = (profileId: string, modelId: string) => {
+    const updated = profiles.map((p) => {
+      if (p.id !== profileId) return p;
+      const currentModels = p.models || [];
+      const nextModels = currentModels.map((m) =>
+        m.id === modelId ? { ...m, enabled: !m.enabled } : m
+      );
+      return { ...p, models: nextModels };
+    });
+    persistUpdatedProfiles(updated);
+  };
+
+  const handleAddModel = (profileId: string) => {
+    if (!newModelId.trim()) return;
+    const trimmedId = newModelId.trim();
+    const trimmedName = newModelName.trim() || trimmedId;
+
+    const targetProf = profiles.find((p) => p.id === profileId);
+    if (targetProf && (targetProf.models || []).some((m) => m.id === trimmedId)) {
+      setStatusMessage({
+        text: `Model identifier "${trimmedId}" is already registered.`,
+        error: true,
+      });
+      return;
+    }
+
+    const updated = profiles.map((p) => {
+      if (p.id !== profileId) return p;
+      const currentModels = p.models || [];
+      return {
+        ...p,
+        models: [...currentModels, { id: trimmedId, name: trimmedName, enabled: true }],
+      };
+    });
+
+    setNewModelId("");
+    setNewModelName("");
+    setAddingModelProfileId(null);
+    persistUpdatedProfiles(updated);
+  };
+
+  const handleDeleteModel = (profileId: string, modelId: string) => {
+    const updated = profiles.map((p) => {
+      if (p.id !== profileId) return p;
+      const nextModels = (p.models || []).filter((m) => m.id !== modelId);
+      return { ...p, models: nextModels };
+    });
+    persistUpdatedProfiles(updated);
+  };
+
   const handleRemoveProfile = async (id: string) => {
     if (profiles.length <= 1) return;
     const target = profiles.find((p) => p.id === id);
@@ -355,6 +467,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
         base_url: p.base_url,
         api_key: profileKeys[p.id]?.trim() || undefined,
         protocol: p.protocol || "openai",
+        models: p.models || [],
       }));
 
       const activePrimary = remainingProfiles.find((p) => p.id === newPrimary) || remainingProfiles[0];
@@ -400,6 +513,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
         base_url: p.base_url,
         api_key: profileKeys[p.id]?.trim() || undefined,
         protocol: p.protocol || "openai",
+        models: p.models || [],
       }));
 
       const activePrimary = profiles.find((p) => p.id === primaryProfileId) || profiles[0];
@@ -591,6 +705,129 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
                         </button>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                {/* Models & Workspace Visibility Toggles */}
+                <div className="pt-2.5 border-t border-app-border/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text">
+                      <Cpu size={12} className="text-blue-400" />
+                      <span>Models & Workspace Visibility</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-app-input-surface border border-app-border text-app-text-muted">
+                        {(prof.models || []).filter((m) => m.enabled).length}/{(prof.models || []).length} active
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingModelProfileId((curr) => (curr === prof.id ? null : prof.id));
+                        setNewModelId("");
+                        setNewModelName("");
+                      }}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <Plus size={12} />
+                      <span>{addingModelProfileId === prof.id ? "Cancel" : "Add Model"}</span>
+                    </button>
+                  </div>
+
+                  {/* Inline Add Model Form */}
+                  {addingModelProfileId === prof.id && (
+                    <div className="p-2.5 rounded-lg bg-app-input-surface border border-app-border space-y-2 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-app-text-dim block mb-1">Model Identifier (Required)</label>
+                          <input
+                            type="text"
+                            value={newModelId}
+                            onChange={(e) => setNewModelId(e.target.value)}
+                            placeholder="e.g. deepseek-reasoner"
+                            className="w-full h-7 px-2 text-xs rounded bg-app-card border border-app-border text-app-text font-mono focus:outline-hidden focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-app-text-dim block mb-1">Display Label (Optional)</label>
+                          <input
+                            type="text"
+                            value={newModelName}
+                            onChange={(e) => setNewModelName(e.target.value)}
+                            placeholder="e.g. DeepSeek R1"
+                            className="w-full h-7 px-2 text-xs rounded bg-app-card border border-app-border text-app-text focus:outline-hidden focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setAddingModelProfileId(null)}
+                          className="h-6 px-2 text-[11px] rounded border border-app-border text-app-text-muted hover:text-app-text cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAddModel(prof.id)}
+                          disabled={!newModelId.trim()}
+                          className="h-6 px-2.5 text-[11px] font-medium rounded bg-blue-600 hover:bg-blue-500 text-white cursor-pointer disabled:opacity-40"
+                        >
+                          Save Model
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Models list with checkboxes */}
+                  <div className="space-y-1">
+                    {(prof.models || []).length === 0 ? (
+                      <p className="text-[11px] text-app-text-dim italic py-1">
+                        No models registered. Click &quot;Add Model&quot; to register custom models.
+                      </p>
+                    ) : (
+                      (prof.models || []).map((m) => (
+                        <div
+                          key={m.id}
+                          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-app-input-surface/50 border border-app-border/40 hover:border-app-border transition-colors text-xs"
+                        >
+                          <label className="flex items-center gap-2 cursor-pointer select-none min-w-0 pr-2">
+                            <input
+                              type="checkbox"
+                              checked={m.enabled}
+                              onChange={() => handleToggleModelVisibility(prof.id, m.id)}
+                              className="rounded border-app-border text-blue-600 focus:ring-0 cursor-pointer h-3.5 w-3.5"
+                            />
+                            <span className={`font-medium truncate ${m.enabled ? "text-app-text" : "text-app-text-dim line-through"}`}>
+                              {m.name || m.id}
+                            </span>
+                            {m.name && m.name !== m.id && (
+                              <span className="text-[10px] font-mono text-app-text-dim truncate">
+                                ({m.id})
+                              </span>
+                            )}
+                          </label>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`text-[9px] font-mono px-1.5 py-0.2 rounded-full border ${
+                                m.enabled
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  : "bg-app-card text-app-text-dim border-app-border"
+                              }`}
+                            >
+                              {m.enabled ? "Visible" : "Hidden"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteModel(prof.id, m.id)}
+                              className="p-1 text-app-text-dim hover:text-rose-400 transition-colors cursor-pointer"
+                              title="Delete model from profile"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 

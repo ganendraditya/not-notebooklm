@@ -20,6 +20,7 @@ _CACHED_MAIN_LLM = None
 _CACHED_FAST_LLM = None
 _CACHED_FALLBACK_LLM = None
 _CACHED_CONFIG_HASH = None
+_CACHED_SESSION_LLMS = {}
 
 
 def _get_env_config_signature():
@@ -169,11 +170,12 @@ def _get_gateway_credentials():
 
 def clear_llm_cache():
     """Clears cached LLM instances, forcing fresh recreation on next query."""
-    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_FALLBACK_LLM, _CACHED_CONFIG_HASH
+    global _CACHED_MAIN_LLM, _CACHED_FAST_LLM, _CACHED_FALLBACK_LLM, _CACHED_CONFIG_HASH, _CACHED_SESSION_LLMS
     _CACHED_MAIN_LLM = None
     _CACHED_FAST_LLM = None
     _CACHED_FALLBACK_LLM = None
     _CACHED_CONFIG_HASH = None
+    _CACHED_SESSION_LLMS.clear()
 
 
 def _create_llm_instance(
@@ -360,12 +362,71 @@ def create_llm_instances(force_refresh: bool = False):
     return main_llm, fast_llm, None, None
 
 
-def get_candidate_llm_chain():
+def get_custom_session_llm(model: str, profile_id: Optional[str] = None) -> Optional[Any]:
+    """
+    Instantiates or returns cached LLM for a specific session-bound model override.
+    Resolves credentials from the specified profile_id or falls back to primary credentials.
+    """
+    global _CACHED_SESSION_LLMS
+    if not model or not model.strip():
+        return None
+
+    target_model = model.strip()
+    target_pid = (profile_id or "").strip() or os.getenv("LLM_PRIMARY_PROFILE_ID", "default").strip() or "default"
+    profile = _get_profile_by_id(target_pid) or _get_profile_by_id("default")
+
+    base_url = (profile.get("base_url", "").strip() if profile else "")
+    if not base_url:
+        base_url = (
+            os.getenv("LLM_BASE_URL", "").strip()
+            or os.getenv("NINEROUTER_BASE_URL", "").strip()
+            or "http://localhost:20128/v1"
+        )
+
+    api_key = (profile.get("api_key", "").strip() if profile else "")
+    if not api_key:
+        api_key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
+
+    protocol = (profile.get("protocol", "").strip().lower() if profile else "")
+    if not protocol:
+        if "anthropic.com" in base_url.lower() or api_key.startswith("sk-ant-"):
+            protocol = "anthropic"
+        else:
+            protocol = "openai"
+
+    try:
+        temperature = float(os.getenv("LLM_TEMPERATURE", "0.1").strip())
+    except (ValueError, TypeError):
+        temperature = 0.1
+
+    cache_key = (protocol, base_url, api_key, target_model, temperature)
+    if cache_key in _CACHED_SESSION_LLMS:
+        return _CACHED_SESSION_LLMS[cache_key]
+
+    inst = _create_llm_instance(
+        protocol=protocol,
+        base_url=base_url,
+        api_key=api_key,
+        model=target_model,
+        temperature=temperature,
+        max_tokens=16384,
+        timeout=120.0,
+    )
+    if inst:
+        _CACHED_SESSION_LLMS[cache_key] = inst
+    return inst
+
+
+def get_candidate_llm_chain(
+    model_override: Optional[str] = None,
+    profile_id_override: Optional[str] = None
+):
     """
     Builds prioritized list of candidate LLMs:
-    1. Primary LLM (LLM_MODEL)
-    2. Fallback LLM (LLM_FALLBACK_MODEL, if configured and distinct)
-    3. Fast LLM (LLM_FAST_MODEL, if distinct from Primary)
+    1. Session Model (if model_override is provided)
+    2. Primary LLM (LLM_MODEL)
+    3. Fallback LLM (LLM_FALLBACK_MODEL, if configured and distinct)
+    4. Fast LLM (LLM_FAST_MODEL, if distinct from Primary)
     """
     candidate_llms = []
     seen = set()
@@ -374,6 +435,11 @@ def get_candidate_llm_chain():
         if inst and id(inst) not in seen:
             candidate_llms.append((inst, label))
             seen.add(id(inst))
+
+    if model_override and model_override.strip():
+        session_inst = get_custom_session_llm(model=model_override, profile_id=profile_id_override)
+        if session_inst:
+            add_candidate(session_inst, f"Session Model ({model_override.strip()})")
 
     main_instance = get_main_llm()
     fast_instance = get_fast_llm()

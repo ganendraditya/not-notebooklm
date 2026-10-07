@@ -76,6 +76,9 @@ export function useChatSession(
           if (activeChatIdRef.current === id) {
             const currentJob = getChatJob(id);
             setDocuments(data.documents || []);
+            if (data.model !== undefined) {
+              useChatStore.getState().updateSessionModel(id, data.model, data.profile_id);
+            }
             if (!currentJob.isProcessing) {
               currentJob.lastCompletedMessages = data.messages || [];
               setMessages(data.messages || []);
@@ -173,6 +176,19 @@ export function useChatSession(
         }
       })
       .catch(err => console.error("Failed to fetch sessions:", err));
+
+    // Fetch available models for workspace dynamic model switching
+    fetch(`${backendUrl}/llm/models`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (data && Array.isArray(data.workspace_models)) {
+          useChatStore.getState().setAvailableModels(data.workspace_models);
+        }
+      })
+      .catch(err => console.debug("Failed to fetch available models:", err));
     // Intentionally run once on component mount to hydrate sessions from persistent storage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -205,13 +221,19 @@ export function useChatSession(
       try {
         // Initial clean default title while AI generates the smart topic name post-response
         const title = suggestedTitle?.trim() || formatDefaultSessionTitle();
+        const pendingModel = useChatStore.getState().pendingNewChatModel;
 
         const res = await fetch(`${backendUrl}/chats`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title })
+          body: JSON.stringify({ 
+            title,
+            model: pendingModel?.model || undefined,
+            profile_id: pendingModel?.profile_id || undefined
+          })
         });
         const newChat = await res.json();
+        useChatStore.getState().setPendingNewChatModel(null);
         try {
           localStorage.setItem("last_active_chat_id", newChat.id);
         } catch {}

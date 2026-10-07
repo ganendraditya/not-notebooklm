@@ -1,3 +1,9 @@
+export interface ProfileModelItem {
+  id: string;
+  name?: string;
+  enabled: boolean;
+}
+
 export interface GatewayProfile {
   id: string;
   name: string;
@@ -5,6 +11,7 @@ export interface GatewayProfile {
   api_key_masked: string;
   has_api_key: boolean;
   protocol?: "openai" | "anthropic";
+  models?: ProfileModelItem[];
 }
 
 export interface AdminConfig {

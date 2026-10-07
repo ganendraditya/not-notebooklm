@@ -34,12 +34,19 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # Request Payload Schemas (Strict Pydantic Contracts)
 # ---------------------------------------------------------------------------
 
+class ProfileModelItem(BaseModel):
+    id: str = Field(..., description="Model identifier, e.g. 'deepseek-reasoner'")
+    name: Optional[str] = Field(None, description="Optional display label, e.g. 'DeepSeek R1'")
+    enabled: bool = Field(True, description="Whether enabled in workspace dropdown")
+
+
 class GatewayProfilePayload(BaseModel):
     id: str = Field(..., description="Unique profile identifier, e.g. 'deepseek' or 'ollama'")
     name: str = Field(..., description="Human-readable profile name")
     base_url: str = Field(..., description="OpenAI-compatible base URL")
     api_key: Optional[str] = Field(None, description="Secret API key (omit to keep unchanged if masked)")
     protocol: Optional[str] = Field("openai", description="Protocol: 'openai' or 'anthropic'")
+    models: Optional[List[ProfileModelItem]] = Field(default=None, description="Registered models with workspace visibility toggles")
 
 
 class LLMConfigRequest(BaseModel):
@@ -149,12 +156,26 @@ def update_llm_config(payload: LLMConfigRequest):
             existing = existing_profiles_map.get(p.id, {})
             # If new api_key is supplied and non-empty, use it; otherwise retain existing unmasked secret
             final_key = p.api_key.strip() if (p.api_key and p.api_key.strip()) else existing.get("api_key", "")
+            
+            models_list = []
+            if p.models is not None:
+                for m in p.models:
+                    if m.id and m.id.strip():
+                        models_list.append({
+                            "id": m.id.strip(),
+                            "name": m.name.strip() if m.name else m.id.strip(),
+                            "enabled": bool(m.enabled),
+                        })
+            else:
+                models_list = existing.get("models", [])
+
             sanitized_profiles.append({
                 "id": p.id.strip(),
                 "name": p.name.strip(),
                 "base_url": p.base_url.strip(),
                 "api_key": final_key,
                 "protocol": (p.protocol.strip() if p.protocol else existing.get("protocol", "openai")) or "openai",
+                "models": models_list,
             })
         updates["LLM_PROFILES_JSON"] = json.dumps(sanitized_profiles)
 
