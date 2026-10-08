@@ -219,3 +219,68 @@ def test_get_doc_file_path_resolves_upgraded_pdf():
         if os.path.exists(pdf_path):
             os.remove(pdf_path)
 
+
+def test_is_safe_external_url_ssrf_mitigation():
+    """Verify that is_safe_external_url blocks loopback, cloud metadata, and private IP ranges."""
+    from utils.network_utils import is_safe_external_url
+
+    # Dangerous / internal targets -> MUST BE BLOCKED
+    assert is_safe_external_url("http://127.0.0.1:6333/dashboard") is False
+    assert is_safe_external_url("http://localhost:8000") is False
+    assert is_safe_external_url("http://169.254.169.254/latest/meta-data/") is False
+    assert is_safe_external_url("http://192.168.1.1/admin") is False
+    assert is_safe_external_url("http://10.0.0.1/secret") is False
+    assert is_safe_external_url("http://[::1]:8080") is False
+    assert is_safe_external_url("file:///etc/passwd") is False
+    assert is_safe_external_url("javascript:alert(1)") is False
+    assert is_safe_external_url("") is False
+    assert is_safe_external_url(None) is False
+
+    # Safe external academic hosts -> MUST BE ALLOWED
+    assert is_safe_external_url("https://arxiv.org/pdf/2301.00001.pdf") is True
+    assert is_safe_external_url("https://doi.org/10.1038/s41586-019-1666-5") is True
+    assert is_safe_external_url("https://api.crossref.org/works") is True
+
+
+def test_storage_delete_chat_scoped_authorization():
+    """Verify that /storage/delete enforces chat_id ownership when supplied."""
+    from utils.file_utils import UPLOAD_DIR
+
+    chat_a = "chat-owner-aaa"
+    chat_b = "chat-victim-bbb"
+    file_a = os.path.join(UPLOAD_DIR, f"{chat_a}_my_doc.txt")
+    file_b = os.path.join(UPLOAD_DIR, f"{chat_b}_victim_doc.txt")
+
+    with open(file_a, "w") as f:
+        f.write("Owner A content")
+    with open(file_b, "w") as f:
+        f.write("Victim B content")
+
+    try:
+        # Chat A attempts to delete Chat B's file while declaring chat_id=chat_a
+        res = client.post("/storage/delete", json={
+            "file_ids": [f"{chat_b}_victim_doc.txt"],
+            "chat_id": chat_a
+        })
+        assert res.status_code == 200
+        data = res.json()
+        assert data["failed"] == 1
+        assert data["deleted"] == 0
+        assert os.path.exists(file_b) # Victim file remains safe!
+
+        # Chat A deletes its own file with chat_id=chat_a
+        res_own = client.post("/storage/delete", json={
+            "file_ids": [f"{chat_a}_my_doc.txt"],
+            "chat_id": chat_a
+        })
+        assert res_own.status_code == 200
+        data_own = res_own.json()
+        assert data_own["deleted"] == 1
+        assert not os.path.exists(file_a)
+    finally:
+        if os.path.exists(file_a):
+            os.remove(file_a)
+        if os.path.exists(file_b):
+            os.remove(file_b)
+
+

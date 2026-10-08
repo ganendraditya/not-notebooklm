@@ -35,6 +35,9 @@ async def generate_bulk_zip_stream(
     queue: asyncio.Queue = asyncio.Queue()
 
     def worker_sync():
+        def publish(event):
+            loop.call_soon_threadsafe(queue.put_nowait, event)
+
         seen_names = set()
         processed_count = 0
         downloaded_count = 0
@@ -84,7 +87,7 @@ async def generate_bulk_zip_stream(
                         })
                     
                     calc_percent = round((processed_count / max(1, total_count)) * 100)
-                    queue.put_nowait({
+                    publish({
                         "type": "progress",
                         "current": processed_count,
                         "total": total_count,
@@ -122,13 +125,13 @@ async def generate_bulk_zip_stream(
                     os.remove(zip_file_path)
             except Exception:
                 pass
-            queue.put_nowait({
+            publish({
                 "type": "error",
                 "message": "Tidak ada naskah lengkap PDF yang dapat diunduh (dokumen yang dipilih hanya berstatus metadata / abstrak)."
             })
         else:
             total_size_mb = round(os.path.getsize(zip_file_path) / (1024 * 1024), 2) if os.path.exists(zip_file_path) else 0.0
-            queue.put_nowait({
+            publish({
                 "type": "complete",
                 "task_id": task_id,
                 "total": total_count,
@@ -139,7 +142,7 @@ async def generate_bulk_zip_stream(
                 "total_size_mb": total_size_mb,
                 "download_url": f"/chats/{chat_id}/documents/download_zip/{task_id}"
             })
-        queue.put_nowait(None)
+        publish(None)
 
     loop = asyncio.get_event_loop()
     loop.run_in_executor(None, worker_sync)

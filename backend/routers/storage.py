@@ -135,6 +135,7 @@ def is_safe_upload_path(file_path: str) -> bool:
 
 class DeleteRequest(BaseModel):
     file_ids: List[str]
+    chat_id: Optional[str] = None
 
 @router.post("/delete")
 def delete_files(req: DeleteRequest, db: Session = Depends(get_db)):
@@ -152,6 +153,21 @@ def delete_files(req: DeleteRequest, db: Session = Depends(get_db)):
         if not is_safe_upload_path(file_path):
             failed += 1
             continue
+
+        base_name = os.path.basename(file_path)
+        if base_name.startswith("."):
+            failed += 1
+            continue
+
+        # Enforce chat scope if chat_id is specified by caller
+        if req.chat_id:
+            safe_cid = req.chat_id.strip()
+            is_chat_doc = base_name.startswith(f"{safe_cid}_")
+            is_chat_media = safe_id.startswith(f"chat_media/{safe_cid}_")
+            if not (is_chat_doc or is_chat_media):
+                logger.warning(f"[Storage Delete Authorization] Denied unowned file delete {file_id} for chat {req.chat_id}")
+                failed += 1
+                continue
 
         try:
             if delete_storage_file_and_records(db, file_path):
@@ -213,38 +229,43 @@ def download_storage_files(req: DownloadRequest, background_tasks: BackgroundTas
     count = 0
     added_arcnames = set()
     
-    with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for file_id in req.file_ids:
-            safe_id = os.path.normpath(file_id)
-            if safe_id.startswith('..') or os.path.isabs(safe_id):
-                continue
-            file_path = os.path.join(UPLOAD_DIR, safe_id)
-            if not is_safe_upload_path(file_path):
-                continue
-            if not os.path.exists(file_path):
-                from services import storage_adapter
-                storage_adapter.ensure_local_copy(safe_id, file_path)
-            if os.path.exists(file_path) and os.path.isfile(file_path):
-                base_name = os.path.basename(file_path)
-                if "_" in base_name:
-                    prefix, remainder = base_name.split("_", 1)
-                    if prefix == "None" or len(prefix) == 36:
-                        base_name = remainder
-                
-                # Prevent silent file overwrites within the same ZIP archive
-                arcname = base_name
-                collision_idx = 1
-                while arcname in added_arcnames:
-                    name, ext = os.path.splitext(base_name)
-                    arcname = f"{name}_{collision_idx}{ext}"
-                    collision_idx += 1
+    try:
+        with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for file_id in req.file_ids:
+                safe_id = os.path.normpath(file_id)
+                if safe_id.startswith('..') or os.path.isabs(safe_id):
+                    continue
+                file_path = os.path.join(UPLOAD_DIR, safe_id)
+                if not is_safe_upload_path(file_path):
+                    continue
+                if not os.path.exists(file_path):
+                    from services import storage_adapter
+                    storage_adapter.ensure_local_copy(safe_id, file_path)
+                if os.path.exists(file_path) and os.path.isfile(file_path):
+                    base_name = os.path.basename(file_path)
+                    if "_" in base_name:
+                        prefix, remainder = base_name.split("_", 1)
+                        if prefix == "None" or len(prefix) == 36:
+                            base_name = remainder
+                    
+                    # Prevent silent file overwrites within the same ZIP archive
+                    arcname = base_name
+                    collision_idx = 1
+                    while arcname in added_arcnames:
+                        name, ext = os.path.splitext(base_name)
+                        arcname = f"{name}_{collision_idx}{ext}"
+                        collision_idx += 1
 
-                try:
-                    zf.write(file_path, arcname=arcname)
-                    added_arcnames.add(arcname)
-                    count += 1
-                except Exception:
-                    pass
+                    try:
+                        zf.write(file_path, arcname=arcname)
+                        added_arcnames.add(arcname)
+                        count += 1
+                    except Exception:
+                        pass
+    except Exception as ze:
+        cleanup_file_safely(temp_zip_path)
+        logger.error(f"[Storage Download Error] Failed to generate zip export: {ze}")
+        raise HTTPException(status_code=500, detail="Failed to create download archive")
                     
     if count == 0:
         cleanup_file_safely(temp_zip_path)

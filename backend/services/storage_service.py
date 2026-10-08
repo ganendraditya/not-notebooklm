@@ -200,7 +200,12 @@ def delete_storage_file_and_records(db: Session, file_path: str) -> bool:
         valid_doc_ids.append(doc.id)
 
     if valid_doc_ids:
-        db.query(Document).filter(Document.id.in_(valid_doc_ids)).delete(synchronize_session=False)
+        try:
+            db.query(Document).filter(Document.id.in_(valid_doc_ids)).delete(synchronize_session=False)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"[Storage Delete Error]: Failed to commit document rows deletion: {e}")
 
     try:
         from services import storage_adapter

@@ -199,16 +199,16 @@ def update_llm_config(payload: LLMConfigRequest):
 @router.post("/test/llm")
 async def test_llm_endpoint(payload: LLMTestRequest):
     """Executes a live test call against the configured LLM endpoint."""
-    target_base = payload.base_url.strip()
+    target_base = payload.base_url.strip().rstrip("/")
 
     from services.admin_service import get_gateway_profiles
     profiles = get_gateway_profiles()
     known_base_urls = {
-        (os.getenv("LLM_BASE_URL", "").strip() or os.getenv("NINEROUTER_BASE_URL", "").strip() or "http://localhost:20128/v1")
+        (os.getenv("LLM_BASE_URL", "").strip() or os.getenv("NINEROUTER_BASE_URL", "").strip() or "http://localhost:20128/v1").rstrip("/")
     }
     for p in profiles:
         if p.get("base_url"):
-            known_base_urls.add(p["base_url"].strip())
+            known_base_urls.add(p["base_url"].strip().rstrip("/"))
 
     matching = None
     if payload.api_key and payload.api_key.strip():
@@ -221,7 +221,7 @@ async def test_llm_endpoint(payload: LLMTestRequest):
             key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
     elif target_base in known_base_urls:
         # Fall back to URL matching when profile_id is not supplied
-        matching = next((p for p in profiles if p.get("base_url", "").strip() == target_base and p.get("api_key")), None)
+        matching = next((p for p in profiles if p.get("base_url", "").strip().rstrip("/") == target_base and p.get("api_key")), None)
         key = matching.get("api_key", "").strip() if matching else (os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip())
     else:
         return {

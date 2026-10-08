@@ -5,6 +5,7 @@ import logging
 from typing import Optional
 import requests
 from utils.pdf_utils import is_authentic_pdf_bytes
+from utils.network_utils import is_safe_external_url
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -13,7 +14,7 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0, max_depth
     Attempts to download an authentic Open Access PDF from publisher or repository.
     Includes browser headers, redirect handling, SSL fallback, and %PDF- verification.
     """
-    if not pdf_url or not isinstance(pdf_url, str) or not pdf_url.startswith("http") or max_depth < 0:
+    if not pdf_url or not isinstance(pdf_url, str) or not pdf_url.startswith("http") or not is_safe_external_url(pdf_url) or max_depth < 0:
         return None
         
     user_agent = os.getenv(
@@ -33,6 +34,10 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0, max_depth
     
     try:
         resp = requests.get(pdf_url, headers=headers, timeout=timeout_sec, allow_redirects=True)
+        # SSRF mitigation: verify target of redirects does not loop back into private subnets
+        if resp.url != pdf_url and not is_safe_external_url(resp.url):
+            logger.warning(f"[SSRF Guard] Blocked redirect to non-public URL: {resp.url}")
+            return None
         if resp.status_code == 200:
             data = resp.content
             if is_authentic_pdf_bytes(data, min_size=1000):

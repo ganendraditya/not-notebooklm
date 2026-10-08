@@ -92,13 +92,12 @@ def parse_document_to_markdown(file_path: str) -> str:
             # Fallback to plain PyMuPDF text extraction if pymupdf4llm parser fails
             try:
                 import pymupdf
-                doc = pymupdf.open(file_path)
-                if len(doc) > 0:
-                    pages_text = [page.get_text() for page in doc]
-                    doc.close()
-                    md_text = "\n\n".join(pages_text)
-                else:
-                    md_text = ""
+                with pymupdf.open(file_path) as doc:
+                    if len(doc) > 0:
+                        pages_text = [page.get_text() for page in doc]
+                        md_text = "\n\n".join(pages_text)
+                    else:
+                        md_text = ""
             except Exception:
                 md_text = ""
                 

@@ -145,14 +145,22 @@ def classify_canonical_section(
                     query_vec /= q_norm
                     scores = {cat: float(np.dot(query_vec, c_vec)) for cat, c_vec in centroids.items()}
                     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-                    top1, s1 = sorted_scores[0]
-                    top2, s2 = sorted_scores[1]
-                    margin = s1 - s2
+                    if len(sorted_scores) >= 2:
+                        top1, s1 = sorted_scores[0]
+                        top2, s2 = sorted_scores[1]
+                        margin = s1 - s2
+                    elif len(sorted_scores) == 1:
+                        top1, s1 = sorted_scores[0]
+                        margin = 1.0
+                    else:
+                        top1, s1, margin = "general", 0.0, 0.0
 
                     # Confidence criteria:
                     # If top match is 'general', or confidence is below threshold, or margin is ambiguous:
                     decision = top1 if (top1 != "general" and s1 >= threshold and margin >= min_margin) else "general"
                     with _CHUNKER_LOCK:
+                        if len(_HEADER_CLASSIFICATION_CACHE) > 4096:
+                            _HEADER_CLASSIFICATION_CACHE.clear()
                         _HEADER_CLASSIFICATION_CACHE[clean_lower] = decision
                     return decision
         except Exception as e:
@@ -160,6 +168,8 @@ def classify_canonical_section(
 
     # Tier 3: Fallback
     with _CHUNKER_LOCK:
+        if len(_HEADER_CLASSIFICATION_CACHE) > 4096:
+            _HEADER_CLASSIFICATION_CACHE.clear()
         _HEADER_CLASSIFICATION_CACHE[clean_lower] = "general"
     return "general"
 

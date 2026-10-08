@@ -8,6 +8,7 @@ import concurrent.futures
 
 from utils.pdf_utils import is_authentic_pdf_bytes, verify_pdf_title_match
 from utils.text_processing import clean_doi as normalize_doi
+from utils.network_utils import is_safe_external_url
 from providers.scrapers.oa_fetcher import try_fetch_open_access_pdf
 
 logger = logging.getLogger("uvicorn.error")
@@ -99,7 +100,7 @@ def resolve_semantic_scholar_pdf(clean_doi: str) -> Optional[bytes]:
 def resolve_landing_page_pdf(clean_doi: str, direct_url: str) -> Optional[bytes]:
     """Inspects publisher landing page meta tags and OJS links."""
     landing_target = direct_url or (f"https://doi.org/{clean_doi}" if clean_doi else "")
-    if not landing_target or not landing_target.startswith("http"):
+    if not landing_target or not landing_target.startswith("http") or not is_safe_external_url(landing_target):
         return None
     try:
         resp = requests.get(landing_target, headers={
@@ -107,8 +108,10 @@ def resolve_landing_page_pdf(clean_doi: str, direct_url: str) -> Optional[bytes]
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
         }, timeout=5.0, allow_redirects=True)
         if resp.status_code == 200:
-            html = resp.text
             final_url = resp.url
+            if not is_safe_external_url(final_url):
+                return None
+            html = resp.text
 
             # A. Citation meta tags
             meta_matches = re.findall(

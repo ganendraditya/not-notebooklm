@@ -12,6 +12,8 @@ os.makedirs(CHAT_MEDIA_DIR, exist_ok=True)
 os.makedirs(PARSED_CACHE_DIR, exist_ok=True)
 
 MAX_SOURCES_PER_CHAT = 300
+MAX_DOCUMENT_FILE_SIZE_BYTES = 100 * 1024 * 1024  # 100MB limit per document
+MAX_TOTAL_STORAGE_BYTES = 10 * 1024 * 1024 * 1024 # 10GB cumulative uploads limit
 
 def make_content_disposition(disposition_type: str, filename: str) -> str:
     """Generates an RFC 5987 / RFC 6266 compliant Content-Disposition header supporting Unicode."""
