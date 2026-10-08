@@ -1,4 +1,5 @@
 import os
+import logging
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -7,6 +8,7 @@ import rag
 from database import get_db, ChatSession, Document, ChatMessage
 from utils.file_utils import UPLOAD_DIR
 
+logger = logging.getLogger("uvicorn.error")
 router = APIRouter(tags=["settings"])
 
 class ResetStoragePayload(BaseModel):
@@ -39,7 +41,8 @@ def factory_reset_storage(payload: ResetStoragePayload, db: Session = Depends(ge
         db.commit()
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database reset failed: {e}")
+        logger.error(f"[Storage Reset Error]: Database wipe failed: {e}")
+        raise HTTPException(status_code=500, detail="Database reset failed. Please check server logs.")
 
     # 2. Clear uploads folder
     if os.path.exists(UPLOAD_DIR):

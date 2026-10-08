@@ -106,7 +106,21 @@ def resolve_landing_page_pdf(clean_doi: str, direct_url: str) -> Optional[bytes]
         resp = requests.get(landing_target, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        }, timeout=5.0, allow_redirects=True)
+        }, timeout=5.0, allow_redirects=False)
+
+        # Explicitly validate redirect destination against SSRF
+        if 300 <= resp.status_code < 400:
+            loc = resp.headers.get("Location")
+            if loc:
+                redirect_url = urllib.parse.urljoin(landing_target, loc.strip())
+                if is_safe_external_url(redirect_url):
+                    resp = requests.get(redirect_url, headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                    }, timeout=5.0, allow_redirects=False)
+                else:
+                    return None
+
         if resp.status_code == 200:
             final_url = resp.url
             if not is_safe_external_url(final_url):

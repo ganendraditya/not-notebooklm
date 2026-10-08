@@ -206,6 +206,7 @@ def delete_storage_file_and_records(db: Session, file_path: str) -> bool:
         except Exception as e:
             db.rollback()
             logger.error(f"[Storage Delete Error]: Failed to commit document rows deletion: {e}")
+            return False
 
     try:
         from services import storage_adapter

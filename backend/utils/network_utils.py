@@ -36,14 +36,7 @@ def is_safe_external_url(url: Optional[str]) -> bool:
         for _, _, _, _, sockaddr in addr_info:
             ip_str = sockaddr[0]
             ip = ipaddress.ip_address(ip_str)
-            if (
-                ip.is_private
-                or ip.is_loopback
-                or ip.is_link_local
-                or ip.is_multicast
-                or ip.is_reserved
-                or ip.is_unspecified
-            ):
+            if not ip.is_global or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
                 logger.warning(f"[SSRF Guard] Blocked outbound request to non-public IP: {ip_str} for host: {hostname}")
                 return False
                 

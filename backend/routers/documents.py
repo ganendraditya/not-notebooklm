@@ -67,7 +67,8 @@ async def upload_document(
     # Enforce physical storage limits
     from services.storage_service import get_directory_total_size
     used_bytes = get_directory_total_size(UPLOAD_DIR)
-    if used_bytes >= MAX_TOTAL_STORAGE_BYTES:
+    incoming_size = getattr(file, "size", 0) or 0
+    if used_bytes + incoming_size >= MAX_TOTAL_STORAGE_BYTES:
         raise HTTPException(
             status_code=507,
             detail="Server storage limit reached (10GB). Please remove unneeded documents or perform storage cleanup."
