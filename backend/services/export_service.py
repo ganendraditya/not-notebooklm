@@ -144,6 +144,11 @@ async def generate_bulk_zip_stream(
                     "download_url": f"/chats/{chat_id}/documents/download_zip/{task_id}"
                 })
         except Exception as e:
+            try:
+                if os.path.exists(zip_file_path):
+                    os.remove(zip_file_path)
+            except Exception:
+                pass
             logger.error(f"[Worker Sync Failure]: {e}")
             publish({
                 "type": "error",
