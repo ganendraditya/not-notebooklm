@@ -386,7 +386,7 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
                     message_payload={
                         "role": "assistant",
                         "content": resp_text,
-                        "created_at": db_msg.created_at.isoformat() if hasattr(db_msg, 'created_at') else get_utc_now().isoformat(),
+                        "created_at": db_msg.created_at.isoformat() if getattr(db_msg, 'created_at', None) is not None else get_utc_now().isoformat(),
                         "variants": existing_variants,
                         "active_variant_index": new_active_idx
                     }

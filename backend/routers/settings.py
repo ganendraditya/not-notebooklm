@@ -1,4 +1,6 @@
 import os
+import logging
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -6,13 +8,17 @@ import rag
 from database import get_db, ChatSession, Document, ChatMessage
 from utils.file_utils import UPLOAD_DIR
 
+logger = logging.getLogger("uvicorn.error")
 router = APIRouter(tags=["settings"])
+
+class ResetStoragePayload(BaseModel):
+    confirm_text: str = ""
 
 @router.post("/settings/storage/cleanup")
 def cleanup_orphan_storage(db: Session = Depends(get_db)):
     """Scans and deletes orphan files on disk not associated with any active chat session."""
     from services.storage_service import cleanup_orphan_files_on_disk
-    active_chats = set(c.id for c in db.query(ChatSession.id).all())
+    active_chats = set(row[0] for row in db.query(ChatSession.id).all())
     deleted_files, freed_bytes = cleanup_orphan_files_on_disk(active_chats)
     return {
         "status": "success",
@@ -21,17 +27,22 @@ def cleanup_orphan_storage(db: Session = Depends(get_db)):
     }
 
 @router.post("/settings/storage/reset")
-def factory_reset_storage(payload: dict, db: Session = Depends(get_db)):
+def factory_reset_storage(payload: ResetStoragePayload, db: Session = Depends(get_db)):
     """Wipes all chats, documents, messages, and vector embeddings."""
-    confirmation = payload.get("confirm_text", "").strip().lower()
+    confirmation = payload.confirm_text.strip().lower()
     if confirmation != "reset-all-data":
         raise HTTPException(status_code=400, detail="Invalid confirmation phrase. Type 'reset-all-data' to proceed.")
 
-    # 1. Clear database
-    db.query(ChatMessage).delete(synchronize_session=False)
-    db.query(Document).delete(synchronize_session=False)
-    db.query(ChatSession).delete(synchronize_session=False)
-    db.commit()
+    # 1. Clear database with clean transaction rollback safety
+    try:
+        db.query(ChatMessage).delete(synchronize_session=False)
+        db.query(Document).delete(synchronize_session=False)
+        db.query(ChatSession).delete(synchronize_session=False)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Storage Reset Error]: Database wipe failed: {e}")
+        raise HTTPException(status_code=500, detail="Database reset failed. Please check server logs.")
 
     # 2. Clear uploads folder
     if os.path.exists(UPLOAD_DIR):

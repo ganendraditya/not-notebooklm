@@ -580,7 +580,7 @@ export default function ChatArea({
               <div className="p-3.5 rounded-full bg-app-surface border border-app-border mb-4 shadow-sm">
                 <Sparkles size={28} className="text-blue-500" />
               </div>
-              <h2 className="text-3xl font-bold tracking-tight text-app-text mb-6">NotbookLM</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-app-text mb-6">NotebookLM</h2>
 
               <ChatInputBox 
                 isCentered={true}

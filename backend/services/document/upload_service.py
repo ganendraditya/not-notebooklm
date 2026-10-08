@@ -1,16 +1,20 @@
 import os
 import re
 import json
-import shutil
 import logging
 import asyncio
 import concurrent.futures
 from typing import Dict, Any, Tuple
 from sqlalchemy.orm import Session
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 
 from database import Document, commit_with_retry
-from utils.file_utils import UPLOAD_DIR, sanitize_safe_filename, MAX_SOURCES_PER_CHAT
+from utils.file_utils import (
+    UPLOAD_DIR,
+    sanitize_safe_filename,
+    MAX_SOURCES_PER_CHAT,
+    MAX_DOCUMENT_FILE_SIZE_BYTES,
+)
 from utils.pdf_utils import is_authentic_pdf_bytes
 from services.document.metadata_extractor import extract_hybrid_document_metadata
 from rag.format_parsers import extract_bibtex_entries, extract_ris_entries
@@ -56,8 +60,27 @@ async def handle_document_upload(chat_id: str, file: UploadFile, db: Session) ->
     clean_fname = sanitize_safe_filename(file.filename or "uploaded_doc")
     file_path = os.path.join(UPLOAD_DIR, f"{clean_chat_id}_{clean_fname}")
     
+    # Stream bytes to disk while strictly enforcing per-file ceiling (100MB)
+    bytes_written = 0
+    chunk_size = 1024 * 1024
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        while True:
+            chunk = file.file.read(chunk_size)
+            if not chunk:
+                break
+            bytes_written += len(chunk)
+            if bytes_written > MAX_DOCUMENT_FILE_SIZE_BYTES:
+                buffer.close()
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                    except Exception:
+                        pass
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"File '{file.filename}' exceeds maximum allowable size of 100MB."
+                )
+            buffer.write(chunk)
 
     # Sync to S3 storage bucket if configured
     from services import storage_adapter
@@ -103,8 +126,13 @@ async def handle_bib_or_ris_split_upload(
     clean_chat_id = sanitize_safe_filename(chat_id)
     clean_fname = sanitize_safe_filename(file.filename or "uploaded_collection")
 
-    # Read uploaded file content
+    # Read uploaded file content with memory ceiling check (100MB)
     content_bytes = await file.read()
+    if len(content_bytes) > MAX_DOCUMENT_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{file.filename}' exceeds maximum allowable size of 100MB."
+        )
     raw_text = content_bytes.decode("utf-8", errors="replace")
 
     if ext in (".bib", ".bibtex"):
@@ -132,7 +160,6 @@ async def handle_bib_or_ris_split_upload(
     existing_count = db.query(Document).filter(Document.chat_id == chat_id).count()
     remaining_slots = max(0, MAX_SOURCES_PER_CHAT - existing_count)
     if remaining_slots == 0:
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=400,
             detail=f"Source limit reached! This conversation already contains {existing_count}/{MAX_SOURCES_PER_CHAT} sources."

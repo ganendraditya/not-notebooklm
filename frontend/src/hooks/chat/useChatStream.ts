@@ -309,7 +309,7 @@ export function useChatStream(
         if (activeChatIdRef.current === targetChatId) {
           setIsLoading(false);
         }
-        if (job.queue.length > 0) {
+        if (job.queue.length > 0 && !controller.signal.aborted) {
           await processNextInQueue(targetChatId);
         }
       }

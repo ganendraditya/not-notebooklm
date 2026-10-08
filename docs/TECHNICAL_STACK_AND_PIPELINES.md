@@ -407,3 +407,14 @@ For rapid navigation during maintenance and development:
 - **Next.js Main Chat Interface:** `frontend/src/app/ChatClient.tsx`
 - **Document Split Reader:** `frontend/src/components/DocumentReader.tsx`
 - **Left Sidebar & Chat Sessions:** `frontend/src/components/LeftSidebar.tsx`
+
+---
+
+## 9. Security Boundaries & Protection Layer
+
+- **SSRF Defense (`backend/utils/network_utils.py`):** Multi-hop DNS resolution inspection blocking loopback (`127.0.0.0/8`), RFC 1918 private subnets, RFC 6598 shared address space, link-local metadata (`169.254.0.0/16`), and internal container hosts across all outbound paper resolvers (`pdf_racing_resolver.py`) and scraper clients (`oa_fetcher.py`). HTTP redirects are verified hop-by-hop up to 5 hops before issuing subsequent socket connections.
+- **Storage Quota & Upload Size Boundaries (`backend/utils/file_utils.py`):** Hard upload limits (`MAX_DOCUMENT_FILE_SIZE_BYTES = 100MB`) enforced at the HTTP boundary and during chunked file streaming, coupled with a 10GB cumulative uploads ceiling (`MAX_TOTAL_STORAGE_BYTES`) to prevent disk exhaustion and OOM crashes.
+- **Chat-Scoped Object Authorization (`backend/routers/storage.py`):** Ownership verification binding file deletion requests to the originating `chat_id` prefix, mitigating cross-workspace IDOR deletion vulnerabilities.
+- **Prompt Injection Delimiters & Strict Token Matching (`backend/rag/intent.py`):** Untrusted user queries and summaries are strictly delimited with `<user_query>` tags and parsed via token-level regex (`re.findall(r'[A-Z_]+')`) to avoid prompt hijacking and destructive intent confusion.
+- **Two-Tier Triage Protocol (`AGENTS.md`):** Workload-calibrated code review and vulnerability scanning dividing full codebase audits into Tier 1 (fast broad triage scan via single frontier model) and Tier 2 (isolated adversarial cross-verification on High/Critical findings).
+

@@ -11,8 +11,11 @@ from database import get_db, ChatSession, Document
 import models
 import rag
 from utils.file_utils import (
+    UPLOAD_DIR,
     TEMP_ZIPS_DIR,
     MAX_SOURCES_PER_CHAT,
+    MAX_DOCUMENT_FILE_SIZE_BYTES,
+    MAX_TOTAL_STORAGE_BYTES,
     make_content_disposition,
     get_doc_file_path,
 )
@@ -60,6 +63,22 @@ async def upload_document(
     existing_count = db.query(Document).filter(Document.chat_id == chat_id).count()
     if existing_count >= MAX_SOURCES_PER_CHAT:
         raise HTTPException(status_code=400, detail=f"Source limit reached! This conversation already contains {existing_count}/{MAX_SOURCES_PER_CHAT} sources.")
+
+    # Enforce physical storage limits
+    from services.storage_service import get_directory_total_size
+    used_bytes = get_directory_total_size(UPLOAD_DIR)
+    incoming_size = getattr(file, "size", 0) or 0
+    if used_bytes + incoming_size >= MAX_TOTAL_STORAGE_BYTES:
+        raise HTTPException(
+            status_code=507,
+            detail="Server storage limit reached (10GB). Please remove unneeded documents or perform storage cleanup."
+        )
+
+    if hasattr(file, "size") and file.size and file.size > MAX_DOCUMENT_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{file.filename}' exceeds maximum allowable size of 100MB."
+        )
 
     # Multi-entry bibliographic file handling (.bib, .ris)
     if ext in (".bib", ".bibtex", ".ris"):
@@ -138,7 +157,6 @@ def bulk_delete_documents(chat_id: str, req: models.BulkDeleteRequest, db: Sessi
 @router.post("/chats/{chat_id}/documents/clean_duplicates")
 @router.post("/chats/{chat_id}/clean-duplicates")
 @router.post("/chats/{chat_id}/clean_duplicates")
-@router.post("/chats/{chat_id}/documents/clean-duplicates")
 async def clean_duplicate_documents(chat_id: str, db: Session = Depends(get_db)):
     db_chat = db.query(ChatSession).filter(ChatSession.id == chat_id).first()
     if not db_chat:
@@ -256,6 +274,8 @@ async def bulk_download_stream(chat_id: str, req: models.BulkDownloadRequest, db
 @router.get("/chats/{chat_id}/documents/download_zip/{task_id}")
 def download_prepared_zip(chat_id: str, task_id: str, background_tasks: BackgroundTasks):
     clean_task = re.sub(r'[^a-zA-Z0-9-]', '', task_id)
+    if not clean_task:
+        raise HTTPException(status_code=400, detail="Invalid task ID.")
     zip_path = os.path.join(TEMP_ZIPS_DIR, f"{clean_task}.zip")
     if not os.path.exists(zip_path):
         raise HTTPException(status_code=404, detail="Prepared download file not found or expired.")

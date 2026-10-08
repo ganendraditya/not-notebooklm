@@ -132,16 +132,46 @@ Mandatory interaction and engineering guardrails between user and agent that mus
   - **Release Publication:** Publish GitHub releases with concise English release notes, tagging the commit corresponding to the merge on `main`.
 
 ### 4. Code Review Scientific Verification Protocol (Anti-Hallucinated Findings)
-When conducting AI Code Reviews (via `ocr review`, dual LLM evaluations, or manual review), the agent **MUST NOT ACCEPT REVIEWER FINDINGS AT FACE VALUE OR ACT AS A SYCOPHANT TO REVIEW BOTS**. Follow a mandatory, evidence-backed verification protocol before touching any code:
+When conducting AI Code Reviews (via `ocr review`, `ocr scan`, multi-model LLM evaluations, or manual diff inspection) and security audits (`security-audit` skill), the agent **MUST NOT ACCEPT REVIEWER FINDINGS AT FACE VALUE OR ACT AS A SYCOPHANT TO REVIEW BOTS**. Follow a mandatory, evidence-backed verification protocol before touching any code:
+
+- **Multi-Model Review & Adversarial Consensus:**
+  - Never rely on a single LLM reviewer's perspective for critical code reviews, security discoveries, or algorithmic decisions. Single models exhibit provider-specific blind spots, training biases, and sycophantic tendencies.
+  - **Workload-Calibrated Model Strategy:**
+    1. *Targeted PR Reviews (`ocr review` on Git Diffs):* Because PR diffs are lightweight and bounded in token volume, **mandatory dual-model evaluation** is enforced (e.g., cross-evaluating the diff with `claude-sonnet-4-6` paired with an independent frontier model such as `gemini-3.8-flash-high`). A finding is credible if both models agree on the defect mechanism or if an empirical test case confirms it.
+    2. *Full Subsystem Scans & Deep Security Audits (`ocr scan` & `security-audit`):* Because scanning entire directories entails heavy token consumption and high timeout risks, do NOT run naive whole-directory scans through multiple models simultaneously. Instead, employ the **Two-Tier Triage Protocol**:
+       - *Tier 1 (Broad Triage Scan):* Run the scoped subsystem scan using **1 primary frontier model** (`claude-sonnet-4-6` or `gemini-pro`) to surface initial prospective findings efficiently.
+       - *Tier 2 (Adversarial Cross-Verification on High/Critical Findings):* Isolate the specific code contexts for any `High` or `Critical` severity findings and submit them to an independent second model specifically for adversarial verification (*"Model A flagged potential race condition / SSRF / path traversal here; verify whether this is genuine or an LLM hallucination"*). Stylistic or low-severity suggestions do not require secondary model passes.
 
 - **Mandatory User Presentation Before Applying Changes:**
   - The agent is **STRICTLY FORBIDDEN** from unilaterally modifying code, committing, or merging fixes immediately after receiving automated review comments without first presenting the findings dialectically to the user.
   - Present a structured scorecard: categorize items into **Hard Blockers / Confirmed Bugs** vs **False Positives / Rejected Claims** vs **Architectural Optimizations**, complete with reproduction proof.
 
-- **Step 1: Problem Validity Verification (Is this a genuine defect or a hallucination/misunderstanding?):**
+- **Full Repository Review Protocol (`ocr scan` Anti-Timeout Execution):**
+  - **Root Cause of Large Scan Hangs:** Running naive unflagged `ocr scan` attempts to evaluate all files indiscriminately (over 240+ files and 62,000+ lines), forcing the LLM reviewer to ingest massive evaluation benchmark matrices (`full100_benchmark.json`, `niah_100_matrix.json`) and 40+ international translation files (`locales/*.json`). Each file incurs a sequential `PLAN_TASK` -> `REVIEW_TASK` -> `DEDUP_TASK` round-trip, blowing through token budgets and triggering network gateway timeouts after 60+ minutes with zero output.
+  - **Mandatory Safe Execution Standard for Whole-Repo `ocr scan`:**
+    1. **Mandatory Exclusions:** Always exclude evaluation benchmark data, localization dictionaries, static lockfiles, and binary/cache artifacts:
+       ```bash
+       ocr scan --exclude '**/datasets/**,**/locales/**,**/*.json,**/*.lock' --no-plan --concurrency 8 --timeout 20
+       ```
+    2. **Modular Subsystem Scoping (Recommended over Monolith):** Rather than scanning the entire repository in one unconstrained execution, scan focused architectural domains:
+       ```bash
+       # Backend routers & API contracts
+       ocr scan --path backend/routers --no-plan --concurrency 8
+       # Core RAG engine & pipelines
+       ocr scan --path backend/rag --no-plan --concurrency 8
+       # Backend services & storage adapters
+       ocr scan --path backend/services --no-plan --concurrency 8
+       # Frontend React components & hooks
+       ocr scan --path frontend/src/components,frontend/src/hooks --no-plan --concurrency 8
+       ```
+    3. **Pre-Flight Verification:** Always execute `ocr scan --preview <flags>` first to ensure the reviewed file count is within bounded, reasonable limits (< 50 code files per run) before dispatching LLM subtasks.
+    4. **Session Resumption & Logging:** In the event of network disruption, leverage `--resume <session-id>` to continue without discarding completed work.
+
+- **Step 1: Problem Validity & Exploitability Verification (Is this a genuine defect or a hallucination/misunderstanding?):**
+  - **Universal Applicability:** This verification protocol is non-negotiable across ALL automated scanning tools: `ocr review`, `ocr scan`, and `security-audit`.
   - **Never Assume Validity:** Treat reviewer comments with healthy skepticism. LLM reviewers frequently misread token-truncated code, misunderstand project conventions, or flag stylistic non-issues as critical bugs.
-  - **Define the Concrete Failure Scenario:** *"Under what exact inputs, network conditions, or concurrency state does this failure occur, and what is the exact stack trace or measurable impact?"*
-  - **Execute an Empirical Reproduction Script:** Run a minimal terminal script, curl command, or test assertion to test the failure hypothesis.
+  - **Define the Concrete Failure Scenario:** *"Under what exact inputs, network conditions, or concurrency state does this failure occur, and what is the exact stack trace, exploit payload, or measurable impact?"*
+  - **Execute an Empirical Reproduction Script:** Run a minimal terminal script, curl command, or test assertion (`pytest`, `vitest`) to test the failure hypothesis.
   - **Classification:**
     - If reproduction confirms an actual error, crash, security loophole, or measurable regression: classify as **CONFIRMED REAL ISSUE** with log/terminal evidence.
     - If reproduction passes cleanly, or the claim is based on truncated files, obsolete syntax, or false assumptions: reject the finding dialectically with proof as **FALSE POSITIVE / REJECTED**. Do not modify code for rejected items.
@@ -151,12 +181,38 @@ When conducting AI Code Reviews (via `ocr review`, dual LLM evaluations, or manu
   - **Surgical Implementation:** Apply the verified solution with minimal footprint.
   - **Dual Verification:**
     1. Re-run the reproduction script from Step 1 to verify the defect is genuinely eliminated.
-    2. Run full test suites (`pytest`, `vitest`, `ruff check`, and build commands) to verify zero regressions across neighboring systems.
+    2. Run full test suites (`pytest`, `vitest`, `ruff check`, and build commands) to verify zero regressions across neighboring systems (orthogonality).
 
-### 5. Execution & Timeout Vigilance (Heavy Workflows)
-- Heavy CLI tasks (multi-framework benchmarks, full test suites, `ocr review`) must explicitly specify sufficient timeouts (minimum `timeout: 300000` / 5 minutes) or be directed to persistent log files to prevent mid-execution truncation.
+### 5. Security Auditing Protocol for Web RAG & Document Intelligence System (Guidance Mode vs. Full Audit Mode)
+Security audits evaluate trust boundaries, data flows, local attack surfaces, and exploitable sinks across `not-notebooklm`:
 
-### 6. Developer Environment & Frontend Tooling Runtime (Bun & Node.js)
+- **Core Attack Surfaces in not-notebooklm:**
+  1. *SSRF & Outbound Academic Resolvers (`routers/papers.py`, `providers/academic/`):*
+     Strict validation of external DOI URLs, CrossRef, OpenAlex, and PDF download endpoints; prohibit requests targeting loopback/internal addresses (`localhost`, `127.0.0.1`, internal ports like Qdrant `6333`, or cloud metadata `169.254.169.254`).
+  2. *Path Traversal & Storage Quota Integrity (`routers/chats.py`, `routers/documents.py`, `services/storage_service.py`):*
+     Sanitize user-provided `chat_id` and document filenames (`is_safe_upload_path`); reject degenerate empty-task paths (`.zip`); strictly enforce physical storage quotas before persisting files.
+  3. *CORS & Local Host Isolation (`main.py`):*
+     Ensure strict origin checking; prohibit arbitrary external website tabs from querying local REST APIs or exfiltrating user chat histories and research papers via drive-by requests.
+  4. *Indirect Prompt Injection & Safe Rendering (`rag/engine.py`, frontend Markdown reader):*
+     Untrusted text extracted from external academic PDFs must be encapsulated within structured boundaries; protect against markdown image link exfiltration and XSS in frontend readers (`DOMPurify`).
+  5. *Database Transaction Integrity & Concurrency TOCTOU (`database.py`, `routers/papers.py`, `routers/settings.py`):*
+     Atomic operations for multi-source document ingestion and chat deletion; prevent race conditions in document limits (`MAX_SOURCES_PER_CHAT`) and guarantee clean rollback on partial failures.
+
+- **Operating Modes:**
+  - **Guidance Mode (Per-Feature / Sensitive PR Reviews):**
+    - *When to Use:* Triggered whenever a PR touches security-sensitive surfaces: external network fetching (`routers/papers.py`), file storage / uploads (`routers/chats.py`, `storage_service.py`), local network policies & CORS (`main.py`), binary file/PDF parsing (`PyMuPDF`), or prompt injection surfaces.
+    - *Execution:* Lightweight, surgical, and targeted. Traces untrusted input to execution sinks and writes zero permanent overhead files.
+  - **Full Audit Mode (Milestone & Pre-Release Baselines):**
+    - *When to Use:* Prior to major milestone releases (`vX.Y.0`), architectural shifts, or public deployments.
+    - *Execution:* Runs the formal multi-phase audit workflow (`security-audit` skill) using modular coverage ledgers (`coverage-ledger.json`) and structured reporting (`REPORT.md`, `findings.json`). Always scope target paths rather than running unconstrained whole-repo scans.
+
+### 6. Execution & Timeout Vigilance (Heavy Workflows & Anti-Timeout Architecture)
+- **Why Monolithic Whole-Repo Runs Fail:** Passing an entire codebase monolithically into a single LLM review prompt causes context window exhaustion, token truncation, and HTTP gateway/socket timeouts (resulting in 1-hour hung sessions with zero output).
+- **Decomposition over Monoliths:** Large audits, reviews, and test suites must be decomposed into modular units, subsystem batches, or scoped paths.
+- **Incremental Disk Checkpointing:** Heavy audit tasks must write incremental artifacts and logs to disk (`coverage-ledger.json`, `~/security-audit-skill/...`, or task log files) so progress is permanently retained even if a single network request drops.
+- **Generous Timeouts & Detached Execution:** Heavy CLI tasks (multi-framework benchmarks, full test suites, `ocr review`, and full security audits) must explicitly specify sufficient timeouts (minimum `timeout: 600000` / 10 minutes) or run via persistent background processes with redirected logs (`> run.log 2>&1`) to prevent mid-execution truncation.
+
+### 7. Developer Environment & Frontend Tooling Runtime (Bun & Node.js)
 - **Local macOS Optimization (Bun):** When `bun` is available on the local environment (`which bun`), developers and AI agents SHOULD prefer using `bun` for local frontend operations (`bun run dev`, `bun run test`, `bun run lint`, `bun run type-check`, `bun run build`) due to its significantly lower idle memory, instant startup, and battery efficiency on Apple Silicon.
 - **Test Runner Protocol:** Always invoke frontend test suites via `bun run test` (or `npm test`) so that `vitest run` is executed. Do NOT invoke raw `bun test` directly, as Bun's internal standalone test runner lacks the DOM environment (`jsdom`) configured for component testing.
 - **Universal Git & CI Parity:** `frontend/package-lock.json` remains the strict, authoritative package lockfile in version control to guarantee deterministic builds in GitHub Actions CI (`.github/workflows/ci.yml`) and across all contributor environments. Do not commit alternative lockfiles (`bun.lock` / `bun.lockb`).

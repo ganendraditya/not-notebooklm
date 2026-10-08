@@ -910,7 +910,7 @@ export const InChatMessageComponent = memo(function InChatMessageComponent({
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
-                            {src.url ? (
+                            {src.url && (src.url.startsWith("http://") || src.url.startsWith("https://")) ? (
                               <a 
                                 href={src.url} 
                                 target="_blank" 
