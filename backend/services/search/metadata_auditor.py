@@ -48,12 +48,7 @@ Rigorous Global Academic Indexing Rules:
 2. AUTHORS: List of real author names (clean full names only).
 3. YEAR: 4-digit publication year.
 4. JOURNAL: Exact journal, conference proceedings, or preprint server name.
-5. INDEXING & REPUTATION (journal_metric):
-   - CONFERENCE PROCEEDINGS (Any IEEE, ACM, Springer, or international conference/symposium/workshop): MUST be labeled as Conference Proceedings (e.g. "IEEE Conference Proceedings", "ACM Conference Proceedings", "Conference Proceedings (Indexed)"). Conferences DO NOT have Q1/Q2/Q3/Q4.
-   - PREPRINT REPOSITORIES (arXiv, SportRxiv, bioRxiv, medRxiv, SSRN, Research Square, OSF, RePEc): "Preprint (Non-Peer-Reviewed)".
-   - INDONESIAN NATIONAL JOURNALS (SINTA): Identify if accredited (e.g. "SINTA 2 Accredited" or "SINTA Accredited").
-   - INTERNATIONAL PEER-REVIEWED JOURNALS: Use your scholarly knowledge base of world journals. If it is a top-quartile journal in its domain, use "Scopus Q1 (SJR)". If high-tier, use "Scopus Q2 (SJR)". If mid-tier, use "Scopus Q3 (SJR)". If regular indexed or open access, use "Scopus Q4 / Indexed" or "DOAJ Open Access".
-6. ABSTRACT:
+5. ABSTRACT:
    - Extract authentic original abstract paragraph written by the authors.
    - REJECT any subject taxonomy categories (like "Social and Behavioral Sciences", "Medicine", "Engineering"), cookie disclaimers, or license notices.
    - If genuine authentic abstract found: set abstract_type = "official".
@@ -65,7 +60,6 @@ Output ONLY valid JSON matching:
   "authors": ["..."],
   "year": "...",
   "journal": "...",
-  "journal_metric": "...",
   "abstract": "...",
   "abstract_type": "official" or "ai_summary"
 }}

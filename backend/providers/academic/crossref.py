@@ -2,6 +2,7 @@ import logging
 import requests
 import re
 from typing import List, Optional
+from journal_indexer import lookup_journal_index
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -74,6 +75,19 @@ def fetch_crossref(
                     if not is_matching_topic_fn(title, snippet): continue
                         
                     mark_candidate_seen_fn(title, doi)
+
+                    # Extract ISSNs from Crossref item
+                    raw_issns = item.get("ISSN") or []
+                    if isinstance(raw_issns, str):
+                        raw_issns = [raw_issns]
+                    work_type = item.get("type", "journal")
+
+                    idx_meta = lookup_journal_index(
+                        issn_list=raw_issns,
+                        journal_title=venue,
+                        venue_type=work_type
+                    )
+
                     fetched.append({
                         "title": title,
                         "year": str(year),
@@ -83,7 +97,11 @@ def fetch_crossref(
                         "authors": authors,
                         "venue": venue,
                         "pdf_url": oa_pdf_link,
-                        "is_oa": is_oa_cr
+                        "is_oa": is_oa_cr,
+                        "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
+                        "quartile": idx_meta.get("quartile"),
+                        "sjr": idx_meta.get("sjr", 0.0),
+                        "citations": item.get("is-referenced-by-count", 0)
                     })
                 offset += rows
             elif resp.status_code == 429:

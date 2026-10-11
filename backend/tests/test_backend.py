@@ -41,6 +41,7 @@ def test_chat_lifecycle():
     res_check = client.get(f"/chats/{chat_id}")
     assert res_check.status_code == 404
 
+@pytest.mark.live
 @pytest.mark.asyncio
 async def test_generate_chat_title_post_response():
     """Verify smart chat title generation with both user message and assistant synthesis context."""

@@ -88,6 +88,25 @@ def test_journal_indexer_classification():
     assert res_journal["is_preprint"] is False
     assert res_journal["is_conference"] is False
 
+    # Deterministic Scopus Master lookup via ISSN (Nature: 0028-0836 -> Q1)
+    res_scopus = lookup_journal_index(issn_list=["0028-0836"], journal_title="Nature", venue_type="journal")
+    assert res_scopus["quartile"] == "Q1"
+    assert res_scopus["indexing_type"] == "Scopus"
+    assert "Scopus Q1" in res_scopus["journal_metric"]
+    assert res_scopus["quality_tier"] == 1
+    assert res_scopus["sjr"] > 10.0
+
+    # Deterministic Scopus Master lookup (IEEE Access: 2169-3536 -> Q1)
+    res_ieee = lookup_journal_index(issn_list=["2169-3536"], journal_title="IEEE Access", venue_type="journal")
+    assert res_ieee["quartile"] == "Q1"
+    assert res_ieee["indexing_type"] == "Scopus"
+
+    # Deterministic SINTA resolution (IJECE: 2088-8708 -> S1 Accredited)
+    res_sinta = lookup_journal_index(issn_list=["2088-8708"], journal_title="IJECE", venue_type="journal")
+    # IJECE is in both Scopus (Q3) and SINTA (S1); Scopus lookup takes priority, or SINTA can be verified
+    assert res_sinta["quartile"] in ("Q3", "S1")
+    assert res_sinta["indexing_type"] in ("Scopus", "SINTA")
+
 def test_pdf_authenticity_check():
     """Verify authentic PDF bytes header detection."""
     fake_bytes = b"This is just plain text, not a pdf file"
@@ -96,6 +115,7 @@ def test_pdf_authenticity_check():
     real_header = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n" + b"A" * 1200
     assert is_authentic_pdf_bytes(real_header, min_size=1000) is True
 
+@pytest.mark.live
 def test_services_modular_integration(tmp_path):
     """Verify service layer functions work end-to-end with temporary artifacts."""
     sample_file = tmp_path / "sample.txt"

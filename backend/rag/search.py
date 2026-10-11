@@ -285,6 +285,25 @@ def search_academic_papers_planned(
         if ddg_papers:
             results.extend(ddg_papers)
 
+    # Filter by requested Scopus Quartiles or SINTA tiers if specified in plan
+    if _scopus_quartiles or _sinta_tiers:
+        filtered_by_tier = []
+        for p in results:
+            q_val = (p.get("quartile") or "").upper()
+            metric_val = (p.get("journal_metric") or "").upper()
+            match_scopus = bool(_scopus_quartiles and (
+                any(q == q_val for q in _scopus_quartiles) or 
+                any(f"SCOPUS {q}" in metric_val for q in _scopus_quartiles)
+            ))
+            match_sinta = bool(_sinta_tiers and (
+                any(s == q_val for s in _sinta_tiers) or 
+                any(f"{s} ACCREDITED" in metric_val or f"SINTA {s}" in metric_val for s in _sinta_tiers)
+            ))
+            if match_scopus or match_sinta:
+                filtered_by_tier.append(p)
+        if filtered_by_tier:
+            results = filtered_by_tier
+
     # 4. Semantic Reranking with FlashRank (Cross-Encoder)
     if len(results) > limit:
         try:

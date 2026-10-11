@@ -3,6 +3,7 @@ import urllib.parse
 import requests
 import html
 from typing import List, Optional
+from journal_indexer import lookup_journal_index
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -58,6 +59,18 @@ def fetch_europe_pmc(
                 
                 mark_candidate_seen_fn(title, doi)
                 src = p.get("source") or "MED"
+
+                # Extract ISSNs from Europe PMC journalInfo
+                j_info = p.get("journalInfo", {}).get("journal", {})
+                raw_issns = [issn_v for issn_v in [j_info.get("issn"), j_info.get("essn")] if issn_v]
+                work_type = p.get("pubType", "journal")
+
+                idx_meta = lookup_journal_index(
+                    issn_list=raw_issns,
+                    journal_title=venue,
+                    venue_type=work_type
+                )
+
                 fetched.append({
                     "title": title,
                     "year": str(year),
@@ -67,7 +80,11 @@ def fetch_europe_pmc(
                     "authors": authors,
                     "venue": venue,
                     "pdf_url": pdf_url,
-                    "is_oa": is_oa_pmc
+                    "is_oa": is_oa_pmc,
+                    "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
+                    "quartile": idx_meta.get("quartile"),
+                    "sjr": idx_meta.get("sjr", 0.0),
+                    "citations": p.get("citedByCount", 0)
                 })
         elif resp.status_code == 429:
             logger.warning(f"[EuropePMC API] Rate limit (429) hit for query '{query_term[:30]}'")

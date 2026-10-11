@@ -145,6 +145,15 @@ class ResearchProfile(Base):
 
     chat_session = relationship("ChatSession", back_populates="research_profiles")
 
+class SintaJournalCache(Base):
+    __tablename__ = "sinta_journal_cache"
+
+    issn = Column(String(16), primary_key=True, index=True)
+    journal_name = Column(String, nullable=True)
+    tier = Column(String(50), nullable=True)  # e.g. "S1 Accredited"
+    is_scopus = Column(Boolean, default=False)
+    updated_at = Column(DateTime, default=get_utc_now)
+
 Base.metadata.create_all(bind=engine)
 
 def auto_migrate_schema():

@@ -243,12 +243,8 @@ def resolve_paper_metadata_by_doi(
     final_year = audited.get("year") or pub_year
     final_journal = audited.get("journal") or journal
     
-    if empirical_idx and empirical_idx.get("journal_metric") and empirical_idx.get("journal_metric") != "Peer-Reviewed Journal":
-        final_metric = empirical_idx["journal_metric"]
-        final_tier = empirical_idx.get("quality_tier", 4)
-    else:
-        final_metric = audited.get("journal_metric") or "Peer-Reviewed"
-        final_tier = audited.get("quality_tier", 4)
+    final_metric = (empirical_idx.get("journal_metric") if empirical_idx else None) or "Peer-Reviewed"
+    final_tier = (empirical_idx.get("quality_tier") if empirical_idx else None) or 4
 
     final_abstract = clean_academic_abstract(audited.get("abstract") or abstract)
     if is_ai_synthesized_overview(final_abstract):

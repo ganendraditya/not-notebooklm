@@ -13,6 +13,7 @@ frontend/.env.local
 
 # Runtime data & uploads
 *.db
+!backend/data/scopus_index.db
 *.db-shm
 *.db-wal
 *.sqlite

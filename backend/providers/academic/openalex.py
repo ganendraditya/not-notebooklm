@@ -4,6 +4,7 @@ import html
 import re
 from typing import List, Optional
 from utils.text_processing import reconstruct_inverted_index
+from journal_indexer import lookup_journal_index
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -84,6 +85,25 @@ def fetch_openalex(
                     if not is_matching_topic_fn(title, snippet): continue
                     
                     mark_candidate_seen_fn(title, doi)
+
+                    # Extract ISSNs from source metadata for deterministic indexing resolution
+                    src_obj = loc.get("source") or {}
+                    issn_list = []
+                    if src_obj.get("issn"):
+                        raw_issn_val = src_obj["issn"]
+                        if isinstance(raw_issn_val, list):
+                            issn_list.extend(raw_issn_val)
+                        elif isinstance(raw_issn_val, str):
+                            issn_list.append(raw_issn_val)
+                    if src_obj.get("issn_l") and src_obj["issn_l"] not in issn_list:
+                        issn_list.append(src_obj["issn_l"])
+
+                    idx_meta = lookup_journal_index(
+                        issn_list=issn_list,
+                        journal_title=venue,
+                        venue_type=work_type
+                    )
+
                     fetched.append({
                         "title": title,
                         "year": str(year),
@@ -93,7 +113,11 @@ def fetch_openalex(
                         "authors": authors,
                         "venue": venue,
                         "pdf_url": oa_pdf,
-                        "is_oa": is_oa_work
+                        "is_oa": is_oa_work,
+                        "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
+                        "quartile": idx_meta.get("quartile"),
+                        "sjr": idx_meta.get("sjr", 0.0),
+                        "citations": citations_count
                     })
                 page += 1
             elif resp.status_code == 429:
