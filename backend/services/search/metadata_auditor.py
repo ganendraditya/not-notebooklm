@@ -19,12 +19,11 @@ def audit_paper_metadata_with_ai(
     raw_doi: str,
     raw_citations: int,
     raw_abstract_or_html: str,
-    is_oa: bool = False
+    is_oa: bool = False,
+    venue_type: str = "journal",
 ) -> dict:
     """
-    AI Research Auditor & Quality Judge:
-    Uses Gemini / active LLM to audit candidate metadata, extract the true abstract,
-    filter out garbage category names, and determine Scopus/SINTA quartile and quality_tier.
+    Extracts candidate bibliographic metadata and the authentic abstract using the active LLM.
     """
     try:
         from rag.llm_factory import get_fast_llm, get_main_llm, get_fallback_llm
@@ -85,14 +84,6 @@ Output ONLY valid JSON matching:
                     return parsed
     except Exception as e:
         logger.debug(f"[AI Auditor] Audit failed for '{paper_title}': {e}")
-
-    # Fallback to empirical journal indexing resolver
-    venue_type = "journal"
-    j_low = (raw_journal or "").lower()
-    if any(p in j_low for p in ["sportrxiv", "arxiv", "biorxiv", "medrxiv", "ssrn", "osf", "repec", "research square", "preprint"]):
-        venue_type = "preprint"
-    elif any(c in j_low for c in ["conference", "proceedings", "symposium", "workshop", "congress"]):
-        venue_type = "conference"
 
     idx_info = journal_indexer.lookup_journal_index(journal_title=raw_journal, venue_type=venue_type)
     metric = idx_info.get("journal_metric")

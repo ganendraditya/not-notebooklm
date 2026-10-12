@@ -107,6 +107,21 @@ def is_paper_duplicate(
 
     return False
 
+def matches_tier_filter(paper: dict, scopus_quartiles: List[str], sinta_tiers: List[str]) -> bool:
+    """True when a paper satisfies an explicit Scopus quartile or SINTA tier constraint."""
+    q_val = (paper.get("quartile") or "").upper()
+    s_val = (paper.get("sinta_tier") or "").upper()
+    metric_val = (paper.get("journal_metric") or "").upper()
+    match_scopus = bool(scopus_quartiles and (
+        q_val in scopus_quartiles or
+        any(f"SCOPUS {q}" in metric_val for q in scopus_quartiles)
+    ))
+    match_sinta = bool(sinta_tiers and (
+        s_val in sinta_tiers or q_val in sinta_tiers or
+        any(f"{s} ACCREDITED" in metric_val or f"SINTA {s}" in metric_val for s in sinta_tiers)
+    ))
+    return match_scopus or match_sinta
+
 def search_academic_papers_planned(
     plan: dict, 
     existing_signatures: dict = None,
@@ -287,22 +302,8 @@ def search_academic_papers_planned(
 
     # Filter by requested Scopus Quartiles or SINTA tiers if specified in plan
     if _scopus_quartiles or _sinta_tiers:
-        filtered_by_tier = []
-        for p in results:
-            q_val = (p.get("quartile") or "").upper()
-            metric_val = (p.get("journal_metric") or "").upper()
-            match_scopus = bool(_scopus_quartiles and (
-                any(q == q_val for q in _scopus_quartiles) or 
-                any(f"SCOPUS {q}" in metric_val for q in _scopus_quartiles)
-            ))
-            match_sinta = bool(_sinta_tiers and (
-                any(s == q_val for s in _sinta_tiers) or 
-                any(f"{s} ACCREDITED" in metric_val or f"SINTA {s}" in metric_val for s in _sinta_tiers)
-            ))
-            if match_scopus or match_sinta:
-                filtered_by_tier.append(p)
-        if filtered_by_tier:
-            results = filtered_by_tier
+        # An explicit tier constraint always replaces the set, even when it matches nothing.
+        results = [p for p in results if matches_tier_filter(p, _scopus_quartiles, _sinta_tiers)]
 
     # 4. Semantic Reranking with FlashRank (Cross-Encoder)
     if len(results) > limit:

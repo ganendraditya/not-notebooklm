@@ -183,6 +183,7 @@ def fetch_crossref_metadata_by_doi(clean_doi: str, expected_title: str = "") -> 
                 "title": cr_cand_title,
                 "authors": authors,
                 "journal": journal,
+                "src_type": msg.get("type") or "journal",
                 "year": pub_year,
                 "citations": citations,
                 "landing": landing,

@@ -1,12 +1,21 @@
 import os
 import sqlite3
 import urllib.request
+import urllib.error
 import csv
 import logging
+from utils.network_utils import is_safe_external_url
 
 logger = logging.getLogger("uvicorn.error")
 
 OPENJOURNALS_CSV_URL = "https://raw.githubusercontent.com/LukasRoeseler/openjournals/main/scimagojr_2024.csv"
+
+class SafeExternalRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_safe_external_url(newurl):
+            logger.warning(f"[SSRF Guard] Blocked Scopus index redirect to unsafe URL: {newurl}")
+            raise urllib.error.HTTPError(req.full_url, code, "Blocked unsafe redirect", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 def build_scopus_index_db(db_path: str) -> bool:
     """
@@ -24,7 +33,8 @@ def build_scopus_index_db(db_path: str) -> bool:
     logger.info("[Scopus Indexer] Initializing Scopus master database from open-source registry...")
     try:
         req = urllib.request.Request(OPENJOURNALS_CSV_URL, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=30.0) as resp:
+        opener = urllib.request.build_opener(SafeExternalRedirectHandler())
+        with opener.open(req, timeout=30.0) as resp:
             lines = [line.decode("utf-8", errors="ignore") for line in resp.readlines()]
 
         reader = csv.reader(lines, delimiter=";")

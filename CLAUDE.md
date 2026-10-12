@@ -134,6 +134,14 @@ Mandatory interaction and engineering guardrails between user and agent that mus
 ### 4. Code Review Scientific Verification Protocol (Anti-Hallucinated Findings)
 When conducting AI Code Reviews (via `ocr review`, `ocr scan`, multi-model LLM evaluations, or manual diff inspection) and security audits (`security-audit` skill), the agent **MUST NOT ACCEPT REVIEWER FINDINGS AT FACE VALUE OR ACT AS A SYCOPHANT TO REVIEW BOTS**. Follow a mandatory, evidence-backed verification protocol before touching any code:
 
+- **Required Severity and Status Labels:** Apply these labels to every `ocr review`, `ocr scan`, security review, and manual app/code review. Severity describes demonstrated impact, not confidence:
+  - **Critical:** Catastrophic impact, such as broad data loss, arbitrary code execution, or system takeover.
+  - **High:** Serious impact that should block release, such as a major security-control bypass or widespread core-feature failure.
+  - **Medium:** Material but bounded impact, such as incorrect results, significant degradation, or a failure under a specific condition.
+  - **Low:** Limited impact, a narrow edge case, or a minor defect.
+- Track verification separately as **Confirmed**, **Needs Validation**, or **Rejected**. Do not use `Low` to mean uncertain. For `Needs Validation`, report `Severity: Not assigned` until impact is verified. Security audits must also follow the `security-audit` skill rule that unresolved `needs_validation` records have no severity.
+- For each reportable finding, include its severity (when established), status, file and line, concrete failure scenario and impact, evidence or reproduction result, and recommended action. Group findings by severity and summarize counts for each severity. Put scope limits, test gaps, and context-only observations in a separate **Notes / Limitations** section, not in the findings or severity totals. Present rejected claims separately and exclude them from severity totals.
+
 - **Multi-Model Review & Adversarial Consensus:**
   - Never rely on a single LLM reviewer's perspective for critical code reviews, security discoveries, or algorithmic decisions. Single models exhibit provider-specific blind spots, training biases, and sycophantic tendencies.
   - **Workload-Calibrated Model Strategy:**
@@ -144,7 +152,7 @@ When conducting AI Code Reviews (via `ocr review`, `ocr scan`, multi-model LLM e
 
 - **Mandatory User Presentation Before Applying Changes:**
   - The agent is **STRICTLY FORBIDDEN** from unilaterally modifying code, committing, or merging fixes immediately after receiving automated review comments without first presenting the findings dialectically to the user.
-  - Present a structured scorecard: categorize items into **Hard Blockers / Confirmed Bugs** vs **False Positives / Rejected Claims** vs **Architectural Optimizations**, complete with reproduction proof.
+  - Present a structured scorecard grouped by severity, with **Hard Blockers / Confirmed Bugs**, **False Positives / Rejected Claims**, and **Architectural Optimizations** clearly distinguished and supported by reproduction evidence where available.
 
 - **Full Repository Review Protocol (`ocr scan` Anti-Timeout Execution):**
   - **Root Cause of Large Scan Hangs:** Running naive unflagged `ocr scan` attempts to evaluate all files indiscriminately (over 240+ files and 62,000+ lines), forcing the LLM reviewer to ingest massive evaluation benchmark matrices (`full100_benchmark.json`, `niah_100_matrix.json`) and 40+ international translation files (`locales/*.json`). Each file incurs a sequential `PLAN_TASK` -> `REVIEW_TASK` -> `DEDUP_TASK` round-trip, blowing through token budgets and triggering network gateway timeouts after 60+ minutes with zero output.

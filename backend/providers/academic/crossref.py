@@ -100,6 +100,7 @@ def fetch_crossref(
                         "is_oa": is_oa_cr,
                         "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
                         "quartile": idx_meta.get("quartile"),
+                        "sinta_tier": idx_meta.get("sinta_tier"),
                         "sjr": idx_meta.get("sjr", 0.0),
                         "citations": item.get("is-referenced-by-count", 0)
                     })

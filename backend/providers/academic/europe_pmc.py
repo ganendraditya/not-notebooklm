@@ -83,6 +83,7 @@ def fetch_europe_pmc(
                     "is_oa": is_oa_pmc,
                     "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
                     "quartile": idx_meta.get("quartile"),
+                    "sinta_tier": idx_meta.get("sinta_tier"),
                     "sjr": idx_meta.get("sjr", 0.0),
                     "citations": p.get("citedByCount", 0)
                 })

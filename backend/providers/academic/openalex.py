@@ -64,10 +64,12 @@ def fetch_openalex(
                     if open_access_only and not is_oa_work:
                         continue
 
-                    work_type = (loc.get("source") or {}).get("type") or work.get("type", "")
-                    is_preprint_work = work_type == "preprint" or "preprint" in ((loc.get("source") or {}).get("display_name") or "").lower()
+                    source_type = str((loc.get("source") or {}).get("type") or "").strip().lower()
+                    publication_type = str(work.get("type") or "").strip().lower()
+                    is_preprint_work = publication_type == "preprint"
                     if exclude_preprints and is_preprint_work:
                         continue
+                    work_type = "preprint" if is_preprint_work else source_type or publication_type
 
                     landing_url = loc.get("landing_page_url") or doi or f"https://openalex.org/{work.get('id')}"
                     oa_pdf = (work.get("best_oa_location") or {}).get("pdf_url") or loc.get("pdf_url") or ""
@@ -116,6 +118,7 @@ def fetch_openalex(
                         "is_oa": is_oa_work,
                         "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
                         "quartile": idx_meta.get("quartile"),
+                        "sinta_tier": idx_meta.get("sinta_tier"),
                         "sjr": idx_meta.get("sjr", 0.0),
                         "citations": citations_count
                     })

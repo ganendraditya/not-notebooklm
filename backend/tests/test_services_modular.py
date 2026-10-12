@@ -103,9 +103,31 @@ def test_journal_indexer_classification():
 
     # Deterministic SINTA resolution (IJECE: 2088-8708 -> S1 Accredited)
     res_sinta = lookup_journal_index(issn_list=["2088-8708"], journal_title="IJECE", venue_type="journal")
-    # IJECE is in both Scopus (Q3) and SINTA (S1); Scopus lookup takes priority, or SINTA can be verified
+    # IJECE is in both Scopus (Q3) and SINTA (S1); Scopus owns the metric, SINTA tier is kept alongside
     assert res_sinta["quartile"] in ("Q3", "S1")
     assert res_sinta["indexing_type"] in ("Scopus", "SINTA")
+
+    # S4-S6 must not masquerade as the S3 rank
+    from journal_indexer import _SINTA_TIER_RANK
+    assert _SINTA_TIER_RANK["S4"] > _SINTA_TIER_RANK["S3"]
+    assert _SINTA_TIER_RANK["S6"] > _SINTA_TIER_RANK["S5"]
+
+def test_tier_filter_matching():
+    """Verify explicit Scopus/SINTA tier constraints match on either index and reject the rest."""
+    from rag.search import matches_tier_filter
+
+    scopus_q1 = {"quartile": "Q1", "journal_metric": "Scopus Q1 (SJR: 18.29)"}
+    dual = {"quartile": "Q3", "sinta_tier": "S1", "journal_metric": "Scopus Q3 (SJR: 0.31) | SINTA S1"}
+    sinta_only = {"quartile": "S2", "sinta_tier": "S2", "journal_metric": "S2 Accredited"}
+    plain = {"quartile": None, "journal_metric": "Peer-Reviewed Journal"}
+
+    assert matches_tier_filter(scopus_q1, ["Q1"], []) is True
+    assert matches_tier_filter(scopus_q1, ["Q2"], []) is False
+    # Dual-index journal satisfies a SINTA S1 request even though its quartile is Q3
+    assert matches_tier_filter(dual, [], ["S1"]) is True
+    assert matches_tier_filter(dual, ["Q1"], []) is False
+    assert matches_tier_filter(sinta_only, [], ["S2"]) is True
+    assert matches_tier_filter(plain, ["Q1"], ["S1"]) is False
 
 def test_pdf_authenticity_check():
     """Verify authentic PDF bytes header detection."""
