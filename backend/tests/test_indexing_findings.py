@@ -149,8 +149,8 @@ def test_sinta_no_result_response_is_cached_as_a_short_lived_miss(monkeypatch):
         lambda issn, entry: cache.__setitem__(issn, entry),
     )
     monkeypatch.setattr(
-        journal_indexer.requests,
-        "get",
+        journal_indexer,
+        "safe_external_get",
         lambda *_args, **_kwargs: requests.append(1) or response,
     )
 
@@ -203,8 +203,8 @@ def test_sinta_http_error_is_not_cached(monkeypatch):
         lambda *args: writes.append(args),
     )
     monkeypatch.setattr(
-        journal_indexer.requests,
-        "get",
+        journal_indexer,
+        "safe_external_get",
         lambda *_args, **_kwargs: requests.append(1) or response,
     )
 

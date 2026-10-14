@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, List
 from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
-from utils.network_utils import is_safe_external_url
+from utils.network_utils import is_safe_external_url, safe_external_get
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -217,14 +217,17 @@ def lookup_sinta_status(clean_digits: str) -> Dict[str, Any]:
     return {"status": "accredited", "record": parsed}
 
 def _get_sinta_response(url: str) -> Optional[requests.Response]:
-    """Follow only redirects whose destinations pass the outbound SSRF guard."""
+    """Fetch through the validated-IP transport and follow only validated redirects."""
     for redirect_count in range(SINTA_MAX_REDIRECTS + 1):
-        resp = requests.get(
-            url,
-            headers=SINTA_REQUEST_HEADERS,
-            timeout=3.0,
-            allow_redirects=False,
-        )
+        try:
+            resp = safe_external_get(
+                url,
+                headers=SINTA_REQUEST_HEADERS,
+                timeout=3.0,
+            )
+        except Exception as e:
+            logger.debug(f"[SINTA] Blocked outbound request to {url}: {e}")
+            return None
         if resp.status_code not in HTTP_REDIRECT_STATUSES:
             return resp
 

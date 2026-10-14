@@ -8,7 +8,7 @@ import concurrent.futures
 
 from utils.pdf_utils import is_authentic_pdf_bytes, verify_pdf_title_match
 from utils.text_processing import clean_doi as normalize_doi
-from utils.network_utils import is_safe_external_url
+from utils.network_utils import safe_external_get
 from providers.scrapers.oa_fetcher import try_fetch_open_access_pdf
 
 logger = logging.getLogger("uvicorn.error")
@@ -100,13 +100,14 @@ def resolve_semantic_scholar_pdf(clean_doi: str) -> Optional[bytes]:
 def resolve_landing_page_pdf(clean_doi: str, direct_url: str) -> Optional[bytes]:
     """Inspects publisher landing page meta tags and OJS links."""
     landing_target = direct_url or (f"https://doi.org/{clean_doi}" if clean_doi else "")
-    if not landing_target or not landing_target.startswith("http") or not is_safe_external_url(landing_target):
+    if not landing_target or not landing_target.startswith("http"):
         return None
     try:
-        resp = requests.get(landing_target, headers={
+        headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-        }, timeout=5.0, allow_redirects=False)
+        }
+        resp = safe_external_get(landing_target, headers=headers, timeout=5.0)
 
         # Explicitly validate each redirect destination against SSRF, up to 5 hops
         curr_target = landing_target
@@ -117,18 +118,11 @@ def resolve_landing_page_pdf(clean_doi: str, direct_url: str) -> Optional[bytes]
             if not loc:
                 break
             redirect_url = urllib.parse.urljoin(curr_target, loc.strip())
-            if not is_safe_external_url(redirect_url):
-                return None
             curr_target = redirect_url
-            resp = requests.get(redirect_url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-            }, timeout=5.0, allow_redirects=False)
+            resp = safe_external_get(redirect_url, headers=headers, timeout=5.0)
 
         if resp.status_code == 200:
             final_url = resp.url
-            if not is_safe_external_url(final_url):
-                return None
             html = resp.text
 
             # A. Citation meta tags

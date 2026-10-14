@@ -71,30 +71,23 @@ def test_sinta_lookup_blocks_redirect_to_loopback(monkeypatch):
 
     monkeypatch.setattr(journal_indexer, "_read_sinta_cache", lambda _: None)
     monkeypatch.setattr(
-        journal_indexer.requests,
-        "get",
+        journal_indexer,
+        "safe_external_get",
         lambda url, **kwargs: calls.append((url, kwargs)) or redirect,
     )
 
     assert journal_indexer.lookup_sinta_live("12345678") is None
     assert len(calls) == 1
-    assert calls[0][1]["allow_redirects"] is False
 
 
-def test_sinta_http_client_does_not_follow_loopback_redirect(monkeypatch):
+def test_sinta_http_client_does_not_reach_a_loopback_target(monkeypatch):
     with local_redirect_server() as server:
         base_url = f"http://127.0.0.1:{server.server_port}"
-        real_get = journal_indexer.requests.get
 
         monkeypatch.setattr(journal_indexer, "_read_sinta_cache", lambda _: None)
-        monkeypatch.setattr(
-            journal_indexer.requests,
-            "get",
-            lambda _url, **kwargs: real_get(f"{base_url}/redirect", **kwargs),
-        )
 
         assert journal_indexer.lookup_sinta_live("12345678") is None
-        assert server.request_paths == ["/redirect"]
+        assert server.request_paths == []
 
 
 def test_sinta_lookup_follows_safe_redirect_manually(monkeypatch):
@@ -117,14 +110,14 @@ def test_sinta_lookup_follows_safe_redirect_manually(monkeypatch):
         lambda url: url == redirect_url,
     )
     monkeypatch.setattr(
-        journal_indexer.requests,
-        "get",
+        journal_indexer,
+        "safe_external_get",
         lambda url, **kwargs: calls.append((url, kwargs)) or responses.pop(0),
     )
 
     assert journal_indexer.lookup_sinta_live("12345678") is None
     assert [call[0] for call in calls] == [source_url, redirect_url]
-    assert all(call[1]["allow_redirects"] is False for call in calls)
+    assert all(call[1]["timeout"] == 3.0 for call in calls)
 
 
 def test_scopus_redirect_handler_rejects_loopback(monkeypatch):
