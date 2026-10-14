@@ -4,7 +4,7 @@ import html
 import re
 from typing import List, Optional
 from utils.text_processing import reconstruct_inverted_index
-from journal_indexer import lookup_journal_index
+from journal_indexer import INDEX_METADATA_FIELDS, lookup_journal_index
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -117,6 +117,7 @@ def fetch_openalex(
                         "pdf_url": oa_pdf,
                         "is_oa": is_oa_work,
                         "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
+                        **{field: idx_meta.get(field) for field in INDEX_METADATA_FIELDS},
                         "quartile": idx_meta.get("quartile"),
                         "sinta_tier": idx_meta.get("sinta_tier"),
                         "sjr": idx_meta.get("sjr", 0.0),

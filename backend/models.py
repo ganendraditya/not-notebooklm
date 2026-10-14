@@ -69,6 +69,14 @@ class PaperCandidate(BaseModel):
     pdf_url: Optional[str] = ""
     is_oa: Optional[bool] = True
     journal_metric: Optional[str] = ""
+    indexing_type: Optional[str] = None
+    scopus_status: Optional[str] = None
+    scopus_source_snapshot: Optional[str] = None
+    scopus_last_coverage_year: Optional[str] = None
+    historical_sjr_quartile: Optional[str] = None
+    historical_sjr: Optional[float] = None
+    historical_sjr_year: Optional[str] = None
+    sinta_status: Optional[str] = None
     citations: Optional[int] = 0
 
 class ImportDoiRequest(BaseModel):
@@ -113,7 +121,6 @@ class UpdateFactRequest(BaseModel):
     is_active: Optional[bool] = None
     fact_text: Optional[str] = None
     category: Optional[str] = None
-
 
 
 

@@ -67,8 +67,9 @@ def test_source_signatures_db_direct():
         db.commit()
         db.close()
 
-def test_journal_indexer_classification():
+def test_journal_indexer_classification(monkeypatch):
     """Verify journal_indexer correctly classifies preprints, conference proceedings, and peer-reviewed journals."""
+    import journal_indexer
     from journal_indexer import lookup_journal_index, init_journal_db
     
     assert init_journal_db() == 0
@@ -88,11 +89,14 @@ def test_journal_indexer_classification():
     assert res_journal["is_preprint"] is False
     assert res_journal["is_conference"] is False
 
-    # Deterministic Scopus Master lookup via ISSN (Nature: 0028-0836 -> Q1)
+    # Current Scopus status comes from Elsevier; the SJR quartile remains dated metadata.
     res_scopus = lookup_journal_index(issn_list=["0028-0836"], journal_title="Nature", venue_type="journal")
     assert res_scopus["quartile"] == "Q1"
     assert res_scopus["indexing_type"] == "Scopus"
-    assert "Scopus Q1" in res_scopus["journal_metric"]
+    assert res_scopus["scopus_status"] == "active"
+    assert "Scopus Indexed" in res_scopus["journal_metric"]
+    assert res_scopus["historical_sjr_quartile"] == "Q1"
+    assert res_scopus["historical_sjr_year"] == "2024"
     assert res_scopus["quality_tier"] == 1
     assert res_scopus["sjr"] > 10.0
 
@@ -101,11 +105,18 @@ def test_journal_indexer_classification():
     assert res_ieee["quartile"] == "Q1"
     assert res_ieee["indexing_type"] == "Scopus"
 
-    # Deterministic SINTA resolution (IJECE: 2088-8708 -> S1 Accredited)
+    # IJECE's historical SJR record is separate from its current Scopus and SINTA status.
+    monkeypatch.setattr(
+        journal_indexer,
+        "lookup_sinta_status",
+        lambda _: {"status": "accredited", "record": {"tier": "S1 Accredited"}},
+    )
     res_sinta = lookup_journal_index(issn_list=["2088-8708"], journal_title="IJECE", venue_type="journal")
-    # IJECE is in both Scopus (Q3) and SINTA (S1); Scopus owns the metric, SINTA tier is kept alongside
-    assert res_sinta["quartile"] in ("Q3", "S1")
-    assert res_sinta["indexing_type"] in ("Scopus", "SINTA")
+    assert res_sinta["scopus_status"] == "discontinued"
+    assert res_sinta["historical_sjr_quartile"] == "Q3"
+    assert res_sinta["sinta_status"] == "accredited"
+    assert res_sinta["indexing_type"] == "SINTA"
+    assert "Scopus Indexed" not in res_sinta["journal_metric"]
 
     # S4-S6 must not masquerade as the S3 rank
     from journal_indexer import _SINTA_TIER_RANK
@@ -445,8 +456,6 @@ def test_verify_pdf_title_match_sanity():
     # Edge cases: empty title or small payload
     assert verify_pdf_title_match(b"", "Attention Is All You Need") is True
     assert verify_pdf_title_match(attention_bytes, "") is True
-
-
 
 
 

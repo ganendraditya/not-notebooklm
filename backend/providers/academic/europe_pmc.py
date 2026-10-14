@@ -3,7 +3,7 @@ import urllib.parse
 import requests
 import html
 from typing import List, Optional
-from journal_indexer import lookup_journal_index
+from journal_indexer import INDEX_METADATA_FIELDS, lookup_journal_index
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -82,6 +82,7 @@ def fetch_europe_pmc(
                     "pdf_url": pdf_url,
                     "is_oa": is_oa_pmc,
                     "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
+                    **{field: idx_meta.get(field) for field in INDEX_METADATA_FIELDS},
                     "quartile": idx_meta.get("quartile"),
                     "sinta_tier": idx_meta.get("sinta_tier"),
                     "sjr": idx_meta.get("sjr", 0.0),

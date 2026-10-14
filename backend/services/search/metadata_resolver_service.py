@@ -103,6 +103,10 @@ def resolve_paper_metadata_by_doi(
             "abstract": "",
             "abstract_type": "official"
         }
+        fast_result.update({
+            field: idx_info.get(field)
+            for field in journal_indexer.INDEX_METADATA_FIELDS
+        })
         if cache is not None:
             cache[cache_key] = fast_result
         return fast_result
@@ -239,14 +243,8 @@ def resolve_paper_metadata_by_doi(
     final_year = audited.get("year") or pub_year
     final_journal = audited.get("journal") or journal
     
-    # Empirical index wins only when it holds a concrete classification (not the generic fallback).
-    has_empirical_match = bool(empirical_idx) and empirical_idx.get("indexing_type") not in (None, "Peer-Reviewed")
-    if has_empirical_match:
-        final_metric = empirical_idx["journal_metric"]
-        final_tier = empirical_idx.get("quality_tier", 4)
-    else:
-        final_metric = audited.get("journal_metric") or "Peer-Reviewed"
-        final_tier = audited.get("quality_tier", 4)
+    final_metric = empirical_idx.get("journal_metric") if empirical_idx else "Peer-Reviewed Journal"
+    final_tier = empirical_idx.get("quality_tier", 4) if empirical_idx else 4
 
     final_abstract = clean_academic_abstract(audited.get("abstract") or abstract)
     if is_ai_synthesized_overview(final_abstract):
@@ -269,6 +267,10 @@ def resolve_paper_metadata_by_doi(
         "abstract": final_abstract,
         "abstract_type": final_abstract_type,
         "sinta_tier": empirical_idx.get("sinta_tier") if empirical_idx else None,
+        **{
+            field: empirical_idx.get(field) if empirical_idx else None
+            for field in journal_indexer.INDEX_METADATA_FIELDS
+        },
     }
     if cache is not None:
         cache[cache_key] = result

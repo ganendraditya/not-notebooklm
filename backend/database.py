@@ -151,6 +151,7 @@ class SintaJournalCache(Base):
     issn = Column(String(16), primary_key=True, index=True)
     journal_name = Column(String, nullable=True)
     tier = Column(String(50), nullable=True)  # e.g. "S1 Accredited"
+    row_found = Column(Boolean, nullable=False, default=False)
     is_scopus = Column(Boolean, default=False)
     updated_at = Column(DateTime, default=get_utc_now)
 
@@ -174,6 +175,13 @@ def auto_migrate_schema():
                 conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN model VARCHAR"))
             if "profile_id" not in cols:
                 conn.execute(text("ALTER TABLE chat_sessions ADD COLUMN profile_id VARCHAR"))
+
+            sinta_cols = [
+                row[1]
+                for row in conn.execute(text("PRAGMA table_info(sinta_journal_cache)")).fetchall()
+            ]
+            if "row_found" not in sinta_cols:
+                conn.execute(text("ALTER TABLE sinta_journal_cache ADD COLUMN row_found BOOLEAN DEFAULT 0"))
 
             # Documents
             res_docs = conn.execute(text("PRAGMA table_info(documents)")).fetchall()

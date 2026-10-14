@@ -227,6 +227,13 @@ To support arbitrary model providers and direct official keys without forcing th
       └── First valid PDF winner saved to uploads/ while cancelling slower tasks
 ```
 
+### 5.2.1 Deterministic Journal Indexing (`journal_indexer.py`)
+
+- Current Scopus status comes from the bundled `backend/data/scopus_index.db`, compiled from Elsevier's September 2026 source-list snapshot. Unknown and unlisted sources do not receive a current Scopus claim.
+- Historical SJR quartiles and scores remain separate metadata from the 2024 SCImago dataset. They do not establish current Scopus coverage.
+- SINTA S1-S6 accreditation comes from the Kemdiktisaintek portal and uses the persistent SQLite `sinta_journal_cache`. Positive entries expire after seven days; negative searches expire after five minutes. The `row_found` field distinguishes a listed journal without a recognized tier from an unlisted ISSN, and startup migration adds this field to existing cache tables.
+- Preprints and conference proceedings bypass journal indexing and retain their own venue classifications.
+
 ### 5.3 Context-Density Adaptive Workspace Retrieval (`workspace_pipeline.py`)
 
 NotbookLM dynamically adjusts retrieval strategy based on workspace document density:
@@ -417,4 +424,3 @@ For rapid navigation during maintenance and development:
 - **Chat-Scoped Object Authorization (`backend/routers/storage.py`):** Ownership verification binding file deletion requests to the originating `chat_id` prefix, mitigating cross-workspace IDOR deletion vulnerabilities.
 - **Prompt Injection Delimiters & Strict Token Matching (`backend/rag/intent.py`):** Untrusted user queries and summaries are strictly delimited with `<user_query>` tags and parsed via token-level regex (`re.findall(r'[A-Z_]+')`) to avoid prompt hijacking and destructive intent confusion.
 - **Two-Tier Triage Protocol (`AGENTS.md`):** Workload-calibrated code review and vulnerability scanning dividing full codebase audits into Tier 1 (fast broad triage scan via single frontier model) and Tier 2 (isolated adversarial cross-verification on High/Critical findings).
-

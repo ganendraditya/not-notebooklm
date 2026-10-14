@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from database import Document, SessionLocal, commit_with_retry
 import models
 import rag
+import journal_indexer
 from providers.academic import resolve_and_fetch_authentic_pdf
 from utils.file_utils import (
     UPLOAD_DIR,
@@ -106,6 +107,7 @@ async def search_academic_papers(query: str, limit: int = 10) -> List[models.Pap
             pdf_url=p.get("pdf_url", ""),
             is_oa=p.get("is_oa", True),
             journal_metric=p.get("journal_metric", ""),
+            **{field: p.get(field) for field in journal_indexer.INDEX_METADATA_FIELDS},
             citations=p.get("citations", 0),
         )
         for p in papers
