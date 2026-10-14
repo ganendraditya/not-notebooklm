@@ -337,6 +337,52 @@ The application reads configuration through standard environment variables. If y
 * **Cross-Encoder Reranker:** FlashRank (`ms-marco-TinyBERT-L-2-v2`, sub-10ms in-memory ONNX singleton).
 * **LLM Engine:** OpenAI-compatible adapter (`OpenAILike`) with tiered model roles (Primary, Fast, Fallback) and automated error recovery.
 
+### System Architecture
+
+```mermaid
+graph TB
+    subgraph WEB["Dual-Web Application Layer"]
+        WS["Research Workspace"]
+        ADM["Control Dashboard"]
+    end
+    API["Backend API - FastAPI + Pydantic v2"]
+    subgraph STORE["Tri-Layer Storage"]
+        SQL[("SQLite WAL")]
+        QD[("Qdrant")]
+        OBJ[("Object Storage")]
+    end
+    WS -->|"HTTP / SSE stream"| API
+    ADM -->|"REST / admin"| API
+    API --> SQL
+    API --> QD
+    API --> OBJ
+```
+
+The workspace handles research; the dashboard handles configuration. The API owns the LLM gateway, the orchestration pipelines, and the citation engine. Storage splits into SQLite for sessions and citations, Qdrant for hybrid vectors, and object storage for original manuscripts.
+
+### Query Routing & Retrieval
+
+Every query is classified before retrieval, and the retrieval strategy adapts to how many documents are in the workspace:
+
+```mermaid
+flowchart TD
+    Q["User query in workspace"] --> IC{"Intent classifier"}
+    IC -->|SEARCH_NEW| P1["Literature discovery"]
+    IC -->|ANALYZE_WORKSPACE| P2["Workspace synthesis"]
+    IC -->|REMOVE_SOURCES| P3["Source action"]
+    IC -->|GENERAL_CHAT| P4["General chat"]
+    P2 --> DENS{"Workspace density"}
+    DENS -->|"4 documents or fewer"| DIRECT["Direct context packing"]
+    DENS -->|"more than 4 documents"| HYB["Hybrid retrieval, top-25"]
+    HYB --> RR["FlashRank rerank, top-12"]
+    DIRECT --> MEM["Inject research profile memory"]
+    RR --> MEM
+    MEM --> LLM["Grounded system prompt"]
+    LLM --> OUT["Synthesis and citation map"]
+```
+
+The classifier runs on the Fast LLM and routes the query to one of four pipelines. Only the synthesis path is density-sensitive: four documents or fewer are packed whole, while larger workspaces go through dense plus BM25 hybrid retrieval and a cross-encoder rerank.
+
 ### Repository Structure
 
 ```text

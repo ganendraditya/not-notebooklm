@@ -3,6 +3,7 @@ import { type ChatMessage, type Attachment, useChatStore } from "@/stores/chatSt
 import { consumeSSEStream } from "@/lib/sse";
 import { sendSystemNotification } from "@/lib/notifications";
 import { createSmoothTextStreamer } from "@/lib/smoothStreamer";
+import { parseChatDeleteProposal } from "@/lib/sourceActions";
 import { formatExecutionDuration } from "@/lib/utils";
 
 // Queue now needs to store attachments too
@@ -35,8 +36,8 @@ export function useChatStream(
   bumpSessionToTop: (id: string) => void,
   updateSessionsList: (updater: (prev: any[]) => any[]) => void,
   updateMessagesList: (updater: (prev: ChatMessage[]) => ChatMessage[]) => void,
-  updateDocumentsList: (updater: (prev: any[]) => any[]) => void,
-  handleEnsureChatSessionRef: React.MutableRefObject<(suggestedTitle?: string) => Promise<string>>
+  handleEnsureChatSessionRef: React.MutableRefObject<(suggestedTitle?: string) => Promise<string>>,
+  onDeleteProposal?: (proposal: { chatId: string; documentIds: number[] }) => void
 ) {
   const chatJobsRef = useRef<Map<string, ChatJobState>>(new Map());
 
@@ -205,24 +206,8 @@ export function useChatStream(
             bodyKey: "notify.responseCompleteBody",
           });
 
-          // Check if response contains an action payload like deleting documents
-          const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
-          if (actionMatch) {
-            try {
-              const actionObj = JSON.parse(actionMatch[1]);
-              if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
-                const idSet = new Set(actionObj.deleted_doc_ids);
-                if (activeChatIdRef.current === targetChatId) {
-                  updateDocumentsList(prev => {
-                    const remaining = prev.filter(d => !idSet.has(d.id));
-                    return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                  });
-                }
-              }
-            } catch (e) {
-              console.error("Failed to parse sources action:", e);
-            }
-          }
+          const deleteProposal = parseChatDeleteProposal(asstMsg.content, targetChatId);
+          if (deleteProposal) onDeleteProposal?.(deleteProposal);
 
           // Process next queued prompt if user entered messages while generation was in progress
           if (job.queue.length > 0) {
@@ -511,23 +496,8 @@ export function useChatStream(
           bodyKey: "notify.editCompleteBody",
         });
 
-        const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
-        if (actionMatch) {
-          try {
-            const actionObj = JSON.parse(actionMatch[1]);
-            if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
-              const idSet = new Set(actionObj.deleted_doc_ids);
-              if (activeChatIdRef.current === currentChatId) {
-                updateDocumentsList(prev => {
-                  const remaining = prev.filter(d => !idSet.has(d.id));
-                  return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                });
-              }
-            }
-          } catch (e) {
-            console.error("Failed to parse sources action:", e);
-          }
-        }
+        const deleteProposal = parseChatDeleteProposal(asstMsg.content, currentChatId);
+        if (deleteProposal) onDeleteProposal?.(deleteProposal);
       }
     });
 
@@ -707,23 +677,8 @@ export function useChatStream(
 
         recordSessionCompletion(currentChatId);
 
-        const actionMatch = asstMsg.content?.match(/<!-- SOURCES_ACTION:\s*([\s\S]*?)\s*-->/);
-        if (actionMatch) {
-          try {
-            const actionObj = JSON.parse(actionMatch[1]);
-            if (actionObj.action === "bulk_delete" && actionObj.deleted_doc_ids) {
-              const idSet = new Set(actionObj.deleted_doc_ids);
-              if (activeChatIdRef.current === currentChatId) {
-                updateDocumentsList(prev => {
-                  const remaining = prev.filter(d => !idSet.has(d.id));
-                  return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-                });
-              }
-            }
-          } catch (e) {
-            console.error("Failed to parse SOURCES_ACTION in regenerated response:", e);
-          }
-        }
+        const deleteProposal = parseChatDeleteProposal(asstMsg.content, currentChatId);
+        if (deleteProposal) onDeleteProposal?.(deleteProposal);
 
         const cleanPreview = (asstMsg.content || "")
           .replace(/<!--[\s\S]*?-->/g, "")

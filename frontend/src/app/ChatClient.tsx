@@ -6,6 +6,7 @@ import LeftSidebar from "@/components/LeftSidebar";
 import ChatArea from "@/components/ChatArea";
 import RightSidebar from "@/components/RightSidebar";
 import SettingsModal from "@/components/SettingsModal";
+import { BulkDeleteModal } from "@/components/RightSidebar/BulkDeleteModal";
 import LibraryView from "@/components/LibraryView";
 import SearchChatsView from "@/components/SearchChatsView";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -16,6 +17,7 @@ import { useDocumentStore, type Document, type PendingSourceItem } from "@/store
 import { useUIStore } from "@/stores/uiStore";
 
 import { useChatSession } from "@/hooks/chat/useChatSession";
+import { useChatDeleteConfirmation } from "@/hooks/chat/useChatDeleteConfirmation";
 import { useChatStream, type ChatJobState } from "@/hooks/chat/useChatStream";
 import { isMatchingPaper } from "@/lib/sourceUtils";
 
@@ -92,6 +94,35 @@ export default function ChatClient() {
     handleEnsureChatSessionRef.current = handleEnsureChatSession;
   }, [handleEnsureChatSession]);
 
+  const handleBulkDocumentsDeleted = (docIds: number[]) => {
+    const idSet = new Set(docIds);
+    updateDocumentsList(prev => {
+      const remaining = prev.filter(d => !idSet.has(d.id));
+      return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
+    });
+  };
+
+  const handleChatSourcesDeleted = (docIds: number[]) => {
+    handleBulkDocumentsDeleted(docIds);
+    if (targetedSource && docIds.includes(targetedSource.id)) setTargetedSource(null);
+    if (viewingDoc && docIds.includes(viewingDoc.id)) setViewingDoc(null);
+  };
+
+  const {
+    proposal: chatDeleteProposal,
+    isDeleting: isChatDeleteSubmitting,
+    hasDeleteError: hasChatDeleteError,
+    requestConfirmation: requestChatDeleteConfirmation,
+    cancel: cancelChatDelete,
+    confirm: confirmChatDelete,
+  } = useChatDeleteConfirmation({
+    activeChatId,
+    activeChatIdRef,
+    backendUrl,
+    documents,
+    onDocumentsDeleted: handleChatSourcesDeleted,
+  });
+
   // 3. Hook for Stream logic
   const {
     getChatJob,
@@ -113,22 +144,14 @@ export default function ChatClient() {
     bumpSessionToTop,
     updateSessionsList,
     updateMessagesList,
-    updateDocumentsList,
-    handleEnsureChatSessionRef
+    handleEnsureChatSessionRef,
+    requestChatDeleteConfirmation
   );
 
   // Keep getChatJobRef in sync with actual implementation
   useEffect(() => {
     getChatJobRef.current = getChatJob;
   }, [getChatJob]);
-
-  const handleBulkDocumentsDeleted = (docIds: number[]) => {
-    const idSet = new Set(docIds);
-    updateDocumentsList(prev => {
-      const remaining = prev.filter(d => !idSet.has(d.id));
-      return remaining.map((doc, idx) => ({ ...doc, index: idx + 1 }));
-    });
-  };
 
   const handleDocumentAdded = (doc: Document, targetChatId?: string) => {
     // Only append to the visible documents list if the user is currently viewing the target chat
@@ -481,6 +504,17 @@ export default function ChatClient() {
           setGroundingHighlight(null);
           handleCreateChat();
         }}
+      />
+
+      <BulkDeleteModal
+        isOpen={Boolean(chatDeleteProposal)}
+        selectedCount={chatDeleteProposal?.documentIds.length || 0}
+        sourceNames={chatDeleteProposal?.sourceNames}
+        description={t("right.chatDeleteConfirmDesc")}
+        isBulkDeleting={isChatDeleteSubmitting}
+        errorMessage={hasChatDeleteError ? (t("notify.errorBody") || "Failed to process request.") : null}
+        onClose={cancelChatDelete}
+        onConfirm={confirmChatDelete}
       />
     </div>
   );
