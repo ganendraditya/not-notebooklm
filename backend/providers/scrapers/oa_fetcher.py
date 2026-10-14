@@ -4,9 +4,8 @@ import html
 import urllib.parse
 import logging
 from typing import Optional
-import requests
 from utils.pdf_utils import is_authentic_pdf_bytes
-from utils.network_utils import is_safe_external_url
+from utils.network_utils import safe_external_get
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -15,7 +14,7 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0, max_depth
     Attempts to download an authentic Open Access PDF from publisher or repository.
     Includes browser headers, redirect handling, SSL fallback, and %PDF- verification.
     """
-    if not pdf_url or not isinstance(pdf_url, str) or not pdf_url.startswith("http") or not is_safe_external_url(pdf_url) or max_depth < 0:
+    if not pdf_url or not isinstance(pdf_url, str) or max_depth < 0:
         return None
         
     user_agent = os.getenv(
@@ -34,17 +33,13 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0, max_depth
     }
     
     try:
-        resp = requests.get(pdf_url, headers=headers, timeout=timeout_sec, allow_redirects=False)
+        resp = safe_external_get(pdf_url, headers=headers, timeout=timeout_sec)
         # SSRF mitigation: intercept HTTP redirects and validate destination before following
         if 300 <= resp.status_code < 400:
             loc = resp.headers.get("Location")
             if loc and max_depth > 0:
                 next_url = urllib.parse.urljoin(pdf_url, loc.strip())
-                if is_safe_external_url(next_url):
-                    return try_fetch_open_access_pdf(next_url, timeout_sec=timeout_sec, max_depth=max_depth - 1)
-                else:
-                    logger.warning(f"[SSRF Guard] Blocked redirect to unsafe URL: {next_url}")
-                    return None
+                return try_fetch_open_access_pdf(next_url, timeout_sec=timeout_sec, max_depth=max_depth - 1)
             return None
 
         if resp.status_code == 200:
@@ -57,7 +52,7 @@ def try_fetch_open_access_pdf(pdf_url: str, timeout_sec: float = 12.0, max_depth
                 meta_pdf = re.search(r'<meta\s+[^>]*?name=["\'](?:citation_pdf_url|eprints\.document_url)["\'][^>]*?content=["\'](.*?)["\']', html_text, re.I)
                 if meta_pdf:
                     next_url = html.unescape(meta_pdf.group(1).strip())
-                    if next_url.startswith("http") and next_url != pdf_url and is_safe_external_url(next_url):
+                    if next_url.startswith("http") and next_url != pdf_url and max_depth > 0:
                         return try_fetch_open_access_pdf(next_url, timeout_sec=timeout_sec, max_depth=max_depth - 1)
     except Exception as e:
         logger.debug(f"Failed to fetch OA PDF from {pdf_url}: {e}")
