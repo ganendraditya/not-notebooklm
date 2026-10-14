@@ -67,8 +67,9 @@ def test_source_signatures_db_direct():
         db.commit()
         db.close()
 
-def test_journal_indexer_classification():
+def test_journal_indexer_classification(monkeypatch):
     """Verify journal_indexer correctly classifies preprints, conference proceedings, and peer-reviewed journals."""
+    import journal_indexer
     from journal_indexer import lookup_journal_index, init_journal_db
     
     assert init_journal_db() == 0
@@ -88,6 +89,57 @@ def test_journal_indexer_classification():
     assert res_journal["is_preprint"] is False
     assert res_journal["is_conference"] is False
 
+    # Current Scopus status comes from Elsevier; the SJR quartile remains dated metadata.
+    res_scopus = lookup_journal_index(issn_list=["0028-0836"], journal_title="Nature", venue_type="journal")
+    assert res_scopus["quartile"] == "Q1"
+    assert res_scopus["indexing_type"] == "Scopus"
+    assert res_scopus["scopus_status"] == "active"
+    assert "Scopus Indexed" in res_scopus["journal_metric"]
+    assert res_scopus["historical_sjr_quartile"] == "Q1"
+    assert res_scopus["historical_sjr_year"] == "2024"
+    assert res_scopus["quality_tier"] == 1
+    assert res_scopus["sjr"] > 10.0
+
+    # Deterministic Scopus Master lookup (IEEE Access: 2169-3536 -> Q1)
+    res_ieee = lookup_journal_index(issn_list=["2169-3536"], journal_title="IEEE Access", venue_type="journal")
+    assert res_ieee["quartile"] == "Q1"
+    assert res_ieee["indexing_type"] == "Scopus"
+
+    # IJECE's historical SJR record is separate from its current Scopus and SINTA status.
+    monkeypatch.setattr(
+        journal_indexer,
+        "lookup_sinta_status",
+        lambda _: {"status": "accredited", "record": {"tier": "S1 Accredited"}},
+    )
+    res_sinta = lookup_journal_index(issn_list=["2088-8708"], journal_title="IJECE", venue_type="journal")
+    assert res_sinta["scopus_status"] == "discontinued"
+    assert res_sinta["historical_sjr_quartile"] == "Q3"
+    assert res_sinta["sinta_status"] == "accredited"
+    assert res_sinta["indexing_type"] == "SINTA"
+    assert "Scopus Indexed" not in res_sinta["journal_metric"]
+
+    # S4-S6 must not masquerade as the S3 rank
+    from journal_indexer import _SINTA_TIER_RANK
+    assert _SINTA_TIER_RANK["S4"] > _SINTA_TIER_RANK["S3"]
+    assert _SINTA_TIER_RANK["S6"] > _SINTA_TIER_RANK["S5"]
+
+def test_tier_filter_matching():
+    """Verify explicit Scopus/SINTA tier constraints match on either index and reject the rest."""
+    from rag.search import matches_tier_filter
+
+    scopus_q1 = {"quartile": "Q1", "journal_metric": "Scopus Q1 (SJR: 18.29)"}
+    dual = {"quartile": "Q3", "sinta_tier": "S1", "journal_metric": "Scopus Q3 (SJR: 0.31) | SINTA S1"}
+    sinta_only = {"quartile": "S2", "sinta_tier": "S2", "journal_metric": "S2 Accredited"}
+    plain = {"quartile": None, "journal_metric": "Peer-Reviewed Journal"}
+
+    assert matches_tier_filter(scopus_q1, ["Q1"], []) is True
+    assert matches_tier_filter(scopus_q1, ["Q2"], []) is False
+    # Dual-index journal satisfies a SINTA S1 request even though its quartile is Q3
+    assert matches_tier_filter(dual, [], ["S1"]) is True
+    assert matches_tier_filter(dual, ["Q1"], []) is False
+    assert matches_tier_filter(sinta_only, [], ["S2"]) is True
+    assert matches_tier_filter(plain, ["Q1"], ["S1"]) is False
+
 def test_pdf_authenticity_check():
     """Verify authentic PDF bytes header detection."""
     fake_bytes = b"This is just plain text, not a pdf file"
@@ -96,6 +148,7 @@ def test_pdf_authenticity_check():
     real_header = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n" + b"A" * 1200
     assert is_authentic_pdf_bytes(real_header, min_size=1000) is True
 
+@pytest.mark.live
 def test_services_modular_integration(tmp_path):
     """Verify service layer functions work end-to-end with temporary artifacts."""
     sample_file = tmp_path / "sample.txt"
@@ -403,8 +456,6 @@ def test_verify_pdf_title_match_sanity():
     # Edge cases: empty title or small payload
     assert verify_pdf_title_match(b"", "Attention Is All You Need") is True
     assert verify_pdf_title_match(attention_bytes, "") is True
-
-
 
 
 

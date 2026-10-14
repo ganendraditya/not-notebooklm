@@ -80,15 +80,7 @@ def resolve_paper_metadata_by_doi(
         return cache[cache_key]
         
     if fast_only:
-        t_low = (title_fallback or "").lower()
-        d_low = clean_doi.lower()
-        
         venue_type = "journal"
-        if any(c in t_low or c in d_low for c in ["proceedings", "conference", "symposium", "workshop"]):
-            venue_type = "conference"
-        elif any(p in t_low or p in d_low for p in ["sportrxiv", "arxiv", "biorxiv", "medrxiv", "ssrn", "osf", "preprint"]):
-            venue_type = "preprint"
-
         idx_info = journal_indexer.lookup_journal_index(
             journal_title=title_fallback,
             venue_type=venue_type
@@ -111,6 +103,10 @@ def resolve_paper_metadata_by_doi(
             "abstract": "",
             "abstract_type": "official"
         }
+        fast_result.update({
+            field: idx_info.get(field)
+            for field in journal_indexer.INDEX_METADATA_FIELDS
+        })
         if cache is not None:
             cache[cache_key] = fast_result
         return fast_result
@@ -176,6 +172,9 @@ def resolve_paper_metadata_by_doi(
     if clean_doi and (not authors or not journal or journal == "Peer-reviewed Publication" or not abstract):
         cr_data = fetch_crossref_metadata_by_doi(clean_doi, expected_title=title or title_fallback)
         if cr_data:
+            crossref_type = cr_data.get("src_type")
+            if crossref_type and journal_indexer.normalize_venue_type(crossref_type) in {"conference", "preprint"}:
+                src_type = crossref_type
             if not title and cr_data.get("title"):
                 title = cr_data["title"]
             if not authors and cr_data.get("authors"):
@@ -233,7 +232,8 @@ def resolve_paper_metadata_by_doi(
         raw_doi=clean_doi,
         raw_citations=citations,
         raw_abstract_or_html=audit_input_content,
-        is_oa=is_oa
+        is_oa=is_oa,
+        venue_type=src_type,
     )
 
     final_title = audited.get("title") or title or title_fallback or clean_doi
@@ -243,12 +243,8 @@ def resolve_paper_metadata_by_doi(
     final_year = audited.get("year") or pub_year
     final_journal = audited.get("journal") or journal
     
-    if empirical_idx and empirical_idx.get("journal_metric") and empirical_idx.get("journal_metric") != "Peer-Reviewed Journal":
-        final_metric = empirical_idx["journal_metric"]
-        final_tier = empirical_idx.get("quality_tier", 4)
-    else:
-        final_metric = audited.get("journal_metric") or "Peer-Reviewed"
-        final_tier = audited.get("quality_tier", 4)
+    final_metric = empirical_idx.get("journal_metric") if empirical_idx else "Peer-Reviewed Journal"
+    final_tier = empirical_idx.get("quality_tier", 4) if empirical_idx else 4
 
     final_abstract = clean_academic_abstract(audited.get("abstract") or abstract)
     if is_ai_synthesized_overview(final_abstract):
@@ -269,7 +265,12 @@ def resolve_paper_metadata_by_doi(
         "url": landing,
         "pdf_url": pdf_url,
         "abstract": final_abstract,
-        "abstract_type": final_abstract_type
+        "abstract_type": final_abstract_type,
+        "sinta_tier": empirical_idx.get("sinta_tier") if empirical_idx else None,
+        **{
+            field: empirical_idx.get(field) if empirical_idx else None
+            for field in journal_indexer.INDEX_METADATA_FIELDS
+        },
     }
     if cache is not None:
         cache[cache_key] = result

@@ -4,6 +4,7 @@ import html
 import re
 from typing import List, Optional
 from utils.text_processing import reconstruct_inverted_index
+from journal_indexer import INDEX_METADATA_FIELDS, lookup_journal_index
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -63,10 +64,12 @@ def fetch_openalex(
                     if open_access_only and not is_oa_work:
                         continue
 
-                    work_type = (loc.get("source") or {}).get("type") or work.get("type", "")
-                    is_preprint_work = work_type == "preprint" or "preprint" in ((loc.get("source") or {}).get("display_name") or "").lower()
+                    source_type = str((loc.get("source") or {}).get("type") or "").strip().lower()
+                    publication_type = str(work.get("type") or "").strip().lower()
+                    is_preprint_work = publication_type == "preprint"
                     if exclude_preprints and is_preprint_work:
                         continue
+                    work_type = "preprint" if is_preprint_work else source_type or publication_type
 
                     landing_url = loc.get("landing_page_url") or doi or f"https://openalex.org/{work.get('id')}"
                     oa_pdf = (work.get("best_oa_location") or {}).get("pdf_url") or loc.get("pdf_url") or ""
@@ -84,6 +87,25 @@ def fetch_openalex(
                     if not is_matching_topic_fn(title, snippet): continue
                     
                     mark_candidate_seen_fn(title, doi)
+
+                    # Extract ISSNs from source metadata for deterministic indexing resolution
+                    src_obj = loc.get("source") or {}
+                    issn_list = []
+                    if src_obj.get("issn"):
+                        raw_issn_val = src_obj["issn"]
+                        if isinstance(raw_issn_val, list):
+                            issn_list.extend(raw_issn_val)
+                        elif isinstance(raw_issn_val, str):
+                            issn_list.append(raw_issn_val)
+                    if src_obj.get("issn_l") and src_obj["issn_l"] not in issn_list:
+                        issn_list.append(src_obj["issn_l"])
+
+                    idx_meta = lookup_journal_index(
+                        issn_list=issn_list,
+                        journal_title=venue,
+                        venue_type=work_type
+                    )
+
                     fetched.append({
                         "title": title,
                         "year": str(year),
@@ -93,7 +115,13 @@ def fetch_openalex(
                         "authors": authors,
                         "venue": venue,
                         "pdf_url": oa_pdf,
-                        "is_oa": is_oa_work
+                        "is_oa": is_oa_work,
+                        "journal_metric": idx_meta.get("journal_metric", "Peer-Reviewed Journal"),
+                        **{field: idx_meta.get(field) for field in INDEX_METADATA_FIELDS},
+                        "quartile": idx_meta.get("quartile"),
+                        "sinta_tier": idx_meta.get("sinta_tier"),
+                        "sjr": idx_meta.get("sjr", 0.0),
+                        "citations": citations_count
                     })
                 page += 1
             elif resp.status_code == 429:
