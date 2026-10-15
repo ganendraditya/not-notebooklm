@@ -25,44 +25,83 @@ export function useChatDeleteConfirmation({
   const [isDeleting, setIsDeleting] = useState(false);
   const [hasDeleteError, setHasDeleteError] = useState(false);
   const isDeletingRef = useRef(false);
+  const proposalRef = useRef<PendingChatDelete | null>(null);
+  const queuedProposalsRef = useRef<PendingChatDelete[]>([]);
   const documentsRef = useRef(documents);
-
-  useEffect(() => {
-    setProposal(null);
-    setHasDeleteError(false);
-  }, [activeChatId]);
 
   useEffect(() => {
     documentsRef.current = documents;
   }, [documents]);
 
-  const requestConfirmation = useCallback((nextProposal: ChatDeleteProposal) => {
-    if (activeChatIdRef.current !== nextProposal.chatId) return;
+  const setPendingProposal = useCallback((nextProposal: PendingChatDelete | null) => {
+    proposalRef.current = nextProposal;
+    setProposal(nextProposal);
+  }, []);
+
+  const resolveProposal = useCallback((nextProposal: ChatDeleteProposal): PendingChatDelete | null => {
+    if (activeChatIdRef.current !== nextProposal.chatId) return null;
 
     const documentsById = new Map(documentsRef.current.map((doc) => [doc.id, doc]));
     const uniqueIds = [...new Set(nextProposal.documentIds)];
     const matchedDocuments = uniqueIds.map((id) => documentsById.get(id));
-    if (uniqueIds.length === 0 || matchedDocuments.some((doc) => !doc)) return;
+    if (uniqueIds.length === 0 || matchedDocuments.some((doc) => !doc)) return null;
     const resolvedDocuments = matchedDocuments.filter((doc): doc is Document => doc !== undefined);
 
-    setProposal({
+    return {
       chatId: nextProposal.chatId,
       documentIds: uniqueIds,
       sourceNames: resolvedDocuments.map((doc) => doc.title?.trim() || doc.filename),
-    });
-    setHasDeleteError(false);
+    };
   }, [activeChatIdRef]);
+
+  const showNextQueuedProposal = useCallback(() => {
+    if (isDeletingRef.current || proposalRef.current) return;
+
+    while (queuedProposalsRef.current.length > 0) {
+      const queuedProposal = queuedProposalsRef.current.shift();
+      if (!queuedProposal) continue;
+
+      const resolvedProposal = resolveProposal(queuedProposal);
+      if (!resolvedProposal) continue;
+
+      setPendingProposal(resolvedProposal);
+      setHasDeleteError(false);
+      return;
+    }
+  }, [resolveProposal, setPendingProposal]);
+
+  useEffect(() => {
+    setPendingProposal(null);
+    setHasDeleteError(false);
+    showNextQueuedProposal();
+  }, [activeChatId, setPendingProposal, showNextQueuedProposal]);
+
+  const requestConfirmation = useCallback((nextProposal: ChatDeleteProposal) => {
+    const resolvedProposal = resolveProposal(nextProposal);
+    if (!resolvedProposal) return;
+
+    if (isDeletingRef.current || proposalRef.current) {
+      queuedProposalsRef.current.push(resolvedProposal);
+      return;
+    }
+
+    setPendingProposal(resolvedProposal);
+    setHasDeleteError(false);
+  }, [resolveProposal, setPendingProposal]);
 
   const cancel = useCallback(() => {
     if (isDeletingRef.current) return;
-    setProposal(null);
+    setPendingProposal(null);
     setHasDeleteError(false);
-  }, []);
+    showNextQueuedProposal();
+  }, [setPendingProposal, showNextQueuedProposal]);
 
   const confirm = useCallback(async () => {
-    if (!proposal || isDeletingRef.current) return;
-    if (activeChatIdRef.current !== proposal.chatId) {
-      setProposal((current) => current === proposal ? null : current);
+    const proposalToDelete = proposalRef.current;
+    if (!proposalToDelete || isDeletingRef.current) return;
+    if (activeChatIdRef.current !== proposalToDelete.chatId) {
+      setPendingProposal(null);
+      showNextQueuedProposal();
       return;
     }
 
@@ -72,29 +111,37 @@ export function useChatDeleteConfirmation({
 
     try {
       const response = await fetch(
-        `${backendUrl}/chats/${encodeURIComponent(proposal.chatId)}/documents/bulk_delete`,
+        `${backendUrl}/chats/${encodeURIComponent(proposalToDelete.chatId)}/documents/bulk_delete`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ doc_ids: proposal.documentIds }),
+          body: JSON.stringify({ doc_ids: proposalToDelete.documentIds }),
         }
       );
       if (!response.ok) throw new Error(`Bulk delete request failed: ${response.status}`);
 
-      if (activeChatIdRef.current === proposal.chatId) {
-        onDocumentsDeleted(proposal.documentIds);
+      if (activeChatIdRef.current === proposalToDelete.chatId) {
+        const deletedIds = new Set(proposalToDelete.documentIds);
+        documentsRef.current = documentsRef.current.filter((doc) => !deletedIds.has(doc.id));
+        onDocumentsDeleted(proposalToDelete.documentIds);
       }
-      setProposal((current) => current === proposal ? null : current);
+      if (proposalRef.current === proposalToDelete) {
+        setPendingProposal(null);
+      }
     } catch (error) {
       console.error("Failed to delete chat sources", error);
-      if (activeChatIdRef.current === proposal.chatId) {
+      if (
+        activeChatIdRef.current === proposalToDelete.chatId &&
+        proposalRef.current === proposalToDelete
+      ) {
         setHasDeleteError(true);
       }
     } finally {
       isDeletingRef.current = false;
       setIsDeleting(false);
+      showNextQueuedProposal();
     }
-  }, [activeChatIdRef, backendUrl, onDocumentsDeleted, proposal]);
+  }, [activeChatIdRef, backendUrl, onDocumentsDeleted, setPendingProposal, showNextQueuedProposal]);
 
   return {
     proposal,

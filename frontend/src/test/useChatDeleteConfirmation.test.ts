@@ -120,6 +120,57 @@ describe("useChatDeleteConfirmation", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the active proposal stable and presents queued proposals after deletion", async () => {
+    const activeChatIdRef = { current: "chat-1" };
+    let resolveFetch!: (response: { ok: boolean }) => void;
+    const fetchPromise = new Promise<{ ok: boolean }>((resolve) => {
+      resolveFetch = resolve;
+    });
+    const fetchMock = vi.fn().mockReturnValue(fetchPromise);
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useChatDeleteConfirmation(makeProps(activeChatIdRef)));
+
+    act(() => result.current.requestConfirmation({ chatId: "chat-1", documentIds: [7] }));
+    let firstConfirm!: Promise<void>;
+    act(() => {
+      firstConfirm = result.current.confirm();
+      result.current.requestConfirmation({ chatId: "chat-1", documentIds: [7] });
+      result.current.requestConfirmation({ chatId: "chat-1", documentIds: [8] });
+    });
+
+    expect(result.current.proposal?.documentIds).toEqual([7]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFetch({ ok: true });
+      await firstConfirm;
+    });
+
+    expect(result.current.proposal?.documentIds).toEqual([8]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps queued proposals available after a delete failure and cancellation", async () => {
+    const activeChatIdRef = { current: "chat-1" };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+    const { result } = renderHook(() => useChatDeleteConfirmation(makeProps(activeChatIdRef)));
+
+    act(() => {
+      result.current.requestConfirmation({ chatId: "chat-1", documentIds: [7] });
+      result.current.requestConfirmation({ chatId: "chat-1", documentIds: [8] });
+    });
+    await act(async () => result.current.confirm());
+
+    expect(result.current.proposal?.documentIds).toEqual([7]);
+    expect(result.current.hasDeleteError).toBe(true);
+
+    act(() => result.current.cancel());
+
+    expect(result.current.proposal?.documentIds).toEqual([8]);
+    expect(result.current.hasDeleteError).toBe(false);
+  });
+
   it("keeps the proposal open and does not refresh when the API fails", async () => {
     const activeChatIdRef = { current: "chat-1" };
     const onDocumentsDeleted = vi.fn();
