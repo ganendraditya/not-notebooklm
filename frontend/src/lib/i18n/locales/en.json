@@ -259,6 +259,7 @@
   "right.import": "Import",
   "right.deleteConfirmTitle": "Delete {count} selected source(s)?",
   "right.deleteConfirmDesc": "Deleted documents will no longer be used by the AI to answer questions in this chat session.",
+  "right.chatDeleteConfirmDesc": "Nothing will be deleted unless you confirm. Confirming permanently removes these sources from this chat.",
   "right.deleteButton": "Delete ({count})",
   "model.select": "Select AI Model",
   "model.local": "Local Models",

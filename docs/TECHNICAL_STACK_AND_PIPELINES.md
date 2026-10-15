@@ -8,52 +8,44 @@ Comprehensive technical specification document for **Not-NotebookLM**: an academ
 
 Not-NotebookLM is built on a decoupled architecture separating the **User Research Workspace** from the **Management Control Plane**, backed by a headless Vector Database and pluggable Hybrid Object Storage:
 
+```mermaid
+graph TB
+    subgraph WEB["Dual-Web Application Layer, Next.js 16"]
+        WS["Research Workspace"]
+        ADM["Control Dashboard"]
+    end
+    subgraph BE["Backend API, FastAPI + Pydantic v2"]
+        subgraph GW["LLM Gateway and Cascading Factory"]
+            PRI["Primary Heavy LLM"]
+            FST["Fast Lite LLM"]
+            FBC["Fallback LLM"]
+        end
+        subgraph PIPE["Core Orchestration Pipelines"]
+            P1["1. Semantic intent classifier"]
+            P2["2. Ingestion and section chunker"]
+            P3["3. Multi-engine literature discovery"]
+            P4["4. Parallel PDF racing resolver"]
+            P5["5. Dual-mode RAG engine"]
+            P6["6. Declarative research memory"]
+            P7["7. Verbatim citation verifier"]
+        end
+    end
+    subgraph STORE["Tri-Layer Storage"]
+        SQL[("SQLite WAL")]
+        QD[("Qdrant hybrid")]
+        OBJ[("Local Disk / S3 / R2")]
+    end
+    WS -->|"HTTP / SSE events"| BE
+    ADM -->|"REST / admin"| BE
+    BE --> STORE
 ```
-+-----------------------------------------------------------------------------------+
-|                        DUAL-WEB APPLICATION LAYER (Next.js 16)                    |
-|                                                                                   |
-|  [PORT 2026 / WORKSPACE]                        [PORT 2027 / CONTROL DASHBOARD]   |
-|  - Split-Pane Academic Reader                   - Model Gateways & BYOK Form      |
-|  - Real-time SSE Chat & Math                    - S3 / R2 / MinIO Storage Switcher|
-|  - In-Workspace Dynamic Model Switcher          - Model Visibility Toggles (#73)  |
-|  - Literature Discovery Modal                   - Infisical / Doppler Secrets     |
-|  - Declarative Research Profile Memory          - FastEmbed ONNX vs Gemini Engine |
-|  - Inline Verbatim Highlight Badges             - SQLite & Qdrant Live Health     |
-+-----------------------------------------+-----------------------------------------+
-                                          |
-                        HTTP / SSE Events | JSON Payload
-                                          v
-+-----------------------------------------------------------------------------------+
-|                           BACKEND API (FastAPI + Pydantic v2)                     |
-|                                                                                   |
-|  +-----------------------------------------------------------------------------+  |
-|  |                        LLM Gateway & Cascading Factory                      |  |
-|  |  - Primary / Heavy LLM (LLM_MODEL, max 16k output tokens, 120s timeout)     |  |
-|  |  - Session-Bound Model Override (per-chat binding via workspace dropdown)    |  |
-|  |  - Fast / Lite LLM (LLM_FAST_MODEL, max 4k output tokens, 45s timeout)      |  |
-|  |  - Fallback LLM (LLM_FALLBACK_MODEL, automatic failover)                    |  |
-|  |  * Input context window is dynamic & auto-detected via token_budget.py      |  |
-|  +-----------------------------------------------------------------------------+  |
-|                                                                                   |
-|  +-----------------------------------------------------------------------------+  |
-|  |                          Core Orchestration Pipelines                       |  |
-|  |  1. Semantic Intent Classifier (4-Class triage + micro-dialogue context)     |  |
-|  |  2. Document Ingestion & Section Chunker (9 Academic Canonical Centroids)    |  |
-|  |  3. Multi-Engine Literature Discovery (OpenAlex, Crossref, Europe PMC, DDG) |  |
-|  |  4. Parallel PDF Racing Resolver (arXiv, Unpaywall, OpenAlex, Scrapers)      |  |
-|  |  5. Dual-Mode RAG Engine (Direct Context Packing vs Dense + BM25 Hybrid)    |  |
-|  |  6. Declarative Research Profile Memory (Constraints, Hardware, Objectives) |  |
-|  |  7. Verbatim Citation Highlighter & Evidence Verifier (ALCE compliance)     |  |
-|  +-----------------------------------------------------------------------------+  |
-+-------------------+--------------------+--------------------+---------------------+
-                    |                    |                    |
-                    v                    v                    v
-         +---------------------+ +------------------+ +-------------------+
-         | Relational Database | | Vector Database  | |  Object Storage   |
-         |  SQLite3 (WAL Mode) | | Qdrant (Hybrid)  | | Local Disk / S3 / |
-         |  Citations, Memory  | | Dense + BM25 RRF | | Cloudflare R2     |
-         +---------------------+ +------------------+ +-------------------+
-```
+
+Notes the diagram does not carry:
+- The workspace is the primary research surface; the Control Dashboard is a separate administrative plane (bare-metal default ports 2026/2027, auto-incremented on collision).
+- The workspace exposes the split-pane reader, SSE chat, model switcher, discovery modal, research memory, and inline highlight badges. The dashboard exposes the gateway vault, storage switcher, visibility toggles, secret managers, embedding engine selector, and live health telemetry.
+- A per-chat model override can rebind the Primary model for a single session without changing global configuration.
+- Model tiers: Primary (16k output, 120s timeout), Fast (4k output, 45s timeout), Fallback (automatic failover).
+- The input context window is dynamic and auto-detected via `backend/rag/token_budget.py` rather than fixed at configuration time.
 
 ---
 
@@ -90,21 +82,27 @@ Not-NotebookLM is built on a decoupled architecture separating the **User Resear
 
 The system employs a **Tri-Layer Storage** approach ensuring persistence, query performance, and cloud portability:
 
+```mermaid
+flowchart LR
+    subgraph REL["1. SQLite Relational DB"]
+        T1["chat_sessions"]
+        T2["documents"]
+        T3["chat_messages"]
+        T4["citation_highlights"]
+        T5["research_profiles"]
+    end
+    subgraph VEC["2. Qdrant Vector DB"]
+        C1["fastembed, 384-dim"]
+        C2["gemini_3072, 3072-dim"]
+    end
+    subgraph FIL["3. File and Media Storage"]
+        F1["PDF / DOCX originals"]
+        F2["chat media"]
+        F3["parsed cache"]
+    end
 ```
-+------------------------------------------------------------------------------------+
-|                               STORAGE & PERSISTENCE                                |
-+----------------------------+-----------------------------+-------------------------+
-| 1. SQLite Relational DB    | 2. Qdrant Vector DB         | 3. File & Media Storage |
-|    (backend/not_notebooklm.db)|    (backend/qdrant_data/)   |    (Local / S3 / R2)    |
-| - ChatSessions             | - not_notebooklm_fastembed  | - Original PDF / DOCX   |
-| - Documents (metadata)     | - not_notebooklm_e5 (legacy)| - Chat Media / Images   |
-| - ChatMessages (variants)  | - not_notebooklm_gemini_3072| - .parsed_cache/ (MD)   |
-| - CitationHighlights       | - not_notebooklm_gemini     | - temp_zips/ (Export)   |
-| - ResearchProfiles (Memory)| - Hybrid: Dense + BM25 RRF  |                         |
-|                            | - Metadata filters:         |                         |
-|                            |   chat_id, filename, section|                         |
-+----------------------------+-----------------------------+-------------------------+
-```
+
+Which collections and on-disk locations each layer holds is enumerated in §3.1 through §3.3 below.
 
 ### 3.1 Relational Database (`SQLite` via SQLAlchemy 2.0)
 - **Path:** `backend/not_notebooklm.db` (can be redirected to PostgreSQL via `DATABASE_URL`).
@@ -148,24 +146,18 @@ The system employs a **Tri-Layer Storage** approach ensuring persistence, query 
 
 The system enforces **Tiered Model Routing** via `backend/rag/llm_factory.py` to balance throughput, latency, and rate-limit resilience:
 
+```mermaid
+flowchart TD
+    REQ["Incoming processing request"] --> SPLIT{"Task tier"}
+    SPLIT -->|"Synthesis / heavy turn"| PRIMARY["Primary Heavy LLM"]
+    SPLIT -->|"Micro-task / helper"| FAST["Fast Lite LLM"]
+    PRIMARY --> ERR{"Network, 5xx, or 429"}
+    FAST --> ERR
+    ERR -->|failure| FB["Fallback LLM"]
+    ERR -->|success| DONE["Response returned"]
 ```
-                      [Incoming Processing Request]
-                                    |
-                    +---------------+---------------+
-                    |                               |
-                    v (Synthesis / Heavy Turn)      v (Micro-Task / Helper)
-           [Primary Heavy LLM]             [Fast / Lite LLM]
-           - Max Output: 16k tokens        - Max Output: 4k tokens
-           - Timeout: 120 seconds          - Timeout: 45 seconds
-           - Temp: 0.2 (RAG) / 0.0 (Eval)  - Temp: 0.1 (JSON parse)
-                    |                               |
-                    +---------------+---------------+
-                                    |
-                          (Network / 5xx / 429)
-                                    v
-                          [Fallback Cascading LLM]
-                          - Automatic retry failover
-```
+
+Tier parameters: Primary runs at 16k max output tokens, 120s timeout, temperature 0.2 for RAG and 0.0 for evaluation. Fast runs at 4k max output tokens, 45s timeout, temperature 0.1 for JSON parsing. The fallback tier retries automatically on failure.
 
 ### 4.1 Fast LLM Responsibilities
 The Fast LLM is strictly decoupled for low-latency auxiliary micro-tasks:
@@ -187,45 +179,38 @@ To support arbitrary model providers and direct official keys without forcing th
 ## 5. End-to-End Orchestration Pipelines
 
 ### 5.1 Ingestion & Section-Aware Academic Chunker (`academic_chunker.py`)
-```
-[Raw Document: PDF / DOCX / Markdown / Text]
-  │
-  ├── PyMuPDF4LLM / python-docx / markdown extractor
-  │   └── Clean Markdown Text (preserves tables, LaTeX, and headings)
-  │
-  ├── Hierarchical Breadcrumb Tracking (Heading Stack H1 -> H2 -> H3)
-  │
-  ├── 9 Canonical IMRaD Centroids (Regex + Cosine Embedding Anchor):
-  │   Abstract, Introduction, Literature Review, Methodology, 
-  │   Results, Discussion, Conclusion, Limitations, References
-  │
-  ├── Embeddings: FastEmbed ONNX Multilingual MiniLM (384 dim) + FastEmbed BM25
-  │
-  └── Persistence: Upsert to Qdrant (Hybrid vectors + metadata payload)
+```mermaid
+flowchart TD
+    IN["Raw document: PDF, DOCX, Markdown, or text"] --> EX["PyMuPDF4LLM, python-docx, or markdown extractor"]
+    EX --> MD["Clean Markdown preserving tables, LaTeX, headings"]
+    MD --> BR["Hierarchical breadcrumb tracking H1 to H3"]
+    BR --> SEC["9 canonical IMRaD centroids"]
+    SEC --> EMB["FastEmbed ONNX MiniLM 384-dim + BM25 sparse"]
+    EMB --> UP["Upsert to Qdrant hybrid vectors + metadata"]
 ```
 
+The nine canonical centroids are Abstract, Introduction, Literature Review, Methodology, Results, Discussion, Conclusion, Limitations, and References, detected by regex plus cosine embedding anchor.
+
 ### 5.2 Literature Discovery & PDF Racing Resolver (`search.py`)
+```mermaid
+flowchart TD
+    UQ["User query: find recent papers on a topic"] --> QP["Query planner: en, id, native"]
+    QP --> PAR{"Concurrent multi-engine search"}
+    PAR --> OA["OpenAlex"]
+    PAR --> CR["Crossref"]
+    PAR --> EP["Europe PMC"]
+    PAR --> DDG["DuckDuckGo fallback"]
+    OA --> AUD["Metadata auditor and ranking"]
+    CR --> AUD
+    EP --> AUD
+    DDG --> AUD
+    AUD --> JUDGE["Paper relevance judge"]
+    JUDGE --> RACE["Parallel PDF racing resolver"]
+    RACE --> VER["In-memory authenticity check"]
+    VER --> WIN["First valid PDF saved"]
 ```
-[User Query: "find recent papers on quantum error mitigation"]
-  │
-  ├── Query Planner (Extracts clean queries: en_query, id_query, native_query)
-  │
-  ├── Concurrent Multi-Engine Search:
-  │   ├── OpenAlex API (Authoritative open-access catalog)
-  │   ├── Crossref API (Global DOI registry)
-  │   ├── Europe PMC API (Biomedical & life sciences literature)
-  │   └── DuckDuckGo Academic Crawler (Preprints, niche topics, fallback)
-  │
-  ├── Metadata Auditor & Ranking (Scopus Q1-Q4, SINTA, Citation Velocity)
-  │
-  ├── Paper Relevance Judge (Fast LLM screens abstracts against research intent)
-  │   └── Eliminates out-of-scope papers and predatory spam
-  │
-  └── Parallel PDF Racing Resolver:
-      ├── Race resolvers concurrently: arXiv, Unpaywall, OpenAlex, Europe PMC
-      ├── In-Memory PDF Authenticity Check (Verifies title & DOI in first 2 pages)
-      └── First valid PDF winner saved to uploads/ while cancelling slower tasks
-```
+
+OpenAlex is the open-access catalog, Crossref the global DOI registry, Europe PMC covers biomedical and life sciences, and DuckDuckGo handles preprints and niche topics. Ranking weighs Scopus Q1-Q4, SINTA, and citation velocity. The judge screens abstracts for scope and predatory spam. Resolvers race across arXiv, Unpaywall, OpenAlex, and Europe PMC, verify title and DOI in the first two pages, and cancel slower tasks once a winner is saved.
 
 ### 5.2.1 Deterministic Journal Indexing (`journal_indexer.py`)
 
@@ -238,38 +223,19 @@ To support arbitrary model providers and direct official keys without forcing th
 
 NotbookLM dynamically adjusts retrieval strategy based on workspace document density:
 
+```mermaid
+flowchart TD
+    Q["User RAG query"] --> INSP["Inspect workspace documents and density"]
+    INSP --> DENS{"Workspace density"}
+    DENS -->|"4 documents or fewer"| DIRECT["Direct context packing"]
+    DENS -->|"more than 4 documents"| HYB["Hybrid retrieval and reranking"]
+    DIRECT --> MEM["Inject active research profile memory"]
+    HYB --> MEM
+    MEM --> SYS["Grounded system prompt with full guardrails"]
+    SYS --> OUT["LLM synthesis and citation map emission"]
 ```
-                                  [User RAG Query]
-                                          |
-                                          v
-                      [Inspect Workspace Documents & Density]
-                                          |
-                  +-----------------------+-----------------------+
-                  |                                               |
-                  v (Workspace <= 4 Documents)                    v (Workspace > 4 Documents)
-      +---------------------------------------+       +---------------------------------------+
-      |        DIRECT CONTEXT PACKING         |       |      HYBRID RETRIEVAL & RERANKING     |
-      | - Token Budget Inspector              |       | - Build Structured Document Catalog   |
-      | - Pack all full-text documents        |       | - Hybrid Qdrant Retrieval (Top-25:    |
-      |   directly into prompt headroom       |       |   FastEmbed Dense MiniLM + FastEmbed  |
-      | - Maximum fidelity & zero recall loss |       |   BM25 via RRF)                       |
-      |                                       |       | - FlashRank Cross-Encoder Rerank      |
-      |                                       |       |   (Top-12 most relevant excerpts)     |
-      |                                       |       | - Solves Stanford 'Lost in Middle'    |
-      +-------------------+-------------------+       +-------------------+-------------------+
-                          |                                               |
-                          +-----------------------+-----------------------+
-                                                  |
-                                                  v
-                              [Inject Active Research Profile Memory]
-                              (Constraints, Hardware, Objectives: <= 250 tokens)
-                                                  |
-                                                  v
-                              [Grounded System Prompt with Full Guardrails]
-                                                  |
-                                                  v
-                              [LLM Synthesis & Citation Map Emission]
-```
+
+Direct packing inspects the token budget and places every full text into prompt headroom for maximum fidelity and zero recall loss. Hybrid retrieval builds a structured document catalog, retrieves the top 25 nodes from Qdrant using dense MiniLM plus BM25 via RRF, then reranks to the top 12 excerpts with the FlashRank cross-encoder, which addresses the lost-in-the-middle failure mode. Both paths then inject up to 250 tokens of active research profile memory before the grounded system prompt.
 
 ### 5.4 Two-Tier Verbatim Citation & Reader Highlighting Engine
 
@@ -325,6 +291,26 @@ To eliminate setup friction for non-developer researchers and students, NotbookL
   - Arrow-key menu providing direct browser launch to Research Workspace (Port 2026), Control Dashboard (Port 2027), live activity logs streaming, detached background execution, and graceful process shutdown.
 - **Process Lifecycle CLI Subcommands:** `notbooklm status`, `notbooklm stop`, `notbooklm admin`, and `notbooklm update` (checks GitHub Atom releases feed with 24-hour local caching and guided upgrade execution).
 - **Strict UNIX Signal & Navigation Semantics:** In live activity logs, pressing `Enter` or `q` exits cleanly to the main menu without stopping servers, while `Ctrl+C` initiates graceful daemon termination (`cmd_stop()`).
+
+### 5.8 Chat-Initiated Source Deletion Confirmation
+
+Chat deletion requests are proposals, not mutations. The Fast LLM selects candidate document IDs from the active workspace; the backend validates those IDs against that chat and returns a `SOURCES_ACTION` proposal. The frontend checks the chat and visible source IDs, then waits for an explicit user confirmation before calling the existing bulk-delete endpoint.
+
+```mermaid
+flowchart TD
+    ASK["User requests source removal"] --> MATCH["Fast LLM matches request to workspace sources"]
+    MATCH --> VALIDATE["Backend validates IDs against the active chat"]
+    VALIDATE --> PROPOSAL["Return proposal; files, vectors, and records remain unchanged"]
+    PROPOSAL --> FRONTEND["Frontend validates chat and source IDs"]
+    FRONTEND --> DECISION{"User decision"}
+    DECISION -->|Cancel or switch chat| KEEP["Discard proposal; sources remain"]
+    DECISION -->|Confirm| API["POST /chats/{chat_id}/documents/bulk_delete"]
+    API --> SCOPE["Deletion service rechecks document IDs within that chat"]
+    SCOPE --> DELETE["Delete source files, vectors, citations, and database rows"]
+    DELETE --> REFRESH["Refresh the visible source list after success"]
+```
+
+Proposals never delete automatically during send, edit, or regenerate. A proposal is cleared when the user changes chats or cancels; failed API requests leave the dialog open and the source list unchanged.
 
 ---
 

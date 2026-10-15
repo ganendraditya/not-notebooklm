@@ -10,6 +10,8 @@ describe("useChatStream Queue Processing", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("automatically processes subsequent queued messages when current stream finishes", async () => {
@@ -22,7 +24,6 @@ describe("useChatStream Queue Processing", () => {
     const bumpSessionToTop = vi.fn();
     const updateSessionsList = vi.fn();
     const updateMessagesList = vi.fn();
-    const updateDocumentsList = vi.fn();
     const handleEnsureChatSessionRef = { current: vi.fn().mockResolvedValue("chat-1") };
 
     // Mock fetch to simulate SSE stream response
@@ -56,7 +57,6 @@ describe("useChatStream Queue Processing", () => {
         bumpSessionToTop,
         updateSessionsList,
         updateMessagesList,
-        updateDocumentsList,
         handleEnsureChatSessionRef
       )
     );
@@ -87,4 +87,53 @@ describe("useChatStream Queue Processing", () => {
     expect(fetchCallCount).toBe(2);
     expect(job.queue.length).toBe(0);
   });
+
+  it.each(["send", "edit", "regenerate"] as const)(
+    "raises a chat-scoped delete proposal after %s completes",
+    async (operation) => {
+      const activeChatIdRef = { current: "chat-1" };
+      const onDeleteProposal = vi.fn();
+      const content = '<!-- SOURCES_ACTION: {"action":"confirm_delete","chat_id":"chat-1","doc_ids":[7]} -->';
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(
+            `data: ${JSON.stringify({
+              type: "done",
+              message: { role: "assistant", content, created_at: "2026-01-01" },
+            })}\n\n`
+          ));
+          controller.close();
+        },
+      });
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(stream, { status: 200 })));
+
+      const { result } = renderHook(() =>
+        useChatStream(
+          "http://localhost:8000",
+          activeChatIdRef,
+          [],
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          vi.fn(),
+          { current: vi.fn().mockResolvedValue("chat-1") },
+          onDeleteProposal
+        )
+      );
+
+      await act(async () => {
+        if (operation === "send") await result.current.handleSendMessage("remove Paper A");
+        if (operation === "edit") await result.current.handleEditMessage(0, "remove Paper A");
+        if (operation === "regenerate") await result.current.handleRegenerateMessage(0);
+      });
+
+      expect(onDeleteProposal).toHaveBeenCalledExactlyOnceWith({
+        chatId: "chat-1",
+        documentIds: [7],
+      });
+    }
+  );
 });
