@@ -11,9 +11,32 @@ from utils.file_utils import get_doc_file_path
 from utils.pdf_utils import is_authentic_pdf_bytes, is_binary_pdf
 from utils.text_processing import clean_doi
 from providers.academic import resolve_and_fetch_authentic_pdf
+from services.document.title_service import update_document_title_if_unchanged
 import rag
 
 logger = logging.getLogger("uvicorn.error")
+
+
+def _persist_enriched_title(
+    db: Session,
+    chat_id: str,
+    doc: Document,
+    expected_title: str | None,
+    new_title: str,
+) -> bool:
+    updated = update_document_title_if_unchanged(
+        db,
+        chat_id,
+        doc.id,
+        expected_title,
+        new_title,
+    )
+    if updated:
+        db.expire(doc, ["title"])
+    else:
+        db.refresh(doc, attribute_names=["title"])
+    return updated
+
 
 def inspect_document_file_status(chat_id: str, filename: str) -> bool:
     """Checks if a document file exists on disk and is an authentic binary PDF."""
@@ -112,6 +135,7 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
     """
     file_path = get_doc_file_path(chat_id, doc.filename)
     has_db_metadata = bool(doc.title)
+    original_title = doc.title
     
     if has_db_metadata:
         try:
@@ -125,14 +149,24 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
         if (not db_doi or not db_authors) and os.path.exists(file_path):
             try:
                 from services.document.metadata_extractor import extract_hybrid_document_metadata
+
                 enriched = await extract_hybrid_document_metadata(file_path, doc.filename)
                 if enriched and (enriched.get("doi") or enriched.get("authors")):
                     if enriched.get("doi"):
                         db_doi = enriched["doi"]
                         doc.doi = enriched["doi"]
                         doc.url = enriched.get("url") or f"https://doi.org/{db_doi}"
-                    if enriched.get("title") and (not doc.title or doc.title == doc.filename.replace(".pdf", "")):
-                        doc.title = enriched["title"]
+                    if enriched.get("title") and (
+                        not original_title
+                        or original_title == doc.filename.replace(".pdf", "")
+                    ):
+                        _persist_enriched_title(
+                            db,
+                            chat_id,
+                            doc,
+                            original_title,
+                            enriched["title"],
+                        )
                     if enriched.get("authors"):
                         doc.authors = json.dumps(enriched["authors"], ensure_ascii=False)
                         db_authors = enriched["authors"]
@@ -374,7 +408,15 @@ async def get_document_full_content(chat_id: str, doc: Document, db: Session) ->
                     pass
             
             try:
-                doc.title = res_data["title"]
+                title_updated = _persist_enriched_title(
+                    db,
+                    chat_id,
+                    doc,
+                    original_title,
+                    res_data["title"],
+                )
+                if not title_updated:
+                    res_data["title"] = doc.title or clean_filename_title
                 doc.authors = json.dumps(res_data["authors"], ensure_ascii=False) if res_data["authors"] else None
                 doc.year = res_data["year"]
                 doc.journal = res_data["journal"]

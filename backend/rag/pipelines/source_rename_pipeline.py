@@ -15,7 +15,7 @@ MAX_SOURCE_RENAME_TITLE_LENGTH = 500
 
 
 class SourceRenameDecision(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(extra="ignore", strict=True)
 
     action: Literal["rename", "clarify", "no_action", "blocked"]
     source_number: StrictInt | None = None
@@ -24,7 +24,11 @@ class SourceRenameDecision(BaseModel):
     success_response: StrictStr | None = Field(default=None, max_length=1200)
     conflict_response: StrictStr | None = Field(default=None, max_length=1200)
     unchanged_response: StrictStr | None = Field(default=None, max_length=1200)
-    stale_response: StrictStr = Field(min_length=1, max_length=1200)
+    stale_response: StrictStr = Field(
+        default="I couldn't verify the source or exact title. No change was made.",
+        min_length=1,
+        max_length=1200,
+    )
 
     @model_validator(mode="after")
     def validate_action_fields(self):
@@ -73,6 +77,14 @@ def _snapshot_title_matches(document: DBDocument, snapshot_title: str | None) ->
     if document.title:
         return snapshot_title == document.title
     return snapshot_title in {None, "", _display_source_title(document), document.filename}
+
+
+def _parse_source_rename_decision(response_text: str) -> SourceRenameDecision:
+    clean_response = response_text.strip()
+    if clean_response.startswith("```"):
+        clean_response = re.sub(r"^```(?:json)?\s*", "", clean_response, flags=re.IGNORECASE)
+        clean_response = re.sub(r"\s*```$", "", clean_response)
+    return SourceRenameDecision.model_validate_json(clean_response)
 
 
 def _load_source_snapshot(
@@ -167,7 +179,7 @@ async def handle_source_rename_pipeline(
 
     try:
         response = await acall_fast_with_fallback(lambda llm: llm.acomplete(prompt))
-        decision = SourceRenameDecision.model_validate_json(response.text)
+        decision = _parse_source_rename_decision(response.text)
     except Exception as error:
         logger.info("[Source Rename Parser] No rename action was produced: %s", error)
         return SourceRenameReply(

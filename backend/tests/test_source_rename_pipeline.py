@@ -78,6 +78,35 @@ async def test_rename_maps_source_number_through_chat_scoped_snapshot(monkeypatc
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("response_format", ["fenced", "extra_field"])
+async def test_rename_accepts_fenced_json_and_ignores_extra_fields(monkeypatch, response_format):
+    session = make_session(source_docs())
+    monkeypatch.setattr(source_rename_pipeline, "SessionLocal", Mock(return_value=session))
+    payload = json.loads(decision_payload(source_number=1))
+    if response_format == "fenced":
+        response_text = f"```json\n{json.dumps(payload)}\n```"
+    else:
+        payload["reason"] = "The command named one source and an exact title."
+        response_text = json.dumps(payload)
+    monkeypatch.setattr(
+        source_rename_pipeline,
+        "acall_fast_with_fallback",
+        AsyncMock(return_value=SimpleNamespace(text=response_text)),
+    )
+
+    result = await source_rename_pipeline.handle_source_rename_pipeline(
+        "chat-1",
+        'Rename source 1 to "Evaluation Dataset"',
+        None,
+        AsyncMock(),
+        source_snapshot(),
+    )
+
+    assert isinstance(result, source_rename_pipeline.SourceRenameCommand)
+    assert result.doc_id == 901
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("snapshot_title", ["paper a", "paper_a.pdf", "", None])
 async def test_rename_accepts_visible_title_variants_when_database_title_is_blank(
     monkeypatch, snapshot_title
@@ -184,6 +213,36 @@ async def test_non_rename_decisions_never_create_a_command(monkeypatch, action):
 
     assert isinstance(result, source_rename_pipeline.SourceRenameReply)
     assert result.response == "No source was changed."
+
+
+@pytest.mark.asyncio
+async def test_non_rename_decision_does_not_require_stale_response(monkeypatch):
+    session = make_session(source_docs())
+    monkeypatch.setattr(source_rename_pipeline, "SessionLocal", Mock(return_value=session))
+    payload = json.loads(
+        decision_payload(
+            action="clarify",
+            source_number=None,
+            new_title=None,
+            response="Which source should I rename?",
+            success_response=None,
+            conflict_response=None,
+            unchanged_response=None,
+        )
+    )
+    del payload["stale_response"]
+    monkeypatch.setattr(
+        source_rename_pipeline,
+        "acall_fast_with_fallback",
+        AsyncMock(return_value=SimpleNamespace(text=json.dumps(payload))),
+    )
+
+    result = await source_rename_pipeline.handle_source_rename_pipeline(
+        "chat-1", "Rename a source", None, AsyncMock(), source_snapshot()
+    )
+
+    assert isinstance(result, source_rename_pipeline.SourceRenameReply)
+    assert result.response == "Which source should I rename?"
 
 
 @pytest.mark.asyncio

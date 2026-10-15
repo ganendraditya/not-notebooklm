@@ -37,6 +37,25 @@ def normalize_document_title(title: str) -> str:
     return clean_title
 
 
+def update_document_title_if_unchanged(
+    db: Session,
+    chat_id: str,
+    doc_id: int,
+    expected_title: str | None,
+    new_title: str,
+) -> bool:
+    query = db.query(Document).filter(
+        Document.id == doc_id,
+        Document.chat_id == chat_id,
+    )
+    if expected_title is None:
+        query = query.filter(Document.title.is_(None))
+    else:
+        query = query.filter(Document.title == expected_title)
+
+    return query.update({Document.title: new_title}, synchronize_session=False) == 1
+
+
 def rename_document_title(
     db: Session,
     chat_id: str,
@@ -68,13 +87,14 @@ def rename_document_title(
         return document, False
 
     if expected_title is not _UNSET:
-        update_query = scoped_query
-        if expected_title is None:
-            update_query = update_query.filter(Document.title.is_(None))
-        else:
-            update_query = update_query.filter(Document.title == expected_title)
-        updated_count = update_query.update({Document.title: clean_title}, synchronize_session=False)
-        if updated_count != 1:
+        updated = update_document_title_if_unchanged(
+            db,
+            chat_id,
+            doc_id,
+            expected_title,
+            clean_title,
+        )
+        if not updated:
             raise DocumentTitleConflictError("Document title changed while the rename was being prepared.")
         db.expire_all()
         document = scoped_query.first()
