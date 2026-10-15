@@ -43,6 +43,30 @@ describe("useChatDeleteConfirmation", () => {
     expect(result.current.proposal).toBeNull();
   });
 
+  it("uses the latest source list from a callback captured before a rerender", () => {
+    const activeChatIdRef = { current: "chat-1" };
+    const addedDocument = {
+      id: 9,
+      filename: "paper-c.pdf",
+      title: "Paper C",
+      created_at: "2026-01-01",
+    };
+    const { result, rerender } = renderHook(
+      ({ currentDocuments }) =>
+        useChatDeleteConfirmation({
+          ...makeProps(activeChatIdRef),
+          documents: currentDocuments,
+        }),
+      { initialProps: { currentDocuments: documents } }
+    );
+    const callbackCapturedBeforeUpdate = result.current.requestConfirmation;
+
+    rerender({ currentDocuments: [...documents, addedDocument] });
+    act(() => callbackCapturedBeforeUpdate({ chatId: "chat-1", documentIds: [9] }));
+
+    expect(result.current.proposal?.sourceNames).toEqual(["Paper C"]);
+  });
+
   it("posts one chat-scoped delete only after confirmation and refreshes on success", async () => {
     const activeChatIdRef = { current: "chat-1" };
     const onDocumentsDeleted = vi.fn();

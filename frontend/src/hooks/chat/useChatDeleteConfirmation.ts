@@ -25,16 +25,21 @@ export function useChatDeleteConfirmation({
   const [isDeleting, setIsDeleting] = useState(false);
   const [hasDeleteError, setHasDeleteError] = useState(false);
   const isDeletingRef = useRef(false);
+  const documentsRef = useRef(documents);
 
   useEffect(() => {
     setProposal(null);
     setHasDeleteError(false);
   }, [activeChatId]);
 
+  useEffect(() => {
+    documentsRef.current = documents;
+  }, [documents]);
+
   const requestConfirmation = useCallback((nextProposal: ChatDeleteProposal) => {
     if (activeChatIdRef.current !== nextProposal.chatId) return;
 
-    const documentsById = new Map(documents.map((doc) => [doc.id, doc]));
+    const documentsById = new Map(documentsRef.current.map((doc) => [doc.id, doc]));
     const uniqueIds = [...new Set(nextProposal.documentIds)];
     const matchedDocuments = uniqueIds.map((id) => documentsById.get(id));
     if (uniqueIds.length === 0 || matchedDocuments.some((doc) => !doc)) return;
@@ -46,7 +51,7 @@ export function useChatDeleteConfirmation({
       sourceNames: resolvedDocuments.map((doc) => doc.title?.trim() || doc.filename),
     });
     setHasDeleteError(false);
-  }, [activeChatIdRef, documents]);
+  }, [activeChatIdRef]);
 
   const cancel = useCallback(() => {
     if (isDeletingRef.current) return;
