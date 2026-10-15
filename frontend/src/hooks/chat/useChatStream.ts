@@ -1,15 +1,17 @@
 import { useRef } from "react";
 import { type ChatMessage, type Attachment, useChatStore } from "@/stores/chatStore";
+import { useDocumentStore } from "@/stores/documentStore";
 import { consumeSSEStream } from "@/lib/sse";
 import { sendSystemNotification } from "@/lib/notifications";
 import { createSmoothTextStreamer } from "@/lib/smoothStreamer";
-import { parseChatDeleteProposal } from "@/lib/sourceActions";
+import { parseChatDeleteProposal, parseSourceRenameEvent, type ChatSourceRename } from "@/lib/sourceActions";
 import { formatExecutionDuration } from "@/lib/utils";
 
 // Queue now needs to store attachments too
 export interface QueuedMessage {
   text: string;
   attachments?: Attachment[];
+  sourceSnapshot?: Array<{ docId: number; title?: string; filename: string }>;
 }
 
 export interface ChatJobState {
@@ -37,7 +39,8 @@ export function useChatStream(
   updateSessionsList: (updater: (prev: any[]) => any[]) => void,
   updateMessagesList: (updater: (prev: ChatMessage[]) => ChatMessage[]) => void,
   handleEnsureChatSessionRef: React.MutableRefObject<(suggestedTitle?: string) => Promise<string>>,
-  onDeleteProposal?: (proposal: { chatId: string; documentIds: number[] }) => void
+  onDeleteProposal?: (proposal: { chatId: string; documentIds: number[] }) => void,
+  onSourceRenamed?: (rename: ChatSourceRename) => void
 ) {
   const chatJobsRef = useRef<Map<string, ChatJobState>>(new Map());
 
@@ -129,7 +132,12 @@ export function useChatStream(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           message: nextMessage.text,
-          attachments: nextMessage.attachments
+          attachments: nextMessage.attachments,
+          source_snapshot: nextMessage.sourceSnapshot?.map((source) => ({
+            doc_id: source.docId,
+            title: source.title ?? null,
+            filename: source.filename,
+          })),
         }),
         signal: controller.signal
       });
@@ -242,6 +250,9 @@ export function useChatStream(
         } else if (data.type === "done") {
           latestAsstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
           smoother.finish();
+        } else if (data.type === "source_renamed") {
+          const rename = parseSourceRenameEvent(data, targetChatId);
+          if (rename) onSourceRenamed?.(rename);
         } else if (data.type === "error") {
           smoother.stop();
           const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };
@@ -368,16 +379,22 @@ export function useChatStream(
 
     const job = getChatJob(currentChatId);
 
+    const sourceSnapshot = useDocumentStore.getState().documents.map((document) => ({
+      docId: document.id,
+      title: document.title,
+      filename: document.filename,
+    }));
+
     if (job.isProcessing) {
       // If AI is currently generating for this chat, add to queue
-      job.queue.push({ text, attachments });
+      job.queue.push({ text, attachments, sourceSnapshot });
       if (activeChatIdRef.current === currentChatId) {
         setQueuedPrompts(job.queue.map(q => q.text));
       }
       return;
     }
 
-    job.queue.push({ text, attachments });
+    job.queue.push({ text, attachments, sourceSnapshot });
     if (activeChatIdRef.current === currentChatId) {
       setQueuedPrompts(job.queue.map(q => q.text));
     }
@@ -391,6 +408,12 @@ export function useChatStream(
       currentChatId = await handleEnsureChatSessionRef.current(newContent);
     }
     if (!currentChatId) return;
+
+    const sourceSnapshot = useDocumentStore.getState().documents.map((document) => ({
+      docId: document.id,
+      title: document.title,
+      filename: document.filename,
+    }));
 
     const job = getChatJob(currentChatId);
 
@@ -507,7 +530,12 @@ export function useChatStream(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message_index: messageIndex,
-          message: newContent
+          message: newContent,
+          source_snapshot: sourceSnapshot.map((source) => ({
+            doc_id: source.docId,
+            title: source.title ?? null,
+            filename: source.filename,
+          })),
         }),
         signal: controller.signal
       });
@@ -531,6 +559,9 @@ export function useChatStream(
         } else if (data.type === "done") {
           latestAsstMsg = data.message || { role: "assistant", content: data.data || "", created_at: new Date().toISOString() };
           smoother.finish();
+        } else if (data.type === "source_renamed") {
+          const rename = parseSourceRenameEvent(data, currentChatId);
+          if (rename) onSourceRenamed?.(rename);
         } else if (data.type === "error") {
           smoother.stop();
           const errorMsg = data.message || { role: "assistant", content: `⚠️ ${data.data || "Error processing request"}`, created_at: new Date().toISOString() };

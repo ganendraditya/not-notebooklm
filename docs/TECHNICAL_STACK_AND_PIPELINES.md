@@ -28,6 +28,7 @@ graph TB
             P5["5. Dual-mode RAG engine"]
             P6["6. Declarative research memory"]
             P7["7. Verbatim citation verifier"]
+            P8["8. Conversational source rename"]
         end
     end
     subgraph STORE["Tri-Layer Storage"]
@@ -161,7 +162,7 @@ Tier parameters: Primary runs at 16k max output tokens, 120s timeout, temperatur
 
 ### 4.1 Fast LLM Responsibilities
 The Fast LLM is strictly decoupled for low-latency auxiliary micro-tasks:
-1. **Semantic Intent Classification:** Classifies user query into 4 execution categories (`backend/rag/intent.py`).
+1. **Semantic Intent Classification:** Classifies user query into 5 execution categories (`backend/rag/intent.py`).
 2. **Academic Query Planner:** Extracts entities, year boundaries, target quantities, language codes, and Scopus quartile filters (`backend/services/search/query_planner.py`).
 3. **Paper Relevance Judge & Screening:** Evaluates candidate abstracts to eliminate false-positives (`backend/services/search/paper_judge.py`).
 4. **Early-Draft Conversation Title:** Generates a 3-5 word concise topic title within 1.5 seconds (`backend/services/search/title_generator.py`).
@@ -311,6 +312,30 @@ flowchart TD
 ```
 
 Proposals never delete automatically during send, edit, or regenerate. A proposal is cleared when the user changes chats or cancels; failed API requests leave the dialog open and the source list unchanged.
+
+### 5.9 Chat-Initiated Source Renaming
+
+Source renaming is a separate intent from deletion. The Fast LLM may propose one rename only when the latest user message is a direct command, identifies one source, and contains the exact new title. Questions, negation, quoted examples, suggestions, batch requests, and incomplete commands do not mutate data.
+
+```mermaid
+flowchart TD
+    ASK["User sends a rename command"] --> INTENT["Fast LLM classifies RENAME_SOURCE"]
+    INTENT --> PARSE["Strict rename decision: one source number and literal title"]
+    PARSE --> VALID{"Explicit, single-source command?"}
+    VALID -->|No| CLARIFY["Reply or ask for details; no database change"]
+    VALID -->|Yes| SNAP["Resolve 1-based source number through submitted chat-scoped ID snapshot"]
+    SNAP --> CAS{"Document belongs to chat and prior title is unchanged?"}
+    CAS -->|No| CONFLICT["Report conflict; do not overwrite the newer title"]
+    CAS -->|Yes| TX["One transaction: compare-and-set title and save assistant response"]
+    TX --> COMMIT{"Commit succeeds?"}
+    COMMIT -->|No| ROLLBACK["Rollback title and response; return stream error"]
+    COMMIT -->|Yes| EVENT["Emit source_renamed SSE event"]
+    EVENT --> UI["Update source list, targeted source, reader, and detail cache"]
+```
+
+The source number is never treated as a database ID. The server resolves it against the ordered ID, title, and filename snapshot captured when the user sends or queues the prompt, then rechecks chat ownership and the previous title when writing. Requests without a submitted snapshot, stale snapshots, missing sources, title conflicts, invalid titles, or failed commits cannot rename a source. The existing `doc.title` field remains the single displayed title, so no schema migration or separate alias field is introduced. The existing manual rename endpoint uses the same title validation service.
+
+Successful rename feedback and the title update commit together. The frontend receives the committed result over SSE and updates the list, open reader, targeted source, and cached paper details. Regeneration disables `RENAME_SOURCE`; a rename is not repeated by replaying an assistant response. Editing a user message creates a new request and is validated again. The feature does not add a toolbar control or confirmation modal.
 
 ---
 

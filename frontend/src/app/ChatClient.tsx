@@ -19,6 +19,8 @@ import { useUIStore } from "@/stores/uiStore";
 import { useChatSession } from "@/hooks/chat/useChatSession";
 import { useChatDeleteConfirmation } from "@/hooks/chat/useChatDeleteConfirmation";
 import { useChatStream, type ChatJobState } from "@/hooks/chat/useChatStream";
+import { updateCachedPaperTitle } from "@/hooks/usePaperDetails";
+import type { ChatSourceRename } from "@/lib/sourceActions";
 import { isMatchingPaper } from "@/lib/sourceUtils";
 
 export default function ChatClient() {
@@ -108,6 +110,26 @@ export default function ChatClient() {
     if (viewingDoc && docIds.includes(viewingDoc.id)) setViewingDoc(null);
   };
 
+  const handleSourceRenamed = (rename: ChatSourceRename) => {
+    updateCachedPaperTitle(rename.chatId, rename.docId, rename.newTitle);
+    if (activeChatIdRef.current !== rename.chatId) return;
+
+    const documentStore = useDocumentStore.getState();
+    documentStore.updateDocumentsList((prev) => prev.map((document) =>
+      document.id === rename.docId ? { ...document, title: rename.newTitle } : document
+    ));
+
+    const currentViewingDoc = documentStore.viewingDoc;
+    if (currentViewingDoc?.id === rename.docId) {
+      documentStore.setViewingDoc({ ...currentViewingDoc, title: rename.newTitle });
+    }
+
+    const currentTargetedSource = documentStore.targetedSource;
+    if (currentTargetedSource?.id === rename.docId) {
+      documentStore.setTargetedSource({ ...currentTargetedSource, title: rename.newTitle });
+    }
+  };
+
   const {
     proposal: chatDeleteProposal,
     isDeleting: isChatDeleteSubmitting,
@@ -145,7 +167,8 @@ export default function ChatClient() {
     updateSessionsList,
     updateMessagesList,
     handleEnsureChatSessionRef,
-    requestChatDeleteConfirmation
+    requestChatDeleteConfirmation,
+    handleSourceRenamed
   );
 
   // Keep getChatJobRef in sync with actual implementation

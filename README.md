@@ -371,6 +371,14 @@ flowchart TD
     IC -->|ANALYZE_WORKSPACE| P2["Workspace synthesis"]
     IC -->|REMOVE_SOURCES| P3["Source action"]
     IC -->|GENERAL_CHAT| P4["General chat"]
+    IC -->|RENAME_SOURCE| R1["Validate explicit rename request"]
+    R1 --> R2{"Source number and exact title valid?"}
+    R2 -->|No| R3["Ask for clarification; no change"]
+    R2 -->|Yes| R4["Resolve number against chat-scoped source snapshot"]
+    R4 --> R5{"Source and previous title still match?"}
+    R5 -->|No| R3
+    R5 -->|Yes| R6["Commit title and assistant response atomically"]
+    R6 --> R7["SSE event updates source list and reader cache"]
     P2 --> DENS{"Workspace density"}
     DENS -->|"4 documents or fewer"| DIRECT["Direct context packing"]
     DENS -->|"more than 4 documents"| HYB["Hybrid retrieval, top-25"]
@@ -381,7 +389,7 @@ flowchart TD
     LLM --> OUT["Synthesis and citation map"]
 ```
 
-The classifier runs on the Fast LLM and routes the query to one of four pipelines. Only the synthesis path is density-sensitive: four documents or fewer are packed whole, while larger workspaces go through dense plus BM25 hybrid retrieval and a cross-encoder rerank.
+The classifier runs on the Fast LLM and routes the query to one of five paths. A rename requires an explicit single-source command and an exact title present in the user's message. The backend resolves the source number through the submitted chat-scoped ID, title, and filename snapshot, then uses a compare-and-set update before committing the response. Regeneration cannot repeat the mutation. Only the synthesis path is density-sensitive: four documents or fewer are packed whole, while larger workspaces go through dense plus BM25 hybrid retrieval and a cross-encoder rerank.
 
 ### Repository Structure
 

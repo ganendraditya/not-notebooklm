@@ -1,12 +1,16 @@
 import json
 import asyncio
 import logging
+from dataclasses import asdict
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db, ChatSession, ChatMessage, commit_with_retry, get_utc_now
 from utils.streaming import create_sse_stream_response, SSEStreamEmitter
+from rag.pipelines.source_rename_pipeline import SourceRenameCommand, SourceRenameReply
+from services.chat_message_service import add_assistant_message
+from services.source_rename_service import persist_chat_source_rename, persist_source_rename_reply
 import models
 import rag
 
@@ -35,17 +39,7 @@ def save_stream_assistant_response(chat_id: str, resp_text: str) -> None:
     from database import SessionLocal
     bg_db = SessionLocal()
     try:
-        asst_msg = ChatMessage(
-            chat_id=chat_id,
-            role="assistant",
-            content=resp_text,
-            variants_json=json.dumps([resp_text]),
-            active_variant_index=0
-        )
-        bg_db.add(asst_msg)
-        bg_chat = bg_db.query(ChatSession).filter(ChatSession.id == chat_id).first()
-        if bg_chat:
-            bg_chat.updated_at = get_utc_now()
+        add_assistant_message(bg_db, chat_id, resp_text)
         commit_with_retry(bg_db)
     finally:
         bg_db.close()
@@ -57,6 +51,58 @@ def save_stream_assistant_response(chat_id: str, resp_text: str) -> None:
         asyncio.create_task(auto_ground_response_citations(chat_id, resp_text))
     except Exception as e:
         logger.debug(f"[Auto-Ground Trigger Warning]: {e}")
+
+
+def persist_rag_response(
+    chat_id: str,
+    response: str | SourceRenameReply | SourceRenameCommand,
+    *,
+    persist_text_response: bool = True,
+):
+    if isinstance(response, SourceRenameReply):
+        if not persist_text_response:
+            return response.response, None
+
+        from database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            return persist_source_rename_reply(db, chat_id, response.response), None
+        finally:
+            db.close()
+
+    if not isinstance(response, SourceRenameCommand):
+        if persist_text_response:
+            save_stream_assistant_response(chat_id, response)
+        return response, None
+
+    if not persist_text_response:
+        raise ValueError("Source changes cannot be replayed while regenerating a response.")
+
+    from database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        result = persist_chat_source_rename(
+            db,
+            chat_id=response.chat_id,
+            doc_id=response.doc_id,
+            source_number=response.source_number,
+            expected_title=response.expected_title,
+            previous_title=response.previous_title,
+            new_title=response.new_title,
+            success_response=response.success_response,
+            conflict_response=response.conflict_response,
+            unchanged_response=response.unchanged_response,
+        )
+        return result.response, asdict(result.event) if result.event else None
+    finally:
+        db.close()
+
+
+async def emit_source_rename_event(emitter: SSEStreamEmitter, event: dict | None) -> None:
+    if event:
+        await emitter.emit_event({"type": "source_renamed", **event})
 
 
 @router.post("/chats/{chat_id}/message/stream")
@@ -129,16 +175,19 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
                     title_task = asyncio.create_task(run_smart_title_gen())
 
         # Main response generation (streaming smoothly to user)
-        resp_text = await rag.query_chat(
+        rag_response = await rag.query_chat(
             chat_id, 
             query.message, 
             chat_history=chat_history, 
             status_callback=emitter.emit_status,
             delta_callback=intercepted_delta,
-            reset_callback=emitter.emit_clear_delta
+            reset_callback=emitter.emit_clear_delta,
+            source_snapshot=query.source_snapshot,
         )
 
-        save_stream_assistant_response(chat_id, resp_text)
+        is_source_rename = isinstance(rag_response, (SourceRenameReply, SourceRenameCommand))
+        resp_text, source_rename_event = persist_rag_response(chat_id, rag_response)
+        await emit_source_rename_event(emitter, source_rename_event)
 
         # Fallback if response was very short (< 80 chars) and title task hasn't started yet
         if is_initial_chat_state and not title_task_started:
@@ -163,21 +212,22 @@ async def send_message_stream(chat_id: str, query: models.ChatQuery, db: Session
             title_task = asyncio.create_task(run_short_title_gen())
 
         # Asynchronous background memory extraction & contradiction reconciliation (Issue #11)
-        try:
-            async def run_bg_memory_extraction():
-                from database import SessionLocal
-                m_db = SessionLocal()
-                try:
-                    from services.memory_service import extract_and_reconcile_research_memory
-                    await extract_and_reconcile_research_memory(chat_id, query.message, m_db, resp_text)
-                except Exception as m_err:
-                    logger.debug(f"[Memory Extraction Background Task Error]: {m_err}")
-                finally:
-                    m_db.close()
+        if not is_source_rename:
+            try:
+                async def run_bg_memory_extraction():
+                    from database import SessionLocal
+                    m_db = SessionLocal()
+                    try:
+                        from services.memory_service import extract_and_reconcile_research_memory
+                        await extract_and_reconcile_research_memory(chat_id, query.message, m_db, resp_text)
+                    except Exception as m_err:
+                        logger.debug(f"[Memory Extraction Background Task Error]: {m_err}")
+                    finally:
+                        m_db.close()
 
-            asyncio.create_task(run_bg_memory_extraction())
-        except Exception:
-            pass
+                asyncio.create_task(run_bg_memory_extraction())
+            except Exception:
+                pass
 
         # Wait for title task if still running so title_update event is pushed into SSE stream before done event
         if title_task and not title_task.done():
@@ -243,32 +293,36 @@ async def edit_message_stream(chat_id: str, req: models.EditMessageRequest, db: 
     truncated_history = extract_chat_history_from_db_messages(all_msgs[:target_idx + 1])
     
     async def stream_worker(emitter: SSEStreamEmitter):
-        resp_text = await rag.query_chat(
+        rag_response = await rag.query_chat(
             chat_id, 
             req.message, 
             chat_history=truncated_history, 
             status_callback=emitter.emit_status,
             delta_callback=emitter.emit_delta,
-            reset_callback=emitter.emit_clear_delta
+            reset_callback=emitter.emit_clear_delta,
+            source_snapshot=req.source_snapshot,
         )
-        save_stream_assistant_response(chat_id, resp_text)
+        is_source_rename = isinstance(rag_response, (SourceRenameReply, SourceRenameCommand))
+        resp_text, source_rename_event = persist_rag_response(chat_id, rag_response)
+        await emit_source_rename_event(emitter, source_rename_event)
 
         # Asynchronous background memory extraction & contradiction reconciliation on edited turn (Issue #11)
-        try:
-            async def run_bg_edit_memory():
-                from database import SessionLocal
-                edit_db = SessionLocal()
-                try:
-                    from services.memory_service import extract_and_reconcile_research_memory
-                    await extract_and_reconcile_research_memory(chat_id, req.message, edit_db, resp_text)
-                except Exception as m_err:
-                    logger.debug(f"[Memory Extraction Edit Background Task Error]: {m_err}")
-                finally:
-                    edit_db.close()
+        if not is_source_rename:
+            try:
+                async def run_bg_edit_memory():
+                    from database import SessionLocal
+                    edit_db = SessionLocal()
+                    try:
+                        from services.memory_service import extract_and_reconcile_research_memory
+                        await extract_and_reconcile_research_memory(chat_id, req.message, edit_db, resp_text)
+                    except Exception as m_err:
+                        logger.debug(f"[Memory Extraction Edit Background Task Error]: {m_err}")
+                    finally:
+                        edit_db.close()
 
-            asyncio.create_task(run_bg_edit_memory())
-        except Exception:
-            pass
+                asyncio.create_task(run_bg_edit_memory())
+            except Exception:
+                pass
 
         await emitter.emit_done(
             final_text=resp_text,
@@ -315,14 +369,18 @@ async def regenerate_message_stream(chat_id: str, req: models.RegenerateMessageR
     target_msg_id = target_msg.id
     
     async def stream_worker(emitter: SSEStreamEmitter):
-        resp_text = await rag.query_chat(
+        rag_response = await rag.query_chat(
             chat_id, 
             user_prompt, 
             chat_history=truncated_history, 
             status_callback=emitter.emit_status,
             delta_callback=emitter.emit_delta,
-            reset_callback=emitter.emit_clear_delta
+            reset_callback=emitter.emit_clear_delta,
+            allow_source_rename=False,
         )
+        if isinstance(rag_response, SourceRenameCommand):
+            raise RuntimeError("Source changes cannot be replayed while regenerating a response.")
+        resp_text, _ = persist_rag_response(chat_id, rag_response, persist_text_response=False)
         from database import SessionLocal
         bg_db = SessionLocal()
         try:

@@ -21,6 +21,7 @@ from .llm_factory import (
 from .pipelines import (
     chat_pipeline,
     source_action_pipeline,
+    source_rename_pipeline,
     search_pipeline,
     workspace_pipeline,
 )
@@ -30,6 +31,7 @@ from .token_budget import (
     extract_context_window_from_error,
     record_discovered_context_window,
 )
+from models import ChatSourceSnapshotItem
 
 load_dotenv()
 
@@ -154,12 +156,15 @@ async def dispatch_intent_pipeline(
     tools: Optional[List[Any]] = None,
     doc_context_info: str = "",
     timeout_sec: float = 60.0,
-    on_delta: Optional[Callable[[str], Any]] = None
-) -> str:
+    on_delta: Optional[Callable[[str], Any]] = None,
+    source_snapshot: Optional[List[ChatSourceSnapshotItem]] = None,
+    allow_source_rename: bool = True,
+    raw_user_query: Optional[str] = None,
+) -> str | source_rename_pipeline.SourceRenameReply | source_rename_pipeline.SourceRenameCommand:
     """Dispatches query execution to the specialized modular pipeline based on intent with timeout protection."""
     has_local_docs = len(local_docs) > 0
     
-    async def _execute_selected_pipeline() -> str:
+    async def _execute_selected_pipeline() -> str | source_rename_pipeline.SourceRenameReply | source_rename_pipeline.SourceRenameCommand:
         if intent == "GENERAL_CHAT":
             raw_res = await chat_pipeline.handle_general_chat_pipeline(query, formatted_history, target_llm, report_status, on_delta=on_delta)
             return format_clean_response(raw_res)
@@ -168,6 +173,20 @@ async def dispatch_intent_pipeline(
             if not has_local_docs:
                 return "Tidak ada dokumen yang diimpor di sesi ini untuk dihapus."
             return await source_action_pipeline.handle_source_removal_pipeline(chat_id, query, target_llm, report_status)
+
+        if intent == "RENAME_SOURCE":
+            if raw_user_query is None:
+                return source_rename_pipeline.SourceRenameReply(
+                    response="I couldn't verify the original rename request. Send the command again; no source was changed."
+                )
+            return await source_rename_pipeline.handle_source_rename_pipeline(
+                chat_id,
+                raw_user_query,
+                target_llm,
+                report_status,
+                source_snapshot,
+                execution_allowed=allow_source_rename,
+            )
 
         if intent == "SEARCH_NEW":
             raw_res = await search_pipeline.handle_academic_search_pipeline(chat_id, query, formatted_history, target_llm, report_status, on_delta=on_delta)
@@ -213,8 +232,10 @@ async def query_chat(
     chat_history: list = None,
     status_callback: Optional[Callable[[str], Any]] = None,
     delta_callback: Optional[Callable[[str], Any]] = None,
-    reset_callback: Optional[Callable[[], Any]] = None
-):
+    reset_callback: Optional[Callable[[], Any]] = None,
+    source_snapshot: Optional[List[ChatSourceSnapshotItem]] = None,
+    allow_source_rename: bool = True,
+) -> str | source_rename_pipeline.SourceRenameReply | source_rename_pipeline.SourceRenameCommand:
     """
     Orchestrates chat queries through intent classification and modular pipelines.
     Automatically handles attachment parsing, history formatting, and multi-LLM cascading fallback.
@@ -310,7 +331,8 @@ async def query_chat(
                 has_local_docs,
                 len(local_docs),
                 llm,
-                chat_history=formatted_history
+                chat_history=formatted_history,
+                allow_source_rename=allow_source_rename,
             )
         )
     except Exception as intent_err:
@@ -335,7 +357,10 @@ async def query_chat(
                 target_llm=curr_llm,
                 report_status=report_status,
                 timeout_sec=pipeline_timeout,
-                on_delta=emit_delta
+                on_delta=emit_delta,
+                source_snapshot=source_snapshot,
+                allow_source_rename=allow_source_rename,
+                raw_user_query=raw_user_query,
             )
         except Exception as e:
             last_err = e
@@ -381,7 +406,10 @@ async def query_chat(
                         target_llm=curr_llm,
                         report_status=report_status,
                         timeout_sec=pipeline_timeout,
-                        on_delta=emit_delta
+                        on_delta=emit_delta,
+                        source_snapshot=source_snapshot,
+                        allow_source_rename=allow_source_rename,
+                        raw_user_query=raw_user_query,
                     )
                 except Exception as retry_err:
                     logger.warning(f"[Auto-Healing Retry] Retry with adapted context failed: {retry_err}")

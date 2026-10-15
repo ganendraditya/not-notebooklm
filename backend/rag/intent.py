@@ -5,6 +5,7 @@ Classifies user queries semantically via LLM into:
 - SEARCH_NEW
 - ANALYZE_WORKSPACE
 - GENERAL_CHAT
+- RENAME_SOURCE
 """
 
 import re
@@ -72,7 +73,8 @@ async def classify_user_intent(
     has_docs: bool, 
     doc_count: int, 
     llm: LLM,
-    chat_history: Optional[Any] = None
+    chat_history: Optional[Any] = None,
+    allow_source_rename: bool = True,
 ) -> str:
     """Uses LLM semantic classification with micro-dialogue context to accurately determine user intent."""
     dialogue_trace = format_micro_dialogue_trace(chat_history, max_turns=2, max_chars=150)
@@ -82,7 +84,7 @@ async def classify_user_intent(
 
     system_intent_prompt = f"""You are the Master Intent Classifier for NotbookLM research workspace.
 Current Workspace Status: {'Contains ' + str(doc_count) + ' imported documents' if has_docs else 'No documents imported yet'}.{context_block}
-Analyze the user's latest prompt carefully in the context of the recent dialogue and determine their true intention. Choose strictly ONE of the following 4 categories:
+Analyze the user's latest prompt carefully in the context of the recent dialogue and determine their true intention. Choose strictly ONE category:
 
 1. 'REMOVE_SOURCES':
    - ONLY when the user is giving an EXPLICIT, DIRECT COMMAND to delete or remove documents from their sources (e.g. 'delete paper A, B, C', 'remove irrelevant papers', 'discard loaded documents').
@@ -99,15 +101,20 @@ Analyze the user's latest prompt carefully in the context of the recent dialogue
 4. 'GENERAL_CHAT':
    - For standalone greetings, casual small talk, thanking, system explanations, or general knowledge questions completely unrelated to the workspace documents or ongoing document discussion.
 
+5. 'RENAME_SOURCE':
+   - When the latest user message directly asks to rename or retitle one or more workspace sources, even if the target or exact title is missing or ambiguous. The rename handler will ask for clarification and will not make an ambiguous change.
+   - DO NOT choose this for questions, negation, quoted examples, or requests for a suggested title without a direct rename command.
+   - {'This category is enabled.' if allow_source_rename else 'Keep this category available to identify a rename being regenerated. The handler will explain that regeneration does not repeat source changes.'}
+
 User Prompt: "{user_query}"
 
-Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_WORKSPACE, or GENERAL_CHAT) without quotes or explanations."""
+Respond with ONLY the exact category name (REMOVE_SOURCES, SEARCH_NEW, ANALYZE_WORKSPACE, GENERAL_CHAT, or RENAME_SOURCE). Do not include quotes or explanations."""
     try:
         resp = await llm.acomplete(system_intent_prompt)
         raw_intent = resp.text.strip().upper().replace("'", "").replace('"', "").replace("`", "")
         # Strict token matching to prevent substring false-positives
         tokens = re.findall(r'[A-Z_]+', raw_intent)
-        for valid in ["REMOVE_SOURCES", "SEARCH_NEW", "ANALYZE_WORKSPACE", "GENERAL_CHAT"]:
+        for valid in ["REMOVE_SOURCES", "SEARCH_NEW", "ANALYZE_WORKSPACE", "GENERAL_CHAT", "RENAME_SOURCE"]:
             if valid in tokens:
                 if not has_docs and valid in ("ANALYZE_WORKSPACE", "REMOVE_SOURCES"):
                     return "GENERAL_CHAT"
