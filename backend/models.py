@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr
 from typing import List, Optional
 from datetime import datetime
 
@@ -49,9 +49,19 @@ class ChatMessageResponse(BaseModel):
     variants: Optional[List[str]] = None
     active_variant_index: Optional[int] = 0
 
+
+class ChatSourceSnapshotItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    doc_id: StrictInt
+    title: StrictStr | None = None
+    filename: StrictStr
+
+
 class ChatQuery(BaseModel):
     message: str
     attachments: Optional[List[AttachmentModel]] = None
+    source_snapshot: Optional[List[ChatSourceSnapshotItem]] = None
 
 class ChatSessionDetailResponse(ChatSessionResponse):
     model_config = {"from_attributes": True}
@@ -88,6 +98,7 @@ class ImportSourcesRequest(BaseModel):
 class EditMessageRequest(BaseModel):
     message_index: int
     message: str
+    source_snapshot: Optional[List[ChatSourceSnapshotItem]] = None
 
 class RegenerateMessageRequest(BaseModel):
     message_index: int # index of the assistant message to regenerate
@@ -121,6 +132,3 @@ class UpdateFactRequest(BaseModel):
     is_active: Optional[bool] = None
     fact_text: Optional[str] = None
     category: Optional[str] = None
-
-
-

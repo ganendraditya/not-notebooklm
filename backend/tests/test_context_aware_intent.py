@@ -93,6 +93,39 @@ async def test_classify_user_intent_injects_dialogue_trace_into_prompt():
     assert "User Prompt: \"Lalu bagaimana dengan limitasinya?\"" in prompt_sent
 
 
+@pytest.mark.asyncio
+async def test_classify_user_intent_accepts_explicit_source_rename_category():
+    mock_llm = MagicMock()
+    mock_llm.acomplete = AsyncMock(return_value=MagicMock(text="RENAME_SOURCE"))
+
+    intent = await classify_user_intent(
+        user_query='Ganti nama paper [2] menjadi "Dataset Evaluasi"',
+        has_docs=True,
+        doc_count=2,
+        llm=mock_llm,
+    )
+
+    assert intent == "RENAME_SOURCE"
+    assert "directly asks to rename or retitle" in mock_llm.acomplete.call_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_classify_user_intent_keeps_rename_intent_for_regeneration_guard():
+    mock_llm = MagicMock()
+    mock_llm.acomplete = AsyncMock(return_value=MagicMock(text="RENAME_SOURCE"))
+
+    intent = await classify_user_intent(
+        user_query='Rename paper [2] to "Evaluation Dataset"',
+        has_docs=True,
+        doc_count=2,
+        llm=mock_llm,
+        allow_source_rename=False,
+    )
+
+    assert intent == "RENAME_SOURCE"
+    assert "identify a rename being regenerated" in mock_llm.acomplete.call_args.args[0]
+
+
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_live_fast_llm_anaphora_intent_resolution():

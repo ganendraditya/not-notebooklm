@@ -39,6 +39,7 @@ interface UsePaperDetailsProps {
 const MAX_PAPER_CACHE_ENTRIES = 50;
 const globalPaperDetailsCache = new Map<string, PaperDetailData>();
 const globalInFlightPaperRequests = new Map<string, Promise<PaperDetailData | null>>();
+const globalPendingPaperTitleUpdates = new Map<string, string>();
 
 function getPaperCacheKey(chatId: string, docId: number): string {
   return `${chatId}:${docId}`;
@@ -59,6 +60,17 @@ export function setCachedPaperDetails(chatId: string, docId: number, data: Paper
     }
   }
   globalPaperDetailsCache.set(key, data);
+}
+
+export function updateCachedPaperTitle(chatId: string, docId: number, title: string): void {
+  const key = getPaperCacheKey(chatId, docId);
+  const cached = globalPaperDetailsCache.get(key);
+  if (cached) {
+    setCachedPaperDetails(chatId, docId, { ...cached, title });
+  }
+  if (globalInFlightPaperRequests.has(key)) {
+    globalPendingPaperTitleUpdates.set(key, title);
+  }
 }
 
 export async function prefetchDocumentContent(
@@ -83,14 +95,17 @@ export async function prefetchDocumentContent(
       if (!res.ok) return null;
       const data = await res.json();
       if (data && !data.error) {
-        setCachedPaperDetails(chatId, docId, data);
-        return data;
+        const latestTitle = globalPendingPaperTitleUpdates.get(key);
+        const currentData = latestTitle === undefined ? data : { ...data, title: latestTitle };
+        setCachedPaperDetails(chatId, docId, currentData);
+        return currentData;
       }
       return null;
     } catch {
       return null;
     } finally {
       globalInFlightPaperRequests.delete(key);
+      globalPendingPaperTitleUpdates.delete(key);
     }
   })();
 

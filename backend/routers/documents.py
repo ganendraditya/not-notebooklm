@@ -33,6 +33,12 @@ from services.storage_service import (
     delete_document_by_id,
     delete_multiple_documents,
 )
+from services.document.title_service import (
+    DocumentNotFoundError,
+    DocumentTitleConflictError,
+    DocumentTitleValidationError,
+    rename_document_title,
+)
 from services.export_service import (
     generate_bulk_zip_stream,
 )
@@ -124,15 +130,13 @@ def delete_document(chat_id: str, doc_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/chats/{chat_id}/documents/{doc_id}/rename", response_model=models.DocumentResponse)
 def rename_document(chat_id: str, doc_id: int, payload: models.RenameDocumentRequest, db: Session = Depends(get_db)):
-    doc = db.query(Document).filter(Document.id == doc_id, Document.chat_id == chat_id).first()
-    if not doc:
+    try:
+        doc, _ = rename_document_title(db, chat_id, doc_id, payload.title)
+    except DocumentNotFoundError:
         raise HTTPException(status_code=404, detail="Document not found")
-    
-    clean_title = payload.title.strip()
-    if not clean_title:
-        raise HTTPException(status_code=400, detail="Document title cannot be empty.")
-        
-    doc.title = clean_title
+    except (DocumentTitleConflictError, DocumentTitleValidationError) as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
     db.commit()
     db.refresh(doc)
     
@@ -339,4 +343,3 @@ async def get_document_highlight(
         db=db,
     )
     return {"passages": passages}
-

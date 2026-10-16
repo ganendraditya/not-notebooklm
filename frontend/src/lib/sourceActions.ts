@@ -3,6 +3,14 @@ export interface ChatDeleteProposal {
   documentIds: number[];
 }
 
+export interface ChatSourceRename {
+  chatId: string;
+  docId: number;
+  sourceNumber: number;
+  previousTitle: string;
+  newTitle: string;
+}
+
 export function parseChatDeleteProposal(
   content: string | null | undefined,
   expectedChatId: string
@@ -32,4 +40,37 @@ export function parseChatDeleteProposal(
   } catch {
     return null;
   }
+}
+
+export function parseSourceRenameEvent(
+  event: unknown,
+  expectedChatId: string
+): ChatSourceRename | null {
+  if (!event || typeof event !== "object") return null;
+
+  const payload = event as Record<string, unknown>;
+  if (
+    payload.type !== "source_renamed" ||
+    payload.chat_id !== expectedChatId ||
+    typeof payload.doc_id !== "number" ||
+    !Number.isSafeInteger(payload.doc_id) ||
+    payload.doc_id <= 0 ||
+    typeof payload.source_number !== "number" ||
+    !Number.isSafeInteger(payload.source_number) ||
+    payload.source_number <= 0 ||
+    typeof payload.previous_title !== "string" ||
+    typeof payload.new_title !== "string" ||
+    !payload.new_title.trim() ||
+    payload.new_title.length > 500
+  ) {
+    return null;
+  }
+
+  return {
+    chatId: expectedChatId,
+    docId: payload.doc_id,
+    sourceNumber: payload.source_number,
+    previousTitle: payload.previous_title,
+    newTitle: payload.new_title,
+  };
 }
