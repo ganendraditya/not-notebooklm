@@ -1,0 +1,1670 @@
+[
+  {
+    "id": "language-override-01",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-01",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.001,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about vision transformers for pneumonia detection.\n\nAssistant: The active research topic is vision transformers for pneumonia detection.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"vision transformers for pneumonia detection\", \"native_query\": \"vision transformers for pneumonia detection\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "vision transformers for pneumonia detection",
+        "native_query": "vision transformers for pneumonia detection",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "vision transformers for pneumonia detection",
+        "id_query": "vision transformers for pneumonia detection",
+        "native_query": "vision transformers for pneumonia detection",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:pneumonia|chest|lung": true,
+          "topic:vision.transform|transformer|\\bvit\\b": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:pneumonia|chest|lung": true,
+          "topic:vision.transform|transformer|\\bvit\\b": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-01",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is vision transformers for pneumonia detection.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is vision transformers for pneumonia detection.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-02",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-02",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about CRISPR off-target editing in hematopoietic stem cells.\n\nAssistant: The active research topic is CRISPR off-target editing in hematopoietic stem cells.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"CRISPR off-target editing in hematopoietic stem cells\", \"native_query\": \"CRISPR off-target editing in hematopoietic stem cells\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "CRISPR off-target editing in hematopoietic stem cells",
+        "native_query": "CRISPR off-target editing in hematopoietic stem cells",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "CRISPR off-target editing in hematopoietic stem cells",
+        "id_query": "CRISPR off-target editing in hematopoietic stem cells",
+        "native_query": "CRISPR off-target editing in hematopoietic stem cells",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:crispr|gene.edit|genome.edit": true,
+          "topic:off.target": true,
+          "topic:hematopo|haematopo|stem.cell": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:crispr|gene.edit|genome.edit": true,
+          "topic:off.target": true,
+          "topic:hematopo|haematopo|stem.cell": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-02",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is CRISPR off-target editing in hematopoietic stem cells.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is CRISPR off-target editing in hematopoietic stem cells.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-03",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-03",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about biochar amendments for cadmium remediation in rice soils.\n\nAssistant: The active research topic is biochar amendments for cadmium remediation in rice soils.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"biochar amendments for cadmium remediation in rice soils\", \"native_query\": \"biochar amendments for cadmium remediation in rice soils\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "biochar amendments for cadmium remediation in rice soils",
+        "native_query": "biochar amendments for cadmium remediation in rice soils",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "biochar amendments for cadmium remediation in rice soils",
+        "id_query": "biochar amendments for cadmium remediation in rice soils",
+        "native_query": "biochar amendments for cadmium remediation in rice soils",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:biochar": true,
+          "topic:cadmium|\\bcd\\b": true,
+          "topic:rice|paddy|soil": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:biochar": true,
+          "topic:cadmium|\\bcd\\b": true,
+          "topic:rice|paddy|soil": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-03",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is biochar amendments for cadmium remediation in rice soils.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is biochar amendments for cadmium remediation in rice soils.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-04",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-04",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about sleep restriction and working memory in adolescents.\n\nAssistant: The active research topic is sleep restriction and working memory in adolescents.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"sleep restriction and working memory in adolescents\", \"native_query\": \"sleep restriction and working memory in adolescents\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "sleep restriction and working memory in adolescents",
+        "native_query": "sleep restriction and working memory in adolescents",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "sleep restriction and working memory in adolescents",
+        "id_query": "sleep restriction and working memory in adolescents",
+        "native_query": "sleep restriction and working memory in adolescents",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:sleep": true,
+          "topic:working.memory": true,
+          "topic:adolescen|teen|youth": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:sleep": true,
+          "topic:working.memory": true,
+          "topic:adolescen|teen|youth": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-04",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is sleep restriction and working memory in adolescents.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is sleep restriction and working memory in adolescents.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-05",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-05",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about differential privacy in federated credit scoring.\n\nAssistant: The active research topic is differential privacy in federated credit scoring.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"differential privacy in federated credit scoring\", \"native_query\": \"differential privacy in federated credit scoring\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "differential privacy in federated credit scoring",
+        "native_query": "differential privacy in federated credit scoring",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "differential privacy in federated credit scoring",
+        "id_query": "differential privacy in federated credit scoring",
+        "native_query": "differential privacy in federated credit scoring",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:differential.priv": true,
+          "topic:federat": true,
+          "topic:credit|loan|lending": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:differential.priv": true,
+          "topic:federat": true,
+          "topic:credit|loan|lending": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-05",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is differential privacy in federated credit scoring.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is differential privacy in federated credit scoring.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-06",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-06",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about mangrove restoration and coastal flood attenuation.\n\nAssistant: The active research topic is mangrove restoration and coastal flood attenuation.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"mangrove restoration and coastal flood attenuation\", \"native_query\": \"mangrove restoration and coastal flood attenuation\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "mangrove restoration and coastal flood attenuation",
+        "native_query": "mangrove restoration and coastal flood attenuation",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "mangrove restoration and coastal flood attenuation",
+        "id_query": "mangrove restoration and coastal flood attenuation",
+        "native_query": "mangrove restoration and coastal flood attenuation",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:mangrove": true,
+          "topic:flood|surge|wave": true,
+          "topic:restor|rehabilit": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:mangrove": true,
+          "topic:flood|surge|wave": true,
+          "topic:restor|rehabilit": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-06",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is mangrove restoration and coastal flood attenuation.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is mangrove restoration and coastal flood attenuation.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-07",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-07",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about morphological segmentation for low-resource Turkish speech recognition.\n\nAssistant: The active research topic is morphological segmentation for low-resource Turkish speech recognition.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"morphological segmentation for low-resource Turkish speech recognition\", \"native_query\": \"morphological segmentation for low-resource Turkish speech recognition\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "morphological segmentation for low-resource Turkish speech recognition",
+        "native_query": "morphological segmentation for low-resource Turkish speech recognition",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "morphological segmentation for low-resource Turkish speech recognition",
+        "id_query": "morphological segmentation for low-resource Turkish speech recognition",
+        "native_query": "morphological segmentation for low-resource Turkish speech recognition",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:morpholog|segment": true,
+          "topic:turkish": true,
+          "topic:speech|asr|acoustic": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:morpholog|segment": true,
+          "topic:turkish": true,
+          "topic:speech|asr|acoustic": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-07",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is morphological segmentation for low-resource Turkish speech recognition.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is morphological segmentation for low-resource Turkish speech recognition.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-08",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-08",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about perovskite solar cell stability under humidity.\n\nAssistant: The active research topic is perovskite solar cell stability under humidity.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"perovskite solar cell stability under humidity\", \"native_query\": \"perovskite solar cell stability under humidity\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "perovskite solar cell stability under humidity",
+        "native_query": "perovskite solar cell stability under humidity",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "perovskite solar cell stability under humidity",
+        "id_query": "perovskite solar cell stability under humidity",
+        "native_query": "perovskite solar cell stability under humidity",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:perovskite": true,
+          "topic:solar|photovoltaic": true,
+          "topic:humid|moisture|water": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:perovskite": true,
+          "topic:solar|photovoltaic": true,
+          "topic:humid|moisture|water": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-08",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is perovskite solar cell stability under humidity.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is perovskite solar cell stability under humidity.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-09",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-09",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about cash transfers and school attendance in rural households.\n\nAssistant: The active research topic is cash transfers and school attendance in rural households.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"cash transfers and school attendance in rural households\", \"native_query\": \"cash transfers and school attendance in rural households\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "cash transfers and school attendance in rural households",
+        "native_query": "cash transfers and school attendance in rural households",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "cash transfers and school attendance in rural households",
+        "id_query": "cash transfers and school attendance in rural households",
+        "native_query": "cash transfers and school attendance in rural households",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:cash.transfer|conditional.transfer|monetary.transfer": true,
+          "topic:school|educat": true,
+          "topic:attendan|enrol": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:cash.transfer|conditional.transfer|monetary.transfer": true,
+          "topic:school|educat": true,
+          "topic:attendan|enrol": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-09",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is cash transfers and school attendance in rural households.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is cash transfers and school attendance in rural households.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  },
+  {
+    "id": "language-override-10",
+    "mechanism": "postprocessing_overrides_correct_model_language",
+    "model_is_synthetic": true,
+    "raw_languages": [
+      "en"
+    ],
+    "final_languages": [
+      "zh"
+    ],
+    "reproduced": true,
+    "evidence": {
+      "case_id": "filter_override-10",
+      "category": "filter_override",
+      "tier": "replay",
+      "model": "synthetic-correct-response",
+      "mode": "history",
+      "repeat": 0,
+      "status": "model_response",
+      "error_type": null,
+      "error_metadata": {},
+      "elapsed_seconds": 0.0,
+      "history_roles": [
+        "user",
+        "assistant"
+      ],
+      "prompt_contains_topic": true,
+      "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nUser: Find English-language research about procedural fairness in algorithmic bail decisions.\n\nAssistant: The active research topic is procedural fairness in algorithmic bail decisions.\n\nCurrent User Request:\n\"Find 5 more on that topic, but English only and since 2024. [Filter Preferences: languages: zh, year: 2020]\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}",
+      "raw_response": "{\"en_query\": \"procedural fairness in algorithmic bail decisions\", \"native_query\": \"procedural fairness in algorithmic bail decisions\", \"target_count\": 5, \"user_requested_count\": 5, \"languages\": [\"en\"], \"min_year\": 2024, \"open_access_only\": false, \"scopus_quartiles\": [], \"sinta_tiers\": [], \"exclude_preprints\": false, \"filter_conflicts\": []}",
+      "response_metadata": {},
+      "raw_plan": {
+        "en_query": "procedural fairness in algorithmic bail decisions",
+        "native_query": "procedural fairness in algorithmic bail decisions",
+        "target_count": 5,
+        "user_requested_count": 5,
+        "languages": [
+          "en"
+        ],
+        "min_year": 2024,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": []
+      },
+      "plan": {
+        "en_query": "procedural fairness in algorithmic bail decisions",
+        "id_query": "procedural fairness in algorithmic bail decisions",
+        "native_query": "procedural fairness in algorithmic bail decisions",
+        "languages": [
+          "zh"
+        ],
+        "target_count": 5,
+        "user_requested_count": 5,
+        "is_capped": false,
+        "cap_limit": 25,
+        "open_access_only": false,
+        "scopus_quartiles": [],
+        "sinta_tiers": [],
+        "exclude_preprints": false,
+        "filter_conflicts": [],
+        "min_year": 2024,
+        "min_citations": 0,
+        "language_preference": "en"
+      },
+      "screen": {
+        "checks": {
+          "topic:procedural|process|due.process": true,
+          "topic:fair|justice": true,
+          "topic:bail|pretrial|pre.trial": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": false
+        },
+        "passed": false,
+        "failed_checks": [
+          "field:languages"
+        ],
+        "diagnostic_only": false
+      },
+      "raw_screen": {
+        "checks": {
+          "topic:procedural|process|due.process": true,
+          "topic:fair|justice": true,
+          "topic:bail|pretrial|pre.trial": true,
+          "field:target_count": true,
+          "field:min_year": true,
+          "field:languages": true
+        },
+        "passed": true,
+        "failed_checks": [],
+        "diagnostic_only": false
+      }
+    }
+  },
+  {
+    "id": "summary-dropped-10",
+    "mechanism": "system_role_compaction_bridge_omitted_from_planner_prompt",
+    "model_is_synthetic": true,
+    "token_counter_is_deterministic_word_count": true,
+    "summary_contains_topic": true,
+    "prompt_contains_topic": false,
+    "reproduced": true,
+    "compacted_history": [
+      {
+        "role": "system",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "[Active Workspace Directives & Constraints (Retained from Earlier Turns):\n- The research topic is procedural fairness in algorithmic bail decisions.\n- Keep the output concise and preserve table formatting.]\n\n[Context Summary of Earlier Conversation: The active research topic is procedural fairness in algorithmic bail decisions.]"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Keep the output concise and preserve table formatting."
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "additional_kwargs": {},
+        "blocks": [
+          {
+            "block_type": "text",
+            "text": "Formatting is noted and the research topic is unchanged."
+          }
+        ]
+      }
+    ],
+    "prompt": "You are an AI Academic Query Planner for a research search engine (like Consensus.app, Elicit, Perplexity).\nYour job: Analyze the user's prompt, any attached '[Filter Preferences: ...]' tags, and conversation context to extract clean, high-precision academic search parameters in JSON.\n\n\nPrevious Full Conversation History:\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nUser: Keep the output concise and preserve table formatting.\n\nAssistant: Formatting is noted and the research topic is unchanged.\n\nCurrent User Request:\n\"Find 5 more on that topic in English.\"\n\nRules for extraction:\n1. CONTEXT & TOPIC RESOLUTION (CRITICAL):\n   - Understand the research domain, typos, slang, numbers in words or leetspeak (e.g. '10 p4p3rZZ' = 10 papers, 'selusin' = 12, 'dua puluh' = 20).\n   - If the user's request refers to previous topics or previous requests (e.g. 'rekomendasiin biar bisa diimport', 'topik tadi'): You MUST examine 'Previous Conversation Context' to identify the specific research domain and retain it!\n   - Indonesian slang: 'gw' / 'gua' / 'gue' = 'I / me'. NEVER interpret 'gw' as 'GW' or 'Gigawatt'!\n2. 'en_query': Pure English academic search term for global scholarly databases.\n3. 'native_query': Academic search term translated into the target language(s).\n4. 'languages': Array of 2-letter ISO 639-1 language codes (e.g. [\"ja\"], [\"zh\"], [\"id\"], [\"en\"]).\n   - RESOLUTION OF CONFLICTS (CRITICAL): If the user's latest prompt explicitly specifies a language or timeframe that conflicts with '[Filter Preferences: ...]' (e.g. prompt asks for 'paper Indonesia' but filter says 'languages: zh'; or prompt asks for '20 tahun lalu' but filter says 'year: 2022-2026'), ALWAYS PRIORITIZE THE USER'S LATEST PROMPT! The prompt represents the user's active intent, while the UI filter may be stale from a prior session.\n   - Priority 1: User's explicit prompt specification (if in conflict with filter preferences).\n   - Priority 2: If no conflict, '[Filter Preferences: ... languages: ja, zh]' tags.\n   - Priority 3: If user wrote prompt in a specific non-English language (e.g. Japanese, Korean), add its code.\n   - Priority 4: Leave as empty [] if global English.\n5. 'target_count': Integer representing how many papers to search for (Strict Maximum Cap is 25).\n   - If user asks for more than 25 (e.g. 30, 50, 100, 500), set 'target_count' to 25 and record their original number in 'user_requested_count'.\n   - If user asks for a specific count <= 25 (e.g. 5, 10, 20), set 'target_count' to that exact number.\n   - If NOT specified, set to default 12.\n6. 'open_access_only': Boolean true if free PDF requested, else false.\n7. 'scopus_quartiles': Array of strings like [\"Q1\"], [\"Q1\", \"Q2\"], or empty [].\n8. 'sinta_tiers': Array of strings like [\"S1\", \"S2\"], or empty [].\n9. 'exclude_preprints': Boolean true if preprints should be excluded, else false.\n10. 'user_requested_count': Integer representing the EXACT quantity of papers the user asked for (regardless of typos like 'p4p3rs', words like 'selusin' -> 12, 'half a dozen' -> 6, '500' -> 500). Set to null if the user did not specify any quantity.\n11. 'min_year': Integer representing minimum publication year, otherwise null.\n12. 'min_citations': Integer representing minimum citations count threshold, otherwise 0.\n13. 'filter_conflicts': Array of short explanation strings if the user's prompt contradicted '[Filter Preferences: ...]' (e.g. [\"Prompt requested Indonesian papers while UI filter was set to Mandarin; prioritized prompt\"]), otherwise empty [].\n14. Return ONLY a valid JSON object without any markdown code fences or conversational text.\n\nExample Output:\n{\n  \"en_query\": \"psychology clinical therapy\",\n  \"native_query\": \"心理学 臨床療法\",\n  \"languages\": [\"ja\"],\n  \"target_count\": 12,\n  \"open_access_only\": true,\n  \"scopus_quartiles\": [],\n  \"sinta_tiers\": [],\n  \"exclude_preprints\": false,\n  \"user_requested_count\": null,\n  \"min_year\": 2021,\n  \"min_citations\": 0,\n  \"filter_conflicts\": []\n}"
+  }
+]

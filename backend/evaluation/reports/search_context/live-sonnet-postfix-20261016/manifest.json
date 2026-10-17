@@ -1,0 +1,27 @@
+{
+  "created_at": "2026-10-16T10:08:34.814715+00:00",
+  "commit": "e2fbfc1745c63de7b00f320c4785244a57c93a8a",
+  "planner_sha256": "b020b447633a1b02a2c23fe390bfe71ee416e734cc53dcf94c2efab0c5ed527f",
+  "cases_sha256": "616b6d79a32a649c96cfde69d0b8d8793c9c2685c86ab0d965206d844e620ff4",
+  "case_count": 140,
+  "models": [
+    {
+      "tier": "fast",
+      "model": "ag/claude-sonnet-4-6",
+      "temperature": 0.1,
+      "model_override": true,
+      "configured_model": "ag/gemini-3.8-flash-high"
+    }
+  ],
+  "modes": [
+    "history",
+    "explicit",
+    "no_history",
+    "summary_as_user"
+  ],
+  "repeat": 1,
+  "concurrency": 2,
+  "timeout_seconds": 55.0,
+  "seed": 48,
+  "planned_observations": 430
+}
