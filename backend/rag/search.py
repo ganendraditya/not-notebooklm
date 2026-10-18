@@ -271,7 +271,7 @@ def search_academic_papers_planned(
         if len(results) < limit:
             spillover_oa = fetch_openalex(en_query, limit - len(results), min_year, min_citations, open_access_only, exclude_preprints, None, headers, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
             results.extend(spillover_oa)
-    else: # "en"
+    else: # "en" or unrestricted "all"
         epmc_papers = fetch_europe_pmc(en_query, limit // 2 + 2, min_year, open_access_only, exclude_preprints, is_valid_academic_title, is_candidate_duplicate_local, is_matching_topic_local, mark_candidate_seen_local)
         results.extend(epmc_papers)
         if len(results) < limit:

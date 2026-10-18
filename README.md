@@ -21,7 +21,7 @@ Internet connectivity is required out-of-the-box for live academic discovery, PD
 ## Workflow & Core Capabilities
 
 ### 1. Literature Discovery & Granular Ingestion
-Search across OpenAlex, Crossref, and Europe PMC, with automated **DuckDuckGo** scholarly web search fallback for niche topics and recent preprints. NotbookLM screens candidate publications and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select candidates with tri-state selection controls, batch-import with live progress tracking (`Adding x/y...`), and cancel individual downloads granularly from the sidebar without leaving orphan files.
+Search across OpenAlex, Crossref, and Europe PMC, with automated **DuckDuckGo** scholarly web search fallback for niche topics and recent preprints. Follow-up searches use current chat history, including compacted summaries, while the latest request takes priority over older topics and conflicting language filters. NotbookLM screens candidate publications and presents actionable cards containing titles, publication years, DOI links, and abstract previews. Users can select candidates with tri-state selection controls, batch-import with live progress tracking (`Adding x/y...`), and cancel individual downloads granularly from the sidebar without leaving orphan files.
 
 ![Literature Discovery](docs/assets/literature-discovery.png)
 

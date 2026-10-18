@@ -195,8 +195,11 @@ The nine canonical centroids are Abstract, Introduction, Literature Review, Meth
 ### 5.2 Literature Discovery & PDF Racing Resolver (`search.py`)
 ```mermaid
 flowchart TD
-    UQ["User query: find recent papers on a topic"] --> QP["Query planner: en, id, native"]
-    QP --> PAR{"Concurrent multi-engine search"}
+    UQ["Latest user request + UI filters"] --> QP["Academic query planner"]
+    HIST["Recent user and assistant turns"] --> QP
+    COMPACT["Server-generated history compaction bridge"] --> QP
+    QP --> PRIORITY["Latest request overrides older context and conflicting filters"]
+    PRIORITY --> PAR{"Concurrent multi-engine search"}
     PAR --> OA["OpenAlex"]
     PAR --> CR["Crossref"]
     PAR --> EP["Europe PMC"]
@@ -210,6 +213,8 @@ flowchart TD
     RACE --> VER["In-memory authenticity check"]
     VER --> WIN["First valid PDF saved"]
 ```
+
+The planner receives ordinary conversation turns and the server-generated bridge created by history compaction. It includes recognized bridge content as historical context, not as new planner instructions, and ignores unrecognized system-role messages. The latest user request takes priority over earlier topics and constraints. For language filters, the planner emits an explicit conflict flag; backend normalization preserves the latest user's language choice only when that conflict is flagged, otherwise the selected UI language filter remains active. Language values must belong to ISO 639-1; invalid model values fall back to the UI filter. An explicit removal of the language restriction clears stale UI filters and uses unrestricted search routing rather than the mixed local-language quota. A sole English-language selection also forces English search routing rather than mixed-language routing.
 
 OpenAlex is the open-access catalog, Crossref the global DOI registry, Europe PMC covers biomedical and life sciences, and DuckDuckGo handles preprints and niche topics. Ranking weighs Scopus Q1-Q4, SINTA, and citation velocity. The judge screens abstracts for scope and predatory spam. Resolvers race across arXiv, Unpaywall, OpenAlex, and Europe PMC, verify title and DOI in the first two pages, and cancel slower tasks once a winner is saved.
 
