@@ -8,6 +8,7 @@ import sys
 import time
 from types import ModuleType
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from llama_index.core.llms import ChatMessage
 
@@ -25,6 +26,8 @@ EVALUATION_SOURCE_FILES = (
     "evaluation/search_context/runtime.py",
     "evaluation/search_context/scoring.py",
     "rag/llm_factory.py",
+    "rag/token_budget.py",
+    "utils/text_processing.py",
 )
 
 
@@ -42,6 +45,14 @@ def load_source_module(name: str, relative_path: str) -> ModuleType:
 
 def source_fingerprint() -> str:
     return hashlib.sha256((BACKEND / "services/search/query_planner.py").read_bytes()).hexdigest()
+
+
+def _endpoint_fingerprint(base_url: str, protocol: str) -> str:
+    parsed = urlsplit(base_url.strip())
+    authority = parsed.netloc.rsplit("@", 1)[-1].lower()
+    safe_endpoint = urlunsplit((parsed.scheme.lower(), authority, parsed.path.rstrip("/"), "", ""))
+    identity = f"{protocol.lower()}\0{safe_endpoint}"
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
 
 
 def evaluation_source_fingerprint() -> str:
@@ -118,7 +129,7 @@ def configured_models(tiers: list[str], model_override: str | None = None) -> li
         base, key, primary, fast, fallback, temperature, configured, protocol = factory._resolve_tier_credentials(tier)
         configured_model = {"fast": fast, "primary": primary, "fallback": fallback}[tier]
         model = model_override or configured_model
-        identity = (base, model)
+        identity = (base, model, protocol)
         if identity in seen or not configured or not model:
             continue
         seen.add(identity)
@@ -137,6 +148,8 @@ def configured_models(tiers: list[str], model_override: str | None = None) -> li
             models.append((tier, llm, {
                 "tier": tier,
                 "model": model,
+                "protocol": protocol,
+                "endpoint_fingerprint": _endpoint_fingerprint(base, protocol),
                 "temperature": temperature,
                 "model_override": bool(model_override),
                 "configured_model": configured_model,

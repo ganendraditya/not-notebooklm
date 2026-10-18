@@ -174,6 +174,28 @@ async def test_invalid_model_language_value_falls_back_to_ui_filter(invalid_lang
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("invalid_language", ["zz", "bh"])
+async def test_unregistered_two_letter_language_code_falls_back_to_ui_filter(invalid_language):
+    llm = fake_llm(languages=[invalid_language], language_filter_conflict=True)
+    plan = await plan_academic_search(
+        "Find papers about pneumonia detection. [Filter Preferences: languages: zh]",
+        llm=llm,
+    )
+    assert plan["languages"] == ["zh"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["ae", "gl"])
+async def test_registered_less_common_iso_language_code_is_accepted(language):
+    llm = fake_llm(languages=[language], language_filter_conflict=True)
+    plan = await plan_academic_search(
+        "Find papers about pneumonia detection. [Filter Preferences: languages: zh]",
+        llm=llm,
+    )
+    assert plan["languages"] == [language]
+
+
+@pytest.mark.asyncio
 async def test_missing_language_conflict_flag_preserves_ui_filter():
     payload = {
         "en_query": "vision transformers pneumonia detection",
@@ -278,3 +300,34 @@ async def test_resolved_context_and_language_reach_search_adapter(
     assert captured_search_plan["languages"] == expected_languages
     assert captured_search_plan["language_preference"] == expected_preference
     assert captured_search_plan["target_count"] == 10
+
+
+@pytest.mark.asyncio
+async def test_explicit_language_clear_uses_unrestricted_search_routing(monkeypatch):
+    search = importlib.import_module("rag.search")
+    llm = fake_llm(
+        native_query="deteksi pneumonia",
+        languages=[],
+        language_filter_conflict=True,
+        language_preference="mixed",
+    )
+    plan = await plan_academic_search(
+        "Carikan 5 paper tentang pneumonia detection, bahasa apa saja. [Filter Preferences: languages: zh]",
+        llm=llm,
+    )
+    openalex_language_filters = []
+    monkeypatch.setattr(search, "fetch_europe_pmc", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        search,
+        "fetch_openalex",
+        lambda *args, **kwargs: openalex_language_filters.append(args[6]) or [],
+    )
+    monkeypatch.setattr(search, "fetch_crossref", lambda *args, **kwargs: [])
+    monkeypatch.setattr(search, "fetch_duckduckgo_fallback", lambda **kwargs: [])
+
+    search.search_academic_papers_planned(plan)
+
+    assert plan["languages"] == []
+    assert plan["language_preference"] == "all"
+    assert openalex_language_filters
+    assert all(language_filter is None for language_filter in openalex_language_filters)

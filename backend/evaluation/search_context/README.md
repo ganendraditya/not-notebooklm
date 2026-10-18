@@ -40,7 +40,7 @@ The runner imports the exact planner and factory source files directly, avoiding
 Each run writes:
 
 - `cases.json`, the frozen synthetic inputs and annotated expectations.
-- `manifest.json`, source commit, planner, evaluation-code, and corpus hashes, plus model IDs and settings. Resume rejects changes to the planner or evaluation harness.
+- `manifest.json`, source commit, planner, directly executed evaluation-source, and corpus hashes, plus model IDs, protocol, settings, and a credential-free endpoint fingerprint. Resume rejects changes to these values.
 - `observations.jsonl`, incremental raw prompts, responses, raw and normalized plans, provider-reported usage, timing, and individual checks.
 - `REPORT.md`, paired controls, category breakdowns, coverage, and limitations.
 - `proofs.json` and `PROOFS.md`, deterministic fixed-response regression checks for compaction-bridge delivery and language-filter precedence.

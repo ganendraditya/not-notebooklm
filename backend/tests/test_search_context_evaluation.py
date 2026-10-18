@@ -93,18 +93,89 @@ def test_scoring_rejects_mixed_type_list_values_without_raising():
     assert "field:languages" in result["failed_checks"]
 
 
-def test_evaluation_fingerprint_changes_when_scoring_source_changes(tmp_path, monkeypatch):
-    for relative_path in evaluation_runtime.EVALUATION_SOURCE_FILES:
-        source_path = tmp_path / relative_path
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "evaluation/search_context/scoring.py",
+        "utils/text_processing.py",
+        "rag/token_budget.py",
+    ],
+)
+def test_evaluation_fingerprint_changes_when_executed_source_changes(tmp_path, monkeypatch, relative_path):
+    for source_relative_path in evaluation_runtime.EVALUATION_SOURCE_FILES:
+        source_path = tmp_path / source_relative_path
         source_path.parent.mkdir(parents=True, exist_ok=True)
-        source_path.write_text(f"original:{relative_path}", encoding="utf-8")
+        source_path.write_text(f"original:{source_relative_path}", encoding="utf-8")
     monkeypatch.setattr(evaluation_runtime, "BACKEND", tmp_path)
 
     initial_fingerprint = evaluation_runtime.evaluation_source_fingerprint()
-    scoring_path = tmp_path / "evaluation/search_context/scoring.py"
-    scoring_path.write_text("changed scoring implementation", encoding="utf-8")
+    changed_path = tmp_path / relative_path
+    changed_path.write_text("changed executed implementation", encoding="utf-8")
 
     assert evaluation_runtime.evaluation_source_fingerprint() != initial_fingerprint
+
+
+@pytest.mark.parametrize(
+    ("base_url", "protocol", "expected_mismatch"),
+    [
+        ("https://other-user:other-password@provider-a.example/v1?api_key=rotated-secret", "openai", None),
+        ("https://user:password@provider-b.example/v1?api_key=url-secret", "openai", "models"),
+        ("https://user:password@provider-a.example/v1?api_key=url-secret", "anthropic", "models"),
+    ],
+)
+def test_model_provenance_tracks_safe_endpoint_and_protocol(monkeypatch, base_url, protocol, expected_mismatch):
+    def factory_for(endpoint, endpoint_protocol):
+        return SimpleNamespace(
+            _resolve_tier_credentials=lambda _tier: (
+                endpoint, "synthetic-api-key", "primary", "same-model", "fallback", 0.1, True, endpoint_protocol,
+            ),
+            _create_llm_instance=lambda **kwargs: SimpleNamespace(model=kwargs["model"], max_retries=0),
+        )
+
+    factory_holder = {"factory": factory_for("https://user:password@provider-a.example/v1?api_key=url-secret", "openai")}
+    monkeypatch.setattr(evaluation_runtime, "load_source_module", lambda *_args: factory_holder["factory"])
+    previous_model = evaluation_runtime.configured_models(["fast"])[0][2]
+    factory_holder["factory"] = factory_for(base_url, protocol)
+    current_model = evaluation_runtime.configured_models(["fast"])[0][2]
+
+    previous = {key: "same" for key in RESUME_PROVENANCE_KEYS}
+    current = previous.copy()
+    previous["models"] = [previous_model]
+    current["models"] = [current_model]
+
+    assert resume_provenance_mismatch(current, previous) == expected_mismatch
+    assert "password" not in json.dumps(current_model)
+    assert "url-secret" not in json.dumps(current_model)
+    assert "synthetic-api-key" not in json.dumps(current_model)
+
+
+def test_configured_models_keep_same_endpoint_model_with_distinct_protocols(monkeypatch):
+    protocols = {"fast": "openai", "primary": "anthropic", "fallback": "openai"}
+
+    class Factory:
+        def _resolve_tier_credentials(self, tier):
+            return (
+                "https://provider.example/v1",
+                "synthetic-api-key",
+                "shared-model",
+                "shared-model",
+                "shared-model",
+                0.1,
+                True,
+                protocols[tier],
+            )
+
+        def _create_llm_instance(self, **kwargs):
+            return SimpleNamespace(model=kwargs["model"], max_retries=0)
+
+    monkeypatch.setattr(evaluation_runtime, "load_source_module", lambda *_args: Factory())
+
+    models = evaluation_runtime.configured_models(["fast", "primary", "fallback"])
+
+    assert [(tier, info["protocol"]) for tier, _llm, info in models] == [
+        ("fast", "openai"),
+        ("primary", "anthropic"),
+    ]
 
 
 @pytest.mark.parametrize(
