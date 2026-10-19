@@ -281,8 +281,12 @@ To decouple low-level configuration from the researcher workspace, the **Control
 - **Staged Configuration & Workspace Fallback Notice:** Changes made in the dashboard stage cleanly without terminating active in-flight chats, and non-intrusive top banners alert users if primary cloud embedding encounters network failure and drops to local offline fallback.
 - **BYOK Gateway Tiering:** Form inputs for Primary, Fast, and Fallback models with real-time ping latency benchmarking against the OpenAI-compatible gateway (`POST /admin/test/llm`).
 - **Object Storage Toggle:** Real-time switcher between Local Disk and S3/R2/MinIO object buckets with live credential validation (`POST /admin/test/storage`).
-- **Secret Manager Injection:** Adapter selector supporting Local `.env`, Infisical CLI (`INFISICAL_ENV`, `INFISICAL_PROJECT_ID`), and Doppler CLI (`DOPPLER_PROJECT`, `DOPPLER_CONFIG`).
+- **Secret Manager Injection:** Configuration persistence uses `DOPPLER_ENVIRONMENT` or `INFISICAL_INJECTED=1` as runtime markers, with Doppler taking precedence if both are present. Project IDs, configs, or tokens alone do not activate vault mode. Admin updates under these markers modify process memory without creating, rewriting, or deleting the local `.env`, even when a caller supplies an explicit path. Outside vault mode, local persistence is unchanged.
 - **System Health Diagnostics:** Direct telemetry querying SQLite WAL record counts, Qdrant collection point volumes, and disk capacity.
+
+`GET /admin/config` and configuration-update responses include `persistence.mode` (`runtime` or `local_env`), `persistence.active_provider`, and `persistence.has_local_env`. Runtime update messages explain that changes are lost after restart and must be persisted through the active vault separately; the backend does not write to the provider's API. The file diagnostic checks existence only, without returning local file contents. A file can still be present during an injected session, so runtime-only writes are not a claim that all plaintext credentials have been removed.
+
+Issue #79 is being implemented in stages. This first stage does not add a purge endpoint, replace the Secret Vaults UI, centralize existing dotenv loading, or change local `.env` serialization. Existing dotenv initialization may still read a local file to fill environment values that were not injected. The current Secret Vaults form saves launch metadata; saving it does not switch the running process to a different provider. Direct `infisical run` launches must supply `INFISICAL_INJECTED=1` for this guard; the existing launcher sets that marker when it re-executes through Infisical itself.
 
 ### 5.7 Consumer Terminal Installer & Process Orchestration (`cli/`)
 

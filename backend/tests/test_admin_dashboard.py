@@ -11,6 +11,7 @@ Validates:
 - GET /admin/system/health: Authoritative counts and disk space diagnostics.
 """
 
+import importlib
 import os
 import tempfile
 import pytest
@@ -29,6 +30,8 @@ def isolate_test_env(monkeypatch):
         temp_path = tf.name
 
     monkeypatch.setenv("TEST_ENV_PATH", temp_path)
+    monkeypatch.delenv("DOPPLER_ENVIRONMENT", raising=False)
+    monkeypatch.delenv("INFISICAL_INJECTED", raising=False)
     # Reset storage type environment to local
     orig_env = os.environ.copy()
     try:
@@ -244,6 +247,56 @@ def test_admin_update_secret_provider():
     assert data["status"] == "success"
     assert data["config"]["doppler_project"] == "notbooklm-core"
     assert data["config"]["doppler_config"] == "stg"
+    assert data["config"]["active_provider"] == "local"
+    assert data["persistence"]["mode"] == "local_env"
+
+
+@pytest.mark.parametrize(
+    ("marker", "value", "provider"),
+    [("DOPPLER_ENVIRONMENT", "dummy-dev", "doppler"), ("INFISICAL_INJECTED", "1", "infisical")],
+)
+@pytest.mark.parametrize(
+    ("endpoint", "payload"),
+    [
+        ("llm", {"base_url": "https://gateway.example/v1", "model": "dummy-model", "api_key": "dummy-runtime-key"}),
+        ("storage", {"storage_type": "local"}),
+        ("secrets", {"provider": "doppler", "doppler_project": "dummy-project"}),
+        ("embeddings", {"provider": "local"}),
+        ("reranker", {"model": "dummy-reranker", "top_n": 6}),
+    ],
+)
+def test_vault_config_endpoints_report_runtime_only_updates(monkeypatch, marker, value, provider, endpoint, payload):
+    import rag
+    from services import storage_adapter
+
+    vector_store = importlib.import_module("rag.vector_store")
+    monkeypatch.setenv(marker, value)
+    monkeypatch.setattr(vector_store, "init_embedding_and_vector_store", lambda: (None, None))
+    monkeypatch.setattr(vector_store, "get_flashrank_ranker", lambda **kwargs: None)
+    monkeypatch.setattr(storage_adapter, "reset_s3_client", lambda: None)
+    monkeypatch.setattr(rag, "embed_model", None)
+    monkeypatch.setattr(rag, "vector_store", None)
+    path = os.environ["TEST_ENV_PATH"]
+    with open(path, "rb") as stream:
+        original = stream.read()
+
+    response = client.post(f"/admin/config/{endpoint}", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["persistence"] == {
+        "mode": "runtime", "active_provider": provider, "has_local_env": True,
+    }
+    assert "this process only" in data["message"]
+    assert "after restart" in data["message"]
+    assert "dummy-runtime-key" not in response.text
+    with open(path, "rb") as stream:
+        assert stream.read() == original
+
+    config = client.get("/admin/config").json()
+    assert config["persistence"] == data["persistence"]
+    assert config["secrets"]["active_provider"] == provider
 
 
 def test_admin_update_embeddings_config():

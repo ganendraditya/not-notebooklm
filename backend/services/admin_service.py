@@ -7,7 +7,7 @@ and vector database health diagnostics without modifying repository source files
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,6 +16,23 @@ logger = logging.getLogger("uvicorn.error")
 CONFIG_FILE_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", ".env")
 )
+
+
+SecretProvider = Literal["local", "infisical", "doppler"]
+
+
+class ConfigurationPersistence(TypedDict):
+    mode: Literal["local_env", "runtime"]
+    active_provider: SecretProvider
+    has_local_env: bool
+
+
+def get_runtime_secret_provider() -> SecretProvider:
+    if os.getenv("DOPPLER_ENVIRONMENT", "").strip():
+        return "doppler"
+    if os.getenv("INFISICAL_INJECTED", "").strip() == "1":
+        return "infisical"
+    return "local"
 
 
 def mask_secret(secret: Optional[str]) -> str:
@@ -134,14 +151,24 @@ def get_config_file_path() -> str:
     return os.getenv("TEST_ENV_PATH", "").strip() or CONFIG_FILE_PATH
 
 
+def get_configuration_persistence(env_path: Optional[str] = None) -> ConfigurationPersistence:
+    provider = get_runtime_secret_provider()
+    return {
+        "mode": "local_env" if provider == "local" else "runtime",
+        "active_provider": provider,
+        "has_local_env": os.path.isfile(env_path or get_config_file_path()),
+    }
+
+
 def update_env_variable(key: str, value: str, env_path: Optional[str] = None) -> bool:
-    """Safely updates or appends a key-value pair in the local .env file and os.environ."""
+    """Applies one setting using the same vault-aware persistence policy as batch updates."""
     return update_multiple_env_variables({key: value}, env_path=env_path)
 
 
 def update_multiple_env_variables(updates: Dict[str, str], env_path: Optional[str] = None) -> bool:
-    """Updates multiple environment variables in a single atomic file write with sanitization."""
+    """Applies sanitized updates in memory; persists locally only outside an injected vault session."""
     target_path = env_path or get_config_file_path()
+    runtime_only = get_runtime_secret_provider() != "local"
     sanitized_updates = {
         _sanitize_env_value(k): _sanitize_env_value(v)
         for k, v in updates.items()
@@ -151,6 +178,9 @@ def update_multiple_env_variables(updates: Dict[str, str], env_path: Optional[st
     # Update in-memory os.environ
     for k, v in sanitized_updates.items():
         os.environ[k] = v
+
+    if runtime_only:
+        return True
 
     lines = []
     if os.path.exists(target_path):
@@ -229,11 +259,7 @@ def get_system_admin_config() -> Dict[str, Any]:
     s3_region = os.getenv("S3_REGION", "auto").strip()
 
     # 3. Secret Manager Provider
-    secret_provider = "local"
-    if os.getenv("INFISICAL_TOKEN") or os.getenv("INFISICAL_ENV") or os.getenv("INFISICAL_PROJECT_ID"):
-        secret_provider = "infisical"
-    elif os.getenv("DOPPLER_ENVIRONMENT") or os.getenv("DOPPLER_CONFIG") or os.getenv("DOPPLER_TOKEN"):
-        secret_provider = "doppler"
+    persistence = get_configuration_persistence()
 
     # 4. Embedding Settings
     embedding_provider = os.getenv("EMBEDDING_PROVIDER", "local").strip().lower()
@@ -271,6 +297,7 @@ def get_system_admin_config() -> Dict[str, Any]:
     fallback_pid = os.getenv("LLM_FALLBACK_PROFILE_ID", primary_pid).strip()
 
     return {
+        "persistence": persistence,
         "llm": {
             "base_url": base_url,
             "api_key_masked": mask_secret(api_key),
@@ -294,7 +321,7 @@ def get_system_admin_config() -> Dict[str, Any]:
             "is_configured": storage_type == "s3" and bool(s3_endpoint and s3_access_key and s3_secret_key and s3_bucket),
         },
         "secrets": {
-            "active_provider": secret_provider,
+            "active_provider": persistence["active_provider"],
             "infisical_project_id": os.getenv("INFISICAL_PROJECT_ID", ""),
             "infisical_env": os.getenv("INFISICAL_ENV", "dev"),
             "doppler_project": os.getenv("DOPPLER_PROJECT", ""),
