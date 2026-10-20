@@ -15,6 +15,11 @@ export interface GatewayProfile {
 }
 
 export interface AdminConfig {
+  persistence?: {
+    mode: "local_env" | "runtime";
+    active_provider: "local" | "infisical" | "doppler";
+    has_local_env: boolean;
+  };
   llm: {
     base_url: string;
     api_key_masked: string;

@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import shutil
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -131,6 +131,25 @@ def get_admin_config():
     return get_system_admin_config()
 
 
+def _configuration_update_response(
+    message: str, section: Literal["llm", "storage", "secrets", "embedding", "reranker"],
+) -> Dict[str, Any]:
+    config = get_system_admin_config()
+    persistence = config["persistence"]
+    if persistence["mode"] == "runtime":
+        provider = "Doppler" if persistence["active_provider"] == "doppler" else "Infisical"
+        message = (
+            "Configuration applied in memory for this process only. Local .env was not changed. "
+            f"Update your {provider} project for changes to persist after restart."
+        )
+    return {
+        "status": "success",
+        "message": message,
+        "persistence": persistence,
+        "config": config[section],
+    }
+
+
 @router.post("/config/llm")
 def update_llm_config(payload: LLMConfigRequest):
     """Updates and persists LLM gateway settings, clearing cached model clients."""
@@ -189,11 +208,7 @@ def update_llm_config(payload: LLMConfigRequest):
     update_multiple_env_variables(updates)
     clear_llm_cache()
 
-    return {
-        "status": "success",
-        "message": "LLM configuration saved and cached clients cleared.",
-        "config": get_system_admin_config()["llm"],
-    }
+    return _configuration_update_response("LLM configuration saved and cached clients cleared.", "llm")
 
 
 @router.post("/test/llm")
@@ -279,11 +294,7 @@ def update_storage_config(payload: StorageConfigRequest):
     except Exception as e:
         logger.warning(f"[Admin] Failed to reset S3 client adapter: {e}")
 
-    return {
-        "status": "success",
-        "message": "Storage configuration updated successfully.",
-        "config": get_system_admin_config()["storage"],
-    }
+    return _configuration_update_response("Storage configuration updated successfully.", "storage")
 
 
 @router.post("/test/storage")
@@ -343,11 +354,11 @@ def update_secret_provider_config(payload: SecretProviderConfigRequest):
     if updates:
         update_multiple_env_variables(updates)
 
-    return {
-        "status": "success",
-        "message": f"Secret management configured for provider: {payload.provider}",
-        "config": get_system_admin_config()["secrets"],
-    }
+    return _configuration_update_response(
+        "Secret launch settings saved. Activate a vault by starting the application with its CLI; "
+        "saving these settings does not change the active runtime provider.",
+        "secrets",
+    )
 
 
 @router.post("/config/embeddings")
@@ -385,11 +396,7 @@ def update_embedding_config(payload: EmbeddingConfigRequest):
     except Exception as e:
         logger.warning(f"[Admin] Vector store re-init on embedding switch noted: {e}")
 
-    return {
-        "status": "success",
-        "message": f"Embedding provider updated to: {payload.provider}",
-        "config": get_system_admin_config()["embedding"],
-    }
+    return _configuration_update_response(f"Embedding provider updated to: {payload.provider}", "embedding")
 
 
 @router.post("/test/embeddings")
@@ -426,11 +433,9 @@ def update_reranker_config(payload: RerankerConfigRequest):
     except Exception as e:
         logger.warning(f"[Admin] Failed to warm reranker {payload.model}: {e}")
 
-    return {
-        "status": "success",
-        "message": f"Reranker settings updated to: {payload.model} (Top-N: {payload.top_n})",
-        "config": get_system_admin_config()["reranker"],
-    }
+    return _configuration_update_response(
+        f"Reranker settings updated to: {payload.model} (Top-N: {payload.top_n})", "reranker",
+    )
 
 
 @router.post("/test/reranker")
