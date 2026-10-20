@@ -21,6 +21,8 @@ import StorageTab from "./components/StorageTab";
 import SecretsTab from "./components/SecretsTab";
 import EmbeddingTab from "./components/EmbeddingTab";
 import SystemHealthTab from "./components/SystemHealthTab";
+import PersistenceNotice from "./components/PersistenceNotice";
+import { parseAdminPersistence } from "@/lib/admin-persistence";
 
 type AdminTabKey = "llm" | "storage" | "secrets" | "embedding" | "health";
 
@@ -65,6 +67,8 @@ export default function AdminPage() {
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  const persistence = parseAdminPersistence(config?.persistence);
 
   return (
     <div className="min-h-screen bg-app-bg text-app-text flex flex-col font-sans">
@@ -182,6 +186,7 @@ export default function AdminPage() {
             </div>
           ) : config ? (
             <>
+              <PersistenceNotice persistence={persistence} />
               {activeTab === "llm" && (
                 <LLMTab config={config.llm} backendUrl={backendUrl} onSaved={fetchConfig} />
               )}
@@ -189,7 +194,7 @@ export default function AdminPage() {
                 <StorageTab config={config.storage} backendUrl={backendUrl} onSaved={fetchConfig} />
               )}
               {activeTab === "secrets" && (
-                <SecretsTab config={config.secrets} backendUrl={backendUrl} onSaved={fetchConfig} />
+                <SecretsTab config={config.secrets} persistence={persistence} />
               )}
               {activeTab === "embedding" && (
                 <EmbeddingTab

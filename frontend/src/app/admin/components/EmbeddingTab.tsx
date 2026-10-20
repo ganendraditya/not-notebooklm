@@ -14,6 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import type { AdminConfig, TestResult } from "@/types/admin";
+import { readConfigUpdateMessage } from "@/lib/admin-persistence";
 
 interface EmbeddingTabProps {
   config: AdminConfig["embedding"];
@@ -161,8 +162,10 @@ export default function EmbeddingTab({
         }),
       });
       if (!embedRes.ok) throw new Error("Failed to save embedding configuration");
+      const embedMessage = await readConfigUpdateMessage(embedRes);
 
       // 2. Save Reranker Config
+      const rankFailureMessage = `Embedding: ${embedMessage} Reranker update could not be confirmed. Refresh the dashboard before retrying.`;
       const rankRes = await fetch(`${backendUrl}/admin/config/reranker`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -170,11 +173,12 @@ export default function EmbeddingTab({
           model: rerankerModel,
           top_n: Number(topN),
         }),
-      });
-      if (!rankRes.ok) throw new Error("Failed to save reranker configuration");
+      }).catch(() => { throw new Error(rankFailureMessage); });
+      if (!rankRes.ok) throw new Error(rankFailureMessage);
+      const rankMessage = await readConfigUpdateMessage(rankRes);
 
       setStatusMessage({
-        text: "Settings saved! Changes are staged and will take effect on next workspace reload.",
+        text: embedMessage === rankMessage ? embedMessage : `Embedding: ${embedMessage} Reranker: ${rankMessage}`,
       });
       setGeminiKey("");
       setCustomKey("");
@@ -548,14 +552,11 @@ export default function EmbeddingTab({
 
         {statusMessage && (
           <div
-            className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
-              statusMessage.error
-                ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
-                : "bg-blue-500/10 border-blue-500/20 text-blue-400"
-            }`}
+            role={statusMessage.error ? "alert" : "status"}
+            className="p-3 rounded-lg border border-app-border bg-app-input-surface text-app-text text-sm flex items-start gap-2"
           >
             {statusMessage.error ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
-            <span>{statusMessage.text}</span>
+            <span className="min-w-0 break-words">{statusMessage.text}</span>
           </div>
         )}
 
@@ -563,7 +564,7 @@ export default function EmbeddingTab({
           <button
             type="submit"
             disabled={isSaving}
-            className="h-8 min-w-[240px] px-4 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            className="h-11 w-full sm:w-auto sm:min-w-[240px] px-4 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
           >
             {isSaving ? "Saving..." : "Save Retrieval & Reranker Settings"}
           </button>
