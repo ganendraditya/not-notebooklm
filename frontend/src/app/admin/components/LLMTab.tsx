@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import type { AdminConfig, GatewayProfile, TestResult } from "@/types/admin";
+import { readConfigUpdateMessage } from "@/lib/admin-persistence";
 
 interface LLMTabProps {
   config: AdminConfig["llm"];
@@ -331,7 +332,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
 
       setProfiles(newProfiles);
       setStatusMessage({
-        text: `Provider "${updatedProfile.name}" saved successfully!`,
+        text: await readConfigUpdateMessage(res),
       });
       closeModal();
       onSaved();
@@ -380,6 +381,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
       });
 
       if (res.ok) {
+        setStatusMessage({ text: await readConfigUpdateMessage(res) });
         onSaved();
         return true;
       } else {
@@ -505,7 +507,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
 
       if (!res.ok) throw new Error("Failed to persist deletion to backend");
 
-      setStatusMessage({ text: `Provider "${target.name}" deleted.` });
+      setStatusMessage({ text: await readConfigUpdateMessage(res) });
       onSaved();
     } catch (e) {
       setStatusMessage({
@@ -550,7 +552,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
       });
 
       if (!res.ok) throw new Error("Failed to save tier bindings");
-      setStatusMessage({ text: "Tier routing bindings and sampling settings saved successfully." });
+      setStatusMessage({ text: await readConfigUpdateMessage(res) });
       onSaved();
     } catch (e) {
       setStatusMessage({
@@ -578,14 +580,11 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
       {/* Global Status Message */}
       {statusMessage && (
         <div
-          className={`p-3 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-            statusMessage.error
-              ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
-              : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-          }`}
+          role={statusMessage.error ? "alert" : "status"}
+          className="p-3 rounded-xl border border-app-border bg-app-input-surface text-app-text text-sm flex items-start gap-2.5"
         >
           {statusMessage.error ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
-          <span>{statusMessage.text}</span>
+          <span className="min-w-0 break-words">{statusMessage.text}</span>
         </div>
       )}
 

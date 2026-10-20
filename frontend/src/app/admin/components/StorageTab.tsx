@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { HardDrive, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import type { AdminConfig, TestResult } from "@/types/admin";
+import { readConfigUpdateMessage } from "@/lib/admin-persistence";
 
 interface StorageTabProps {
   config: AdminConfig["storage"];
@@ -68,7 +69,7 @@ export default function StorageTab({ config, backendUrl, onSaved }: StorageTabPr
         }),
       });
       if (!res.ok) throw new Error("Failed to update storage configuration");
-      setStatusMessage({ text: "Storage backend settings successfully updated." });
+      setStatusMessage({ text: await readConfigUpdateMessage(res) });
       setAccessKey("");
       setSecretKey("");
       onSaved();
@@ -222,14 +223,11 @@ export default function StorageTab({ config, backendUrl, onSaved }: StorageTabPr
 
         {statusMessage && (
           <div
-            className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
-              statusMessage.error
-                ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
-                : "bg-blue-500/10 border-blue-500/20 text-blue-400"
-            }`}
+            role={statusMessage.error ? "alert" : "status"}
+            className="p-3 rounded-lg border border-app-border bg-app-input-surface text-app-text text-sm flex items-start gap-2"
           >
             {statusMessage.error ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
-            <span>{statusMessage.text}</span>
+            <span className="min-w-0 break-words">{statusMessage.text}</span>
           </div>
         )}
 
