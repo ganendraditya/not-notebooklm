@@ -2,7 +2,7 @@ import json
 import os
 import sys
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from llama_index.core.llms import ChatMessage, MessageRole
@@ -10,6 +10,7 @@ from llama_index.core.llms import ChatMessage, MessageRole
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from evaluation.eval_search_context import RESUME_PROVENANCE_KEYS, resume_provenance_mismatch
+from evaluation import eval_search_context
 from evaluation.search_context.cases import TOPICS, build_cases
 from evaluation.search_context.report import write_report
 from evaluation.search_context import runtime as evaluation_runtime
@@ -96,6 +97,7 @@ def test_scoring_rejects_mixed_type_list_values_without_raising():
 @pytest.mark.parametrize(
     "relative_path",
     [
+        "runtime_environment.py",
         "evaluation/search_context/scoring.py",
         "utils/text_processing.py",
         "rag/token_budget.py",
@@ -113,6 +115,29 @@ def test_evaluation_fingerprint_changes_when_executed_source_changes(tmp_path, m
     changed_path.write_text("changed executed implementation", encoding="utf-8")
 
     assert evaluation_runtime.evaluation_source_fingerprint() != initial_fingerprint
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("offline", [False, True])
+async def test_search_context_initializes_only_live_entry_point(monkeypatch, tmp_path, offline):
+    class CasesReached(Exception):
+        pass
+
+    def stop_before_cases():
+        raise CasesReached
+
+    loader = Mock()
+    args = ["eval_search_context.py", "--output", str(tmp_path / "unused")]
+    if offline:
+        args.append("--offline")
+    monkeypatch.setattr(sys, "argv", args)
+    monkeypatch.setattr(eval_search_context, "load_backend_environment", loader)
+    monkeypatch.setattr(eval_search_context, "build_cases", stop_before_cases)
+
+    with pytest.raises(CasesReached):
+        await eval_search_context.main()
+
+    assert loader.call_count == (0 if offline else 1)
 
 
 @pytest.mark.parametrize(

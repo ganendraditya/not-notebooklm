@@ -4,7 +4,6 @@ import asyncio
 import inspect
 import logging
 from typing import List, Optional, Callable, Any
-from dotenv import load_dotenv
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -32,8 +31,6 @@ from .token_budget import (
     record_discovered_context_window,
 )
 from models import ChatSourceSnapshotItem
-
-load_dotenv()
 
 async def generate_chat_title(first_user_message: str, assistant_response: Optional[str] = None) -> str:
     """

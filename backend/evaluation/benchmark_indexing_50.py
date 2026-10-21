@@ -290,8 +290,9 @@ def matches(gt: str, output: str) -> bool:
 
 
 def main():
-    from dotenv import load_dotenv
-    load_dotenv(os.path.join(ROOT, "backend", ".env"))
+    from runtime_environment import load_backend_environment
+
+    load_backend_environment()
     try:
         from rag.llm_factory import get_fast_llm, get_main_llm
         llm = get_fast_llm() or get_main_llm()

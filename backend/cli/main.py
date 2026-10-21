@@ -21,6 +21,8 @@ REPO_ROOT = BACKEND_DIR.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
+from runtime_environment import load_backend_environment
+
 from cli.ui import (
     prompt_select,
     prompt_yes_no,
@@ -382,6 +384,7 @@ def run_interactive_start_menu():
 
 def main():
     """Root CLI dispatcher."""
+    load_backend_environment()
     args = sys.argv[1:]
     cmd = args[0].lower() if args else "start"
 

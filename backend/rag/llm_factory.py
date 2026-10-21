@@ -4,7 +4,6 @@ import logging
 import os
 import re
 from typing import Any, Callable, Dict, Optional
-from dotenv import load_dotenv
 
 from llama_index.llms.openai_like import OpenAILike
 
@@ -13,7 +12,6 @@ try:
 except ImportError:
     LlamaAnthropic = None
 
-load_dotenv()
 logger = logging.getLogger("uvicorn.error")
 
 _CACHED_MAIN_LLM = None

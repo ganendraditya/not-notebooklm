@@ -13,6 +13,8 @@ import sys
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
+from runtime_environment import load_backend_environment
+
 from evaluation.search_context.cases import build_cases
 from evaluation.search_context.proofs import write_proofs
 from evaluation.search_context.report import write_report
@@ -65,6 +67,8 @@ async def main() -> None:
         parser.error("concurrency, repeat, timeout, and limit must be positive")
     if args.model and (len(args.tiers) != 1 or args.offline):
         parser.error("--model requires exactly one live tier")
+    if not args.offline:
+        load_backend_environment()
     logging.getLogger("httpx").setLevel(logging.WARNING)
     cases = build_cases()
     if args.category:

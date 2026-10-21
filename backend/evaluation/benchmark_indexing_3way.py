@@ -2,9 +2,16 @@ import os
 import time
 import json
 import sqlite3
-from dotenv import load_dotenv
+import sys
+from pathlib import Path
 
-load_dotenv("backend/.env")
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from runtime_environment import load_backend_environment
+
+load_backend_environment()
 
 from rag.llm_factory import get_fast_llm, get_main_llm
 from journal_indexer import lookup_journal_index, lookup_sinta_live

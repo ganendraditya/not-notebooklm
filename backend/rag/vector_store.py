@@ -5,7 +5,6 @@ import threading
 import time
 import requests
 from typing import Optional, List, Any
-from dotenv import load_dotenv
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore as _BaseQdrantVectorStore
 import qdrant_client
@@ -210,7 +209,6 @@ try:
 except Exception:
     HuggingFaceEmbedding = None
 
-load_dotenv()
 logger = logging.getLogger("uvicorn.error")
 
 QDRANT_URL = os.getenv("QDRANT_URL")
@@ -506,4 +504,3 @@ def ingest_document(file_path: str, chat_id: str, filename: Optional[str] = None
     fn = filename or os.path.basename(file_path)
     md_text = parse_document_to_markdown(file_path)
     return ingest_document_text(md_text, fn, chat_id)
-

@@ -9,14 +9,15 @@ import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-from dotenv import load_dotenv
 
 # Ensure backend root is on sys.path
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-load_dotenv(BACKEND_DIR / ".env")
+from runtime_environment import load_backend_environment
+
+load_backend_environment()
 
 # Enforce deterministic greedy decoding (zero entropy) during benchmark evaluation
 os.environ["LLM_TEMPERATURE"] = "0.0"

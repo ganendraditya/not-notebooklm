@@ -18,6 +18,7 @@ from .scoring import prompt_contains_topic, screen_plan
 
 BACKEND = Path(__file__).resolve().parents[2]
 EVALUATION_SOURCE_FILES = (
+    "runtime_environment.py",
     "evaluation/eval_search_context.py",
     "evaluation/search_context/__init__.py",
     "evaluation/search_context/cases.py",
