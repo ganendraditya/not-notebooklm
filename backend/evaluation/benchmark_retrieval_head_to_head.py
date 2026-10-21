@@ -2,15 +2,20 @@ import sys
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from qdrant_client import QdrantClient
-from llama_index.core import Document, VectorStoreIndex, StorageContext
-from llama_index.core.embeddings import BaseEmbedding
-from fastembed import TextEmbedding
 
 # Add backend directory to sys.path
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
+
+from runtime_environment import load_backend_environment
+
+load_backend_environment()
+
+from qdrant_client import QdrantClient
+from llama_index.core import Document, VectorStoreIndex, StorageContext
+from llama_index.core.embeddings import BaseEmbedding
+from fastembed import TextEmbedding
 
 from rag.vector_store import QdrantVectorStore
 from rag.academic_chunker import split_markdown_into_academic_sections

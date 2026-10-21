@@ -13,11 +13,14 @@ import time
 from urllib.parse import urlparse
 
 import requests
-from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from runtime_environment import load_backend_environment
+
+load_backend_environment()
 
 from benchmark_indexing_50 import SINTA_SEED, matches as legacy_match  # noqa: E402
 import journal_indexer  # noqa: E402
@@ -428,7 +431,6 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
-    load_dotenv(ROOT / "backend" / ".env")
     cases, sinta_cache = build_cases()
     v1_metrics = _v1_map()
     runs = {

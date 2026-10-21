@@ -1,4 +1,7 @@
 import os
+from runtime_environment import load_backend_environment
+
+load_backend_environment()
 os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
 import re
 import logging
@@ -64,7 +67,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(asyncio.to_thread(heal_legacy_upload_files))
     yield
 
-app = FastAPI(title="Not-NotebookLM API", version="1.18.4", lifespan=lifespan)
+app = FastAPI(title="Not-NotebookLM API", version="1.18.5", lifespan=lifespan)
 
 # Secure static mount: expose only chat media attachments (images/thumbnails)
 # Research documents and ZIP downloads are protected and served exclusively via validated endpoints

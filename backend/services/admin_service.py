@@ -8,9 +8,7 @@ import json
 import logging
 import os
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict
-from dotenv import load_dotenv
 
-load_dotenv()
 logger = logging.getLogger("uvicorn.error")
 
 CONFIG_FILE_PATH = os.path.abspath(

@@ -21,13 +21,14 @@ import argparse
 import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
-from dotenv import load_dotenv
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-load_dotenv(BACKEND_DIR / ".env")
+from runtime_environment import load_backend_environment
+
+load_backend_environment()
 os.environ["LLM_TEMPERATURE"] = "0.0"
 
 from rag.llm_factory import get_main_llm, get_fast_llm
