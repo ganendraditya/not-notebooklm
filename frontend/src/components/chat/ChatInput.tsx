@@ -18,6 +18,9 @@ import { QueuedPromptsList } from "./input/QueuedPromptsList";
 import { TargetedSourceBadge } from "./input/TargetedSourceBadge";
 import { AttachmentPreviewList, type Attachment } from "./input/AttachmentPreviewList";
 import { ALLOWED_ATTACHMENT_EXTS } from "./input/fileUtils";
+import { ModelSwitcher } from "./ModelSwitcher";
+import { ComposerMoreActions } from "./ComposerMoreActions";
+import { calculateCount } from "@/hooks/search/useSearchFilter";
 
 export type { Attachment };
 
@@ -67,6 +70,8 @@ export const ChatInputBox = memo(function ChatInputBox({
   const [containerWidth, setContainerWidth] = useState(760);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const moreActionsRef = useRef<HTMLButtonElement>(null);
+  const compactActions = containerWidth < 480;
   const activeUploadControllersRef = useRef<Map<string, AbortController>>(new Map());
   const attachmentsRef = useRef<Attachment[]>([]);
   attachmentsRef.current = attachments;
@@ -547,14 +552,14 @@ export const ChatInputBox = memo(function ChatInputBox({
         />
 
         {/* Bottom Actions Row */}
-        <div className="flex items-center justify-between gap-1.5 pt-2 px-1 w-full min-w-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 pt-2 px-1 w-full min-w-0">
           {/* Left: File Attach Button */}
-          <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center shrink-0">
             <Tooltip content={t('chat.attachTitle')} side="top">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 rounded-full text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors shrink-0 cursor-pointer"
+                 className="h-11 w-11 sm:h-8 sm:w-8 pointer-coarse:h-11 pointer-coarse:w-11 flex items-center justify-center rounded-full text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-app-text"
                 aria-label={t('chat.attachTitle')}
               >
                 <Plus size={20} />
@@ -570,34 +575,43 @@ export const ChatInputBox = memo(function ChatInputBox({
             />
           </div>
 
-          {/* Right: Filter, Sources Badge, and Send/Stop Button */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-1">
+          <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-1.5">
+            <ModelSwitcher backendUrl={backendUrl} activeChatId={chatId ?? null} />
+            {compactActions && <ComposerMoreActions
+              triggerRef={moreActionsRef}
+              filterCount={calculateCount(filter)}
+              documentsCount={documentsCount}
+              onOpenFilter={() => setIsFilterOpen(true)}
+              onToggleSources={onToggleRightSidebar}
+            />}
             <SearchFilterPopover
               isOpen={isFilterOpen}
               onClose={() => setIsFilterOpen(false)}
               onToggle={() => setIsFilterOpen(prev => !prev)}
               filter={filter}
               onApplyFilter={setFilter}
+              hideTrigger={compactActions}
+              returnFocusRef={compactActions ? moreActionsRef : undefined}
             />
 
-            <Tooltip content={t('chat.sourcesCount').replace('{count}', documentsCount.toString())} side="top">
+            {!compactActions && <Tooltip content={t('chat.sourcesCount').replace('{count}', documentsCount.toString())} side="top">
               <button 
                 type="button"
                 onClick={onToggleRightSidebar}
-                className="relative px-3 py-1.5 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text text-xs font-medium border border-app-border transition-colors cursor-pointer shrink-0 flex items-center justify-center gap-1.5"
+                className="relative h-11 sm:h-8 pointer-coarse:h-11 rounded-full bg-app-item-hover hover:bg-app-item-active text-app-text text-xs font-medium border border-app-border transition-colors cursor-pointer shrink-0 flex items-center justify-center gap-1.5 px-3 focus-visible:outline-2 focus-visible:outline-app-text"
                 aria-label={t('chat.sourcesCount').replace('{count}', documentsCount.toString())}
               >
                 <FileText size={15} className="text-blue-500 fill-blue-500/20 shrink-0" />
                 <span>{t('chat.sourcesCount').replace('{count}', documentsCount.toString())}</span>
               </button>
-            </Tooltip>
+            </Tooltip>}
 
             {isLoading && onStopGeneration ? (
               <Tooltip content={t('chat.stopTitle')} side="top">
                 <button
                   type="button"
                   onClick={onStopGeneration}
-                  className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 transition-all cursor-pointer shadow-md flex items-center justify-center shrink-0"
+                  className="h-11 w-11 sm:h-8 sm:w-8 pointer-coarse:h-11 pointer-coarse:w-11 rounded-full bg-app-text text-app-bg hover:opacity-90 transition-colors cursor-pointer shadow-md flex items-center justify-center shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text"
                   aria-label={t('chat.stopTitle')}
                 >
                   <Square size={16} className="fill-current" />
@@ -609,7 +623,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                   type="button"
                   onClick={handleSend}
                   disabled={(!input.trim() && attachments.length === 0) || isUploading || attachments.some(a => a.isUploading)}
-                  className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 disabled:opacity-30 disabled:hover:opacity-30 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0"
+                  className="h-11 w-11 sm:h-8 sm:w-8 pointer-coarse:h-11 pointer-coarse:w-11 rounded-full bg-app-text text-app-bg hover:opacity-90 disabled:opacity-30 disabled:hover:opacity-30 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text"
                   aria-label={t('chat.sendTitle')}
                 >
                   <ArrowUp size={18} strokeWidth={2.5} />

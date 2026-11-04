@@ -444,7 +444,6 @@ export default function ChatClient() {
                   onRegenerateMessage={handleRegenerateMessage}
                   onSelectVariant={handleSelectVariant}
                   onOpenStorage={() => setIsSettingsOpen(true)}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
                 />
               </ErrorBoundary>
             </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, type RefObject } from "react";
+import { Dialog } from "@base-ui/react/dialog";
 import { useTranslation } from "@/lib/i18n";
-import { Portal } from "@/components/ui/Portal";
 import { Tooltip } from "@/components/ui/tooltip";
 import { 
   X, 
@@ -30,6 +30,9 @@ interface SearchFilterPopoverProps {
   isOpen: boolean;
   onClose: () => void;
   onToggle: () => void;
+  compact?: boolean;
+  hideTrigger?: boolean;
+  returnFocusRef?: RefObject<HTMLButtonElement | null>;
 }
 
 export default function SearchFilterPopover({
@@ -38,6 +41,9 @@ export default function SearchFilterPopover({
   isOpen,
   onClose,
   onToggle,
+  compact = false,
+  hideTrigger = false,
+  returnFocusRef,
 }: SearchFilterPopoverProps) {
   const { t } = useTranslation();
   
@@ -54,22 +60,7 @@ export default function SearchFilterPopover({
   const [domainSearch, setDomainSearch] = useState<string>("");
   const [languageSearch, setLanguageSearch] = useState<string>("");
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Escape key listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const appliedCount = calculateCount(filter);
   const activeLocalCount = calculateCount(localFilter);
@@ -91,40 +82,44 @@ export default function SearchFilterPopover({
   };
 
   return (
-    <div className="relative inline-block text-left select-none text-app-text" ref={containerRef}>
-      {/* Trigger Button: Always display pill with Text + Icon */}
-      <Tooltip content={appliedCount > 0 ? `${t('filter.button')} (${appliedCount})` : t('filter.button')} side="top">
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <div className={hideTrigger ? "contents" : "relative inline-block shrink-0 text-left select-none text-app-text"} ref={containerRef}>
+      {!hideTrigger && <Tooltip content={appliedCount > 0 ? `${t('filter.button')} (${appliedCount})` : t('filter.button')} side="top">
         <button
+          ref={triggerRef}
           type="button"
           onClick={onToggle}
-          className={
+          className={`h-11 sm:h-8 pointer-coarse:h-11 ${compact ? "w-11 sm:w-8 pointer-coarse:w-11 justify-center" : "px-3"} focus-visible:outline-2 focus-visible:outline-app-text ${
             appliedCount > 0 
-              ? "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-500 font-medium shadow-sm" 
-              : "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all cursor-pointer shrink-0 bg-app-item-hover hover:bg-app-item-active border-app-border text-app-text-muted hover:text-app-text font-medium"
-          }
+              ? "relative flex items-center gap-1.5 rounded-full border text-xs transition-colors cursor-pointer shrink-0 bg-blue-600/20 hover:bg-blue-600/30 border-blue-500/50 text-blue-700 dark:text-blue-300 font-medium"
+              : "flex items-center gap-1.5 rounded-full border text-xs transition-colors cursor-pointer shrink-0 bg-app-item-hover hover:bg-app-item-active border-app-border text-app-text-muted hover:text-app-text font-medium"
+          }`}
           aria-label={t('filter.button')}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
         >
-          <SlidersHorizontal size={13} className={appliedCount > 0 ? "text-blue-500" : "text-app-text-dim"} />
-          <span>{t('filter.button')}</span>
+          <SlidersHorizontal size={13} aria-hidden="true" />
+          {!compact && <span>{t('filter.button')}</span>}
           {appliedCount > 0 && (
-            <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-blue-500 text-white text-[10px] font-mono font-semibold">
+            <span className={`${compact ? "absolute -top-1 -right-1" : "ml-0.5"} px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-mono font-semibold`}>
               {appliedCount}
             </span>
           )}
         </button>
-      </Tooltip>
+      </Tooltip>}
 
       {/* Centered Modal Overlay (Option 1: Centered Dialog with Backdrop) */}
       {isOpen && (
-        <Portal>
-          <div 
+        <Dialog.Portal>
+          <div
             onClick={(e) => {
               e.stopPropagation();
               onClose();
             }}
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 text-app-text"
           >
-          <div 
+          <Dialog.Popup
+            finalFocus={returnFocusRef ?? triggerRef}
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-lg max-h-[85vh] rounded-2xl bg-app-modal border border-app-border-strong shadow-2xl overflow-hidden flex flex-col p-4 sm:p-5 backdrop-blur-2xl animate-in zoom-in-95 duration-150 text-app-text"
           >
@@ -135,12 +130,12 @@ export default function SearchFilterPopover({
                   <SlidersHorizontal size={15} />
                 </div>
                 <div className="flex flex-col justify-between h-8 py-0.5">
-                  <h3 className="text-xs sm:text-sm font-semibold text-app-text leading-none">
+                  <Dialog.Title render={<h3 />} className="text-xs sm:text-sm font-semibold text-app-text leading-none">
                     {t('filter.title')}
-                  </h3>
-                  <span className="text-[11px] text-app-text-muted leading-none">
+                  </Dialog.Title>
+                  <Dialog.Description render={<span />} className="text-[11px] text-app-text-muted leading-none">
                     {t('filter.desc')}
-                  </span>
+                  </Dialog.Description>
                 </div>
               </div>
 
@@ -148,7 +143,7 @@ export default function SearchFilterPopover({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="h-7 w-7 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer"
+                  className="h-11 w-11 sm:h-7 sm:w-7 pointer-coarse:h-11 pointer-coarse:w-11 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover flex items-center justify-center transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-app-text"
                   aria-label={t('right.close') ? `${t('right.close')} (Esc)` : "Close (Esc)"}
                 >
                   <X size={15} />
@@ -402,10 +397,11 @@ export default function SearchFilterPopover({
                 </button>
               </div>
             </div>
-          </div>
+          </Dialog.Popup>
         </div>
-        </Portal>
+        </Dialog.Portal>
       )}
     </div>
+    </Dialog.Root>
   );
 }
