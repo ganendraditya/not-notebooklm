@@ -15,7 +15,7 @@ export interface WorkspaceModel {
   name: string;
   profile_id: string;
   profile_name: string;
-  protocol?: "openai" | "anthropic";
+  protocol?: string;
   is_default?: boolean;
 }
 

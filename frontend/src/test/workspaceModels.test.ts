@@ -18,7 +18,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("fetchWorkspaceModels", () => {
   it("preserves valid names, technical IDs, and supported optional fields", async () => {
-    const models = [model, { ...model, id: "other", protocol: "anthropic" }];
+    const models = [model, { ...model, id: "other", protocol: "anthropic" }, { ...model, id: "custom", protocol: "ollama" }];
     respond({ workspace_models: models });
     await expect(fetchWorkspaceModels("http://synthetic.invalid")).resolves.toEqual(models);
   });
@@ -38,7 +38,7 @@ describe("fetchWorkspaceModels", () => {
     { ...model, name: { unexpected: "object" } },
     { ...model, profile_name: undefined },
     { ...model, profile_name: { unexpected: "object" } },
-    { ...model, protocol: "unsupported" },
+    { ...model, protocol: { unexpected: "object" } },
     { ...model, is_default: "false" },
     null,
   ])("rejects malformed entries before they reach the picker: %j", async (invalid) => {

@@ -6,7 +6,7 @@ function isWorkspaceModel(value: unknown): value is WorkspaceModel {
     && "name" in value && typeof value.name === "string"
     && "profile_id" in value && typeof value.profile_id === "string"
     && "profile_name" in value && typeof value.profile_name === "string"
-    && (!("protocol" in value) || value.protocol === "openai" || value.protocol === "anthropic")
+    && (!("protocol" in value) || typeof value.protocol === "string")
     && (!("is_default" in value) || typeof value.is_default === "boolean");
 }
 
