@@ -172,7 +172,7 @@ describe("ModelSwitcher Component", () => {
     const originalSessions = useChatStore.getState().sessions;
     const pending = { model: "pending-model", profile_id: "pending-provider" };
     useChatStore.setState({ pendingNewChatModel: pending });
-    const models = [{ id: "fresh-model", profile_id: "fresh-provider", name: "Fresh model", is_default: true }];
+    const models = [{ id: "fresh-model", profile_id: "fresh-provider", profile_name: "Fresh provider", name: "Fresh model", is_default: true }];
     const fetcher = vi.spyOn(global, "fetch").mockResolvedValue({ ok: true, json: async () => ({ workspace_models: models }) } as Response);
     renderWithI18n(<ModelSwitcher backendUrl={backendUrl} activeChatId="session-1" />);
     fireEvent.click(screen.getByRole("button", { name: /DeepSeek R1/i }));
@@ -193,6 +193,21 @@ describe("ModelSwitcher Component", () => {
     await screen.findByText("The model list could not be refreshed. Your current selection is unchanged.");
     expect(useChatStore.getState().availableModels).toEqual(models);
     expect(useChatStore.getState().sessions[0].model).toBe("deepseek-reasoner");
+  });
+
+  it.each(["name", "profile_name"])("retains the previous list when refresh returns an invalid %s", async (field) => {
+    const models = useChatStore.getState().availableModels;
+    vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ workspace_models: [{ ...models[0], [field]: { unexpected: "object" } }] }),
+    } as Response);
+    renderWithI18n(<ModelSwitcher backendUrl={backendUrl} activeChatId="session-1" />);
+    fireEvent.click(screen.getByRole("button", { name: /DeepSeek R1/i }));
+    fireEvent.click(await screen.findByRole("button", { name: "Refresh model list" }));
+    await screen.findByText("The model list could not be refreshed. Your current selection is unchanged.");
+    expect(useChatStore.getState().availableModels).toEqual(models);
+    expect(useChatStore.getState().sessions[0].model).toBe("deepseek-reasoner");
+    expect(screen.getByRole("button", { name: /Use DeepSeek R1/i })).toBeInTheDocument();
   });
 
   it.each(["mouse", "touch", "pen"])("does not autofocus search when opened by %s", async (pointerType) => {
