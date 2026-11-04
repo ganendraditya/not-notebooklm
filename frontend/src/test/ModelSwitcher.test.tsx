@@ -159,7 +159,7 @@ describe("ModelSwitcher Component", () => {
     renderWithI18n(<ModelSwitcher backendUrl={backendUrl} activeChatId="session-1" />);
     fireEvent.click(screen.getByRole("button", { name: /DeepSeek R1/i }));
     const dialog = await screen.findByRole("dialog");
-    const link = within(dialog).getByRole("link", { name: accessibleName });
+    const link = await within(dialog).findByRole("link", { name: accessibleName });
     expect(link).toHaveTextContent(label);
     expect(link).toHaveAttribute("href", "/admin");
     expect(link).toHaveAttribute("target", "_blank");
