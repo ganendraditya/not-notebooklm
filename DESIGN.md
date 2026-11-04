@@ -92,3 +92,11 @@ When implementing or editing UI components:
 3. **No Decorative Gradients**: Text and cards must never use rainbow or gradient text clipping (`bg-gradient-to-r from-purple to-pink bg-clip-text`).
 4. **Honest Copywriting**: State system actions plainly ("Uploading paper", "Extracting citations", "Searching Europe PMC") without synthetic hype words ("revolutionary", "synergy", "supercharge").
 5. **Interactive Citation Anchors**: Every reference chip (`[1]`, `[Doc 2]`) must link directly to the physical document inspector with jump-to-highlight capability.
+
+## 7. Composer Control Hierarchy
+
+- Model selection and Send/Stop stay directly visible beside the prompt; attachment remains on the left. Filter and Sources are secondary composer actions, disclosed through an action menu when space is limited, with active-filter state still visible.
+- Selected model names occupy one line with a bounded, content-sized trigger. Visual truncation never changes the stored name or model ID; the opened picker exposes both in full, including on touch devices.
+- Interaction patterns follow their purpose: the model popover contains search and selection; the overflow menu contains actions; the filter dialog contains its form. Keyboard focus, Escape dismissal, and focus return follow those patterns.
+- Width caps and breakpoints depend on actual composer space and tested content, not character counts or a claimed universal pixel standard. Existing type, neutral semantic colors, and compact pill controls keep the prompt as the primary focus.
+- Reference patterns: [Carbon overflow content](https://www.carbondesignsystem.com/building-blocks/core/patterns/overflow-content), [Carbon menus](https://www.carbondesignsystem.com/building-blocks/core/components/menu), and [WAI-ARIA menu buttons](https://www.w3.org/WAI/ARIA/apg/patterns/menu-button/).
