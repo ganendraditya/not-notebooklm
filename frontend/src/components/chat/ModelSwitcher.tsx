@@ -4,8 +4,10 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Cpu, ChevronDown, Check, Settings, Sparkles } from "lucide-react";
 import { useChatStore, WorkspaceModel } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
-import { readModelPreferences, recordModelSelection } from "@/lib/model-preferences";
+import { MODEL_PREFERENCES_KEY, readModelPreferences, recordModelSelection, syncRememberedModelSelection } from "@/lib/model-preferences";
 import { resolveNewChatModel } from "@/lib/workspace-models";
+import { chatRequiresModel } from "@/lib/new-chat-models";
+import { persistChatModel } from "@/lib/chat-model-binding";
 
 interface ModelSwitcherProps {
   backendUrl: string;
@@ -20,14 +22,23 @@ export function ModelSwitcher({
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const saving = useChatStore((state) => !!activeChatId && state.modelUpdatingChatIds.includes(activeChatId));
+  const requiredChatIds = useChatStore((state) => state.modelRequiredChatIds);
 
   const availableModels = useChatStore((state) => state.availableModels);
   const modelCatalogStatus = useChatStore((state) => state.modelCatalogStatus);
   const lastSelectedModelKey = useChatStore((state) => state.lastSelectedModelKey);
   const sessions = useChatStore((state) => state.sessions);
   const pendingNewChatModel = useChatStore((state) => state.pendingNewChatModel);
-  const updateSessionModel = useChatStore((state) => state.updateSessionModel);
   const setPendingNewChatModel = useChatStore((state) => state.setPendingNewChatModel);
+  useEffect(() => {
+    const focus = () => { syncRememberedModelSelection(); };
+    const storage = (event: StorageEvent) => { if (event.key === MODEL_PREFERENCES_KEY || event.key === null) syncRememberedModelSelection(true); };
+    focus();
+    window.addEventListener("focus", focus);
+    window.addEventListener("storage", storage);
+    return () => { window.removeEventListener("focus", focus); window.removeEventListener("storage", storage); };
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -70,9 +81,9 @@ export function ModelSwitcher({
       return availableModels.find((model) => model.id === currentSession.model && (!currentSession.profile_id || model.profile_id === currentSession.profile_id))
         || { id: currentSession.model, name: currentSession.model, profile_id: currentSession.profile_id || "", profile_name: currentSession.profile_id || "" };
     }
-    if (activeChatId) return availableModels.find((model) => model.is_default) || availableModels[0];
+    if (activeChatId && !chatRequiresModel(activeChatId)) return availableModels.find((model) => model.is_default) || availableModels[0];
     return resolveNewChatModel(availableModels, lastSelectedModelKey || readModelPreferences().recent[0], pendingNewChatModel);
-  }, [currentSession, activeChatId, availableModels, lastSelectedModelKey, pendingNewChatModel]);
+  }, [currentSession, activeChatId, availableModels, lastSelectedModelKey, pendingNewChatModel, requiredChatIds]);
 
   const catalogMessage = t(modelCatalogStatus === "loading" ? "chat.loadingModels" : modelCatalogStatus === "error" ? "chat.modelLoadError" : "chat.noModels");
 
@@ -90,32 +101,12 @@ export function ModelSwitcher({
   }, [availableModels]);
 
   const handleSelectModel = async (m: WorkspaceModel) => {
+    if (saving) return;
     setIsOpen(false);
     if (activeChatId) {
-      const prevModel = currentSession?.model ?? null;
-      const prevProfileId = currentSession?.profile_id ?? null;
-
-      // 1. Optimistically update store
-      updateSessionModel(activeChatId, m.id, m.profile_id);
-
-      // 2. Persist to backend database with rollback on failure
       try {
-        const res = await fetch(`${backendUrl}/chats/${activeChatId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: m.id,
-            profile_id: m.profile_id,
-          }),
-        });
-        if (!res.ok) {
-          updateSessionModel(activeChatId, prevModel, prevProfileId);
-          console.error("Failed to update session model:", res.statusText);
-          return;
-        }
-        recordModelSelection(m);
+        await persistChatModel(backendUrl, activeChatId, m, true);
       } catch (err) {
-        updateSessionModel(activeChatId, prevModel, prevProfileId);
         console.error("Failed to update session model:", err);
       }
     } else {
@@ -133,6 +124,8 @@ export function ModelSwitcher({
       {/* Trigger Button */}
       <button
         type="button"
+        disabled={saving}
+        aria-busy={saving}
         onClick={() => setIsOpen((prev) => !prev)}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-app-surface border border-app-border hover:border-app-border-strong text-xs text-app-text transition-all cursor-pointer group shadow-xs focus:outline-hidden"
         title={t("chat.selectModel") || "Select synthesis model"}

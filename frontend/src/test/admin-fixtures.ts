@@ -22,7 +22,7 @@ export const adminHealth: AdminSystemHealth = {
 };
 
 export function jsonResponse(value: unknown, status = 200): Response {
-  return { ok: status >= 200 && status < 300, status, json: async () => value } as Response;
+  return { ok: status >= 200 && status < 300, status, json: async () => structuredClone(value) } as Response;
 }
 
 export function installAdminDialogs() {

@@ -11,6 +11,15 @@ describe("Admin configuration contracts", () => {
     expect(isConfigSection("embedding", adminConfig.embedding)).toBe(true);
   });
 
+  it.each([2, 31])("reads operator reranker value %s without weakening save validation", async (top_n) => {
+    const config = { ...adminConfig, reranker: { ...adminConfig.reranker!, top_n } };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(config)));
+    await expect(loadAdminConfig("http://fixture.invalid")).resolves.toMatchObject({ reranker: { top_n } });
+    expect(isConfigSection("reranker", config.reranker)).toBe(false);
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ config: config.reranker }));
+    await expect(saveAdminSection("http://fixture.invalid", "reranker", config.reranker)).rejects.toThrow();
+  });
+
   it.each([null, {}, { ...adminConfig, llm: { ...adminConfig.llm, profiles: "invalid" } }])("rejects incomplete or malformed configuration: %j", async (config) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(config)));
     await expect(loadAdminConfig("http://localhost:8000")).rejects.toThrow("Configuration response unavailable");

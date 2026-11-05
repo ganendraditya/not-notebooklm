@@ -7,11 +7,13 @@ and vector database health diagnostics without modifying repository source files
 import json
 import logging
 import os
+import threading
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger("uvicorn.error")
+_configuration_write_lock = threading.RLock()
 
 CONFIG_FILE_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", ".env")
@@ -133,6 +135,11 @@ def update_env_variable(key: str, value: str, env_path: Optional[str] = None) ->
 
 def update_multiple_env_variables(updates: Dict[str, str], env_path: Optional[str] = None) -> bool:
     """Applies sanitized updates in memory; persists locally only outside an injected vault session."""
+    with _configuration_write_lock:
+        return _update_multiple_env_variables(updates, env_path)
+
+
+def _update_multiple_env_variables(updates: Dict[str, str], env_path: Optional[str]) -> bool:
     target_path = env_path or get_config_file_path()
     runtime_only = get_runtime_secret_provider() != "local"
     sanitized_updates = {

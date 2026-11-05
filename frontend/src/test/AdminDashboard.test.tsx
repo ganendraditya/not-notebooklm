@@ -145,6 +145,19 @@ describe("System configuration navigation and persistence", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await screen.findByText("Metadata database");
     expect(screen.getAllByText(/Not reported/).length).toBeGreaterThan(3);
+    const disk = screen.getByRole("heading", { name: "Backend disk capacity" }).closest("section")!;
+    expect(within(disk).getAllByText("Not reported", { exact: true })).toHaveLength(3);
+    expect(within(disk).queryByText(/GB/)).not.toBeInTheDocument();
     expect(screen.queryByText("healthy")).not.toBeInTheDocument();
+  });
+
+  it("keeps units for finite disk metrics, including zero", async () => {
+    const { fetcher } = serveAdmin(); renderPage(); await screen.findByRole("heading", { name: "Your providers" });
+    fetcher.mockResolvedValueOnce(jsonResponse({ ...adminHealth, disk: { free_gb: 0, used_gb: 12.5, total_gb: 12.5 } }));
+    fireEvent.click(screen.getByRole("button", { name: "System status" }));
+    await screen.findByText("0 GB");
+    const disk = screen.getByRole("heading", { name: "Backend disk capacity" }).closest("section")!;
+    expect(within(disk).getAllByText(`${(12.5).toLocaleString()} GB`)).toHaveLength(2);
+    expect(within(disk).queryByText("Not reported")).not.toBeInTheDocument();
   });
 });

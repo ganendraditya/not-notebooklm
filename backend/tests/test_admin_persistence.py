@@ -1,4 +1,6 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 import pytest
 
@@ -131,3 +133,42 @@ def test_returning_to_local_mode_does_not_flush_runtime_credentials(isolated_con
     assert "LLM_API_KEY=dummy-local-key\n" in contents
     assert "LLM_MODEL=dummy-local-model\n" in contents
     assert "dummy-runtime-key" not in contents
+
+
+def test_concurrent_section_updates_preserve_both_persisted_values(isolated_config, monkeypatch):
+    monkeypatch.setenv("LOCAL_EMBEDDING_MODEL", "old-model")
+    monkeypatch.setenv("RERANKER_TOP_N", "12")
+    isolated_config.write_text("LOCAL_EMBEDDING_MODEL=old-model\nRERANKER_TOP_N=12\n", encoding="utf-8")
+    original = admin_service._update_multiple_env_variables
+    first_entered, second_entered, release_first, second_started = (Event() for _ in range(4))
+
+    def controlled_update(updates, env_path):
+        if "LOCAL_EMBEDDING_MODEL" in updates:
+            first_entered.set()
+            assert release_first.wait(5)
+        else:
+            second_entered.set()
+        return original(updates, env_path)
+
+    def second_update():
+        second_started.set()
+        return admin_service.update_multiple_env_variables({"RERANKER_TOP_N": "15"})
+
+    monkeypatch.setattr(admin_service, "_update_multiple_env_variables", controlled_update)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(admin_service.update_multiple_env_variables, {"LOCAL_EMBEDDING_MODEL": "new-model"})
+        try:
+            assert first_entered.wait(5)
+            second = pool.submit(second_update)
+            assert second_started.wait(5)
+            assert not second_entered.wait(0.05)
+        finally:
+            release_first.set()
+        assert first.result(timeout=5) is True
+        assert second.result(timeout=5) is True
+
+    contents = isolated_config.read_text(encoding="utf-8")
+    assert "LOCAL_EMBEDDING_MODEL=new-model\n" in contents
+    assert "RERANKER_TOP_N=15\n" in contents
+    assert os.environ["LOCAL_EMBEDDING_MODEL"] == "new-model"
+    assert os.environ["RERANKER_TOP_N"] == "15"

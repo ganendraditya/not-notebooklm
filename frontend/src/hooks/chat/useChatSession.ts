@@ -3,8 +3,10 @@ import { type ChatSession, type ChatMessage, type WorkspaceModel, useChatStore }
 import { type Document, type PendingSourceItem, type TargetedSource } from "@/stores/documentStore";
 import { type ChatJobState } from "./useChatStream";
 import { formatDefaultSessionTitle } from "@/lib/utils";
-import { fetchWorkspaceModels, resolveNewChatModel } from "@/lib/workspace-models";
-import { readModelPreferences } from "@/lib/model-preferences";
+import { fetchWorkspaceModels, ModelRequiredError, resolveNewChatModel } from "@/lib/workspace-models";
+import { syncRememberedModelSelection } from "@/lib/model-preferences";
+import { chatRequiresModel, setChatRequiresModel } from "@/lib/new-chat-models";
+import { pendingChatModelUpdate, persistChatModel } from "@/lib/chat-model-binding";
 
 export function useChatSession(
   backendUrl: string,
@@ -221,14 +223,26 @@ export function useChatSession(
     }
   }, [activeChatId, sessions]);
 
-  const handleEnsureChatSession = async (suggestedTitle?: string): Promise<string> => {
+  const handleEnsureChatSession = async (suggestedTitle?: string, requireModel = false): Promise<string> => {
     // Fast path: session already active (check both ref and state)
-    if (activeChatIdRef.current) return activeChatIdRef.current;
-    if (activeChatId) return activeChatId;
+    const existingId = activeChatIdRef.current || activeChatId;
+    if (existingId) {
+      if (requireModel) await pendingChatModelUpdate(existingId);
+      if (requireModel && chatRequiresModel(existingId)) {
+        await modelsRequestRef.current;
+        const { availableModels, pendingNewChatModel } = useChatStore.getState();
+        const selected = resolveNewChatModel(availableModels, syncRememberedModelSelection(), pendingNewChatModel);
+        if (!selected) throw new ModelRequiredError();
+        await persistChatModel(backendUrl, existingId, selected);
+        useChatStore.getState().setPendingNewChatModel(null);
+      }
+      return existingId;
+    }
 
     // Mutex: If a session creation request is already in-flight, await the same promise
     if (pendingSessionCreationRef.current) {
-      return await pendingSessionCreationRef.current;
+      const id = await pendingSessionCreationRef.current;
+      return requireModel ? handleEnsureChatSession(suggestedTitle, true) : id;
     }
 
     pendingSessionCreationRef.current = (async () => {
@@ -236,8 +250,9 @@ export function useChatSession(
         // Initial clean default title while AI generates the smart topic name post-response
         const title = suggestedTitle?.trim() || formatDefaultSessionTitle();
         await modelsRequestRef.current;
-        const { availableModels, pendingNewChatModel, lastSelectedModelKey } = useChatStore.getState();
-        const selectedModel = resolveNewChatModel(availableModels, lastSelectedModelKey || readModelPreferences().recent[0], pendingNewChatModel);
+        const { availableModels, pendingNewChatModel } = useChatStore.getState();
+        const selectedModel = resolveNewChatModel(availableModels, syncRememberedModelSelection(), pendingNewChatModel);
+        if (requireModel && !selectedModel) throw new ModelRequiredError();
 
         const res = await fetch(`${backendUrl}/chats`, {
           method: "POST",
@@ -252,6 +267,7 @@ export function useChatSession(
           throw new Error(`Failed to create chat session: ${res.status} ${res.statusText}`);
         }
         const newChat = await res.json();
+        if (!selectedModel) setChatRequiresModel(newChat.id, true);
         useChatStore.getState().setPendingNewChatModel(null);
         try {
           localStorage.setItem("last_active_chat_id", newChat.id);

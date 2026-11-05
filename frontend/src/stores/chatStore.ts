@@ -56,6 +56,8 @@ interface ChatStore {
   availableModels: WorkspaceModel[];
   modelCatalogStatus: ModelCatalogStatus;
   lastSelectedModelKey: string | null;
+  modelRequiredChatIds: string[];
+  modelUpdatingChatIds: string[];
   pendingNewChatModel: { model: string; profile_id: string } | null;
   
   setSessions: (sessions: ChatSession[]) => void;
@@ -68,7 +70,7 @@ interface ChatStore {
   dismissSessionExecution: (chatId: string) => void;
   setAvailableModels: (models: WorkspaceModel[]) => void;
   setModelCatalogStatus: (status: ModelCatalogStatus) => void;
-  setLastSelectedModelKey: (key: string) => void;
+  setLastSelectedModelKey: (key: string | null) => void;
   setPendingNewChatModel: (selection: { model: string; profile_id: string } | null) => void;
   updateSessionModel: (chatId: string, model: string | null, profile_id: string | null) => void;
   
@@ -90,6 +92,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   availableModels: [],
   modelCatalogStatus: "loading",
   lastSelectedModelKey: null,
+  modelRequiredChatIds: [],
+  modelUpdatingChatIds: [],
   pendingNewChatModel: null,
 
   setSessions: (sessions) => set({ sessions }),

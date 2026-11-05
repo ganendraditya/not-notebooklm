@@ -78,6 +78,13 @@ describe("session model selection", () => {
     expect(useChatStore.getState().sessions[0]).toEqual(session);
   });
 
+  it("preserves backend-default behavior for grandfathered unbound chats even at message preflight", async () => {
+    useChatStore.setState({ sessions: [{ id: "legacy-unbound", title: "Legacy", created_at: "2026-11-05" }] });
+    const { result, fetcher } = setup("legacy-unbound");
+    await act(async () => { await expect(result.current.handleEnsureChatSession(undefined, true)).resolves.toBe("legacy-unbound"); });
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST" || init?.method === "PATCH")).toBe(false);
+  });
+
   it("waits for model hydration and shares a concurrent creation request", async () => {
     let finish!: (response: Response) => void;
     const loading = new Promise<Response>((resolve) => { finish = resolve; });

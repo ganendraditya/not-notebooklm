@@ -1,6 +1,10 @@
 import type { WorkspaceModel } from "@/stores/chatStore";
 import { modelKey } from "./model-preferences";
 
+export class ModelRequiredError extends Error {
+  constructor() { super("No available model for this new chat"); }
+}
+
 function isWorkspaceModel(value: unknown): value is WorkspaceModel {
   return typeof value === "object" && value !== null
     && "id" in value && typeof value.id === "string"

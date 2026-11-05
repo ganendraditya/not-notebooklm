@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { AdminConfig, AdminSystemHealth } from "@/types/admin";
 import { adminRequest, loadAdminConfig } from "@/lib/admin-api";
+import type { ConfigUpdate } from "@/lib/admin-api";
+import type { ConfigSection } from "@/lib/admin-config";
 import { parseAdminPersistence } from "@/lib/admin-persistence";
 import { useTranslation } from "@/lib/i18n";
 import LLMTab from "./components/LLMTab";
@@ -59,6 +61,10 @@ export default function AdminPage() {
     } catch { if (generation === configGeneration.current) setError(true); }
     finally { if (generation === configGeneration.current) setLoading(false); }
   }, [backendUrl]);
+  const publishSection = <K extends ConfigSection>(section: K, update: ConfigUpdate<NonNullable<AdminConfig[K]>>) => {
+    configGeneration.current += 1;
+    setConfig((previous) => previous && { ...previous, [section]: update.config, ...(update.persistence ? { persistence: update.persistence } : {}) });
+  };
   const fetchHealth = useCallback(async () => {
     if (healthLock.current) return;
     healthLock.current = true;
@@ -109,9 +115,9 @@ export default function AdminPage() {
           {error && <div role="alert" className="admin-notice"><p>{t(config ? "admin.configRefreshFailed" : "admin.loadFailed")}</p><button className="admin-button" onClick={() => { if (!config) setLoading(true); void fetchConfig(); }}>{t("admin.retry")}</button></div>}
           {config && <>
             {persistence?.mode !== "local_env" && <PersistenceNotice persistence={persistence} />}
-            {active === "llm" && <LLMTab config={config.llm} backendUrl={backendUrl} onSaved={fetchConfig} />}
-            {active === "storage" && <StorageTab config={config.storage} backendUrl={backendUrl} onSaved={fetchConfig} />}
-            {active === "embedding" && <EmbeddingTab config={config.embedding} rerankerConfig={config.reranker} backendUrl={backendUrl} onSaved={fetchConfig} />}
+            {active === "llm" && <LLMTab config={config.llm} backendUrl={backendUrl} onSaved={(update) => publishSection("llm", update)} />}
+            {active === "storage" && <StorageTab config={config.storage} backendUrl={backendUrl} onSaved={(update) => publishSection("storage", update)} />}
+            {active === "embedding" && <EmbeddingTab config={config.embedding} rerankerConfig={config.reranker} backendUrl={backendUrl} onSaved={(update) => publishSection("embedding", update)} onRerankerSaved={(update) => publishSection("reranker", update)} />}
             {active === "secrets" && <SecretsTab config={config.secrets} persistence={persistence} />}
             {persistence?.mode === "local_env" && active !== "health" && active !== "secrets" && <PersistenceNotice persistence={persistence} />}
           </>}

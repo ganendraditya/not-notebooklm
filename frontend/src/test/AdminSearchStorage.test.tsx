@@ -91,14 +91,17 @@ describe("File storage drafts", () => {
     expect(body).toMatchObject({ s3_bucket: "changed-bucket", s3_region: "region-fixture" });
   });
 
-  it("retains failed drafts and Cancel restores the last saved snapshot", async () => {
+  it("retains failed drafts until an uncertain write is reconciled", async () => {
     const { fetcher } = serveAdmin(); renderStorage();
     fireEvent.change(screen.getByLabelText("Bucket name"), { target: { value: "draft-bucket" } });
     fetcher.mockRejectedValueOnce(new TypeError("Offline"));
     fireEvent.click(screen.getByRole("button", { name: "Save file storage" }));
     await screen.findByRole("alert");
     expect(screen.getByLabelText("Bucket name")).toHaveValue("draft-bucket");
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save file storage" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Reload saved values" }));
+    await screen.findByText(/Saved values reloaded/);
     expect(screen.getByLabelText("Bucket name")).toHaveValue("fixture");
     expect(screen.getByRole("button", { name: "Save file storage" })).toBeDisabled();
   });

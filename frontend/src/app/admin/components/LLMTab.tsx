@@ -3,14 +3,14 @@
 import { useRef, useState } from "react";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import type { AdminConfig, GatewayProfile } from "@/types/admin";
-import { loadAdminConfig, llmPayload, profilesFromConfig, routingFromConfig, saveAdminSection, type LlmRouting } from "@/lib/admin-api";
+import { loadAdminConfig, llmPayload, profilesFromConfig, routingFromConfig, saveAdminSection, type ConfigUpdate, type LlmRouting } from "@/lib/admin-api";
 import { useTranslation } from "@/lib/i18n";
 import { AdminDialog, DiscardDialog, FeedbackMessage, useDraftGuard, usePersistenceFeedback, type Feedback } from "./AdminForms";
 import ConnectionEditor from "./ConnectionEditor";
 import ConnectionModels from "./ConnectionModels";
 import ModelRoutingForm from "./ModelRoutingForm";
 
-interface LLMTabProps { config: AdminConfig["llm"]; backendUrl: string; onSaved: () => void }
+interface LLMTabProps { config: AdminConfig["llm"]; backendUrl: string; onSaved: (update: ConfigUpdate<AdminConfig["llm"]>) => void }
 
 export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
   const { t } = useTranslation();
@@ -35,7 +35,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
   const profiles = profilesFromConfig(saved);
   const selected = profiles.find((profile) => profile.id === selectedId);
   const dirty = JSON.stringify(routing) !== JSON.stringify(routingFromConfig(saved));
-  useDraftGuard(dirty, busy);
+  useDraftGuard(dirty || uncertain, busy || uncertain);
   const showProviders = () => {
     setSelectedId(null); setModelDirty(false); setDiscardModels(false);
     requestAnimationFrame(() => providerButtons.current[selectedId || ""]?.focus());
@@ -47,6 +47,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
     try {
       const current = await loadAdminConfig(backendUrl);
       setSaved(current.llm);
+      onSaved({ config: current.llm, persistence: current.persistence });
       if (!dirty) setRouting(routingFromConfig(current.llm));
       setUncertain(false);
       setFeedback({ text: t("admin.reconciled") });
@@ -67,7 +68,7 @@ export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
       const message = { text: persistenceFeedback(result.persistence) };
       if (nextRouting && !removing) setRoutingFeedback(message);
       else setFeedback(message);
-      onSaved();
+      onSaved(result);
       return true;
     } catch {
       setFeedback({ text: t("admin.saveUnconfirmed"), error: true });

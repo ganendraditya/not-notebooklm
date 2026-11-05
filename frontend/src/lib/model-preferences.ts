@@ -2,6 +2,7 @@ import { useChatStore, type WorkspaceModel } from "@/stores/chatStore";
 
 export const MODEL_PREFERENCES_KEY = "notbooklm:model-preferences";
 export const RECENT_MODEL_LIMIT = 5;
+let unpersistedSelection: string | null = null;
 
 export interface ModelPreferences {
   favorites: string[];
@@ -35,5 +36,19 @@ export function recordModelSelection(model: WorkspaceModel): void {
   const recent = [key, ...preferences.recent.filter((item) => item !== key)].slice(0, RECENT_MODEL_LIMIT);
   try {
     localStorage.setItem(MODEL_PREFERENCES_KEY, JSON.stringify({ ...preferences, recent }));
-  } catch {}
+    unpersistedSelection = null;
+  } catch { unpersistedSelection = key; }
+}
+
+export function syncRememberedModelSelection(external = false): string | undefined {
+  const store = useChatStore.getState();
+  if (!external && unpersistedSelection && store.lastSelectedModelKey === unpersistedSelection) return unpersistedSelection;
+  try {
+    const raw = localStorage.getItem(MODEL_PREFERENCES_KEY);
+    const value: unknown = JSON.parse(raw || "null");
+    const key = value && typeof value === "object" && "recent" in value ? readKeys(value.recent)[0] : null;
+    store.setLastSelectedModelKey(key || null);
+    unpersistedSelection = null;
+    return key || undefined;
+  } catch { return store.lastSelectedModelKey || undefined; }
 }

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import type { AdminConfig } from "@/types/admin";
-import { saveAdminSection } from "@/lib/admin-api";
+import { saveAdminSection, type ConfigUpdate } from "@/lib/admin-api";
 import { useTranslation } from "@/lib/i18n";
-import { FormActions, SecretField, TestFeedback, useDraftGuard, useExplicitTest, usePersistenceFeedback, type Feedback } from "./AdminForms";
+import { FormActions, SectionRecovery, SecretField, TestFeedback, useDraftGuard, useExplicitTest, usePersistenceFeedback, type Feedback } from "./AdminForms";
+import { useConfigRecovery } from "./useConfigRecovery";
 
 const storageDraft = (config: AdminConfig["storage"]) => ({
   storage_type: config.storage_type,
@@ -15,7 +16,7 @@ const storageDraft = (config: AdminConfig["storage"]) => ({
   s3_secret_key: "",
 });
 
-export default function StorageTab({ config, backendUrl, onSaved }: { config: AdminConfig["storage"]; backendUrl: string; onSaved: () => void }) {
+export default function StorageTab({ config, backendUrl, onSaved }: { config: AdminConfig["storage"]; backendUrl: string; onSaved: (update: ConfigUpdate<AdminConfig["storage"]>) => void }) {
   const { t } = useTranslation();
   const describePersistence = usePersistenceFeedback();
   const [saved, setSaved] = useState(config);
@@ -23,23 +24,28 @@ export default function StorageTab({ config, backendUrl, onSaved }: { config: Ad
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const test = useExplicitTest(backendUrl, "storage");
+  const recovery = useConfigRecovery(backendUrl, "storage", (update) => {
+    setSaved(update.config); setDraft(storageDraft(update.config)); test.invalidate();
+    setFeedback({ text: t("admin.reconciled") }); onSaved(update);
+  });
   const dirty = JSON.stringify(draft) !== JSON.stringify(storageDraft(saved));
-  useDraftGuard(dirty, busy || test.pending);
+  useDraftGuard(dirty || recovery.uncertain, busy || recovery.reloading || recovery.uncertain || test.pending);
   const update = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) => { test.invalidate(); setFeedback(null); setDraft({ ...draft, [key]: value }); };
   const body = () => ({ ...draft, s3_access_key: draft.s3_access_key.trim() || undefined, s3_secret_key: draft.s3_secret_key.trim() || undefined });
   return <form className="admin-form-panel" aria-label={t("admin.storageLocation")} onSubmit={async (event) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || recovery.reloading || recovery.uncertain) return;
     setBusy(true); setFeedback(null);
     try {
       const result = await saveAdminSection(backendUrl, "storage", body());
       setSaved(result.config); setDraft(storageDraft(result.config)); test.invalidate();
-      setFeedback({ text: describePersistence(result.persistence) }); onSaved();
-    } catch { setFeedback({ text: t("admin.saveUnconfirmed"), error: true }); }
+      setFeedback({ text: describePersistence(result.persistence) }); onSaved(result);
+    } catch { recovery.markUncertain(); setFeedback({ text: t("admin.saveUnconfirmed"), error: true }); }
     finally { setBusy(false); }
   }}>
     <div className="admin-section-heading"><div><h2>{t("admin.storageLocation")}</h2><p className="admin-help">{t("admin.storageLocationHelp")}</p></div></div>
-      <fieldset disabled={busy}>
+      <SectionRecovery recovery={recovery} />
+      <fieldset disabled={busy || recovery.reloading}>
         <div className="admin-field admin-service-choice">
           <label htmlFor="storage-type">{t("admin.storageType")}</label>
           <select id="storage-type" value={draft.storage_type} onChange={(event) => update("storage_type", event.target.value as "local" | "s3")}>
@@ -64,6 +70,6 @@ export default function StorageTab({ config, backendUrl, onSaved }: { config: Ad
         </> : <p className="admin-help admin-field-note">{t("admin.backendLocalStorage")}</p>}
         <p className="admin-notice admin-warning">{t("admin.storageNoMigration")}</p>
       </fieldset>
-      <FormActions dirty={dirty} busy={busy} pending={test.pending} onCancel={() => { setDraft(storageDraft(saved)); test.invalidate(); setFeedback(null); }} saveLabel={t("admin.saveStorage")} feedback={feedback} />
+      <FormActions dirty={dirty} busy={busy || recovery.reloading} pending={test.pending} saveDisabled={recovery.uncertain} cancelDisabled={recovery.uncertain} onCancel={() => { setDraft(storageDraft(saved)); test.invalidate(); setFeedback(null); }} saveLabel={t("admin.saveStorage")} feedback={feedback} />
   </form>;
 }

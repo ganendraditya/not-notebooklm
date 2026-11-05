@@ -5,6 +5,7 @@ import type { AdminPersistence, TestResult } from "@/types/admin";
 import { useTranslation } from "@/lib/i18n";
 import { SECRET_PROVIDER_LABELS } from "@/lib/admin-persistence";
 import { X } from "lucide-react";
+import type { ConfigRecovery } from "./useConfigRecovery";
 
 export interface DraftState { dirty: boolean; busy: boolean }
 export const AdminDraftContext = createContext<(id: string, state: DraftState | null) => void>(() => {});
@@ -44,13 +45,23 @@ export function TestFeedback({ result, pending }: { result: TestResult | null; p
   </div>;
 }
 
-export function FormActions({ dirty, busy, pending = false, saveDisabled = false, onCancel, saveLabel, feedback }: { dirty: boolean; busy: boolean; pending?: boolean; saveDisabled?: boolean; onCancel: () => void; saveLabel: string; feedback: Feedback | null }) {
+export function SectionRecovery({ recovery }: { recovery: ConfigRecovery }) {
+  const { t } = useTranslation();
+  if (!recovery.uncertain) return null;
+  return <div className="admin-notice">
+    <p>{t("admin.sectionReconcileHelp")}</p>
+    {recovery.error && <p role="alert" className="admin-error">{t("admin.loadFailed")}</p>}
+    <button className="admin-button" type="button" disabled={recovery.reloading} onClick={recovery.reload}>{t("admin.reloadSaved")}</button>
+  </div>;
+}
+
+export function FormActions({ dirty, busy, pending = false, saveDisabled = false, cancelDisabled = false, onCancel, saveLabel, feedback }: { dirty: boolean; busy: boolean; pending?: boolean; saveDisabled?: boolean; cancelDisabled?: boolean; onCancel: () => void; saveLabel: string; feedback: Feedback | null }) {
   const { t } = useTranslation();
   return <>
     <div className="admin-form-actions">
       <div className="admin-form-status" aria-live="polite">{feedback ? <p className={`admin-feedback${feedback.error ? " admin-error" : ""}`} role={feedback.error ? "alert" : "status"}>{feedback.text}</p> : dirty && <span className="admin-help">{t("admin.unsaved")}</span>}</div>
       <div className="admin-actions">
-        <button type="button" className="admin-button admin-quiet" disabled={!dirty || busy || pending} onClick={onCancel}>{t("admin.cancel")}</button>
+        <button type="button" className="admin-button admin-quiet" disabled={!dirty || busy || pending || cancelDisabled} onClick={onCancel}>{t("admin.cancel")}</button>
         <button type="submit" className="admin-button admin-primary" disabled={!dirty || busy || pending || saveDisabled} aria-busy={busy}><span style={{ visibility: busy ? "hidden" : undefined }}>{saveLabel}</span>{busy && <span className="admin-busy-label">{t("admin.saving")}</span>}</button>
       </div>
     </div>
