@@ -18,6 +18,7 @@ import { QueuedPromptsList } from "./input/QueuedPromptsList";
 import { TargetedSourceBadge } from "./input/TargetedSourceBadge";
 import { AttachmentPreviewList, type Attachment } from "./input/AttachmentPreviewList";
 import { ALLOWED_ATTACHMENT_EXTS } from "./input/fileUtils";
+import { useChatStore } from "@/stores/chatStore";
 
 export type { Attachment };
 
@@ -63,6 +64,9 @@ export const ChatInputBox = memo(function ChatInputBox({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [modelRequired, setModelRequired] = useState(false);
+  const availableModels = useChatStore((state) => state.availableModels);
+  const modelCatalogStatus = useChatStore((state) => state.modelCatalogStatus);
   const [storageWarningFile, setStorageWarningFile] = useState<{ filename: string; size: number } | null>(null);
   const [containerWidth, setContainerWidth] = useState(760);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -400,6 +404,7 @@ export const ChatInputBox = memo(function ChatInputBox({
     if (isLoading || isUploading || attachments.some(a => a.isUploading)) return;
     const query = input.trim();
     if (!query && attachments.length === 0) return;
+    if (!availableModels.length && !chatId) { setModelRequired(true); return; }
 
     const filterClauses: string[] = [];
     if (filter.yearFrom && filter.yearTo) {
@@ -492,6 +497,10 @@ export const ChatInputBox = memo(function ChatInputBox({
           textareaRef.current?.focus();
         }}
       />
+
+      {modelRequired && !availableModels.length && !chatId && <p className="mb-2 px-2 text-xs text-app-text-muted" role="alert">
+        {t(modelCatalogStatus === "loading" ? "chat.loadingModels" : modelCatalogStatus === "error" ? "chat.modelLoadError" : "chat.modelRequired")} <a href="/admin" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">{t("admin.title")}</a>
+      </p>}
 
       {/* Attachment Error Banner */}
       {attachmentError && (

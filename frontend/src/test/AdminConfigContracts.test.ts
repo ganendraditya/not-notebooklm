@@ -1,0 +1,47 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { isAdminConfig, isConfigSection } from "@/lib/admin-config";
+import { llmPayload, loadAdminConfig, profilesFromConfig, saveAdminSection } from "@/lib/admin-api";
+import { adminConfig, jsonResponse } from "./admin-fixtures";
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("Admin configuration contracts", () => {
+  it("accepts complete masked responses and preserves configured model IDs", () => {
+    expect(isAdminConfig(adminConfig)).toBe(true);
+    expect(isConfigSection("embedding", adminConfig.embedding)).toBe(true);
+  });
+
+  it.each([null, {}, { ...adminConfig, llm: { ...adminConfig.llm, profiles: "invalid" } }])("rejects incomplete or malformed configuration: %j", async (config) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(config)));
+    await expect(loadAdminConfig("http://localhost:8000")).rejects.toThrow("Configuration response unavailable");
+  });
+
+  it("does not accept a success envelope without an authoritative saved section", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ status: "success", config: {} })));
+    await expect(saveAdminSection("http://localhost:8000", "llm", {})).rejects.toThrow("Configuration response unavailable");
+  });
+
+  it("omits stored masks and blank replacement keys from combined LLM writes", () => {
+    const payload = llmPayload(adminConfig.llm, adminConfig.llm.profiles, undefined, { default: "  " });
+    expect(payload).not.toHaveProperty("api_key");
+    expect(payload.profiles[0]).not.toHaveProperty("api_key");
+    expect(payload.profiles[0]).not.toHaveProperty("api_key_masked");
+    expect(payload.profiles[0]).not.toHaveProperty("has_api_key");
+  });
+
+  it("respects an explicit empty profile list even when legacy endpoint fields remain", () => {
+    expect(profilesFromConfig({ ...adminConfig.llm, profiles: [] })).toEqual([]);
+  });
+
+  it("bootstraps internal routing from the first registered model without a separate answer-default form", () => {
+    const saved = { ...adminConfig.llm, model: "", fast_model: "", primary_profile_id: "", fast_profile_id: "", fallback_profile_id: "", base_url: "", profiles: [] };
+    const payload = llmPayload(saved, adminConfig.llm.profiles);
+    expect(payload).toMatchObject({ model: "answer-model", primary_profile_id: "default", fast_profile_id: "default", fallback_profile_id: "default", base_url: "https://fixture.invalid/v1" });
+    expect(payload).not.toHaveProperty("api_key");
+  });
+
+  it("does not replace an existing unregistered internal model when editing the provider list", () => {
+    const saved = { ...adminConfig.llm, model: "legacy-unregistered-model" };
+    expect(llmPayload(saved, saved.profiles).model).toBe("legacy-unregistered-model");
+  });
+});

@@ -1,575 +1,114 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Binary,
-  CheckCircle2,
-  AlertCircle,
-  RefreshCw,
-  Sliders,
-  AlertTriangle,
-  Eye,
-  EyeOff,
-  Copy,
-  Check,
-} from "lucide-react";
-import type { AdminConfig, TestResult } from "@/types/admin";
-import { readConfigUpdateMessage } from "@/lib/admin-persistence";
+import type { AdminConfig } from "@/types/admin";
+import { saveAdminSection } from "@/lib/admin-api";
+import { useTranslation } from "@/lib/i18n";
+import { FormActions, SecretField, TestFeedback, useDraftGuard, useExplicitTest, usePersistenceFeedback, type Feedback } from "./AdminForms";
 
-interface EmbeddingTabProps {
-  config: AdminConfig["embedding"];
-  rerankerConfig?: AdminConfig["reranker"];
-  backendUrl: string;
-  onSaved: () => void;
+const LOCAL_MODELS = ["sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2", "intfloat/multilingual-e5-large"];
+const RERANKER_MODELS = ["ms-marco-TinyBERT-L-2-v2", "ms-marco-MiniLM-L-12-v2", "ms-marco-MultiBERT-L-12", "rank-T5-flan"];
+const embeddingDraft = (config: AdminConfig["embedding"]) => ({
+  provider: config.provider,
+  local_model: config.local_model,
+  gemini_model: config.gemini_model,
+  custom_base_url: config.custom_base_url || "",
+  custom_model_name: config.custom_model_name || "",
+  custom_local_path: config.custom_local_path || "",
+  gemini_key: "",
+  custom_key: "",
+});
+
+function EmbeddingForm({ config, backendUrl, onSaved }: { config: AdminConfig["embedding"]; backendUrl: string; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const describePersistence = usePersistenceFeedback();
+  const [saved, setSaved] = useState(config);
+  const [draft, setDraft] = useState(() => embeddingDraft(config));
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const test = useExplicitTest(backendUrl, "embeddings");
+  const dirty = JSON.stringify(draft) !== JSON.stringify(embeddingDraft(saved));
+  useDraftGuard(dirty, busy || test.pending);
+  const update = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) => { test.invalidate(); setFeedback(null); setDraft({ ...draft, [key]: value }); };
+  return <form className="admin-form-panel" aria-label={t("admin.embeddings")} onSubmit={async (event) => {
+    event.preventDefault(); if (busy) return;
+    setBusy(true); setFeedback(null);
+    try {
+      const result = await saveAdminSection(backendUrl, "embedding", { ...draft, custom_key: draft.custom_key.trim() || undefined, gemini_key: draft.gemini_key.trim() || undefined });
+      setSaved(result.config); setDraft(embeddingDraft(result.config)); test.invalidate();
+      setFeedback({ text: `${t("admin.embeddings")}: ${describePersistence(result.persistence)}` }); onSaved();
+    } catch { setFeedback({ text: `${t("admin.embeddings")}: ${t("admin.saveUnconfirmed")}`, error: true }); }
+    finally { setBusy(false); }
+  }}>
+    <div className="admin-section-heading"><div><h2>{t("admin.embeddings")}</h2><p className="admin-help">{t("admin.embeddingsHelp")}</p></div></div>
+    <fieldset disabled={busy}>
+      <div className="admin-field admin-service-choice"><label htmlFor="embedding-provider">{t("admin.embeddingProvider")}</label><select id="embedding-provider" value={draft.provider} onChange={(event) => update("provider", event.target.value as typeof draft.provider)}>
+        <option value="local">{t("admin.localEmbeddings")}</option><option value="openai">OpenAI-compatible</option><option value="gemini">Google Gemini</option><option value="custom">{t("admin.customPath")}</option>
+      </select></div>
+      {draft.provider === "local" && <div className="admin-field admin-field-group"><label htmlFor="embedding-local-model">{t("admin.embeddingModel")}</label><select id="embedding-local-model" value={draft.local_model} onChange={(event) => update("local_model", event.target.value)}>
+        {[...new Set([draft.local_model, ...LOCAL_MODELS])].filter(Boolean).map((model) => <option key={model}>{model}</option>)}
+      </select><small>{t("admin.localDownloadHelp")}</small></div>}
+      {draft.provider === "openai" && <>
+        <div className="admin-grid admin-field-group">
+          <div className="admin-field admin-wide"><label htmlFor="embedding-url">{t("admin.baseUrl")}</label><input id="embedding-url" type="url" required value={draft.custom_base_url} onChange={(event) => update("custom_base_url", event.target.value)} /></div>
+          <div className="admin-field"><label htmlFor="embedding-model">{t("admin.embeddingModel")}</label><input id="embedding-model" required value={draft.custom_model_name} onChange={(event) => update("custom_model_name", event.target.value)} /></div>
+          <SecretField id="embedding-key" label={t("admin.apiKey")} value={draft.custom_key} onChange={(value) => update("custom_key", value)} configured={saved.has_custom_key} />
+        </div>
+        <details className="admin-disclosure admin-test-disclosure"><summary>{t("admin.optionalEmbeddingTest")}</summary><div className="admin-disclosure-content">
+          <p className="admin-help">{t("admin.embeddingTestHelp")}</p>
+          <div className="admin-actions"><button type="button" className="admin-button" disabled={test.pending || !draft.custom_base_url || !draft.custom_model_name || (draft.custom_base_url !== saved.custom_base_url && !draft.custom_key.trim())} onClick={() => test.run({ base_url: draft.custom_base_url, model_name: draft.custom_model_name, api_key: draft.custom_key.trim() || undefined })}>{t("admin.testEmbeddings")}</button></div>
+          <TestFeedback result={test.result} pending={test.pending} />
+        </div></details>
+      </>}
+      {draft.provider === "gemini" && <div className="admin-grid admin-field-group">
+        <div className="admin-field"><label htmlFor="embedding-gemini-model">{t("admin.embeddingModel")}</label><input id="embedding-gemini-model" required value={draft.gemini_model} onChange={(event) => update("gemini_model", event.target.value)} /></div>
+        <SecretField id="embedding-gemini-key" label={t("admin.apiKey")} value={draft.gemini_key} onChange={(value) => update("gemini_key", value)} configured={saved.has_gemini_key} />
+      </div>}
+      {draft.provider === "custom" && <div className="admin-field admin-field-group"><label htmlFor="embedding-path">{t("admin.modelPath")}</label><input id="embedding-path" required value={draft.custom_local_path} onChange={(event) => update("custom_local_path", event.target.value)} /><small>{t("admin.modelPathHelp")}</small></div>}
+      <p className="admin-notice admin-warning">{t("admin.embeddingChangeWarning")}</p>
+    </fieldset>
+    <FormActions dirty={dirty} busy={busy} pending={test.pending} onCancel={() => { setDraft(embeddingDraft(saved)); test.invalidate(); setFeedback(null); }} saveLabel={t("admin.saveEmbeddings")} feedback={feedback} />
+  </form>;
 }
 
-const LOCAL_CATALOG_OPTIONS = [
-  {
-    id: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
-    name: "FastEmbed MiniLM-L12 (384-dim, ~220MB)",
-    desc: "Default local offline engine. Lightweight, sub-millisecond CPU speed.",
-  },
-  {
-    id: "intfloat/multilingual-e5-large",
-    name: "FastEmbed Multilingual E5-Large (1024-dim, ~2.2GB)",
-    desc: "Maximum academic rigor across 100+ languages.",
-  },
-];
-
-const FLASHRANK_RERANKER_OPTIONS = [
-  { id: "ms-marco-TinyBERT-L-2-v2", name: "TinyBERT (Ultra-fast <10ms, ~15MB)" },
-  { id: "ms-marco-MiniLM-L-12-v2", name: "MiniLM-L-12-v2 (Higher precision, ~30MB)" },
-  { id: "ms-marco-MultiBERT-L-12", name: "MultiBERT-L-12 (Multilingual cross-encoder)" },
-  { id: "rank-T5-flan", name: "Rank-T5 Flan (T5 reasoning ranker)" },
-];
-
-export default function EmbeddingTab({
-  config,
-  rerankerConfig,
-  backendUrl,
-  onSaved,
-}: EmbeddingTabProps) {
-  // Embedding State
-  const [provider, setProvider] = useState<"local" | "gemini" | "openai" | "custom">(
-    config.provider || "local"
-  );
-  const [localModel, setLocalModel] = useState(
-    config.local_model || "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-  );
-  const [geminiKey, setGeminiKey] = useState("");
-  const [geminiModel, setGeminiModel] = useState(config.gemini_model || "models/gemini-embedding-001");
-
-  // OpenAI-Compatible / Custom Embedding State
-  const [customBaseUrl, setCustomBaseUrl] = useState(config.custom_base_url || "http://localhost:11434/v1");
-  const [customKey, setCustomKey] = useState("");
-  const [customModelName, setCustomModelName] = useState(config.custom_model_name || "nomic-embed-text");
-  const [customLocalPath, setCustomLocalPath] = useState(config.custom_local_path || "");
-
-  // Reranker State
-  const [rerankerModel, setRerankerModel] = useState(
-    rerankerConfig?.model || "ms-marco-TinyBERT-L-2-v2"
-  );
-  const [topN, setTopN] = useState(rerankerConfig?.top_n ?? 12);
-
-  // Secret toggles & copy states
-  const [showCustomKey, setShowCustomKey] = useState(false);
-  const [showGeminiKey, setShowGeminiKey] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const handleCopy = (text: string, id: string) => {
-    if (!text || !navigator.clipboard) return;
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        setCopiedId(id);
-        setTimeout(() => setCopiedId(null), 2000);
-      })
-      .catch(() => {});
-  };
-  const [isSaving, setIsSaving] = useState(false);
-  const [isTestingEmbed, setIsTestingEmbed] = useState(false);
-  const [isTestingRerank, setIsTestingRerank] = useState(false);
-  const [embedTestResult, setEmbedTestResult] = useState<TestResult & { dimensions?: number } | null>(null);
-  const [rerankTestResult, setRerankTestResult] = useState<TestResult | null>(null);
-  const [statusMessage, setStatusMessage] = useState<{ text: string; error?: boolean } | null>(null);
-
-  const handleTestEmbedding = async () => {
-    setIsTestingEmbed(true);
-    setEmbedTestResult(null);
+function RerankerForm({ config, backendUrl, onSaved }: { config?: AdminConfig["reranker"]; backendUrl: string; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const describePersistence = usePersistenceFeedback();
+  const [saved, setSaved] = useState(config);
+  const [draft, setDraft] = useState({ model: config?.model || "", top_n: config?.top_n ?? 12 });
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const test = useExplicitTest(backendUrl, "reranker");
+  const dirty = draft.model !== (saved?.model || "") || draft.top_n !== (saved?.top_n ?? 12);
+  useDraftGuard(dirty, busy || test.pending);
+  return <form className="admin-form-panel" aria-label={t("admin.reranker")} onSubmit={async (event) => {
+    event.preventDefault(); if (busy) return;
+    setBusy(true); setFeedback(null);
     try {
-      const res = await fetch(`${backendUrl}/admin/test/embeddings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base_url: customBaseUrl,
-          api_key: customKey.trim() || undefined,
-          model_name: customModelName,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      const data = await res.json();
-      setEmbedTestResult(data);
-    } catch (e) {
-      setEmbedTestResult({
-        success: false,
-        message: e instanceof Error ? e.message : "Failed to connect to embedding endpoint",
-      });
-    } finally {
-      setIsTestingEmbed(false);
-    }
-  };
-
-  const handleTestReranker = async () => {
-    setIsTestingRerank(true);
-    setRerankTestResult(null);
-    try {
-      const res = await fetch(`${backendUrl}/admin/test/reranker`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model: rerankerModel }),
-      });
-      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      const data = await res.json();
-      setRerankTestResult(data);
-    } catch (e) {
-      setRerankTestResult({
-        success: false,
-        message: e instanceof Error ? e.message : "Failed to benchmark reranker",
-      });
-    } finally {
-      setIsTestingRerank(false);
-    }
-  };
-
-  const handleSaveAll = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setStatusMessage(null);
-    try {
-      // 1. Save Embedding Config
-      const embedRes = await fetch(`${backendUrl}/admin/config/embeddings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: provider,
-          local_model: localModel,
-          gemini_key: geminiKey.trim() || undefined,
-          gemini_model: geminiModel.trim() || undefined,
-          custom_base_url: customBaseUrl.trim() || undefined,
-          custom_key: customKey.trim() || undefined,
-          custom_model_name: customModelName.trim() || undefined,
-          custom_local_path: customLocalPath.trim() || undefined,
-        }),
-      });
-      if (!embedRes.ok) throw new Error("Failed to save embedding configuration");
-      const embedMessage = await readConfigUpdateMessage(embedRes);
-
-      // 2. Save Reranker Config
-      const rankFailureMessage = `Embedding: ${embedMessage} Reranker update could not be confirmed. Refresh the dashboard before retrying.`;
-      const rankRes = await fetch(`${backendUrl}/admin/config/reranker`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: rerankerModel,
-          top_n: Number(topN),
-        }),
-      }).catch(() => { throw new Error(rankFailureMessage); });
-      if (!rankRes.ok) throw new Error(rankFailureMessage);
-      const rankMessage = await readConfigUpdateMessage(rankRes);
-
-      setStatusMessage({
-        text: embedMessage === rankMessage ? embedMessage : `Embedding: ${embedMessage} Reranker: ${rankMessage}`,
-      });
-      setGeminiKey("");
-      setCustomKey("");
-      onSaved();
-    } catch (e) {
-      setStatusMessage({
-        text: e instanceof Error ? e.message : "Error saving configuration",
-        error: true,
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="border-b border-app-border pb-4">
-        <h2 className="text-base font-semibold text-app-text flex items-center gap-2">
-          <Binary size={18} className="text-blue-500" />
-          Universal Embedding Vault & Reranker Manager
-        </h2>
-        <p className="text-xs text-app-text-muted mt-1">
-          Configure document retrieval engines: local offline models, OpenAI-compatible endpoints (Ollama/Voyage), Google Gemini, and cross-encoder rerankers.
-        </p>
-      </div>
-
-      <form onSubmit={handleSaveAll} className="space-y-6">
-        {/* SECTION 1: EMBEDDING ENGINE SELECTION */}
-        <div className="space-y-3">
-          <label className="text-xs font-semibold text-app-text">Active Embedding Provider</label>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <button
-              type="button"
-              onClick={() => setProvider("local")}
-              className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
-                provider === "local"
-                  ? "border-blue-500 bg-blue-500/10 text-app-text"
-                  : "border-app-border bg-app-input-surface text-app-text-muted hover:text-app-text"
-              }`}
-            >
-              <div className="text-xs font-semibold">FastEmbed (Local)</div>
-              <div className="text-[11px] text-app-text-dim mt-0.5">CPU ONNX, 100% offline</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setProvider("openai")}
-              className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
-                provider === "openai" || provider === "custom"
-                  ? "border-blue-500 bg-blue-500/10 text-app-text"
-                  : "border-app-border bg-app-input-surface text-app-text-muted hover:text-app-text"
-              }`}
-            >
-              <div className="text-xs font-semibold">OpenAI / Ollama</div>
-              <div className="text-[11px] text-app-text-dim mt-0.5">Universal /v1/embeddings</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setProvider("gemini")}
-              className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
-                provider === "gemini"
-                  ? "border-blue-500 bg-blue-500/10 text-app-text"
-                  : "border-app-border bg-app-input-surface text-app-text-muted hover:text-app-text"
-              }`}
-            >
-              <div className="text-xs font-semibold">Google Gemini</div>
-              <div className="text-[11px] text-app-text-dim mt-0.5">Cloud GenAI 3072-dim</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setProvider("custom")}
-              className={`p-3 rounded-xl border text-left transition-colors cursor-pointer ${
-                provider === "custom"
-                  ? "border-blue-500 bg-blue-500/10 text-app-text"
-                  : "border-app-border bg-app-input-surface text-app-text-muted hover:text-app-text"
-              }`}
-            >
-              <div className="text-xs font-semibold">Custom Local Path</div>
-              <div className="text-[11px] text-app-text-dim mt-0.5">From local disk folder</div>
-            </button>
-          </div>
-        </div>
-
-        {/* DETAILS: LOCAL FASTEMBED */}
-        {provider === "local" && (
-          <div className="p-4 rounded-xl border border-app-border bg-app-card space-y-3">
-            <label className="text-xs font-medium text-app-text">Choose Built-in Local Model</label>
-            <div className="space-y-2">
-              {LOCAL_CATALOG_OPTIONS.map((opt) => (
-                <label
-                  key={opt.id}
-                  className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    localModel === opt.id
-                      ? "border-blue-500 bg-blue-500/10"
-                      : "border-app-border bg-app-input-surface hover:bg-app-item-hover"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="localModel"
-                    checked={localModel === opt.id}
-                    onChange={() => setLocalModel(opt.id)}
-                    className="mt-0.5"
-                  />
-                  <div>
-                    <div className="text-xs font-semibold text-app-text">{opt.name}</div>
-                    <div className="text-[11px] text-app-text-dim">{opt.desc}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* DETAILS: OPENAI-COMPATIBLE / OLLAMA */}
-        {provider === "openai" && (
-          <div className="p-4 rounded-xl border border-app-border bg-app-card space-y-3">
-            <div className="text-xs font-medium text-app-text">Universal OpenAI-Compatible Embeddings (/v1)</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-[11px] text-app-text-dim">Base URL (/v1)</label>
-                <input
-                  type="text"
-                  value={customBaseUrl}
-                  onChange={(e) => setCustomBaseUrl(e.target.value)}
-                  placeholder="http://localhost:11434/v1 or https://api.openai.com/v1"
-                  className="w-full px-3 py-1.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] text-app-text-dim">Model Identifier</label>
-                <input
-                  type="text"
-                  value={customModelName}
-                  onChange={(e) => setCustomModelName(e.target.value)}
-                  placeholder="nomic-embed-text or text-embedding-3-small"
-                  className="w-full px-3 py-1.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[11px] text-app-text-dim">API Key (Optional for Ollama)</label>
-                  {config.has_custom_key && (
-                    <span className="text-[10px] font-mono text-emerald-400">
-                      Configured: {config.custom_key_masked}
-                    </span>
-                  )}
-                </div>
-                <div className="relative flex items-center">
-                  <input
-                    type={showCustomKey ? "text" : "password"}
-                    value={customKey}
-                    onChange={(e) => setCustomKey(e.target.value)}
-                    placeholder={config.has_custom_key ? "Leave blank to keep key" : "sk-..."}
-                    className="w-full h-8 pl-3 pr-16 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text font-mono focus:outline-none focus:border-blue-500"
-                  />
-                  <div className="absolute right-1.5 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowCustomKey(!showCustomKey)}
-                      className="p-1 rounded text-app-text-dim hover:text-app-text transition-colors cursor-pointer"
-                      title={showCustomKey ? "Hide Secret" : "Show Secret"}
-                    >
-                      {showCustomKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                    </button>
-                    {(customKey || config.has_custom_key) && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(customKey || config.custom_key_masked || "", "custom_embed_key")}
-                        className="p-1 rounded text-app-text-dim hover:text-app-text transition-colors cursor-pointer"
-                        title="Copy Key"
-                      >
-                        {copiedId === "custom_embed_key" ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2">
-              <button
-                type="button"
-                onClick={handleTestEmbedding}
-                disabled={isTestingEmbed}
-                className="h-8 min-w-[210px] px-3 text-xs font-medium rounded-lg border border-app-border bg-app-input-surface hover:bg-app-card-hover text-app-text flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
-              >
-                <RefreshCw size={12} className={isTestingEmbed ? "animate-spin" : ""} />
-                <span>{isTestingEmbed ? "Testing..." : "Test Connection & Dimensions"}</span>
-              </button>
-
-              <div className="min-h-[22px] flex items-center text-xs">
-                {embedTestResult && (
-                  <div
-                    className={`flex items-center gap-1.5 ${
-                      embedTestResult.success ? "text-emerald-400" : "text-rose-400"
-                    }`}
-                  >
-                    {embedTestResult.success ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                    <span>{embedTestResult.message}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* DETAILS: GOOGLE GEMINI */}
-        {provider === "gemini" && (
-          <div className="p-4 rounded-xl border border-app-border bg-app-card space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-[11px] text-app-text-dim">Gemini Embedding Model</label>
-                <input
-                  type="text"
-                  value={geminiModel}
-                  onChange={(e) => setGeminiModel(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text font-mono focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[11px] text-app-text-dim">Gemini API Key</label>
-                  {config.has_gemini_key && (
-                    <span className="text-[10px] font-mono text-emerald-400">
-                      Configured: {config.gemini_key_masked}
-                    </span>
-                  )}
-                </div>
-                <div className="relative flex items-center">
-                  <input
-                    type={showGeminiKey ? "text" : "password"}
-                    value={geminiKey}
-                    onChange={(e) => setGeminiKey(e.target.value)}
-                    placeholder={config.has_gemini_key ? "Leave blank to keep key" : "AIzaSy..."}
-                    className="w-full h-8 pl-3 pr-16 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text font-mono focus:outline-none focus:border-blue-500"
-                  />
-                  <div className="absolute right-1.5 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowGeminiKey(!showGeminiKey)}
-                      className="p-1 rounded text-app-text-dim hover:text-app-text transition-colors cursor-pointer"
-                      title={showGeminiKey ? "Hide Secret" : "Show Secret"}
-                    >
-                      {showGeminiKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                    </button>
-                    {(geminiKey || config.has_gemini_key) && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(geminiKey || config.gemini_key_masked || "", "gemini_embed_key")}
-                        className="p-1 rounded text-app-text-dim hover:text-app-text transition-colors cursor-pointer"
-                        title="Copy Key"
-                      >
-                        {copiedId === "gemini_embed_key" ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* DETAILS: CUSTOM LOCAL PATH */}
-        {provider === "custom" && (
-          <div className="p-4 rounded-xl border border-app-border bg-app-card space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-app-text">Custom Model Directory Path</label>
-              <input
-                type="text"
-                value={customLocalPath}
-                onChange={(e) => setCustomLocalPath(e.target.value)}
-                placeholder="/Users/username/models/my-custom-embedder"
-                className="w-full px-3 py-1.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text font-mono focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2.5">
-              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">Custom Model Notice</p>
-                <p className="text-[11px] text-amber-300/80 mt-0.5 leading-relaxed">
-                  If loading a custom model from disk or external runtime, please ensure any required packages, drivers, or software dependencies needed by that model are available on your machine.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* SECTION 2: RERANKER (CROSS-ENCODER) MANAGER */}
-        <div className="space-y-3 pt-4 border-t border-app-border">
-          <div className="flex items-center justify-between">
-            <div>
-              <label className="text-xs font-semibold text-app-text flex items-center gap-2">
-                <Sliders size={14} className="text-purple-400" />
-                Cross-Encoder Reranker Manager
-              </label>
-              <p className="text-[11px] text-app-text-dim mt-0.5">
-                Re-ranks retrieved hybrid chunks before passing them to the synthesis prompt.
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-xl border border-app-border bg-app-card space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-app-text">Reranker Model</label>
-                <select
-                  value={rerankerModel}
-                  onChange={(e) => setRerankerModel(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text cursor-pointer focus:outline-none focus:border-blue-500"
-                >
-                  {FLASHRANK_RERANKER_OPTIONS.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-medium text-app-text">Top Chunks to Context (top_n)</label>
-                  <span className="text-xs font-mono text-blue-400">{topN} Chunks</span>
-                </div>
-                <input
-                  type="range"
-                  min="3"
-                  max="25"
-                  step="1"
-                  value={topN}
-                  onChange={(e) => setTopN(parseInt(e.target.value, 10))}
-                  className="w-full h-1.5 bg-app-border rounded-lg appearance-none cursor-pointer accent-blue-600"
-                />
-                <div className="text-[10px] text-app-text-dim">
-                  Recommended: 10–12 chunks for comprehensive academic literature coverage.
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
-              <button
-                type="button"
-                onClick={handleTestReranker}
-                disabled={isTestingRerank}
-                className="h-8 min-w-[170px] px-3 text-xs font-medium rounded-lg border border-app-border bg-app-input-surface hover:bg-app-card-hover text-app-text flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
-              >
-                <RefreshCw size={12} className={isTestingRerank ? "animate-spin" : ""} />
-                <span>{isTestingRerank ? "Benchmarking..." : "Test Reranker Speed"}</span>
-              </button>
-
-              <div className="min-h-[22px] flex items-center text-xs">
-                {rerankTestResult && (
-                  <div
-                    className={`flex items-center gap-1.5 ${
-                      rerankTestResult.success ? "text-emerald-400" : "text-rose-400"
-                    }`}
-                  >
-                    {rerankTestResult.success ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                    <span>{rerankTestResult.message}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {statusMessage && (
-          <div
-            role={statusMessage.error ? "alert" : "status"}
-            className="p-3 rounded-lg border border-app-border bg-app-input-surface text-app-text text-sm flex items-start gap-2"
-          >
-            {statusMessage.error ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
-            <span className="min-w-0 break-words">{statusMessage.text}</span>
-          </div>
-        )}
-
-        <div className="flex justify-end pt-4 border-t border-app-border">
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="h-11 w-full sm:w-auto sm:min-w-[240px] px-4 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-          >
-            {isSaving ? "Saving..." : "Save Retrieval & Reranker Settings"}
-          </button>
-        </div>
-      </form>
+      const result = await saveAdminSection(backendUrl, "reranker", draft);
+      setSaved(result.config); setDraft(result.config); test.invalidate();
+      setFeedback({ text: `${t("admin.reranker")}: ${describePersistence(result.persistence)}` }); onSaved();
+    } catch { setFeedback({ text: `${t("admin.reranker")}: ${t("admin.saveUnconfirmed")}`, error: true }); }
+    finally { setBusy(false); }
+  }}>
+    <div className="admin-section-heading"><div><h2>{t("admin.reranker")}</h2><p className="admin-help">{t("admin.rerankerHelp")}</p></div></div>
+    <fieldset disabled={busy}><div className="admin-grid">
+      <div className="admin-field"><label htmlFor="reranker-model">{t("admin.rerankerModel")}</label><select id="reranker-model" required value={draft.model} onChange={(event) => { test.invalidate(); setFeedback(null); setDraft({ ...draft, model: event.target.value }); }}>
+        {!draft.model && <option value="">{t("admin.chooseModel")}</option>}
+        {[...new Set([draft.model, ...RERANKER_MODELS])].filter(Boolean).map((model) => <option key={model}>{model}</option>)}
+      </select></div>
+      <div className="admin-field"><label htmlFor="reranker-count">{t("admin.contextCount")}</label><input id="reranker-count" type="number" min="3" max="30" step="1" required value={draft.top_n} onChange={(event) => { setFeedback(null); setDraft({ ...draft, top_n: Number(event.target.value) }); }} /><small>{t("admin.contextCountHelp")}</small></div>
     </div>
-  );
+    <details className="admin-disclosure admin-test-disclosure"><summary>{t("admin.optionalRerankerTest")}</summary><div className="admin-disclosure-content">
+      <p className="admin-help">{t("admin.rerankerDownloadHelp")}</p>
+      <div className="admin-actions"><button className="admin-button" type="button" disabled={test.pending || !draft.model} onClick={() => test.run({ model: draft.model })}>{t("admin.testReranker")}</button></div>
+      <TestFeedback result={test.result} pending={test.pending} />
+    </div></details></fieldset>
+    <FormActions dirty={dirty} busy={busy} pending={test.pending} onCancel={() => { setDraft({ model: saved?.model || "", top_n: saved?.top_n ?? 12 }); test.invalidate(); setFeedback(null); }} saveLabel={t("admin.saveReranker")} feedback={feedback} />
+  </form>;
+}
+
+export default function EmbeddingTab({ config, rerankerConfig, backendUrl, onSaved }: { config: AdminConfig["embedding"]; rerankerConfig?: AdminConfig["reranker"]; backendUrl: string; onSaved: () => void }) {
+  const { t } = useTranslation();
+  return <><EmbeddingForm config={config} backendUrl={backendUrl} onSaved={onSaved} /><RerankerForm config={rerankerConfig} backendUrl={backendUrl} onSaved={onSaved} /><p className="admin-help admin-policy-note">{t(config.hybrid_bm25_enabled ? "admin.hybridEnabled" : "admin.hybridNotReported")}</p></>;
 }

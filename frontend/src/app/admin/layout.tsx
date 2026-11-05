@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Control Dashboard - Not-NotebookLM",
-  description: "Dedicated Management Plane for LLM Gateways, S3 Storage, Secret Providers, and System Diagnostics",
+  title: "System configuration - NotbookLM",
+  description: "Configure model connections, file storage, and document search. Inspect configuration sources and system status.",
 };
 
 export default function AdminLayout({

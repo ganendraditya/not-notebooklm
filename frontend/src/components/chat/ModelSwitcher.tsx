@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Cpu, ChevronDown, Check, Settings, Sparkles } from "lucide-react";
 import { useChatStore, WorkspaceModel } from "@/stores/chatStore";
 import { useTranslation } from "@/lib/i18n";
+import { readModelPreferences, recordModelSelection } from "@/lib/model-preferences";
+import { resolveNewChatModel } from "@/lib/workspace-models";
 
 interface ModelSwitcherProps {
   backendUrl: string;
@@ -14,13 +16,14 @@ interface ModelSwitcherProps {
 export function ModelSwitcher({
   backendUrl,
   activeChatId,
-  onOpenSettings,
 }: ModelSwitcherProps) {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const availableModels = useChatStore((state) => state.availableModels);
+  const modelCatalogStatus = useChatStore((state) => state.modelCatalogStatus);
+  const lastSelectedModelKey = useChatStore((state) => state.lastSelectedModelKey);
   const sessions = useChatStore((state) => state.sessions);
   const pendingNewChatModel = useChatStore((state) => state.pendingNewChatModel);
   const updateSessionModel = useChatStore((state) => state.updateSessionModel);
@@ -62,44 +65,16 @@ export function ModelSwitcher({
     return sessions.find((s) => s.id === activeChatId) || null;
   }, [activeChatId, sessions]);
 
-  const activeModelId = useMemo(() => {
-    if (currentSession && currentSession.model) {
-      return currentSession.model;
-    }
-    if (!activeChatId && pendingNewChatModel) {
-      return pendingNewChatModel.model;
-    }
-    // Default model
-    const def = availableModels.find((m) => m.is_default);
-    if (def) return def.id;
-    return availableModels[0]?.id || "gpt-4o";
-  }, [currentSession, activeChatId, pendingNewChatModel, availableModels]);
-
-  const activeProfileId = useMemo(() => {
-    if (currentSession?.profile_id) return currentSession.profile_id;
-    if (!activeChatId && pendingNewChatModel?.profile_id) return pendingNewChatModel.profile_id;
-    const def = availableModels.find((m) => m.is_default);
-    if (def) return def.profile_id;
-    return availableModels[0]?.profile_id || "default";
-  }, [currentSession, activeChatId, pendingNewChatModel, availableModels]);
-
   const activeModel = useMemo(() => {
-    const matched =
-      availableModels.find(
-        (m) => m.id === activeModelId && m.profile_id === activeProfileId
-      ) || availableModels.find((m) => m.id === activeModelId);
+    if (currentSession?.model) {
+      return availableModels.find((model) => model.id === currentSession.model && (!currentSession.profile_id || model.profile_id === currentSession.profile_id))
+        || { id: currentSession.model, name: currentSession.model, profile_id: currentSession.profile_id || "", profile_name: currentSession.profile_id || "" };
+    }
+    if (activeChatId) return availableModels.find((model) => model.is_default) || availableModels[0];
+    return resolveNewChatModel(availableModels, lastSelectedModelKey || readModelPreferences().recent[0], pendingNewChatModel);
+  }, [currentSession, activeChatId, availableModels, lastSelectedModelKey, pendingNewChatModel]);
 
-    return (
-      matched || {
-        id: activeModelId,
-        name: activeModelId,
-        profile_id: activeProfileId,
-        profile_name: "Default",
-        protocol: "openai",
-        is_default: true,
-      }
-    );
-  }, [availableModels, activeModelId, activeProfileId]);
+  const catalogMessage = t(modelCatalogStatus === "loading" ? "chat.loadingModels" : modelCatalogStatus === "error" ? "chat.modelLoadError" : "chat.noModels");
 
   // Group models by gateway provider
   const groupedModels = useMemo(() => {
@@ -136,7 +111,9 @@ export function ModelSwitcher({
         if (!res.ok) {
           updateSessionModel(activeChatId, prevModel, prevProfileId);
           console.error("Failed to update session model:", res.statusText);
+          return;
         }
+        recordModelSelection(m);
       } catch (err) {
         updateSessionModel(activeChatId, prevModel, prevProfileId);
         console.error("Failed to update session model:", err);
@@ -147,6 +124,7 @@ export function ModelSwitcher({
         model: m.id,
         profile_id: m.profile_id,
       });
+      recordModelSelection(m);
     }
   };
 
@@ -162,11 +140,11 @@ export function ModelSwitcher({
         aria-expanded={isOpen}
       >
         <Sparkles size={12} className="text-blue-500 shrink-0" />
-        <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-app-card text-app-text-muted border border-app-border max-w-[80px] truncate">
-          {activeModel.profile_name || "Default"}
-        </span>
+        {activeModel?.profile_name && <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-app-card text-app-text-muted border border-app-border max-w-[80px] truncate">
+          {activeModel.profile_name}
+        </span>}
         <span className="font-medium text-app-text max-w-[110px] sm:max-w-[150px] truncate">
-          {activeModel.name || activeModel.id}
+          {activeModel ? activeModel.name || activeModel.id : catalogMessage}
         </span>
         <ChevronDown
           size={11}
@@ -188,7 +166,7 @@ export function ModelSwitcher({
 
           {Object.keys(groupedModels).length === 0 ? (
             <div className="px-3 py-2 text-xs text-app-text-muted text-center">
-              No models available
+              {catalogMessage}
             </div>
           ) : (
             Object.entries(groupedModels).map(([groupName, models]) => (
@@ -199,7 +177,7 @@ export function ModelSwitcher({
                 </div>
                 <div className="space-y-0.5">
                   {models.map((m) => {
-                    const isSelected = m.id === activeModel.id && m.profile_id === activeModel.profile_id;
+                    const isSelected = m.id === activeModel?.id && m.profile_id === activeModel?.profile_id;
                     return (
                       <button
                         key={`${m.profile_id}_${m.id}`}
@@ -229,24 +207,21 @@ export function ModelSwitcher({
             ))
           )}
 
-          {onOpenSettings && (
-            <>
+          <>
               <div className="my-1 border-t border-app-border" />
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOpen(false);
-                  onOpenSettings();
-                }}
+              <a
+                href="/admin"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setIsOpen(false)}
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors cursor-pointer text-xs"
               >
                 <Settings size={12} className="text-app-text-dim" />
                 <span className="truncate">
                   {t("chat.manageModels") || "Manage models in Settings"}
                 </span>
-              </button>
+              </a>
             </>
-          )}
         </div>
       )}
     </div>

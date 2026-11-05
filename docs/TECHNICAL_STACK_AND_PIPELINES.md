@@ -12,7 +12,7 @@ Not-NotebookLM is built on a decoupled architecture separating the **User Resear
 graph TB
     subgraph WEB["Dual-Web Application Layer, Next.js 16"]
         WS["Research Workspace"]
-        ADM["Control Dashboard"]
+        ADM["System configuration"]
     end
     subgraph BE["Backend API, FastAPI + Pydantic v2"]
         subgraph GW["LLM Gateway and Cascading Factory"]
@@ -42,11 +42,26 @@ graph TB
 ```
 
 Notes the diagram does not carry:
-- The workspace is the primary research surface; the Control Dashboard is a separate administrative plane (bare-metal default ports 2026/2027, auto-incremented on collision).
-- The workspace exposes the split-pane reader, SSE chat, model switcher, discovery modal, research memory, and inline highlight badges. The dashboard exposes the gateway vault, storage switcher, visibility toggles, secret managers, embedding engine selector, and live health telemetry.
+- The workspace is the primary research surface; System configuration (`/admin`) is a separate administrative plane (bare-metal default ports 2026/2027, auto-incremented on collision). The UI does not present the default port as a detected runtime value.
+- The workspace exposes the split-pane reader, SSE chat, model switcher, discovery modal, research memory, and inline highlight badges.
 - A per-chat model override can rebind the Primary model for a single session without changing global configuration.
+- New chats resolve a valid pending choice, then the last selected available provider/model pair, then the first enabled configured pair, independently of backend default marking. The resolved pair is persisted on session creation. An unavailable remembered pair does not select an older recent item. Saved chats retain their bindings, including hidden models; legacy unbound chats retain their existing backend-default behavior.
+- Browser-local preferences preserve explicit selections across restarts. Workspace memory keeps displayed and newly persisted selections consistent when browser storage is blocked; restart persistence requires available browser storage.
 - Model tiers: Primary (16k output, 120s timeout), Fast (4k output, 45s timeout), Fallback (automatic failover).
 - The input context window is dynamic and auto-detected via `backend/rag/token_budget.py` rather than fixed at configuration time.
+
+### System configuration frontend (#103)
+
+- The workspace **Settings** modal retains appearance, language, notifications, and data management. Management links open **System configuration** in a separate tab. **Back to app** returns to `/` without new query parameters.
+- Five flat destinations expose Models & providers, File storage, Document search, read-only Configuration source, and on-demand System status. Selection uses neutral styling and regular-weight labels, without categories or a colored stripe. Narrow screens expose the same choices through a labeled selector.
+- Models & providers opens on **Your providers**. A provider row opens its connection summary and scoped model list. Add provider and Add model are separate list/detail tasks. The answer-default selector is removed; a closed **Quick tasks, backup & sampling** disclosure retains exact provider/model search, manual unknown IDs, and independent supporting-task bindings. Provider navigation does not write configuration, and routing drafts survive it.
+- `frontend/src/lib/admin-api.ts` owns admin transport and mask-free LLM payload construction; `admin-config.ts` validates responses. The Models tab separates its committed snapshot from routing, connection, and model-list drafts. Combined writes use committed routing unless routing itself is saved, serialize local operations, and require authoritative reconciliation after an unconfirmed write.
+- Routing, file storage, embeddings, and reranking retain independent save/cancel feedback. Failed groups retain their drafts without erasing successful sibling outcomes. Tests call existing endpoints only after explicit activation. Changed test inputs invalidate results and abort/ignore stale responses. Blank keys are omitted to preserve stored secrets; masks never populate credentials.
+- A shared draft guard blocks internal dismissal during pending operations and confirms unsaved section/return navigation. Native dialogs contain keyboard focus and handle Escape. Browser unload protection is best-effort.
+- Routine local-file persistence metadata is expandable secondary context; runtime-only, unknown-persistence, and remaining local-credential warnings remain prominent. Configuration source and System status use read-only lists and diagnostic rows rather than forms. Model configuration does not migrate research files or reindex documents.
+- `frontend/src/lib/workspace-models.ts` validates catalog responses during initialization and window-focus refresh. Concurrent focus events share the in-flight request. Failures retain cached availability and differ from an authoritative empty catalog. New-chat submission without an available model retains the prompt and offers configuration; source-only session creation remains possible.
+- Admin/catalog reads no longer invent a localhost provider, vendor model lists, or a workspace fallback row. Explicit lists, including empty lists, are authoritative. Explicit legacy endpoint and primary-model environment values remain readable without migration. If internal primary routing is empty, an explicit provider/model save initializes it from the first enabled configured pair; nonempty routing is preserved. The inference factory's primary/fast/backup candidate chain and legacy localhost fallback are unchanged.
+- This revision changes no RAG algorithm, API route, dependency versions, credential store, or database schema. UI/API metadata is prepared as v1.19.0; release publication requires separate authorization. Composer redesign (#114), Sources sorting (#111), and answer metadata (#112) are excluded.
 
 ---
 

@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelSwitcher } from "@/components/chat/ModelSwitcher";
 import { useChatStore } from "@/stores/chatStore";
 import { I18nProvider } from "../lib/i18n";
+import { MODEL_PREFERENCES_KEY, modelKey } from "@/lib/model-preferences";
 
 const renderWithI18n = (ui: React.ReactElement) => render(<I18nProvider>{ui}</I18nProvider>);
 
@@ -12,7 +13,10 @@ describe("ModelSwitcher Component", () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
     useChatStore.setState({
+      lastSelectedModelKey: null,
+      modelCatalogStatus: "ready",
       sessions: [
         {
           id: "session-1",
@@ -131,5 +135,36 @@ describe("ModelSwitcher Component", () => {
       model: "deepseek-reasoner",
       profile_id: "deepseek",
     });
+    expect(JSON.parse(localStorage.getItem(MODEL_PREFERENCES_KEY)!).recent[0]).toBe(modelKey({ id: "deepseek-reasoner", profile_id: "deepseek" }));
+  });
+
+  it("uses remembered exact identity for a new chat instead of the backend default", () => {
+    localStorage.setItem(MODEL_PREFERENCES_KEY, JSON.stringify({ recent: [modelKey({ id: "deepseek-reasoner", profile_id: "deepseek" })] }));
+    renderWithI18n(<ModelSwitcher backendUrl={backendUrl} activeChatId={null} />);
+    expect(screen.getByRole("button", { name: /DeepSeek R1/ })).toBeInTheDocument();
+  });
+
+  it("uses the first available model when a remembered selection has been removed", () => {
+    useChatStore.setState({ lastSelectedModelKey: modelKey({ id: "removed", profile_id: "missing" }) });
+    renderWithI18n(<ModelSwitcher backendUrl={backendUrl} activeChatId={null} />);
+    expect(screen.getByRole("button", { name: /GPT-4o/ })).toBeInTheDocument();
+  });
+
+  it("shows an empty catalog without inventing a model and links configuration in a new tab", () => {
+    useChatStore.setState({ availableModels: [] });
+    renderWithI18n(<ModelSwitcher backendUrl={backendUrl} activeChatId={null} />);
+    fireEvent.click(screen.getByRole("button", { name: /No models configured/ }));
+    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Manage models/ })).toHaveAttribute("target", "_blank");
+  });
+
+  it("rolls back a failed saved-chat selection without remembering it", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(new Response("Failed", { status: 503 }));
+    renderWithI18n(<ModelSwitcher backendUrl={backendUrl} activeChatId="session-1" />);
+    fireEvent.click(screen.getByRole("button", { name: /DeepSeek R1/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Claude 3.7/ }));
+    await waitFor(() => expect(useChatStore.getState().sessions[0].model).toBe("deepseek-reasoner"));
+    expect(useChatStore.getState().lastSelectedModelKey).toBeNull();
+    expect(localStorage.getItem(MODEL_PREFERENCES_KEY)).toBeNull();
   });
 });

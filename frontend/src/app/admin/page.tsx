@@ -1,221 +1,124 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Sliders,
-  Cpu,
-  HardDrive,
-  KeyRound,
-  Binary,
-  Activity,
-  ArrowLeft,
-  ExternalLink,
-  RefreshCw,
-  AlertCircle
-} from "lucide-react";
-
+import { useRouter } from "next/navigation";
 import type { AdminConfig, AdminSystemHealth } from "@/types/admin";
+import { adminRequest, loadAdminConfig } from "@/lib/admin-api";
+import { parseAdminPersistence } from "@/lib/admin-persistence";
+import { useTranslation } from "@/lib/i18n";
 import LLMTab from "./components/LLMTab";
 import StorageTab from "./components/StorageTab";
 import SecretsTab from "./components/SecretsTab";
 import EmbeddingTab from "./components/EmbeddingTab";
 import SystemHealthTab from "./components/SystemHealthTab";
 import PersistenceNotice from "./components/PersistenceNotice";
-import { parseAdminPersistence } from "@/lib/admin-persistence";
+import { AdminDraftContext, DiscardDialog, type DraftState } from "./components/AdminForms";
+import "./admin.css";
 
-type AdminTabKey = "llm" | "storage" | "secrets" | "embedding" | "health";
+const SECTIONS = [
+  { id: "llm", label: "admin.models", help: "admin.modelsHelp" },
+  { id: "storage", label: "admin.fileStorage", help: "admin.fileStorageHelp" },
+  { id: "embedding", label: "admin.documentSearch", help: "admin.documentSearchHelp" },
+  { id: "secrets", label: "admin.configurationSource", help: "admin.configurationSourceHelp" },
+  { id: "health", label: "admin.systemStatus", help: "admin.systemStatusHelp" },
+] as const;
+type SectionId = (typeof SECTIONS)[number]["id"];
 
 export default function AdminPage() {
+  const { t } = useTranslation();
+  const router = useRouter();
   const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-  const [activeTab, setActiveTab] = useState<AdminTabKey>("llm");
+  const [active, setActive] = useState<SectionId>("llm");
   const [config, setConfig] = useState<AdminConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [health, setHealth] = useState<AdminSystemHealth | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthError, setHealthError] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [guards, setGuards] = useState<Record<string, DraftState>>({});
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const healthLock = useRef(false);
+  const configGeneration = useRef(0);
+  const setGuard = useCallback((id: string, state: DraftState | null) => setGuards((previous) => {
+    if (!state) { const next = { ...previous }; delete next[id]; return next; }
+    if (previous[id]?.dirty === state.dirty && previous[id]?.busy === state.busy) return previous;
+    return { ...previous, [id]: state };
+  }), []);
+  const dirty = Object.values(guards).some((guard) => guard.dirty);
+  const busy = Object.values(guards).some((guard) => guard.busy);
+  const section = SECTIONS.find((item) => item.id === active)!;
   const fetchConfig = useCallback(async () => {
+    const generation = ++configGeneration.current;
+    setError(false);
     try {
-      setError(null);
-      const res = await fetch(`${backendUrl}/admin/config`);
-      if (!res.ok) throw new Error(`HTTP error ${res.status} fetching admin config`);
-      const data: AdminConfig = await res.json();
-      setConfig(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load admin settings");
-    }
+      const data = await loadAdminConfig(backendUrl);
+      if (generation === configGeneration.current) setConfig(data);
+    } catch { if (generation === configGeneration.current) setError(true); }
+    finally { if (generation === configGeneration.current) setLoading(false); }
   }, [backendUrl]);
-
   const fetchHealth = useCallback(async () => {
+    if (healthLock.current) return;
+    healthLock.current = true;
+    setHealthLoading(true); setHealthError(false);
     try {
-      const res = await fetch(`${backendUrl}/admin/system/health`);
-      if (!res.ok) throw new Error(`HTTP error ${res.status} fetching health`);
-      const data: AdminSystemHealth = await res.json();
-      setHealth(data);
-    } catch (e) {
-      console.warn("Failed to load health stats:", e);
-    }
+      const data = await adminRequest<AdminSystemHealth>(backendUrl, "system/health");
+      if (!data || typeof data !== "object") throw new Error("Status unavailable");
+      setHealth(data); setUpdatedAt(new Date().toLocaleString());
+    } catch { setHealthError(true); }
+    finally { setHealthLoading(false); healthLock.current = false; }
   }, [backendUrl]);
-
-  const loadAll = useCallback(async () => {
-    setIsLoading(true);
-    await Promise.all([fetchConfig(), fetchHealth()]);
-    setIsLoading(false);
-  }, [fetchConfig, fetchHealth]);
-
+  useEffect(() => { void fetchConfig(); }, [fetchConfig]);
+  useEffect(() => { if (active === "health") void fetchHealth(); }, [active, fetchHealth]);
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
-
+    if (!dirty && !busy) return;
+    const prevent = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", prevent);
+    return () => window.removeEventListener("beforeunload", prevent);
+  }, [dirty, busy]);
+  const navigate = (action: () => void) => {
+    if (busy) return;
+    if (dirty) setPendingNavigation(() => action);
+    else action();
+  };
+  const selectSection = (id: SectionId) => {
+    if (id === active) return;
+    navigate(() => { setActive(id); requestAnimationFrame(() => titleRef.current?.focus({ preventScroll: true })); });
+  };
   const persistence = parseAdminPersistence(config?.persistence);
 
-  return (
-    <div className="min-h-screen bg-app-bg text-app-text flex flex-col font-sans">
-      {/* Top Navigation Bar */}
-      <header className="h-14 border-b border-app-border bg-app-sidebar/80 backdrop-blur-md px-4 md:px-6 flex items-center justify-between shrink-0 sticky top-0 z-30">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="p-1.5 rounded-lg text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors"
-            title="Return to Workspace"
-          >
-            <ArrowLeft size={16} />
-          </Link>
-
-          <div className="h-4 w-[1px] bg-app-border" />
-
-          <div className="flex items-center gap-2">
-            <Sliders size={16} className="text-blue-500" />
-            <h1 className="text-sm font-semibold tracking-tight text-app-text">
-              NotbookLM Control Dashboard
-            </h1>
-            <span className="text-[10px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 px-1.5 py-0.5 rounded">
-              Port 2027
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-xs">
-          <Link
-            href="/"
-            className="px-2.5 py-1.5 rounded-lg border border-app-border hover:bg-app-item-hover text-app-text-muted hover:text-app-text transition-colors flex items-center gap-1.5"
-          >
-            <span>Research Workspace</span>
-            <ExternalLink size={12} />
-          </Link>
-        </div>
+  return <AdminDraftContext.Provider value={setGuard}>
+    <div className="admin-control min-h-screen bg-app-bg">
+      <a className="admin-button admin-skip" href="#configuration-content">{t("admin.skipNavigation")}</a>
+      <header className="admin-header"><div className="admin-brand"><strong>NotbookLM</strong><span>{t("admin.title")}</span></div>
+        <Link className="admin-button admin-quiet" href="/" aria-disabled={busy} onClick={(event) => {
+          if (event.ctrlKey || event.metaKey || event.shiftKey) return;
+          if (dirty || busy) { event.preventDefault(); navigate(() => router.push("/")); }
+        }}>{t("admin.backToApp")}</Link>
       </header>
-
-      {/* Main Container */}
-      <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 flex flex-col md:flex-row gap-6">
-        {/* Navigation Tabs Menu */}
-        <nav className="w-full md:w-56 shrink-0 space-y-1">
-          <button
-            onClick={() => setActiveTab("llm")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
-              activeTab === "llm"
-                ? "bg-app-item-active text-app-text shadow-sm"
-                : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
-            }`}
-          >
-            <Cpu size={15} className={activeTab === "llm" ? "text-blue-500" : "text-app-text-dim"} />
-            <span>Model Gateways</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("storage")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
-              activeTab === "storage"
-                ? "bg-app-item-active text-app-text shadow-sm"
-                : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
-            }`}
-          >
-            <HardDrive size={15} className={activeTab === "storage" ? "text-blue-500" : "text-app-text-dim"} />
-            <span>Storage & S3</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("secrets")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
-              activeTab === "secrets"
-                ? "bg-app-item-active text-app-text shadow-sm"
-                : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
-            }`}
-          >
-            <KeyRound size={15} className={activeTab === "secrets" ? "text-blue-500" : "text-app-text-dim"} />
-            <span>Secret Vaults</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("embedding")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
-              activeTab === "embedding"
-                ? "bg-app-item-active text-app-text shadow-sm"
-                : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
-            }`}
-          >
-            <Binary size={15} className={activeTab === "embedding" ? "text-blue-500" : "text-app-text-dim"} />
-            <span>Embedding Engine</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("health")}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-colors cursor-pointer ${
-              activeTab === "health"
-                ? "bg-app-item-active text-app-text shadow-sm"
-                : "text-app-text-muted hover:bg-app-item-hover hover:text-app-text"
-            }`}
-          >
-            <Activity size={15} className={activeTab === "health" ? "text-blue-500" : "text-app-text-dim"} />
-            <span>System Health</span>
-          </button>
+      <div className="admin-layout">
+        <nav className="admin-nav" aria-label={t("admin.navigation")}>
+          {SECTIONS.map((item) => <button type="button" key={item.id} className="admin-nav-button" aria-current={active === item.id ? "page" : undefined} onClick={() => selectSection(item.id)} disabled={busy}>{t(item.label)}</button>)}
         </nav>
-
-        {/* Tab Content Canvas */}
-        <main className="flex-1 min-w-0 bg-app-card border border-app-border rounded-2xl p-5 md:p-6 shadow-sm">
-          {isLoading ? (
-            <div className="py-20 flex flex-col items-center justify-center text-app-text-dim gap-3">
-              <RefreshCw size={22} className="animate-spin text-blue-500" />
-              <span className="text-xs">Loading Management Plane...</span>
-            </div>
-          ) : error ? (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2.5">
-              <AlertCircle size={16} />
-              <span>{error}</span>
-            </div>
-          ) : config ? (
-            <>
-              <PersistenceNotice persistence={persistence} />
-              {activeTab === "llm" && (
-                <LLMTab config={config.llm} backendUrl={backendUrl} onSaved={fetchConfig} />
-              )}
-              {activeTab === "storage" && (
-                <StorageTab config={config.storage} backendUrl={backendUrl} onSaved={fetchConfig} />
-              )}
-              {activeTab === "secrets" && (
-                <SecretsTab config={config.secrets} persistence={persistence} />
-              )}
-              {activeTab === "embedding" && (
-                <EmbeddingTab
-                  config={config.embedding}
-                  rerankerConfig={config.reranker}
-                  backendUrl={backendUrl}
-                  onSaved={fetchConfig}
-                />
-              )}
-              {activeTab === "health" && (
-                <SystemHealthTab
-                  health={health}
-                  backendUrl={backendUrl}
-                  onRefresh={fetchHealth}
-                  isLoading={false}
-                />
-              )}
-            </>
-          ) : null}
+        <main id="configuration-content" className="admin-main">
+          <div className="admin-mobile-nav"><label htmlFor="configuration-section">{t("admin.navigation")}</label><select id="configuration-section" value={active} disabled={busy} onChange={(event) => selectSection(event.target.value as SectionId)}>{SECTIONS.map((item) => <option key={item.id} value={item.id}>{t(item.label)}</option>)}</select></div>
+          <div className="admin-page-heading"><h1 ref={titleRef} tabIndex={-1}>{t(section.label)}</h1><p>{t(section.help)}</p></div>
+          {loading && <p role="status">{t("admin.loadingConfiguration")}</p>}
+          {error && <div role="alert" className="admin-notice"><p>{t(config ? "admin.configRefreshFailed" : "admin.loadFailed")}</p><button className="admin-button" onClick={() => { if (!config) setLoading(true); void fetchConfig(); }}>{t("admin.retry")}</button></div>}
+          {config && <>
+            {persistence?.mode !== "local_env" && <PersistenceNotice persistence={persistence} />}
+            {active === "llm" && <LLMTab config={config.llm} backendUrl={backendUrl} onSaved={fetchConfig} />}
+            {active === "storage" && <StorageTab config={config.storage} backendUrl={backendUrl} onSaved={fetchConfig} />}
+            {active === "embedding" && <EmbeddingTab config={config.embedding} rerankerConfig={config.reranker} backendUrl={backendUrl} onSaved={fetchConfig} />}
+            {active === "secrets" && <SecretsTab config={config.secrets} persistence={persistence} />}
+            {persistence?.mode === "local_env" && active !== "health" && active !== "secrets" && <PersistenceNotice persistence={persistence} />}
+          </>}
+          {active === "health" && <SystemHealthTab health={health} onRefresh={fetchHealth} isLoading={healthLoading} error={healthError} updatedAt={updatedAt} />}
         </main>
       </div>
+      {pendingNavigation && <DiscardDialog onStay={() => setPendingNavigation(null)} onDiscard={() => { const action = pendingNavigation; setPendingNavigation(null); action(); }} />}
     </div>
-  );
+  </AdminDraftContext.Provider>;
 }

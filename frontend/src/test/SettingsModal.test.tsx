@@ -47,11 +47,14 @@ describe("SettingsModal Component", () => {
 
     // Initial General tab button should be active
     expect(screen.getByRole("button", { name: /^general/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^storage/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Data & storage" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^notifications/i })).toBeInTheDocument();
 
     // Click Storage tab
-    const storageTabBtn = screen.getByRole("button", { name: /^storage/i });
+    const configurationLink = screen.getByRole("link", { name: "System configuration" });
+    expect(configurationLink).toHaveAttribute("href", "/admin");
+    expect(configurationLink).toHaveAttribute("target", "_blank");
+    const storageTabBtn = screen.getByRole("button", { name: "Data & storage" });
     fireEvent.click(storageTabBtn);
 
     // Storage summary should be requested
