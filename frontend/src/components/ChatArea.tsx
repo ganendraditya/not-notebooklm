@@ -45,7 +45,7 @@ interface ChatAreaProps {
   onAddPendingSources?: (items: { id: string; filename: string; type: "file" | "doi"; status: "uploading" }[]) => void;
   onResolvePendingSource?: (pendingId: string) => void;
   onOpenDocument?: (doc: DocType, citationContext?: CitationContext) => void;
-  onEnsureChatSession?: (suggestedTitle?: string) => Promise<string>;
+  onEnsureChatSession?: (suggestedTitle?: string, requireModel?: boolean) => Promise<string>;
   backendUrl: string;
   isSidebarOpen?: boolean;
   onOpenSidebar?: () => void;

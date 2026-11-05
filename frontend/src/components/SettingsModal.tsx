@@ -136,7 +136,7 @@ export default function SettingsModal({
               }`}
             >
               <HardDrive size={15} className={activeTab === "storage" ? "text-blue-500" : "text-app-text-dim"} />
-              <span>{t('settings.storage')}</span>
+              <span>{t('admin.dataStorage')}</span>
             </button>
 
             <button
@@ -157,11 +157,11 @@ export default function SettingsModal({
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-app-text-muted hover:text-app-text hover:bg-app-item-hover transition-colors"
-                title="Open Dedicated Web Control Dashboard"
+                title={t("admin.openNewTab")}
               >
                 <span className="flex items-center gap-2.5">
-                  <Sliders size={15} className="text-purple-400" />
-                  <span>Control Plane</span>
+                  <Sliders size={15} />
+                  <span>{t("admin.title")}</span>
                 </span>
                 <ExternalLink size={12} className="text-app-text-dim" />
               </a>

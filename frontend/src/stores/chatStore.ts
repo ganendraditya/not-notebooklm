@@ -19,6 +19,8 @@ export interface WorkspaceModel {
   is_default?: boolean;
 }
 
+export type ModelCatalogStatus = "loading" | "ready" | "error";
+
 export interface Attachment {
   type: "image" | "file";
   filename: string;
@@ -52,6 +54,10 @@ interface ChatStore {
   queuedPrompts: string[];
   sessionExecutions: Record<string, SessionExecutionStatus>;
   availableModels: WorkspaceModel[];
+  modelCatalogStatus: ModelCatalogStatus;
+  lastSelectedModelKey: string | null;
+  modelRequiredChatIds: string[];
+  modelUpdatingChatIds: string[];
   pendingNewChatModel: { model: string; profile_id: string } | null;
   
   setSessions: (sessions: ChatSession[]) => void;
@@ -63,6 +69,8 @@ interface ChatStore {
   setSessionExecution: (chatId: string, execution: SessionExecutionStatus | null) => void;
   dismissSessionExecution: (chatId: string) => void;
   setAvailableModels: (models: WorkspaceModel[]) => void;
+  setModelCatalogStatus: (status: ModelCatalogStatus) => void;
+  setLastSelectedModelKey: (key: string | null) => void;
   setPendingNewChatModel: (selection: { model: string; profile_id: string } | null) => void;
   updateSessionModel: (chatId: string, model: string | null, profile_id: string | null) => void;
   
@@ -82,6 +90,10 @@ export const useChatStore = create<ChatStore>((set) => ({
   queuedPrompts: [],
   sessionExecutions: {},
   availableModels: [],
+  modelCatalogStatus: "loading",
+  lastSelectedModelKey: null,
+  modelRequiredChatIds: [],
+  modelUpdatingChatIds: [],
   pendingNewChatModel: null,
 
   setSessions: (sessions) => set({ sessions }),
@@ -90,7 +102,9 @@ export const useChatStore = create<ChatStore>((set) => ({
   setIsLoading: (isLoading) => set({ isLoading }),
   setActiveStatus: (activeStatus) => set({ activeStatus }),
   setQueuedPrompts: (queuedPrompts) => set({ queuedPrompts }),
-  setAvailableModels: (availableModels) => set({ availableModels }),
+  setAvailableModels: (availableModels) => set({ availableModels, modelCatalogStatus: "ready" }),
+  setModelCatalogStatus: (modelCatalogStatus) => set({ modelCatalogStatus }),
+  setLastSelectedModelKey: (lastSelectedModelKey) => set({ lastSelectedModelKey }),
   setPendingNewChatModel: (pendingNewChatModel) => set({ pendingNewChatModel }),
   updateSessionModel: (chatId, model, profile_id) => set((state) => ({
     sessions: state.sessions.map((s) =>

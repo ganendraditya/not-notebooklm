@@ -1,14 +1,41 @@
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import { ChatInputBox } from "../components/chat/ChatInput";
 import { I18nProvider } from "../lib/i18n";
+import { useChatStore } from "@/stores/chatStore";
 
 const renderWithI18n = (ui: React.ReactElement) => {
   return render(<I18nProvider>{ui}</I18nProvider>);
 };
 
 describe("ChatInput Component", () => {
+  beforeEach(() => {
+    useChatStore.setState({ availableModels: [{ id: "fixture", name: "Fixture", profile_id: "provider", profile_name: "Provider" }], modelCatalogStatus: "ready" });
+  });
+
+  it.each(["loading", "error", "ready"] as const)("preserves a new prompt without models when the catalog is %s", (status) => {
+    useChatStore.setState({ availableModels: [], modelCatalogStatus: status });
+    const onSubmit = vi.fn();
+    renderWithI18n(<ChatInputBox onSubmit={onSubmit} backendUrl="http://fixture.invalid" />);
+    const textarea = screen.getByRole("textbox");
+    fireEvent.change(textarea, { target: { value: "Keep this research draft" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(textarea).toHaveValue("Keep this research draft");
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "System configuration" })).toHaveAttribute("target", "_blank");
+  });
+
+  it("preserves legacy unbound saved-chat behavior with an empty catalog", () => {
+    useChatStore.setState({ availableModels: [], modelCatalogStatus: "ready" });
+    const onSubmit = vi.fn();
+    renderWithI18n(<ChatInputBox chatId="legacy-saved-chat" onSubmit={onSubmit} backendUrl="http://fixture.invalid" />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Continue saved chat" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    expect(onSubmit).toHaveBeenCalledWith("Continue saved chat", undefined);
+  });
+
   it("renders input box and triggers onSubmit with trimmed text", () => {
     const onSubmit = vi.fn();
 

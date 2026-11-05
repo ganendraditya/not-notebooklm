@@ -74,16 +74,11 @@ def factory_reset_storage(payload: ResetStoragePayload, db: Session = Depends(ge
 @router.get("/llm/models")
 def get_llm_models():
     """Returns active LLM configuration info dynamically, including enabled models for the workspace."""
-    from rag.llm_factory import get_main_llm, get_fast_llm, get_fallback_llm
     from services.admin_service import get_gateway_profiles
-    
-    main_instance = get_main_llm()
-    fast_instance = get_fast_llm()
-    fallback_instance = get_fallback_llm()
-    
-    main_model = getattr(main_instance, "model", None) or os.getenv("LLM_MODEL", "gpt-4o")
-    fast_model = getattr(fast_instance, "model", None) or os.getenv("LLM_FAST_MODEL", main_model)
-    fallback_model = getattr(fallback_instance, "model", None) or os.getenv("LLM_FALLBACK_MODEL", "")
+
+    main_model = os.getenv("LLM_MODEL", "").strip() or os.getenv("NINEROUTER_MODEL", "").strip()
+    fast_model = os.getenv("LLM_FAST_MODEL", "").strip() or os.getenv("NINEROUTER_FAST_MODEL", "").strip() or main_model
+    fallback_model = os.getenv("LLM_FALLBACK_MODEL", "").strip() or os.getenv("NINEROUTER_FALLBACK_MODEL", "").strip()
     primary_pid = os.getenv("LLM_PRIMARY_PROFILE_ID", "default").strip() or "default"
 
     # Collect enabled models across all configured gateway profiles for workspace selection
@@ -96,9 +91,6 @@ def get_llm_models():
         p_name = p.get("name", "Gateway")
         p_proto = p.get("protocol", "openai")
         models_list = p.get("models", [])
-
-        if not models_list and p_id == primary_pid:
-            models_list = [{"id": main_model, "name": main_model, "enabled": True}]
 
         for m in models_list:
             if m.get("enabled", True):
@@ -118,16 +110,7 @@ def get_llm_models():
                         "is_default": is_def,
                     })
 
-    if not workspace_models:
-        workspace_models.append({
-            "id": main_model,
-            "name": main_model,
-            "profile_id": primary_pid,
-            "profile_name": "Default Gateway",
-            "protocol": "openai",
-            "is_default": True,
-        })
-    elif not any(m.get("is_default") for m in workspace_models):
+    if workspace_models and not any(m.get("is_default") for m in workspace_models):
         workspace_models[0]["is_default"] = True
 
     return {
@@ -138,5 +121,5 @@ def get_llm_models():
         "fallback_model": fallback_model or None,
         "primary_profile_id": primary_pid,
         "workspace_models": workspace_models,
-        "description": f"Two-Tier Engine: Heavy Synthesis powered by {main_model}, Rapid Triage & Auditing powered by {fast_model}." + (f" Fallback cascade: {fallback_model}." if fallback_model else "")
+        "description": "Registered models available for chat." if workspace_models else "No models registered. Add a provider and its models in System configuration.",
     }

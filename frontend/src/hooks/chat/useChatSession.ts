@@ -1,8 +1,12 @@
 import { useRef, useEffect, useCallback } from "react";
-import { type ChatSession, type ChatMessage, useChatStore } from "@/stores/chatStore";
+import { type ChatSession, type ChatMessage, type WorkspaceModel, useChatStore } from "@/stores/chatStore";
 import { type Document, type PendingSourceItem, type TargetedSource } from "@/stores/documentStore";
 import { type ChatJobState } from "./useChatStream";
 import { formatDefaultSessionTitle } from "@/lib/utils";
+import { fetchWorkspaceModels, ModelRequiredError, resolveNewChatModel } from "@/lib/workspace-models";
+import { syncRememberedModelSelection } from "@/lib/model-preferences";
+import { chatRequiresModel, setChatRequiresModel } from "@/lib/new-chat-models";
+import { pendingChatModelUpdate, persistChatModel } from "@/lib/chat-model-binding";
 
 export function useChatSession(
   backendUrl: string,
@@ -29,6 +33,7 @@ export function useChatSession(
   }, [activeChatId, activeChatIdRef]);
 
   const pendingSessionCreationRef = useRef<Promise<string> | null>(null);
+  const modelsRequestRef = useRef<Promise<WorkspaceModel[]> | null>(null);
   const handleSelectChatRef = useRef<(id: string) => void>(() => {});
 
   const handleSelectChat = useCallback((id: string) => {
@@ -178,19 +183,28 @@ export function useChatSession(
       .catch(err => console.error("Failed to fetch sessions:", err));
 
     // Fetch available models for workspace dynamic model switching
+    let disposed = false;
     const fetchAvailableModels = async () => {
+      useChatStore.getState().setModelCatalogStatus("loading");
       try {
-        const res = await fetch(`${backendUrl}/llm/models`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (data && Array.isArray(data.workspace_models)) {
-          useChatStore.getState().setAvailableModels(data.workspace_models);
-        }
+        const models = await fetchWorkspaceModels(backendUrl);
+        if (!disposed) useChatStore.getState().setAvailableModels(models);
+        return models;
       } catch (err) {
+        if (!disposed) useChatStore.getState().setModelCatalogStatus("error");
         console.debug("Failed to fetch available models:", err);
+        return useChatStore.getState().availableModels;
       }
     };
-    fetchAvailableModels();
+    const refreshModels = () => {
+      if (modelsRequestRef.current) return;
+      const request = fetchAvailableModels();
+      modelsRequestRef.current = request;
+      void request.finally(() => { if (modelsRequestRef.current === request) modelsRequestRef.current = null; });
+    };
+    refreshModels();
+    window.addEventListener("focus", refreshModels);
+    return () => { disposed = true; modelsRequestRef.current = null; window.removeEventListener("focus", refreshModels); };
     // Intentionally run once on component mount to hydrate sessions from persistent storage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -209,35 +223,51 @@ export function useChatSession(
     }
   }, [activeChatId, sessions]);
 
-  const handleEnsureChatSession = async (suggestedTitle?: string): Promise<string> => {
+  const handleEnsureChatSession = async (suggestedTitle?: string, requireModel = false): Promise<string> => {
     // Fast path: session already active (check both ref and state)
-    if (activeChatIdRef.current) return activeChatIdRef.current;
-    if (activeChatId) return activeChatId;
+    const existingId = activeChatIdRef.current || activeChatId;
+    if (existingId) {
+      if (requireModel) await pendingChatModelUpdate(existingId);
+      if (requireModel && chatRequiresModel(existingId)) {
+        await modelsRequestRef.current;
+        const { availableModels, pendingNewChatModel } = useChatStore.getState();
+        const selected = resolveNewChatModel(availableModels, syncRememberedModelSelection(), pendingNewChatModel);
+        if (!selected) throw new ModelRequiredError();
+        await persistChatModel(backendUrl, existingId, selected);
+        useChatStore.getState().setPendingNewChatModel(null);
+      }
+      return existingId;
+    }
 
     // Mutex: If a session creation request is already in-flight, await the same promise
     if (pendingSessionCreationRef.current) {
-      return await pendingSessionCreationRef.current;
+      const id = await pendingSessionCreationRef.current;
+      return requireModel ? handleEnsureChatSession(suggestedTitle, true) : id;
     }
 
     pendingSessionCreationRef.current = (async () => {
       try {
         // Initial clean default title while AI generates the smart topic name post-response
         const title = suggestedTitle?.trim() || formatDefaultSessionTitle();
-        const pendingModel = useChatStore.getState().pendingNewChatModel;
+        await modelsRequestRef.current;
+        const { availableModels, pendingNewChatModel } = useChatStore.getState();
+        const selectedModel = resolveNewChatModel(availableModels, syncRememberedModelSelection(), pendingNewChatModel);
+        if (requireModel && !selectedModel) throw new ModelRequiredError();
 
         const res = await fetch(`${backendUrl}/chats`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             title,
-            model: pendingModel?.model || undefined,
-            profile_id: pendingModel?.profile_id || undefined
+            model: selectedModel?.id,
+            profile_id: selectedModel?.profile_id
           })
         });
         if (!res.ok) {
           throw new Error(`Failed to create chat session: ${res.status} ${res.statusText}`);
         }
         const newChat = await res.json();
+        if (!selectedModel) setChatRequiresModel(newChat.id, true);
         useChatStore.getState().setPendingNewChatModel(null);
         try {
           localStorage.setItem("last_active_chat_id", newChat.id);

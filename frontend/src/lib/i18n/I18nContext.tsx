@@ -81,8 +81,7 @@ export function getResolvedLanguage(): string {
   return currentActiveLanguage || 'en';
 }
 
-export function getSystemTranslation(key: string, variables?: Record<string, string>, fallbackText?: string): string {
-  const lang = currentActiveLanguage || getResolvedLanguage();
+function translateLanguage(lang: string, key: string, variables?: Record<string, string>, fallbackText?: string): string {
   const dict = loadedLocales[lang] || loadedLocales['en'];
   let text = dict?.[key] || loadedLocales['en']?.[key] || fallbackText || key;
 
@@ -93,6 +92,10 @@ export function getSystemTranslation(key: string, variables?: Record<string, str
   }
 
   return text;
+}
+
+export function getSystemTranslation(key: string, variables?: Record<string, string>, fallbackText?: string): string {
+  return translateLanguage(currentActiveLanguage || getResolvedLanguage(), key, variables, fallbackText);
 }
 
 export function registerLoadedLocale(lang: string, dict: LocaleDict) {
@@ -171,7 +174,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     if (activeLanguage || localeVersion) {
       // Intentionally reference to recompute on language switch
     }
-    return getSystemTranslation(key, variables);
+    return translateLanguage(activeLanguage, key, variables);
   }, [activeLanguage, localeVersion]);
 
   return (

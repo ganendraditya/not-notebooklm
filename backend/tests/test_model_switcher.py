@@ -1,3 +1,4 @@
+import json
 import os
 from unittest.mock import patch
 import pytest
@@ -50,8 +51,18 @@ def test_chat_session_model_and_profile_binding():
     # Clean up
     client.delete(f"/chats/{chat_id}")
 
-def test_llm_models_workspace_models_endpoint():
+def test_llm_models_workspace_models_endpoint(monkeypatch):
     """Verify /llm/models returns workspace_models list with enabled models."""
+    monkeypatch.setenv("LLM_PROFILES_JSON", json.dumps([{
+        "id": "fixture-provider",
+        "name": "Fixture provider",
+        "base_url": "https://fixture.invalid/v1",
+        "protocol": "openai",
+        "models": [
+            {"id": "fixture-model", "name": "Fixture model", "enabled": True},
+            {"id": "hidden-model", "name": "Hidden model", "enabled": False},
+        ],
+    }]))
     res = client.get("/llm/models")
     assert res.status_code == 200
     data = res.json()
@@ -59,13 +70,16 @@ def test_llm_models_workspace_models_endpoint():
     assert "workspace_models" in data
     workspace_models = data["workspace_models"]
     assert isinstance(workspace_models, list)
-    assert len(workspace_models) > 0
+    assert len(workspace_models) == 1
     # First model has id, name, profile_id, protocol
     first = workspace_models[0]
     assert "id" in first
     assert "name" in first
     assert "profile_id" in first
     assert "protocol" in first
+    assert first["id"] == "fixture-model"
+    assert first["name"] == "Fixture model"
+    assert first["profile_id"] == "fixture-provider"
 
 def test_get_candidate_llm_chain_with_model_override():
     """Verify get_candidate_llm_chain puts model_override as the first synthesizer."""

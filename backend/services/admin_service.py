@@ -7,11 +7,13 @@ and vector database health diagnostics without modifying repository source files
 import json
 import logging
 import os
+import threading
 from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger("uvicorn.error")
+_configuration_write_lock = threading.RLock()
 
 CONFIG_FILE_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", ".env")
@@ -54,12 +56,12 @@ def _sanitize_env_value(val: Any) -> str:
 
 
 def _normalize_profile_models(profile: Dict[str, Any], default_model: str) -> List[Dict[str, Any]]:
-    """Ensures each profile possesses a valid list of models with enabled toggles."""
+    """Keep explicit model lists, including empty lists; adapt only absent legacy lists."""
     raw_models = profile.get("models")
-    if isinstance(raw_models, list) and raw_models:
+    if isinstance(raw_models, list):
         cleaned = []
         for m in raw_models:
-            if isinstance(m, dict) and m.get("id"):
+            if isinstance(m, dict) and str(m.get("id") or "").strip():
                 cleaned.append({
                     "id": str(m["id"]).strip(),
                     "name": str(m.get("name") or m["id"]).strip(),
@@ -71,77 +73,43 @@ def _normalize_profile_models(profile: Dict[str, Any], default_model: str) -> Li
                     "name": m.strip(),
                     "enabled": True,
                 })
-        if cleaned:
-            return cleaned
-
-    # Fallback default models based on profile properties
-    pid = profile.get("id", "")
-    proto = profile.get("protocol", "openai")
-    base_url = profile.get("base_url", "").lower()
-
-    if pid == "default" or "20128" in base_url or "9router" in base_url:
+        return cleaned
+    if "models" not in profile and default_model:
         return [{"id": default_model, "name": default_model, "enabled": True}]
-    elif proto == "anthropic" or "anthropic.com" in base_url:
-        return [
-            {"id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet", "enabled": True},
-            {"id": "claude-3-5-haiku-20241022", "name": "Claude 3.5 Haiku", "enabled": True},
-        ]
-    elif "deepseek.com" in base_url:
-        return [
-            {"id": "deepseek-chat", "name": "DeepSeek V3", "enabled": True},
-            {"id": "deepseek-reasoner", "name": "DeepSeek R1", "enabled": True},
-        ]
-    elif "api.x.ai" in base_url:
-        return [{"id": "grok-2-latest", "name": "Grok 2", "enabled": True}]
-    elif "groq.com" in base_url:
-        return [{"id": "llama-3.3-70b-versatile", "name": "LLaMA 3.3 70B", "enabled": True}]
-    elif "api.openai.com" in base_url:
-        return [
-            {"id": "gpt-4o", "name": "GPT-4o", "enabled": True},
-            {"id": "gpt-4o-mini", "name": "GPT-4o Mini", "enabled": True},
-        ]
-    elif "11434" in base_url:
-        return [{"id": "llama3.2", "name": "Llama 3.2", "enabled": True}]
-    else:
-        return [{"id": default_model, "name": default_model, "enabled": True}]
+    return []
 
 
 def get_gateway_profiles() -> List[Dict[str, Any]]:
-    """
-    Parses and returns registered OpenAI-compatible gateway profiles.
-    Falls back gracefully to synthesizing a 'default' profile from LLM_BASE_URL and LLM_API_KEY.
-    """
+    """Read configured profiles, or adapt an explicitly configured legacy endpoint."""
     raw_json = os.getenv("LLM_PROFILES_JSON", "").strip()
-    profiles: List[Dict[str, Any]] = []
+    profiles: Optional[List[Dict[str, Any]]] = None
     if raw_json:
         try:
             parsed = json.loads(raw_json)
             if isinstance(parsed, list):
-                profiles = parsed
+                profiles = [profile for profile in parsed if isinstance(profile, dict)]
         except Exception as e:
             logger.warning(f"[AdminService] Failed to parse LLM_PROFILES_JSON: {e}")
 
-    # Ensure there is always at least one default profile matching base credentials
     default_base_url = (
         os.getenv("LLM_BASE_URL", "").strip()
         or os.getenv("NINEROUTER_BASE_URL", "").strip()
-        or "http://localhost:20128/v1"
     )
     default_api_key = os.getenv("LLM_API_KEY", "").strip() or os.getenv("NINEROUTER_API_KEY", "").strip()
-    default_model = os.getenv("LLM_MODEL", "gpt-4o").strip() or "gpt-4o"
+    default_model = os.getenv("LLM_MODEL", "").strip() or os.getenv("NINEROUTER_MODEL", "").strip()
+    primary_pid = os.getenv("LLM_PRIMARY_PROFILE_ID", "default").strip() or "default"
 
-    has_default = any(p.get("id") == "default" for p in profiles)
-    if not profiles or not has_default:
-        profiles.insert(0, {
+    if profiles is None:
+        profiles = [{
             "id": "default",
             "name": "Default Gateway",
             "base_url": default_base_url,
             "api_key": default_api_key,
-        })
+            "models": _normalize_profile_models({}, default_model),
+        }] if default_base_url else []
 
-    # Ensure each profile has normalized models list
     for p in profiles:
-        p["models"] = _normalize_profile_models(p, default_model=default_model)
+        p["models"] = _normalize_profile_models(p, default_model=default_model if p.get("id") == primary_pid else "")
 
     return profiles
 
@@ -167,6 +135,11 @@ def update_env_variable(key: str, value: str, env_path: Optional[str] = None) ->
 
 def update_multiple_env_variables(updates: Dict[str, str], env_path: Optional[str] = None) -> bool:
     """Applies sanitized updates in memory; persists locally only outside an injected vault session."""
+    with _configuration_write_lock:
+        return _update_multiple_env_variables(updates, env_path)
+
+
+def _update_multiple_env_variables(updates: Dict[str, str], env_path: Optional[str]) -> bool:
     target_path = env_path or get_config_file_path()
     runtime_only = get_runtime_secret_provider() != "local"
     sanitized_updates = {
@@ -229,12 +202,10 @@ def get_system_admin_config() -> Dict[str, Any]:
     base_url = (
         os.getenv("LLM_BASE_URL", "").strip()
         or os.getenv("NINEROUTER_BASE_URL", "").strip()
-        or "http://localhost:20128/v1"
     )
     main_model = (
         os.getenv("LLM_MODEL", "").strip()
         or os.getenv("NINEROUTER_MODEL", "").strip()
-        or "gpt-4o"
     )
     fast_model = (
         os.getenv("LLM_FAST_MODEL", "").strip()
@@ -292,9 +263,9 @@ def get_system_admin_config() -> Dict[str, Any]:
         }
         for p in raw_profiles
     ]
-    primary_pid = os.getenv("LLM_PRIMARY_PROFILE_ID", "default").strip()
-    fast_pid = os.getenv("LLM_FAST_PROFILE_ID", primary_pid).strip()
-    fallback_pid = os.getenv("LLM_FALLBACK_PROFILE_ID", primary_pid).strip()
+    primary_pid = os.getenv("LLM_PRIMARY_PROFILE_ID", "").strip() or "default"
+    fast_pid = os.getenv("LLM_FAST_PROFILE_ID", "").strip() or primary_pid
+    fallback_pid = os.getenv("LLM_FALLBACK_PROFILE_ID", "").strip() or primary_pid
 
     return {
         "persistence": persistence,

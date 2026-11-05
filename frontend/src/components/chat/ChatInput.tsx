@@ -18,6 +18,9 @@ import { QueuedPromptsList } from "./input/QueuedPromptsList";
 import { TargetedSourceBadge } from "./input/TargetedSourceBadge";
 import { AttachmentPreviewList, type Attachment } from "./input/AttachmentPreviewList";
 import { ALLOWED_ATTACHMENT_EXTS } from "./input/fileUtils";
+import { useChatStore } from "@/stores/chatStore";
+import { chatRequiresModel } from "@/lib/new-chat-models";
+import { ModelRequiredError } from "@/lib/workspace-models";
 
 export type { Attachment };
 
@@ -33,7 +36,7 @@ export interface ChatInputBoxProps {
   onPromoteQueuedPrompt?: (index: number) => void;
   backendUrl: string;
   chatId?: string | null;
-  onEnsureChatSession?: () => Promise<string>;
+  onEnsureChatSession?: (suggestedTitle?: string, requireModel?: boolean) => Promise<string>;
   targetedSource?: TargetedSource | null;
   onClearTargetedSource?: () => void;
   onOpenStorage?: () => void;
@@ -63,6 +66,17 @@ export const ChatInputBox = memo(function ChatInputBox({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [modelRequired, setModelRequired] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const preparationLock = useRef(false);
+  const mounted = useRef(true);
+  const currentChatId = useRef(chatId);
+  useEffect(() => { currentChatId.current = chatId; }, [chatId]);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useChatStore((state) => state.modelRequiredChatIds);
+  const needsModel = chatRequiresModel(chatId);
+  const availableModels = useChatStore((state) => state.availableModels);
+  const modelCatalogStatus = useChatStore((state) => state.modelCatalogStatus);
   const [storageWarningFile, setStorageWarningFile] = useState<{ filename: string; size: number } | null>(null);
   const [containerWidth, setContainerWidth] = useState(760);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -396,10 +410,23 @@ export const ChatInputBox = memo(function ChatInputBox({
     }
   };
 
-  const handleSend = () => {
-    if (isLoading || isUploading || attachments.some(a => a.isUploading)) return;
+  const handleSend = async () => {
+    if (isLoading || isUploading || preparationLock.current || attachments.some(a => a.isUploading)) return;
     const query = input.trim();
     if (!query && attachments.length === 0) return;
+    if (!availableModels.length && needsModel) { setModelRequired(true); return; }
+    if (needsModel && onEnsureChatSession) {
+      preparationLock.current = true; setPreparing(true);
+      try {
+        const preparedId = await onEnsureChatSession(undefined, true);
+        if (!mounted.current || (currentChatId.current !== chatId && currentChatId.current !== preparedId)) return;
+      }
+      catch (error) {
+        if (error instanceof ModelRequiredError) setModelRequired(true);
+        else setAttachmentError(t("chat.sessionPreparationFailed"));
+        return;
+      } finally { preparationLock.current = false; setPreparing(false); }
+    }
 
     const filterClauses: string[] = [];
     if (filter.yearFrom && filter.yearTo) {
@@ -449,9 +476,9 @@ export const ChatInputBox = memo(function ChatInputBox({
 
     const readyAttachments = attachments.filter(a => !a.isUploading && Boolean(a.url));
     onSubmit(finalMessage, readyAttachments.length > 0 ? readyAttachments : undefined);
-    setInput("");
+    setInput((current) => current === input ? "" : current);
     attachments.forEach(a => revokeBlobUrl(a.previewUrl));
-    setAttachments([]);
+    setAttachments((current) => current.filter((attachment) => !attachments.includes(attachment)));
     onClearTargetedSource?.();
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -493,6 +520,10 @@ export const ChatInputBox = memo(function ChatInputBox({
         }}
       />
 
+      {modelRequired && !availableModels.length && needsModel && <p className="mb-2 px-2 text-xs text-app-text-muted" role="alert">
+        {t(modelCatalogStatus === "loading" ? "chat.loadingModels" : modelCatalogStatus === "error" ? "chat.modelLoadError" : "chat.modelRequired")} <a href="/admin" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">{t("admin.title")}</a>
+      </p>}
+
       {/* Attachment Error Banner */}
       {attachmentError && (
         <div className="mb-2 px-3.5 py-2 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-between gap-2 text-xs text-red-400 animate-in fade-in slide-in-from-bottom-1 duration-150">
@@ -531,6 +562,7 @@ export const ChatInputBox = memo(function ChatInputBox({
 
         <textarea
           id="chat-input-textarea"
+          disabled={preparing}
           ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -608,7 +640,7 @@ export const ChatInputBox = memo(function ChatInputBox({
                 <button
                   type="button"
                   onClick={handleSend}
-                  disabled={(!input.trim() && attachments.length === 0) || isUploading || attachments.some(a => a.isUploading)}
+                  disabled={(!input.trim() && attachments.length === 0) || preparing || isUploading || attachments.some(a => a.isUploading)}
                   className="p-2 rounded-full bg-app-text text-app-bg hover:opacity-90 disabled:opacity-30 disabled:hover:opacity-30 transition-all cursor-pointer disabled:cursor-not-allowed shadow-md flex items-center justify-center shrink-0"
                   aria-label={t('chat.sendTitle')}
                 >

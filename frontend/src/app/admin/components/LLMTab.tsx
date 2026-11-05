@@ -1,1231 +1,143 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import {
-  Cpu,
-  CheckCircle2,
-  AlertCircle,
-  RefreshCw,
-  Plus,
-  Trash2,
-  Server,
-  Eye,
-  EyeOff,
-  Copy,
-  Check,
-  Edit3,
-  X,
-} from "lucide-react";
-import type { AdminConfig, GatewayProfile, TestResult } from "@/types/admin";
-import { readConfigUpdateMessage } from "@/lib/admin-persistence";
+import { useRef, useState } from "react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
+import type { AdminConfig, GatewayProfile } from "@/types/admin";
+import { loadAdminConfig, llmPayload, profilesFromConfig, routingFromConfig, saveAdminSection, type ConfigUpdate, type LlmRouting } from "@/lib/admin-api";
+import { useTranslation } from "@/lib/i18n";
+import { AdminDialog, DiscardDialog, FeedbackMessage, useDraftGuard, usePersistenceFeedback, type Feedback } from "./AdminForms";
+import ConnectionEditor from "./ConnectionEditor";
+import ConnectionModels from "./ConnectionModels";
+import ModelRoutingForm from "./ModelRoutingForm";
 
-interface LLMTabProps {
-  config: AdminConfig["llm"];
-  backendUrl: string;
-  onSaved: () => void;
-}
-
-const PRESET_OPENAI_GATEWAYS = [
-  { name: "9Router", url: "http://localhost:20128/v1" },
-  { name: "DeepSeek", url: "https://api.deepseek.com/v1" },
-  { name: "xAI Grok", url: "https://api.x.ai/v1" },
-  { name: "Groq", url: "https://api.groq.com/openai/v1" },
-  { name: "OpenRouter", url: "https://openrouter.ai/api/v1" },
-  { name: "Ollama (Local)", url: "http://localhost:11434/v1" },
-  { name: "OpenAI Official", url: "https://api.openai.com/v1" },
-];
-
-const PRESET_ANTHROPIC_GATEWAYS = [
-  { name: "Anthropic Official", url: "https://api.anthropic.com/v1" },
-];
-
-interface ModalState {
-  isOpen: boolean;
-  mode: "add" | "edit";
-  protocol: "openai" | "anthropic";
-  profileId: string;
-  name: string;
-  baseUrl: string;
-  apiKey: string;
-  showKey: boolean;
-  hasExistingKey: boolean;
-  existingMaskedKey: string;
-  isTesting: boolean;
-  testResult: TestResult | null;
-  isSaving: boolean;
-  errorMessage: string | null;
-}
+interface LLMTabProps { config: AdminConfig["llm"]; backendUrl: string; onSaved: (update: ConfigUpdate<AdminConfig["llm"]>) => void }
 
 export default function LLMTab({ config, backendUrl, onSaved }: LLMTabProps) {
-  // Profiles State
-  const initialProfiles: GatewayProfile[] =
-    config.profiles && config.profiles.length > 0
-      ? config.profiles
-      : [
-          {
-            id: "default",
-            name: "Default Gateway",
-            base_url: config.base_url || "http://localhost:20128/v1",
-            api_key_masked: config.api_key_masked || "",
-            has_api_key: config.has_api_key || false,
-            protocol: "openai",
-          },
-        ];
-
-  const [profiles, setProfiles] = useState<GatewayProfile[]>(initialProfiles);
-  const [profileKeys, setProfileKeys] = useState<Record<string, string>>({});
-
-  // Tier Bindings & Models
-  const [primaryProfileId, setPrimaryProfileId] = useState(config.primary_profile_id || "default");
-  const [fastProfileId, setFastProfileId] = useState(config.fast_profile_id || primaryProfileId);
-  const [fallbackProfileId, setFallbackProfileId] = useState(config.fallback_profile_id || primaryProfileId);
-
-  const [model, setModel] = useState(config.model || "gpt-4o");
-  const [fastModel, setFastModel] = useState(config.fast_model || "");
-  const [fallbackModel, setFallbackModel] = useState(config.fallback_model || "");
-  const [temperature, setTemperature] = useState(config.temperature ?? 0.1);
-
-  // Status & Testing States for Catalog Cards
-  const [isSavingTiers, setIsSavingTiers] = useState(false);
-  const [testingProfileId, setTestingProfileId] = useState<string | null>(null);
-  const [testResults, setTestResults] = useState<Record<string, TestResult>>({});
-  const [statusMessage, setStatusMessage] = useState<{ text: string; error?: boolean } | null>(null);
-  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
-
-  // Model Visibility Management State
-  const [addingModelProfileId, setAddingModelProfileId] = useState<string | null>(null);
-  const [newModelId, setNewModelId] = useState("");
-  const [newModelName, setNewModelName] = useState("");
-
-  useEffect(() => {
-    if (config.profiles && config.profiles.length > 0) {
-      setProfiles(config.profiles);
-    }
-  }, [config.profiles]);
-
-  // Dedicated Modal State
-  const [modal, setModal] = useState<ModalState>({
-    isOpen: false,
-    mode: "add",
-    protocol: "openai",
-    profileId: "",
-    name: "",
-    baseUrl: "",
-    apiKey: "",
-    showKey: false,
-    hasExistingKey: false,
-    existingMaskedKey: "",
-    isTesting: false,
-    testResult: null,
-    isSaving: false,
-    errorMessage: null,
-  });
-
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  // Keyboard accessibility: Escape closes modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && modal.isOpen) {
-        closeModal();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [modal.isOpen]);
-
-  const openAddModal = (protocol: "openai" | "anthropic") => {
-    const newId = `profile_${Date.now()}`;
-    const defaultUrl = protocol === "anthropic" ? "https://api.anthropic.com/v1" : "http://localhost:20128/v1";
-    const defaultName = protocol === "anthropic" ? `Anthropic Claude ${profiles.length + 1}` : `Gateway ${profiles.length + 1}`;
-
-    setModal({
-      isOpen: true,
-      mode: "add",
-      protocol,
-      profileId: newId,
-      name: defaultName,
-      baseUrl: defaultUrl,
-      apiKey: "",
-      showKey: false,
-      hasExistingKey: false,
-      existingMaskedKey: "",
-      isTesting: false,
-      testResult: null,
-      isSaving: false,
-      errorMessage: null,
-    });
+  const { t } = useTranslation();
+  const persistenceFeedback = usePersistenceFeedback();
+  const [saved, setSaved] = useState(config);
+  const [routing, setRouting] = useState(() => routingFromConfig(config));
+  const [busy, setBusy] = useState(false);
+  const lock = useRef(false);
+  const [uncertain, setUncertain] = useState(false);
+  const [editor, setEditor] = useState<{ profile?: GatewayProfile } | null>(null);
+  const [removing, setRemoving] = useState<GatewayProfile | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [feedbackProfileId, setFeedbackProfileId] = useState<string | null>(null);
+  const [routingFeedback, setRoutingFeedback] = useState<Feedback | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [modelDirty, setModelDirty] = useState(false);
+  const [discardModels, setDiscardModels] = useState(false);
+  const providerButtons = useRef<Record<string, HTMLButtonElement | null>>({});
+  const listHeading = useRef<HTMLHeadingElement>(null);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  const removeReturnFocus = useRef<HTMLElement | null>(null);
+  const profiles = profilesFromConfig(saved);
+  const selected = profiles.find((profile) => profile.id === selectedId);
+  const dirty = JSON.stringify(routing) !== JSON.stringify(routingFromConfig(saved));
+  useDraftGuard(dirty || uncertain, busy || uncertain);
+  const showProviders = () => {
+    setSelectedId(null); setModelDirty(false); setDiscardModels(false);
+    requestAnimationFrame(() => providerButtons.current[selectedId || ""]?.focus());
   };
-
-  const openEditModal = (profile: GatewayProfile) => {
-    setModal({
-      isOpen: true,
-      mode: "edit",
-      protocol: profile.protocol || "openai",
-      profileId: profile.id,
-      name: profile.name,
-      baseUrl: profile.base_url,
-      apiKey: profileKeys[profile.id] || "",
-      showKey: false,
-      hasExistingKey: profile.has_api_key,
-      existingMaskedKey: profile.api_key_masked,
-      isTesting: false,
-      testResult: null,
-      isSaving: false,
-      errorMessage: null,
-    });
-  };
-
-  const closeModal = () => {
-    setModal((prev) => ({ ...prev, isOpen: false }));
-  };
-
-  const handleCopy = (text: string, id: string) => {
-    if (!text || !navigator.clipboard) return;
-    navigator.clipboard
-      .writeText(text)
-      .then(() => {
-        setCopiedKeyId(id);
-        setTimeout(() => setCopiedKeyId(null), 2000);
-      })
-      .catch(() => {});
-  };
-
-  const handleTestConnection = async (profile: GatewayProfile, explicitKey?: string) => {
-    setTestingProfileId(profile.id);
-    setTestResults((prev) => {
-      const next = { ...prev };
-      delete next[profile.id];
-      return next;
-    });
-
-    const keyToTest = (explicitKey !== undefined ? explicitKey : profileKeys[profile.id])?.trim() || undefined;
-
+  const reloadSaved = async () => {
+    if (lock.current) return;
+    lock.current = true; setBusy(true);
+    setFeedbackProfileId(null);
     try {
-      const res = await fetch(`${backendUrl}/admin/test/llm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base_url: profile.base_url,
-          api_key: keyToTest,
-          model: model || (profile.protocol === "anthropic" ? "claude-3-5-haiku-20241022" : "gpt-4o"),
-          profile_id: profile.id,
-          protocol: profile.protocol || "openai",
-        }),
-      });
-      const data = await res.json();
-      setTestResults((prev) => ({ ...prev, [profile.id]: data }));
-    } catch (e) {
-      setTestResults((prev) => ({
-        ...prev,
-        [profile.id]: {
-          success: false,
-          message: e instanceof Error ? e.message : "Failed to connect to backend",
-        },
-      }));
-    } finally {
-      setTestingProfileId(null);
-    }
+      const current = await loadAdminConfig(backendUrl);
+      setSaved(current.llm);
+      onSaved({ config: current.llm, persistence: current.persistence });
+      if (!dirty) setRouting(routingFromConfig(current.llm));
+      setUncertain(false);
+      setFeedback({ text: t("admin.reconciled") });
+    } catch { setFeedback({ text: t("admin.loadFailed"), error: true }); }
+    finally { lock.current = false; setBusy(false); }
   };
 
-  const handleModalTestConnection = async () => {
-    setModal((prev) => ({ ...prev, isTesting: true, testResult: null, errorMessage: null }));
-
+  const write = async (nextProfiles: GatewayProfile[], nextRouting?: LlmRouting, credentials?: Record<string, string>) => {
+    if (lock.current || uncertain) return false;
+    lock.current = true;
+    setBusy(true);
+    setFeedback(null);
     try {
-      const res = await fetch(`${backendUrl}/admin/test/llm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base_url: modal.baseUrl.trim(),
-          api_key: modal.apiKey.trim() || undefined,
-          model: model || (modal.protocol === "anthropic" ? "claude-3-5-haiku-20241022" : "gpt-4o"),
-          profile_id: modal.mode === "edit" ? modal.profileId : undefined,
-          protocol: modal.protocol,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      const data = await res.json();
-      setModal((prev) => ({ ...prev, testResult: data, isTesting: false }));
-    } catch (e) {
-      setModal((prev) => ({
-        ...prev,
-        testResult: {
-          success: false,
-          message: e instanceof Error ? e.message : "Failed to test connection",
-        },
-        isTesting: false,
-      }));
-    }
-  };
-
-  const handleModalSaveProvider = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!modal.name.trim() || !modal.baseUrl.trim()) {
-      setModal((prev) => ({ ...prev, errorMessage: "Name and Base URL are required." }));
-      return;
-    }
-
-    setModal((prev) => ({ ...prev, isSaving: true, errorMessage: null }));
-
-    try {
-      const safeMaskedKey = modal.apiKey
-        ? modal.apiKey.length > 8
-          ? `${modal.apiKey.slice(0, 4)}...${modal.apiKey.slice(-4)}`
-          : "••••••••"
-        : modal.existingMaskedKey;
-
-      const existingProf = profiles.find((p) => p.id === modal.profileId);
-      const updatedProfile: GatewayProfile = {
-        id: modal.profileId,
-        name: modal.name.trim(),
-        base_url: modal.baseUrl.trim(),
-        api_key_masked: safeMaskedKey,
-        has_api_key: Boolean(modal.apiKey.trim() || modal.hasExistingKey),
-        protocol: modal.protocol,
-        models: modal.mode === "edit" ? existingProf?.models || [] : undefined,
-      };
-
-      let newProfiles: GatewayProfile[];
-      if (modal.mode === "add") {
-        newProfiles = [...profiles, updatedProfile];
-      } else {
-        newProfiles = profiles.map((p) => (p.id === modal.profileId ? updatedProfile : p));
-      }
-
-      // Update local profile keys if a new key was entered
-      const newKeys = { ...profileKeys };
-      if (modal.apiKey.trim()) {
-        newKeys[modal.profileId] = modal.apiKey.trim();
-        setProfileKeys(newKeys);
-      }
-
-      // Prepare payload to save directly to backend
-      const payloadProfiles = newProfiles.map((p) => ({
-        id: p.id,
-        name: p.name,
-        base_url: p.base_url,
-        api_key: newKeys[p.id]?.trim() || undefined,
-        protocol: p.protocol || "openai",
-        models: p.models || [],
-      }));
-
-      const activePrimary = newProfiles.find((p) => p.id === primaryProfileId) || newProfiles[0];
-
-      const res = await fetch(`${backendUrl}/admin/config/llm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base_url: activePrimary.base_url,
-          api_key: newKeys[activePrimary.id]?.trim() || undefined,
-          model: model,
-          fast_model: fastModel.trim() || undefined,
-          fallback_model: fallbackModel.trim() || undefined,
-          temperature: Number(temperature),
-          profiles: payloadProfiles,
-          primary_profile_id: primaryProfileId,
-          fast_profile_id: fastProfileId,
-          fallback_profile_id: fallbackProfileId,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Failed to persist gateway provider");
-
-      setProfiles(newProfiles);
-      setStatusMessage({
-        text: await readConfigUpdateMessage(res),
-      });
-      closeModal();
-      onSaved();
-    } catch (err) {
-      setModal((prev) => ({
-        ...prev,
-        errorMessage: err instanceof Error ? err.message : "Error saving provider",
-        isSaving: false,
-      }));
-    }
-  };
-
-  const persistUpdatedProfiles = async (updatedProfiles: GatewayProfile[]): Promise<boolean> => {
-    const previousProfiles = profiles;
-    setProfiles(updatedProfiles);
-    try {
-      const payloadProfiles = updatedProfiles.map((p) => ({
-        id: p.id,
-        name: p.name,
-        base_url: p.base_url,
-        api_key: profileKeys[p.id]?.trim() || undefined,
-        protocol: p.protocol || "openai",
-        models: p.models || [],
-      }));
-
-      const activePrimary = updatedProfiles.find((p) => p.id === primaryProfileId) || updatedProfiles[0];
-      if (!activePrimary) {
-        throw new Error("No gateway profile available to persist.");
-      }
-
-      const res = await fetch(`${backendUrl}/admin/config/llm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base_url: activePrimary.base_url,
-          api_key: profileKeys[activePrimary.id]?.trim() || undefined,
-          model: model,
-          fast_model: fastModel.trim() || undefined,
-          fallback_model: fallbackModel.trim() || undefined,
-          temperature: Number(temperature),
-          profiles: payloadProfiles,
-          primary_profile_id: primaryProfileId,
-          fast_profile_id: fastProfileId,
-          fallback_profile_id: fallbackProfileId,
-        }),
-      });
-
-      if (res.ok) {
-        setStatusMessage({ text: await readConfigUpdateMessage(res) });
-        onSaved();
-        return true;
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        setStatusMessage({
-          text: errorData.detail || "Failed to update model settings.",
-          error: true,
-        });
-        setProfiles(previousProfiles);
-        return false;
-      }
-    } catch (err) {
-      console.error("Failed to persist model visibility update:", err);
-      setStatusMessage({ text: "Failed to persist model visibility update.", error: true });
-      setProfiles(previousProfiles);
+      const result = await saveAdminSection(backendUrl, "llm", llmPayload(saved, nextProfiles, nextRouting, credentials));
+      setSaved(result.config);
+      if (nextRouting) setRouting(routingFromConfig(result.config));
+      else if (!dirty) setRouting(routingFromConfig(result.config));
+      const message = { text: persistenceFeedback(result.persistence) };
+      if (nextRouting && !removing) setRoutingFeedback(message);
+      else setFeedback(message);
+      onSaved(result);
+      return true;
+    } catch {
+      setFeedback({ text: t("admin.saveUnconfirmed"), error: true });
+      if (nextRouting && !removing) setRoutingFeedback({ text: t("admin.saveUnconfirmed"), error: true });
+      setUncertain(true);
       return false;
-    }
+    } finally { lock.current = false; setBusy(false); }
   };
 
-  const handleToggleModelVisibility = (profileId: string, modelId: string) => {
-    const updated = profiles.map((p) => {
-      if (p.id !== profileId) return p;
-      const currentModels = p.models || [];
-      const nextModels = currentModels.map((m) =>
-        m.id === modelId ? { ...m, enabled: !m.enabled } : m
-      );
-      return { ...p, models: nextModels };
-    });
-    persistUpdatedProfiles(updated);
-  };
-
-  const handleAddModel = async (profileId: string) => {
-    if (!newModelId.trim()) return;
-    const trimmedId = newModelId.trim();
-    const trimmedName = newModelName.trim() || trimmedId;
-
-    const targetProf = profiles.find((p) => p.id === profileId);
-    if (
-      targetProf &&
-      (targetProf.models || []).some(
-        (m) => m.id.toLowerCase() === trimmedId.toLowerCase()
-      )
-    ) {
-      setStatusMessage({
-        text: `Model identifier "${trimmedId}" is already registered.`,
-        error: true,
-      });
-      return;
-    }
-
-    const updated = profiles.map((p) => {
-      if (p.id !== profileId) return p;
-      const currentModels = p.models || [];
-      return {
-        ...p,
-        models: [...currentModels, { id: trimmedId, name: trimmedName, enabled: true }],
-      };
-    });
-
-    const success = await persistUpdatedProfiles(updated);
-    if (success) {
-      setNewModelId("");
-      setNewModelName("");
-      setAddingModelProfileId(null);
-    }
-  };
-
-  const handleDeleteModel = (profileId: string, modelId: string) => {
-    const updated = profiles.map((p) => {
-      if (p.id !== profileId) return p;
-      const nextModels = (p.models || []).filter((m) => m.id !== modelId);
-      return { ...p, models: nextModels };
-    });
-    persistUpdatedProfiles(updated);
-  };
-
-  const handleRemoveProfile = async (id: string) => {
-    if (profiles.length <= 1) return;
-    const target = profiles.find((p) => p.id === id);
-    if (!target) return;
-
-    if (!confirm(`Are you sure you want to delete profile "${target.name}"?`)) return;
-
-    const remainingProfiles = profiles.filter((p) => p.id !== id);
-    const newPrimary = primaryProfileId === id ? (remainingProfiles[0]?.id || "default") : primaryProfileId;
-    const newFast = fastProfileId === id ? newPrimary : fastProfileId;
-    const newFallback = fallbackProfileId === id ? newPrimary : fallbackProfileId;
-
-    setProfiles(remainingProfiles);
-    setPrimaryProfileId(newPrimary);
-    setFastProfileId(newFast);
-    setFallbackProfileId(newFallback);
-
-    // Persist removal directly to backend
-    try {
-      const payloadProfiles = remainingProfiles.map((p) => ({
-        id: p.id,
-        name: p.name,
-        base_url: p.base_url,
-        api_key: profileKeys[p.id]?.trim() || undefined,
-        protocol: p.protocol || "openai",
-        models: p.models || [],
-      }));
-
-      const activePrimary = remainingProfiles.find((p) => p.id === newPrimary) || remainingProfiles[0];
-
-      const res = await fetch(`${backendUrl}/admin/config/llm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base_url: activePrimary.base_url,
-          api_key: profileKeys[activePrimary.id]?.trim() || undefined,
-          model: model,
-          fast_model: fastModel.trim() || undefined,
-          fallback_model: fallbackModel.trim() || undefined,
-          temperature: Number(temperature),
-          profiles: payloadProfiles,
-          primary_profile_id: newPrimary,
-          fast_profile_id: newFast,
-          fallback_profile_id: newFallback,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Failed to persist deletion to backend");
-
-      setStatusMessage({ text: await readConfigUpdateMessage(res) });
-      onSaved();
-    } catch (e) {
-      setStatusMessage({
-        text: e instanceof Error ? e.message : "Failed to delete provider",
-        error: true,
-      });
-    }
-  };
-
-  const handleSaveTierRouting = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingTiers(true);
-    setStatusMessage(null);
-
-    try {
-      const payloadProfiles = profiles.map((p) => ({
-        id: p.id,
-        name: p.name,
-        base_url: p.base_url,
-        api_key: profileKeys[p.id]?.trim() || undefined,
-        protocol: p.protocol || "openai",
-        models: p.models || [],
-      }));
-
-      const activePrimary = profiles.find((p) => p.id === primaryProfileId) || profiles[0];
-
-      const res = await fetch(`${backendUrl}/admin/config/llm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          base_url: activePrimary.base_url,
-          api_key: profileKeys[activePrimary.id]?.trim() || undefined,
-          model: model,
-          fast_model: fastModel.trim() || undefined,
-          fallback_model: fallbackModel.trim() || undefined,
-          temperature: Number(temperature),
-          profiles: payloadProfiles,
-          primary_profile_id: primaryProfileId,
-          fast_profile_id: fastProfileId,
-          fallback_profile_id: fallbackProfileId,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Failed to save tier bindings");
-      setStatusMessage({ text: await readConfigUpdateMessage(res) });
-      onSaved();
-    } catch (e) {
-      setStatusMessage({
-        text: e instanceof Error ? e.message : "Error saving tier routing",
-        error: true,
-      });
-    } finally {
-      setIsSavingTiers(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="border-b border-app-border pb-4">
-        <h2 className="text-base font-semibold text-app-text flex items-center gap-2">
-          <Cpu size={18} className="text-blue-500" />
-          Universal OpenAI-Compatible Gateway Vault
-        </h2>
-        <p className="text-xs text-app-text-muted mt-1">
-          Configure arbitrary OpenAI-compatible endpoints (DeepSeek, Grok, 9Router, Ollama, Groq, vLLM) and direct Anthropic Claude protocol. Route Primary, Fast, and Fallback tiers to separate keys and endpoints.
-        </p>
+  return <>
+    {uncertain && <div className="admin-notice">
+      <p>{t("admin.reconcileHelp")}</p>
+      <button className="admin-button" disabled={busy} onClick={reloadSaved}>{t("admin.reloadSaved")}</button>
+    </div>}
+    <div hidden={!!selected}>
+    <section aria-labelledby="connections-heading">
+      <div className="admin-section-heading admin-task-heading">
+        <h2 ref={listHeading} tabIndex={-1} id="connections-heading">{t("admin.connections")}</h2>
+        <button className="admin-button admin-primary" type="button" disabled={busy || uncertain} onClick={() => { setFeedbackProfileId(null); setEditor({}); }}>{t("admin.addConnection")}</button>
+        <p className="admin-help">{t("admin.connectionsHelp")}</p>
       </div>
-
-      {/* Global Status Message */}
-      {statusMessage && (
-        <div
-          role={statusMessage.error ? "alert" : "status"}
-          className="p-3 rounded-xl border border-app-border bg-app-input-surface text-app-text text-sm flex items-start gap-2.5"
-        >
-          {statusMessage.error ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
-          <span className="min-w-0 break-words">{statusMessage.text}</span>
-        </div>
-      )}
-
-      {/* Section 1: Provider Catalog Cards */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <label className="text-xs font-semibold text-app-text flex items-center gap-2">
-            <Server size={14} className="text-purple-400" />
-            Registered Gateway Profiles ({profiles.length})
-          </label>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openAddModal("openai")}
-              className="h-8 px-3 text-xs font-medium rounded-lg border border-app-border bg-app-card hover:bg-app-card-hover text-app-text transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus size={13} />
-              Add OpenAI Compatible
-            </button>
-            <button
-              type="button"
-              onClick={() => openAddModal("anthropic")}
-              className="h-8 px-3 text-xs font-medium rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus size={13} />
-              Add Anthropic Claude
-            </button>
-          </div>
-        </div>
-
-        {/* Catalog Grid */}
-        <div className="space-y-3">
-          {profiles.map((prof) => {
-            const testResult = testResults[prof.id];
-            const isTesting = testingProfileId === prof.id;
-            const hasKey = prof.has_api_key || Boolean(profileKeys[prof.id]);
-            const isAnthropic = prof.protocol === "anthropic";
-
-            return (
-              <div
-                key={prof.id}
-                className="p-4 rounded-xl border border-app-border bg-app-card space-y-3 hover:border-app-border-strong transition-colors"
-              >
-                {/* Card Top Row: Name, Protocol Badge & Fixed Action Buttons */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-sm font-semibold text-app-text">{prof.name}</span>
-                    {isAnthropic ? (
-                      <span className="px-2 py-0.5 text-[10px] font-mono rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium">
-                        Anthropic Claude
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-mono rounded-full bg-blue-500/15 text-blue-300 border border-blue-500/30 font-medium">
-                        OpenAI Compatible
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Fixed-dimension Actions (Zero Cumulative Layout Shift) */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleTestConnection(prof)}
-                      disabled={isTesting || (!hasKey && !prof.base_url.includes("11434"))}
-                      className="h-8 min-w-[76px] px-2.5 text-xs font-medium rounded-lg border border-app-border bg-app-input-surface hover:bg-app-card-hover text-app-text flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
-                      title="Test Connection"
-                    >
-                      <RefreshCw size={12} className={isTesting ? "animate-spin" : ""} />
-                      <span>{isTesting ? "Testing" : "Test"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(prof)}
-                      className="h-8 min-w-[68px] px-2.5 text-xs font-medium rounded-lg border border-app-border bg-app-input-surface hover:bg-app-card-hover text-app-text flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-                      title="Edit Provider Settings"
-                    >
-                      <Edit3 size={12} />
-                      <span>Edit</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveProfile(prof.id)}
-                      disabled={profiles.length <= 1}
-                      className="h-8 w-8 text-xs font-medium rounded-lg border border-app-border bg-app-input-surface hover:bg-rose-500/10 hover:border-rose-500/30 text-app-text-muted hover:text-rose-400 flex items-center justify-center cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      title={profiles.length <= 1 ? "Cannot delete the sole profile" : "Delete Profile"}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Card Mid Row: URL and Secret Preview */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-app-text-dim">Base URL</label>
-                    <div className="h-8 px-2.5 rounded-lg bg-app-input-surface border border-app-border font-mono text-app-text-muted flex items-center justify-between">
-                      <span className="truncate">{prof.base_url}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(prof.base_url, `url_${prof.id}`)}
-                        className="p-1 text-app-text-dim hover:text-app-text rounded transition-colors ml-2 cursor-pointer"
-                        title="Copy Base URL"
-                      >
-                        {copiedKeyId === `url_${prof.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-app-text-dim">API Key Status</label>
-                    <div className="h-8 px-2.5 rounded-lg bg-app-input-surface border border-app-border font-mono text-app-text-muted flex items-center justify-between">
-                      <span className="truncate">
-                        {profileKeys[prof.id]
-                          ? profileKeys[prof.id].length > 8
-                            ? `${profileKeys[prof.id].slice(0, 4)}...${profileKeys[prof.id].slice(-4)} (Staged)`
-                            : "•••••••• (Staged)"
-                          : prof.has_api_key
-                          ? `Configured (${prof.api_key_masked})`
-                          : "No API Key (Local Ollama)"}
-                      </span>
-                      {hasKey && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(profileKeys[prof.id] || prof.api_key_masked, `key_${prof.id}`)}
-                          className="p-1 text-app-text-dim hover:text-app-text rounded transition-colors ml-2 cursor-pointer"
-                          title="Copy API Key"
-                        >
-                          {copiedKeyId === `key_${prof.id}` ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Models & Workspace Visibility Toggles */}
-                <div className="pt-2.5 border-t border-app-border/60 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-app-text">
-                      <Cpu size={12} className="text-blue-400" />
-                      <span>Models & Workspace Visibility</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-app-input-surface border border-app-border text-app-text-muted">
-                        {(prof.models || []).filter((m) => m.enabled).length}/{(prof.models || []).length} active
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAddingModelProfileId((curr) => (curr === prof.id ? null : prof.id));
-                        setNewModelId("");
-                        setNewModelName("");
-                      }}
-                      className="text-xs text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      <Plus size={12} />
-                      <span>{addingModelProfileId === prof.id ? "Cancel" : "Add Model"}</span>
-                    </button>
-                  </div>
-
-                  {/* Inline Add Model Form */}
-                  {addingModelProfileId === prof.id && (
-                    <div className="p-2.5 rounded-lg bg-app-input-surface border border-app-border space-y-2 text-xs">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] text-app-text-dim block mb-1">Model Identifier (Required)</label>
-                          <input
-                            type="text"
-                            value={newModelId}
-                            onChange={(e) => setNewModelId(e.target.value)}
-                            placeholder="e.g. deepseek-reasoner"
-                            className="w-full h-7 px-2 text-xs rounded bg-app-card border border-app-border text-app-text font-mono focus:outline-hidden focus:border-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-app-text-dim block mb-1">Display Label (Optional)</label>
-                          <input
-                            type="text"
-                            value={newModelName}
-                            onChange={(e) => setNewModelName(e.target.value)}
-                            placeholder="e.g. DeepSeek R1"
-                            className="w-full h-7 px-2 text-xs rounded bg-app-card border border-app-border text-app-text focus:outline-hidden focus:border-blue-500"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-end gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setAddingModelProfileId(null)}
-                          className="h-6 px-2 text-[11px] rounded border border-app-border text-app-text-muted hover:text-app-text cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAddModel(prof.id)}
-                          disabled={!newModelId.trim()}
-                          className="h-6 px-2.5 text-[11px] font-medium rounded bg-blue-600 hover:bg-blue-500 text-white cursor-pointer disabled:opacity-40"
-                        >
-                          Save Model
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Models list with checkboxes */}
-                  <div className="space-y-1">
-                    {(prof.models || []).length === 0 ? (
-                      <p className="text-[11px] text-app-text-dim italic py-1">
-                        No models registered. Click &quot;Add Model&quot; to register custom models.
-                      </p>
-                    ) : (
-                      (prof.models || []).map((m) => (
-                        <div
-                          key={m.id}
-                          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-app-input-surface/50 border border-app-border/40 hover:border-app-border transition-colors text-xs"
-                        >
-                          <label className="flex items-center gap-2 cursor-pointer select-none min-w-0 pr-2">
-                            <input
-                              type="checkbox"
-                              checked={m.enabled}
-                              onChange={() => handleToggleModelVisibility(prof.id, m.id)}
-                              className="rounded border-app-border text-blue-600 focus:ring-0 cursor-pointer h-3.5 w-3.5"
-                            />
-                            <span className={`font-medium truncate ${m.enabled ? "text-app-text" : "text-app-text-dim line-through"}`}>
-                              {m.name || m.id}
-                            </span>
-                            {m.name && m.name !== m.id && (
-                              <span className="text-[10px] font-mono text-app-text-dim truncate">
-                                ({m.id})
-                              </span>
-                            )}
-                          </label>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full border ${
-                                m.enabled
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                  : "bg-app-card text-app-text-dim border-app-border"
-                              }`}
-                            >
-                              {m.enabled ? "Visible" : "Hidden"}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteModel(prof.id, m.id)}
-                              className="p-1 text-app-text-dim hover:text-rose-400 transition-colors cursor-pointer"
-                              title="Delete model from profile"
-                            >
-                              <X size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Card Bottom Row: Dedicated Feedback Container (Zero Cumulative Layout Shift) */}
-                <div className="min-h-[22px] flex items-center text-xs">
-                  {testResult && (
-                    <div
-                      className={`flex items-center gap-1.5 ${
-                        testResult.success ? "text-emerald-400" : "text-rose-400"
-                      }`}
-                    >
-                      {testResult.success ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
-                      <span>
-                        {testResult.message}
-                        {testResult.latency_ms !== undefined && ` (${testResult.latency_ms}ms)`}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Section 2: Model & Profile Tier Routing */}
-      <form onSubmit={handleSaveTierRouting} className="space-y-4 pt-4 border-t border-app-border">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <label className="text-xs font-semibold text-app-text">Tiered Gateway Routing</label>
-            <p className="text-[11px] text-app-text-dim mt-0.5">
-              Bind Primary, Fast triage, and Fallback models to specific registered gateway profiles.
-            </p>
-          </div>
-          <button
-            type="submit"
-            disabled={isSavingTiers}
-            className="h-8 min-w-[150px] px-4 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
-          >
-            {isSavingTiers ? "Saving..." : "Save Tier Routing"}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Primary Tier */}
-          <div className="p-3.5 rounded-xl border border-app-border bg-app-card space-y-2.5">
-            <div className="text-xs font-semibold text-app-text">Primary Heavy Model</div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-app-text-dim">Gateway Profile</label>
-              <select
-                value={primaryProfileId}
-                onChange={(e) => setPrimaryProfileId(e.target.value)}
-                className="w-full h-8 px-2.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text focus:outline-none focus:border-blue-500 cursor-pointer"
-              >
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.protocol === "anthropic" ? "Anthropic" : "OpenAI"})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[11px] text-app-text-dim">Model Identifier</label>
-              <input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="gpt-4o or claude-3-5-sonnet-20241022"
-                required
-                className="w-full h-8 px-2.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text focus:outline-none focus:border-blue-500 font-mono"
-              />
-            </div>
-          </div>
-
-          {/* Fast Tier */}
-          <div className="p-3.5 rounded-xl border border-app-border bg-app-card space-y-2.5">
-            <div className="text-xs font-semibold text-app-text">Fast Micro-Model (Triage)</div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-app-text-dim">Gateway Profile</label>
-              <select
-                value={fastProfileId}
-                onChange={(e) => setFastProfileId(e.target.value)}
-                className="w-full h-8 px-2.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text focus:outline-none focus:border-blue-500 cursor-pointer"
-              >
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.protocol === "anthropic" ? "Anthropic" : "OpenAI"})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[11px] text-app-text-dim">Model Identifier</label>
-              <input
-                type="text"
-                value={fastModel}
-                onChange={(e) => setFastModel(e.target.value)}
-                placeholder="gpt-4o-mini or claude-3-5-haiku-20241022"
-                className="w-full h-8 px-2.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text focus:outline-none focus:border-blue-500 font-mono"
-              />
-            </div>
-          </div>
-
-          {/* Fallback Tier */}
-          <div className="p-3.5 rounded-xl border border-app-border bg-app-card space-y-2.5">
-            <div className="text-xs font-semibold text-app-text">Fallback Model (Safety Net)</div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-app-text-dim">Gateway Profile</label>
-              <select
-                value={fallbackProfileId}
-                onChange={(e) => setFallbackProfileId(e.target.value)}
-                className="w-full h-8 px-2.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text focus:outline-none focus:border-blue-500 cursor-pointer"
-              >
-                {profiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.protocol === "anthropic" ? "Anthropic" : "OpenAI"})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[11px] text-app-text-dim">Model Identifier</label>
-              <input
-                type="text"
-                value={fallbackModel}
-                onChange={(e) => setFallbackModel(e.target.value)}
-                placeholder="grok-beta or gemini-1.5-flash"
-                className="w-full h-8 px-2.5 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text focus:outline-none focus:border-blue-500 font-mono"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Sampling Temperature */}
-        <div className="space-y-1 max-w-sm pt-2">
-          <div className="flex justify-between items-center">
-            <label className="text-xs font-medium text-app-text">Sampling Temperature</label>
-            <span className="text-[11px] font-mono text-app-text-muted">{temperature}</span>
-          </div>
-          <input
-            type="range"
-            min="0.0"
-            max="1.0"
-            step="0.05"
-            value={temperature}
-            onChange={(e) => setTemperature(parseFloat(e.target.value))}
-            className="w-full h-1.5 bg-app-border rounded-lg appearance-none cursor-pointer accent-blue-600"
-          />
-        </div>
-      </form>
-
-      {/* DEDICATED MODAL: Add / Edit Gateway Provider */}
-      {modal.isOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
-          onClick={closeModal}
-        >
-          <div
-            ref={modalRef}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg rounded-2xl border border-app-border bg-app-card shadow-2xl p-6 space-y-5 text-app-text"
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-app-border">
-              <div className="flex items-center gap-2.5">
-                <Server size={18} className={modal.protocol === "anthropic" ? "text-amber-400" : "text-blue-500"} />
-                <div>
-                  <h3 className="text-sm font-semibold text-app-text">
-                    {modal.mode === "add"
-                      ? modal.protocol === "anthropic"
-                        ? "Add Anthropic Claude Gateway"
-                        : "Add OpenAI Compatible Gateway"
-                      : `Edit Gateway: ${modal.name}`}
-                  </h3>
-                  <p className="text-[11px] text-app-text-dim">
-                    {modal.protocol === "anthropic"
-                      ? "Direct native Anthropic Claude protocol with official messages API."
-                      : "OpenAI-compatible /v1/chat/completions gateway endpoint."}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="h-8 w-8 rounded-lg border border-app-border flex items-center justify-center text-app-text-muted hover:text-app-text hover:bg-app-input-surface transition-colors cursor-pointer"
-                title="Close (Esc)"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleModalSaveProvider} className="space-y-4">
-              {/* Protocol selector if in Add mode */}
-              {modal.mode === "add" && (
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-app-text-dim">Gateway Protocol</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setModal((prev) => ({
-                          ...prev,
-                          protocol: "openai",
-                          baseUrl: "http://localhost:20128/v1",
-                        }))
-                      }
-                      className={`h-8 px-3 text-xs font-medium rounded-lg border text-center transition-colors cursor-pointer ${
-                        modal.protocol === "openai"
-                          ? "border-blue-500 bg-blue-500/10 text-blue-400"
-                          : "border-app-border bg-app-input-surface text-app-text-muted hover:text-app-text"
-                      }`}
-                    >
-                      OpenAI Compatible
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setModal((prev) => ({
-                          ...prev,
-                          protocol: "anthropic",
-                          baseUrl: "https://api.anthropic.com/v1",
-                        }))
-                      }
-                      className={`h-8 px-3 text-xs font-medium rounded-lg border text-center transition-colors cursor-pointer ${
-                        modal.protocol === "anthropic"
-                          ? "border-amber-500 bg-amber-500/10 text-amber-400"
-                          : "border-app-border bg-app-input-surface text-app-text-muted hover:text-app-text"
-                      }`}
-                    >
-                      Anthropic Claude
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Profile Name */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-medium text-app-text-dim">Profile Display Name</label>
-                <input
-                  type="text"
-                  value={modal.name}
-                  onChange={(e) => setModal((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. DeepSeek Official or 9Router Local"
-                  required
-                  className="w-full h-9 px-3 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Base URL with Presets */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-medium text-app-text-dim">Base URL (/v1)</label>
-                </div>
-                <input
-                  type="text"
-                  value={modal.baseUrl}
-                  onChange={(e) => setModal((prev) => ({ ...prev, baseUrl: e.target.value }))}
-                  placeholder="https://api.deepseek.com/v1"
-                  required
-                  className="w-full h-9 px-3 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text font-mono focus:outline-none focus:border-blue-500"
-                />
-
-                {/* Quick Presets */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-[10px] text-app-text-dim py-0.5">Quick Presets:</span>
-                  {(modal.protocol === "anthropic" ? PRESET_ANTHROPIC_GATEWAYS : PRESET_OPENAI_GATEWAYS).map((preset) => (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      onClick={() => setModal((prev) => ({ ...prev, baseUrl: preset.url }))}
-                      className="text-[10px] px-2 py-0.5 rounded bg-app-input-surface hover:bg-app-card-hover border border-app-border text-app-text-muted hover:text-app-text font-mono transition-colors cursor-pointer"
-                    >
-                      {preset.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* API Key Input with Eye Toggle & Copy */}
-              <div className="space-y-1">
-                <div className="flex justify-between items-center">
-                  <label className="text-[11px] font-medium text-app-text-dim">API Secret Key / Token</label>
-                  {modal.hasExistingKey && (
-                    <span className="text-[10px] font-mono text-emerald-400">
-                      Configured: {modal.existingMaskedKey}
-                    </span>
-                  )}
-                </div>
-                <div className="relative flex items-center">
-                  <input
-                    type={modal.showKey ? "text" : "password"}
-                    value={modal.apiKey}
-                    onChange={(e) => setModal((prev) => ({ ...prev, apiKey: e.target.value }))}
-                    placeholder={modal.hasExistingKey ? "Leave blank to preserve existing key" : "sk-..."}
-                    className="w-full h-9 pl-3 pr-16 text-xs rounded-lg bg-app-input-surface border border-app-border text-app-text font-mono focus:outline-none focus:border-blue-500"
-                  />
-                  <div className="absolute right-1.5 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setModal((prev) => ({ ...prev, showKey: !prev.showKey }))}
-                      className="p-1 rounded text-app-text-dim hover:text-app-text transition-colors cursor-pointer"
-                      title={modal.showKey ? "Hide Secret" : "Show Secret"}
-                    >
-                      {modal.showKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                    </button>
-                    {(modal.apiKey || modal.hasExistingKey) && (
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(modal.apiKey || modal.existingMaskedKey, "modal_key")}
-                        className="p-1 rounded text-app-text-dim hover:text-app-text transition-colors cursor-pointer"
-                        title="Copy Key"
-                      >
-                        {copiedKeyId === "modal_key" ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* In-Modal Test Connection Button & Result (Zero Layout Shift) */}
-              <div className="pt-2 space-y-2">
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={handleModalTestConnection}
-                    disabled={modal.isTesting || (!modal.apiKey && !modal.hasExistingKey && !modal.baseUrl.includes("11434"))}
-                    className="h-8 min-w-[130px] px-3 text-xs font-medium rounded-lg border border-app-border bg-app-input-surface hover:bg-app-card-hover text-app-text flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 transition-colors"
-                  >
-                    <RefreshCw size={12} className={modal.isTesting ? "animate-spin" : ""} />
-                    <span>{modal.isTesting ? "Testing..." : "Test Connection"}</span>
-                  </button>
-                </div>
-
-                <div className="min-h-[22px] flex items-center text-xs">
-                  {modal.testResult && (
-                    <div
-                      className={`flex items-center gap-1.5 ${
-                        modal.testResult.success ? "text-emerald-400" : "text-rose-400"
-                      }`}
-                    >
-                      {modal.testResult.success ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
-                      <span>
-                        {modal.testResult.message}
-                        {modal.testResult.latency_ms !== undefined && ` (${modal.testResult.latency_ms}ms)`}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Error Message if any */}
-              {modal.errorMessage && (
-                <div className="p-2.5 rounded-lg border border-rose-500/20 bg-rose-500/10 text-xs text-rose-400 flex items-center gap-2">
-                  <AlertCircle size={14} />
-                  <span>{modal.errorMessage}</span>
-                </div>
-              )}
-
-              {/* Modal Footer Actions (Fixed Dimensions) */}
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-app-border">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="h-8 min-w-[80px] px-3 text-xs font-medium rounded-lg border border-app-border bg-app-input-surface hover:bg-app-card-hover text-app-text transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={modal.isSaving}
-                  className="h-8 min-w-[130px] px-4 text-xs font-medium rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
-                >
-                  {modal.isSaving ? "Saving..." : "Save Provider"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {!profiles.length && <div className="admin-empty"><h3>{t("admin.noConnections")}</h3><p>{t("admin.noConnectionsHelp")}</p></div>}
+      {!!profiles.length && <ul className="admin-provider-list">{profiles.map((profile) => <li key={profile.id}>
+        <button ref={(node) => { providerButtons.current[profile.id] = node; }} className="admin-provider-row" type="button" disabled={busy} aria-label={profile.name} aria-describedby={`provider-${profile.id}-summary`} onClick={() => {
+          setSelectedId(profile.id);
+          requestAnimationFrame(() => detailHeading.current?.focus());
+        }}>
+          <span><span className="admin-provider-name">{profile.name}</span><span id={`provider-${profile.id}-summary`} className="admin-provider-meta"><span>{profile.protocol === "anthropic" ? "Anthropic" : "OpenAI-compatible"}</span><code>{profile.base_url}</code></span></span>
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
+      </li>)}</ul>}
+    </section>
+    {!!profiles.length && <details className="admin-disclosure admin-routing-settings">
+      <summary>{t("admin.advancedRouting")}{dirty && <span className="admin-help">{t("admin.unsaved")}</span>}</summary>
+      <div className="admin-disclosure-content"><ModelRoutingForm profiles={profiles} draft={routing} onChange={(draft) => { setRouting(draft); setRoutingFeedback(null); }} onSave={() => { setFeedbackProfileId(null); void write(profiles, routing); }} onCancel={() => { setRouting(routingFromConfig(saved)); setRoutingFeedback(null); }} busy={busy} uncertain={uncertain} dirty={dirty} feedback={routingFeedback} /></div>
+    </details>}
     </div>
-  );
+    {selected && <section aria-labelledby="provider-detail-heading">
+      <button className="admin-button admin-quiet admin-back" type="button" disabled={busy} onClick={() => modelDirty ? setDiscardModels(true) : showProviders()}><ArrowLeft size={16} aria-hidden="true" />{t("admin.allProviders")}</button>
+      <div className="admin-section-heading admin-provider-heading">
+        <div><h2 ref={detailHeading} tabIndex={-1} id="provider-detail-heading">{selected.name}</h2><p className="admin-help">{selected.protocol === "anthropic" ? "Anthropic" : "OpenAI-compatible"}</p></div>
+        <button className="admin-button" type="button" disabled={busy || uncertain} onClick={() => { setFeedbackProfileId(selected.id); setEditor({ profile: selected }); }}>{t("admin.editConnection")}</button>
+      </div>
+      <dl className="admin-definition-list admin-provider-connection"><dt>{t("admin.baseUrl")}</dt><dd><code>{selected.base_url}</code></dd><dt>{t("admin.apiKey")}</dt><dd>{t(selected.has_api_key ? "admin.keyConfigured" : "admin.keyNotConfigured")}</dd></dl>
+      <ConnectionModels key={selected.id} profile={selected} busy={busy} blocked={uncertain} onDraftChange={setModelDirty} onSave={(models) => { setFeedbackProfileId(selected.id); return write(profiles.map((item) => item.id === selected.id ? { ...item, models } : item)); }} />
+      {feedbackProfileId === selected.id && <FeedbackMessage feedback={feedback} />}
+      {profiles.length > 1 && <div className="admin-provider-removal">
+        <button className="admin-button admin-quiet admin-danger" type="button" disabled={busy || uncertain || dirty || modelDirty} onClick={(event) => { removeReturnFocus.current = event.currentTarget; setFeedbackProfileId(null); setRemoving(selected); }}>{t("admin.removeProvider")}</button>
+        {dirty && <p className="admin-help">{t("admin.resolveRoutingFirst")}</p>}
+      </div>}
+    </section>}
+    {!feedbackProfileId && <FeedbackMessage feedback={feedback} />}
+    {editor && <ConnectionEditor profile={editor.profile} backendUrl={backendUrl} busy={busy} uncertain={uncertain} onReload={reloadSaved} onClose={() => setEditor(null)} onSave={(profile, key) => write(profiles.some((item) => item.id === profile.id) ? profiles.map((item) => item.id === profile.id ? profile : item) : [...profiles, profile], undefined, key ? { [profile.id]: key } : undefined)} />}
+    {discardModels && <DiscardDialog onStay={() => setDiscardModels(false)} onDiscard={showProviders} />}
+    {removing && <AdminDialog returnFocusRef={removeReturnFocus} title={t("admin.removeConnectionTitle")} description={t("admin.removeConnectionHelp", { name: removing.name, replacement: profiles.find((profile) => profile.id !== removing.id)?.name || "" })} onClose={() => setRemoving(null)} busy={busy}>
+      <p className="admin-help">{t("admin.removeConnectionRoles", { roles: [saved.primary_profile_id === removing.id ? t("admin.mainRole") : "", saved.fast_profile_id === removing.id ? t("admin.quickRole") : "", saved.fallback_profile_id === removing.id ? t("admin.backupRole") : ""].filter(Boolean).join(", ") || t("admin.none") })}</p>
+      <div className="admin-actions admin-dialog-actions">
+        <button className="admin-button" disabled={busy} onClick={() => setRemoving(null)}>{t("admin.cancel")}</button>
+        <button className="admin-button admin-danger" disabled={busy || uncertain} onClick={async () => {
+          const remaining = profiles.filter((profile) => profile.id !== removing.id);
+          const next = routingFromConfig(saved);
+          if (next.primary_profile_id === removing.id) next.primary_profile_id = remaining[0].id;
+          if (next.fast_profile_id === removing.id) next.fast_profile_id = next.primary_profile_id;
+          if (next.fallback_profile_id === removing.id) next.fallback_profile_id = next.primary_profile_id;
+          if (await write(remaining, next)) { removeReturnFocus.current = listHeading.current; setSelectedId(null); setModelDirty(false); setRemoving(null); }
+        }}>{t("admin.remove")}</button>
+      </div>
+      <FeedbackMessage feedback={feedback} />
+      {uncertain && <button className="admin-button" disabled={busy} onClick={reloadSaved}>{t("admin.reloadSaved")}</button>}
+    </AdminDialog>}
+  </>;
 }
