@@ -53,4 +53,16 @@ describe("Admin configuration contracts", () => {
     const saved = { ...adminConfig.llm, model: "legacy-unregistered-model" };
     expect(llmPayload(saved, saved.profiles).model).toBe("legacy-unregistered-model");
   });
+
+  it("preserves an active legacy primary when only a custom provider's model visibility changes", () => {
+    const profile = { ...adminConfig.llm.profiles[0], id: "custom-profile", base_url: "https://profile.invalid/v1" };
+    const saved = { ...adminConfig.llm, base_url: "https://legacy.invalid/v1", model: "legacy-model", profiles: [profile] };
+    const changed = [{ ...profile, models: profile.models!.map((model) => ({ ...model, enabled: false })) }];
+    const payload = llmPayload(saved, changed);
+    expect(payload).toMatchObject({ base_url: saved.base_url, model: "legacy-model", primary_profile_id: "default", fast_profile_id: "default", fallback_profile_id: "default" });
+    expect(payload.profiles).toHaveLength(1);
+    expect(payload.profiles[0]).toMatchObject({ id: "custom-profile", models: [{ enabled: false }] });
+    expect(payload).not.toHaveProperty("api_key");
+    expect(payload.profiles[0]).not.toHaveProperty("api_key");
+  });
 });

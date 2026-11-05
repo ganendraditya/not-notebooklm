@@ -263,7 +263,7 @@ def get_system_admin_config() -> Dict[str, Any]:
         }
         for p in raw_profiles
     ]
-    primary_pid = os.getenv("LLM_PRIMARY_PROFILE_ID", "").strip() or (raw_profiles[0].get("id", "") if raw_profiles else "")
+    primary_pid = os.getenv("LLM_PRIMARY_PROFILE_ID", "").strip() or "default"
     fast_pid = os.getenv("LLM_FAST_PROFILE_ID", "").strip() or primary_pid
     fallback_pid = os.getenv("LLM_FALLBACK_PROFILE_ID", "").strip() or primary_pid
 

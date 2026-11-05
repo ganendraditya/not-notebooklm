@@ -116,3 +116,29 @@ def test_only_explicit_primary_legacy_model_is_adapted_not_a_vendor_catalog(monk
     ]))
     models = catalog()["workspace_models"]
     assert [(model["profile_id"], model["id"]) for model in models] == [("primary", "configured-main")]
+
+
+@pytest.mark.parametrize("prefix", ["LLM", "NINEROUTER"])
+@pytest.mark.parametrize("registered_models", [None, [], [{"id": "custom-model", "name": "Saved model", "enabled": True}]])
+def test_mixed_legacy_preserves_effective_primary_without_inventing_a_profile(monkeypatch, prefix, registered_models):
+    profile = {"id": "custom-profile", "name": "Saved provider", "base_url": "https://profile.invalid/v1", "api_key": "fixture-profile-key"}
+    if registered_models is not None:
+        profile["models"] = registered_models
+    raw = json.dumps([profile])
+    monkeypatch.setenv("LLM_PROFILES_JSON", raw)
+    monkeypatch.setenv(f"{prefix}_BASE_URL", "https://legacy.invalid/v1")
+    monkeypatch.setenv(f"{prefix}_API_KEY", "fixture-legacy-key")
+    monkeypatch.setenv(f"{prefix}_MODEL", "legacy-model")
+
+    config = admin_service.get_system_admin_config()["llm"]
+    assert config["primary_profile_id"] == "default"
+    assert config["fast_profile_id"] == config["fallback_profile_id"] == "default"
+    assert config["base_url"] == "https://legacy.invalid/v1"
+    assert config["model"] == "legacy-model"
+    assert [item["id"] for item in config["profiles"]] == ["custom-profile"]
+    assert config["profiles"][0]["models"] == (registered_models or [])
+    assert os.environ["LLM_PROFILES_JSON"] == raw
+    assert "LLM_PRIMARY_PROFILE_ID" not in os.environ
+
+    monkeypatch.setenv("LLM_PRIMARY_PROFILE_ID", "custom-profile")
+    assert admin_service.get_system_admin_config()["llm"]["primary_profile_id"] == "custom-profile"
